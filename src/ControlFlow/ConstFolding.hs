@@ -44,108 +44,108 @@ evalConstExpression _ = throwError $ annotateError Internal ENotConstant
 -- | Evaluates a type. This basically only applies to arrays. The function
 -- returns the same expression but with the types (i.e., the array sizes)
 -- evaluated.
-constFoldType :: Location -> TerminaType SemanticAnn -> ConstFoldMonad (TerminaType SemanticAnn)
-constFoldType loc (TArray ty arraySize)= do
+foldType :: Location -> TerminaType SemanticAnn -> ConstFoldMonad (TerminaType SemanticAnn)
+foldType loc (TArray ty arraySize)= do
   arraySizeValue <- evalConstExpression arraySize
-  ty' <- constFoldType loc ty
+  ty' <- foldType loc ty
   return (TArray ty' (Constant arraySizeValue (buildExpAnn loc TUSize)))
-constFoldType loc (TAtomicArray ty arraySize) = do
+foldType loc (TAtomicArray ty arraySize) = do
   arraySizeValue <- evalConstExpression arraySize
   return (TAtomicArray ty (Constant arraySizeValue (buildExpAnn loc TUSize)))
-constFoldType loc (TFixedLocation (TArray ty arraySize)) = do
+foldType loc (TFixedLocation (TArray ty arraySize)) = do
   arraySizeValue <- evalConstExpression arraySize
-  ty' <- constFoldType loc ty
+  ty' <- foldType loc ty
   return (TFixedLocation (TArray ty' (Constant arraySizeValue (buildExpAnn loc TUSize))))
-constFoldType _ ty = return ty
+foldType _ ty = return ty
 
-constFoldParam :: Location -> Parameter SemanticAnn -> ConstFoldMonad (Parameter SemanticAnn)
-constFoldParam loc (Parameter name ty) = 
-  Parameter name <$> constFoldType loc ty
+foldParam :: Location -> Parameter SemanticAnn -> ConstFoldMonad (Parameter SemanticAnn)
+foldParam loc (Parameter name ty) = 
+  Parameter name <$> foldType loc ty
 
-constFoldInterfaceMember :: InterfaceMember SemanticAnn -> ConstFoldMonad (InterfaceMember SemanticAnn)
-constFoldInterfaceMember (InterfaceProcedure ak procId params mods ann) = do
-  params' <- mapM (constFoldParam (getLocation ann)) params
-  ann' <- constFoldAnnotation ann
+foldInterfaceMember :: InterfaceMember SemanticAnn -> ConstFoldMonad (InterfaceMember SemanticAnn)
+foldInterfaceMember (InterfaceProcedure ak procId params mods ann) = do
+  params' <- mapM (foldParam (getLocation ann)) params
+  ann' <- foldAnnotation ann
   return $ InterfaceProcedure ak procId params' mods ann'
 
-constFoldAnnotation :: SemanticAnn -> ConstFoldMonad SemanticAnn
-constFoldAnnotation (SemanticAnn (ETy (SimpleType ty)) exprLoc) = do
-  ty' <- constFoldType exprLoc ty
+foldAnnotation :: SemanticAnn -> ConstFoldMonad SemanticAnn
+foldAnnotation (SemanticAnn (ETy (SimpleType ty)) exprLoc) = do
+  ty' <- foldType exprLoc ty
   return $ SemanticAnn (ETy (SimpleType ty')) exprLoc
-constFoldAnnotation (SemanticAnn (ETy (ObjectType ak ty)) exprLoc) = do
-  ty' <- constFoldType exprLoc ty
+foldAnnotation (SemanticAnn (ETy (ObjectType ak ty)) exprLoc) = do
+  ty' <- foldType exprLoc ty
   return $ SemanticAnn (ETy (ObjectType ak ty')) exprLoc
-constFoldAnnotation (SemanticAnn (ETy (AccessPortObjType ak fields ty)) exprLoc) = do
-  ty' <- constFoldType exprLoc ty
+foldAnnotation (SemanticAnn (ETy (AccessPortObjType ak fields ty)) exprLoc) = do
+  ty' <- foldType exprLoc ty
   return $ SemanticAnn (ETy (AccessPortObjType ak fields ty')) exprLoc
-constFoldAnnotation (SemanticAnn (ETy (AppType params ty)) exprLoc) = do
-  ty' <- constFoldType exprLoc ty
-  params' <- mapM (constFoldParam exprLoc) params
+foldAnnotation (SemanticAnn (ETy (AppType params ty)) exprLoc) = do
+  ty' <- foldType exprLoc ty
+  params' <- mapM (foldParam exprLoc) params
   return $ SemanticAnn (ETy (AppType params' ty')) exprLoc
-constFoldAnnotation ann@(SemanticAnn (FTy SimpleField) _) = return ann
-constFoldAnnotation (SemanticAnn (FTy (AccessPortField ifaces)) exprLoc) = do
-  ifaces' <- mapM constFoldInterfaceMember ifaces
+foldAnnotation ann@(SemanticAnn (FTy SimpleField) _) = return ann
+foldAnnotation (SemanticAnn (FTy (AccessPortField ifaces)) exprLoc) = do
+  ifaces' <- mapM foldInterfaceMember ifaces
   return $ SemanticAnn (FTy (AccessPortField ifaces')) exprLoc
-constFoldAnnotation ann@(SemanticAnn (STy SimpleStmtType) _) = return ann
-constFoldAnnotation (SemanticAnn (STy (MatchCaseStmtType tys)) exprLoc) = do
-  tys' <- mapM (constFoldType exprLoc) tys
+foldAnnotation ann@(SemanticAnn (STy SimpleStmtType) _) = return ann
+foldAnnotation (SemanticAnn (STy (MatchCaseStmtType tys)) exprLoc) = do
+  tys' <- mapM (foldType exprLoc) tys
   return $ SemanticAnn (STy (MatchCaseStmtType tys')) exprLoc
-constFoldAnnotation (SemanticAnn (STy (PortConnection (APConnTy pty resTy procs))) loc) = do
-  pty' <- constFoldType loc pty
-  resTy' <- constFoldType loc resTy
+foldAnnotation (SemanticAnn (STy (PortConnection (APConnTy pty resTy procs))) loc) = do
+  pty' <- foldType loc pty
+  resTy' <- foldType loc resTy
   procs' <- mapM (\(ProcedureSeman ident params mods) -> do
-    params' <- mapM (constFoldParam loc) params
+    params' <- mapM (foldParam loc) params
     return $ ProcedureSeman ident params' mods) procs
   return $ SemanticAnn (STy (PortConnection (APConnTy pty' resTy' procs'))) loc
-constFoldAnnotation (SemanticAnn (STy (PortConnection (APAtomicConnTy ty))) loc) = do
-  ty' <- constFoldType loc ty
+foldAnnotation (SemanticAnn (STy (PortConnection (APAtomicConnTy ty))) loc) = do
+  ty' <- foldType loc ty
   return $ SemanticAnn (STy (PortConnection (APAtomicConnTy ty'))) loc
-constFoldAnnotation (SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ty arrSize arrPortSize))) loc) = do
-  ty' <- constFoldType loc ty
+foldAnnotation (SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ty arrSize arrPortSize))) loc) = do
+  ty' <- foldType loc ty
   arraySizeValue <- evalConstExpression arrSize
   arrayPortSizeValue <- evalConstExpression arrPortSize
   let arrSizeConst = Constant arraySizeValue (buildExpAnn loc TUSize)
       arrPortSizeValue = Constant arrayPortSizeValue (buildExpAnn loc TUSize)
   return $ SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ty' arrSizeConst arrPortSizeValue))) loc
-constFoldAnnotation (SemanticAnn (STy (PortConnection (APPoolConnTy ty poolSize))) loc) = do
-  ty' <- constFoldType loc ty
+foldAnnotation (SemanticAnn (STy (PortConnection (APPoolConnTy ty poolSize))) loc) = do
+  ty' <- foldType loc ty
   poolSizeValue <- evalConstExpression poolSize
   let poolSizeConst = Constant poolSizeValue (buildExpAnn loc TUSize)
   return $ SemanticAnn (STy (PortConnection (APPoolConnTy ty' poolSizeConst))) loc
-constFoldAnnotation (SemanticAnn (STy (PortConnection (SPConnTy ty ident))) loc) = do
-  ty' <- constFoldType loc ty
+foldAnnotation (SemanticAnn (STy (PortConnection (SPConnTy ty ident))) loc) = do
+  ty' <- foldType loc ty
   return $ SemanticAnn (STy (PortConnection (SPConnTy ty' ident))) loc
-constFoldAnnotation (SemanticAnn (STy (PortConnection (InPConnTy ty ident))) loc) = do
-  ty' <- constFoldType loc ty
+foldAnnotation (SemanticAnn (STy (PortConnection (InPConnTy ty ident))) loc) = do
+  ty' <- foldType loc ty
   return $ SemanticAnn (STy (PortConnection (InPConnTy ty' ident))) loc
-constFoldAnnotation (SemanticAnn (STy (PortConnection (OutPConnTy ty))) loc) = do
-  ty' <- constFoldType loc ty
+foldAnnotation (SemanticAnn (STy (PortConnection (OutPConnTy ty))) loc) = do
+  ty' <- foldType loc ty
   return $ SemanticAnn (STy (PortConnection (OutPConnTy ty'))) loc
-constFoldAnnotation (SemanticAnn (GTy ty) loc) = do
-  ty' <- constFoldType loc ty
+foldAnnotation (SemanticAnn (GTy ty) loc) = do
+  ty' <- foldType loc ty
   return $ SemanticAnn (GTy ty') loc
-constFoldAnnotation ann@(SemanticAnn TTy _) = return ann
-constFoldAnnotation (SemanticAnn (FnTy (FunctionSeman params rty)) loc) = do
-  rty' <- constFoldType loc rty
-  params' <- mapM (constFoldParam loc) params
+foldAnnotation ann@(SemanticAnn TTy _) = return ann
+foldAnnotation (SemanticAnn (FnTy (FunctionSeman params rty)) loc) = do
+  rty' <- foldType loc rty
+  params' <- mapM (foldParam loc) params
   return $ SemanticAnn (FnTy (FunctionSeman params' rty')) loc
 
-constFoldFieldValueAssignment :: FieldAssignment SemanticAnn -> ConstFoldMonad (FieldAssignment SemanticAnn)
-constFoldFieldValueAssignment (FieldValueAssignment ident expr ann) = do
-  ann' <- constFoldAnnotation ann
-  expr' <- constFoldExpression expr
+foldFieldValueAssignment :: FieldAssignment SemanticAnn -> ConstFoldMonad (FieldAssignment SemanticAnn)
+foldFieldValueAssignment (FieldValueAssignment ident expr ann) = do
+  ann' <- foldAnnotation ann
+  expr' <- foldExpression expr
   case ann' of 
     (SemanticAnn (ETy (SimpleType exprTy)) exprLoc) -> 
-      constFoldCheckType exprLoc exprTy expr'
+      checkType exprLoc exprTy expr'
     _ -> return ()
   return $ FieldValueAssignment ident expr' ann'
-constFoldFieldValueAssignment (FieldAddressAssignment ident expr ann) = do
-  ann' <- constFoldAnnotation ann
-  expr' <- constFoldExpression expr
+foldFieldValueAssignment (FieldAddressAssignment ident expr ann) = do
+  ann' <- foldAnnotation ann
+  expr' <- foldExpression expr
   return $ FieldAddressAssignment ident expr' ann'
-constFoldFieldValueAssignment (FieldPortConnection kind id1 id2 ann) = do
+foldFieldValueAssignment (FieldPortConnection kind id1 id2 ann) = do
   let connLoc = getLocation ann
-  ann' <- constFoldAnnotation ann
+  ann' <- foldAnnotation ann
   case ann' of
     (SemanticAnn (STy (PortConnection (APAtomicArrayConnTy _ portSize glbSize))) _) -> do
       case (portSize, glbSize) of
@@ -167,8 +167,8 @@ getArraySizeValue _ = throwError $ annotateError Internal EInvalidConstantEvalua
 
 -- | This function checks the initialization expression of an array against its type.
 -- The function assumes that the annotations have already been folded.
-constFoldCheckType :: Location -> TerminaType SemanticAnn -> Expression SemanticAnn -> ConstFoldMonad ()
-constFoldCheckType loc array@(TArray ty _) initExpr@(ArrayInitializer assignmentExpr _ _) = do
+checkType :: Location -> TerminaType SemanticAnn -> Expression SemanticAnn -> ConstFoldMonad ()
+checkType loc array@(TArray ty _) initExpr@(ArrayInitializer assignmentExpr _ _) = do
   arraySizeValue <- getArraySizeValue array
   initExprType <- getExprType initExpr
   initExprSizeValue <- case initExprType of
@@ -180,8 +180,8 @@ constFoldCheckType loc array@(TArray ty _) initExpr@(ArrayInitializer assignment
     return ()
   else
     throwError $ annotateError loc (EArrayInitializerSizeMismatch arraySizeValue initExprSizeValue)
-  constFoldCheckType loc ty assignmentExpr
-constFoldCheckType loc array@(TArray ty _) initExpr@(ArrayExprListInitializer assignmentExprs _) = do
+  checkType loc ty assignmentExpr
+checkType loc array@(TArray ty _) initExpr@(ArrayExprListInitializer assignmentExprs _) = do
   arraySizeValue <- getArraySizeValue array
   initExprType <- getExprType initExpr
   initExprSizeValue <- case initExprType of
@@ -193,8 +193,8 @@ constFoldCheckType loc array@(TArray ty _) initExpr@(ArrayExprListInitializer as
     return ()
   else
     throwError $ annotateError loc (EArrayInitializerSizeMismatch arraySizeValue initExprSizeValue)
-  mapM_ (constFoldCheckType loc ty) assignmentExprs
-constFoldCheckType loc array@(TArray _ _) initExpr@(StringInitializer {}) = do
+  mapM_ (checkType loc ty) assignmentExprs
+checkType loc array@(TArray _ _) initExpr@(StringInitializer {}) = do
   arraySizeValue <- getArraySizeValue array
   initExprType <- getExprType initExpr
   initExprSizeValue <- case initExprType of
@@ -206,7 +206,7 @@ constFoldCheckType loc array@(TArray _ _) initExpr@(StringInitializer {}) = do
     return ()
   else
     throwError $ annotateError loc (EStringInitializerInvalidSize arraySizeValue initExprSizeValue)
-constFoldCheckType loc ty expr = do
+checkType loc ty expr = do
   exprType <- getExprType expr
   checkSameTy loc ty exprType
 
@@ -229,14 +229,14 @@ constFoldCheckType loc ty expr = do
         throwError $ annotateError loc' (EReferencedArraySizeMismatch lhsArraySizeValue rhsArraySizeValue)
     checkSameTy _ _ _ = return ()
 
-constFoldObject :: Object SemanticAnn -> ConstFoldMonad (Object SemanticAnn)
-constFoldObject (Variable ident ann) = do
-  ann' <- constFoldAnnotation ann
+foldObject :: Object SemanticAnn -> ConstFoldMonad (Object SemanticAnn)
+foldObject (Variable ident ann) = do
+  ann' <- foldAnnotation ann
   return $ Variable ident ann'
-constFoldObject (ArrayIndexExpression obj index ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
-  index' <- constFoldExpression index
+foldObject (ArrayIndexExpression obj index ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  index' <- foldExpression index
   objType <- getObjType obj'
   indexExprType <- getExprType index'
   case (objType, indexExprType) of
@@ -250,58 +250,58 @@ constFoldObject (ArrayIndexExpression obj index ann) = do
           return $ ArrayIndexExpression obj' index' ann'
         _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
     _ -> return $ ArrayIndexExpression obj' index' ann'
-constFoldObject (MemberAccess obj ident ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
+foldObject (MemberAccess obj ident ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
   return $ MemberAccess obj' ident ann'
-constFoldObject (Dereference obj ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
+foldObject (Dereference obj ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
   return $ Dereference obj' ann'
-constFoldObject (DereferenceMemberAccess obj ident ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
+foldObject (DereferenceMemberAccess obj ident ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
   return $ DereferenceMemberAccess obj' ident ann'
-constFoldObject (Unbox obj ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
+foldObject (Unbox obj ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
   return $ Unbox obj' ann'
 
 
-constFoldExpression :: Expression SemanticAnn -> ConstFoldMonad (Expression SemanticAnn)
-constFoldExpression (Constant c ann) = do
-  ann' <- constFoldAnnotation ann
+foldExpression :: Expression SemanticAnn -> ConstFoldMonad (Expression SemanticAnn)
+foldExpression (Constant c ann) = do
+  ann' <- foldAnnotation ann
   return $ Constant c ann'
-constFoldExpression (StringInitializer str ann) = do
-  ann' <- constFoldAnnotation ann
+foldExpression (StringInitializer str ann) = do
+  ann' <- foldAnnotation ann
   return $ StringInitializer str ann'
-constFoldExpression (IsEnumVariantExpression obj enum var ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
+foldExpression (IsEnumVariantExpression obj enum var ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
   return $ IsEnumVariantExpression obj' enum var ann'
-constFoldExpression (IsMonadicVariantExpression obj label ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
+foldExpression (IsMonadicVariantExpression obj label ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
   return $ IsMonadicVariantExpression obj' label ann'
-constFoldExpression (MonadicVariantInitializer variant ann) = do
-  ann' <- constFoldAnnotation ann
+foldExpression (MonadicVariantInitializer variant ann) = do
+  ann' <- foldAnnotation ann
   variant' <- case variant of
-    Some expr -> Some <$> constFoldExpression expr
-    Ok expr -> Ok <$> constFoldExpression expr
-    Error expr -> Error <$> constFoldExpression expr
-    Failure expr -> Failure <$> constFoldExpression expr
+    Some expr -> Some <$> foldExpression expr
+    Ok expr -> Ok <$> foldExpression expr
+    Error expr -> Error <$> foldExpression expr
+    Failure expr -> Failure <$> foldExpression expr
     v -> return v
   return $ MonadicVariantInitializer variant' ann'
-constFoldExpression e@(BinOp op (Constant lConst@(I {}) _) (Constant rConst@(I {}) _) ann) = do
-  ann' <- constFoldAnnotation ann
+foldExpression e@(BinOp op (Constant lConst@(I {}) _) (Constant rConst@(I {}) _) ann) = do
+  ann' <- foldAnnotation ann
   ty <- getExprType e
   plt <- ST.gets targetPlatform
   fConst <- evalBinOp plt (getLocation ann) op lConst rConst ty
   return $ Constant fConst ann'
-constFoldExpression e@(BinOp op lhs rhs ann) = do
-  ann' <- constFoldAnnotation ann
-  lhs' <- constFoldExpression lhs
-  rhs' <- constFoldExpression rhs
+foldExpression e@(BinOp op lhs rhs ann) = do
+  ann' <- foldAnnotation ann
+  lhs' <- foldExpression lhs
+  rhs' <- foldExpression rhs
   case (lhs', rhs') of
     (Constant lConst@(I {}) _, Constant rConst@(I {}) _) -> do
       ty <- getExprType e
@@ -309,7 +309,7 @@ constFoldExpression e@(BinOp op lhs rhs ann) = do
       fConst <- evalBinOp plt (getLocation ann) op lConst rConst ty
       return $ Constant fConst ann'
     _ -> do
-      constFoldCheckComparison (getLocation ann) op lhs' rhs'
+      checkComparison (getLocation ann) op lhs' rhs'
       case (op, rhs') of
         (BitwiseLeftShift, Constant (I (TInteger k _) _) _)  -> checkShiftAmount k
         (BitwiseRightShift, Constant (I (TInteger k _) _) _) -> checkShiftAmount k
@@ -322,9 +322,9 @@ constFoldExpression e@(BinOp op lhs rhs ann) = do
       plt <- ST.gets targetPlatform
       when (k >= shiftWidth plt ty) $
         throwError $ annotateError (getLocation ann) (EShiftAmountOutOfBounds (shiftWidth plt ty) k)
-constFoldExpression (Casting expr ty ann) = do
-  ann' <- constFoldAnnotation ann
-  expr' <- constFoldExpression expr
+foldExpression (Casting expr ty ann) = do
+  ann' <- foldAnnotation ann
+  expr' <- foldExpression expr
   plt <- ST.gets targetPlatform
   case expr' of
     -- | We only fold integer-to-integer casts, where the result is exact and
@@ -338,44 +338,44 @@ constFoldExpression (Casting expr ty ann) = do
       else
         throwError $ annotateError (getLocation ann) (EConstIntegerOverflow i ty)
     _ -> return $ Casting expr' ty ann'
-constFoldExpression (FunctionCall ident args ann) = do
-  ann' <- constFoldAnnotation ann
-  args' <- mapM constFoldExpression args
+foldExpression (FunctionCall ident args ann) = do
+  ann' <- foldAnnotation ann
+  args' <- mapM foldExpression args
   case ann' of
     (SemanticAnn (ETy (AppType params _ty)) exprLoc) ->
       zipWithM_ (\param arg -> case param of
-        Parameter _ paramTy -> constFoldCheckType exprLoc paramTy arg) params args'
+        Parameter _ paramTy -> checkType exprLoc paramTy arg) params args'
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
   return $ FunctionCall ident args' ann'
-constFoldExpression (MemberFunctionCall obj ident args ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
-  args' <- mapM constFoldExpression args
+foldExpression (MemberFunctionCall obj ident args ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  args' <- mapM foldExpression args
   case ann' of
     (SemanticAnn (ETy (AppType params _ty)) exprLoc) ->
       zipWithM_ (\param arg -> case param of
-        Parameter _ paramTy -> constFoldCheckType exprLoc paramTy arg) params args'
+        Parameter _ paramTy -> checkType exprLoc paramTy arg) params args'
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
   return $ MemberFunctionCall obj' ident args' ann'
-constFoldExpression (DerefMemberFunctionCall obj ident args ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
-  args' <- mapM constFoldExpression args
+foldExpression (DerefMemberFunctionCall obj ident args ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  args' <- mapM foldExpression args
   case ann' of
     (SemanticAnn (ETy (AppType params _ty)) exprLoc) ->
       zipWithM_ (\param arg -> case param of
-        Parameter _ paramTy -> constFoldCheckType exprLoc paramTy arg) params args'
+        Parameter _ paramTy -> checkType exprLoc paramTy arg) params args'
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
   return $ DerefMemberFunctionCall obj' ident args' ann'
-constFoldExpression (ArraySliceExpression ak obj lower upper ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
+foldExpression (ArraySliceExpression ak obj lower upper ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
   exprTy <- case ann' of
     (SemanticAnn (ETy (SimpleType ty)) _) -> return ty
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
   objTy <- getObjType obj'
-  lower' <- constFoldExpression lower
-  upper' <- constFoldExpression upper
+  lower' <- foldExpression lower
+  upper' <- foldExpression upper
   lowerType <- getExprType lower
   upperType <- getExprType upper
   case (exprTy, objTy, lowerType, upperType) of
@@ -395,52 +395,52 @@ constFoldExpression (ArraySliceExpression ak obj lower upper ann) = do
         _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
     _ -> return ()
   return $ ArraySliceExpression ak obj' lower' upper' ann'
-constFoldExpression (EnumVariantInitializer enumId variantId exprs ann) = do
-  ann' <- constFoldAnnotation ann
-  exprs' <- mapM constFoldExpression exprs
+foldExpression (EnumVariantInitializer enumId variantId exprs ann) = do
+  ann' <- foldAnnotation ann
+  exprs' <- mapM foldExpression exprs
   return $ EnumVariantInitializer enumId variantId exprs' ann'
-constFoldExpression (StructInitializer fvas ann) = do
-  ann' <- constFoldAnnotation ann
-  fvas' <- mapM constFoldFieldValueAssignment fvas
+foldExpression (StructInitializer fvas ann) = do
+  ann' <- foldAnnotation ann
+  fvas' <- mapM foldFieldValueAssignment fvas
   return $ StructInitializer fvas' ann'
-constFoldExpression (ArrayInitializer expr size ann) = do
-  ann' <- constFoldAnnotation ann
-  expr' <- constFoldExpression expr
-  size' <- constFoldExpression size
+foldExpression (ArrayInitializer expr size ann) = do
+  ann' <- foldAnnotation ann
+  expr' <- foldExpression expr
+  size' <- foldExpression size
   return $ ArrayInitializer expr' size' ann'
-constFoldExpression (ArrayExprListInitializer exprs ann) = do
-  ann' <- constFoldAnnotation ann
-  exprs' <- mapM constFoldExpression exprs
+foldExpression (ArrayExprListInitializer exprs ann) = do
+  ann' <- foldAnnotation ann
+  exprs' <- mapM foldExpression exprs
   return $ ArrayExprListInitializer exprs' ann'
-constFoldExpression (AccessObject obj) = AccessObject <$> constFoldObject obj
-constFoldExpression (ReferenceExpression ak obj ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
+foldExpression (AccessObject obj) = AccessObject <$> foldObject obj
+foldExpression (ReferenceExpression ak obj ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
   return $ ReferenceExpression ak obj' ann'
 
-constFoldStatement :: Statement SemanticAnn -> ConstFoldMonad (Statement SemanticAnn)
-constFoldStatement (Declaration ident ak ty initExpr ann) = do
+foldStatement :: Statement SemanticAnn -> ConstFoldMonad (Statement SemanticAnn)
+foldStatement (Declaration ident ak ty initExpr ann) = do
   let stmtLoc = getLocation ann
-  ann' <- constFoldAnnotation ann
-  ty' <- constFoldType (getLocation ann) ty
-  initExpr' <- mapM constFoldExpression initExpr
-  mapM_ (constFoldCheckType stmtLoc ty') initExpr'
+  ann' <- foldAnnotation ann
+  ty' <- foldType (getLocation ann) ty
+  initExpr' <- mapM foldExpression initExpr
+  mapM_ (checkType stmtLoc ty') initExpr'
   return $ Declaration ident ak ty' initExpr' ann'
-constFoldStatement (AssignmentStmt obj expr ann) = do
+foldStatement (AssignmentStmt obj expr ann) = do
   let stmtLoc = getLocation ann
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
-  expr' <- constFoldExpression expr
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  expr' <- foldExpression expr
   objType <- getObjType obj'
-  constFoldCheckType stmtLoc objType expr'
+  checkType stmtLoc objType expr'
   return $ AssignmentStmt obj' expr' ann'
-constFoldStatement (SingleExpStmt expr ann) = do
-  ann' <- constFoldAnnotation ann
-  expr' <- constFoldExpression expr
+foldStatement (SingleExpStmt expr ann) = do
+  ann' <- foldAnnotation ann
+  expr' <- foldExpression expr
   return $ SingleExpStmt expr' ann'
 
-constFoldCheckCondition :: Expression SemanticAnn -> ConstFoldMonad()
-constFoldCheckCondition cond = do
+checkCondition :: Expression SemanticAnn -> ConstFoldMonad()
+checkCondition cond = do
   condExprType <- getExprType cond
   case condExprType of
     (TConstSubtype _) -> do
@@ -453,8 +453,8 @@ constFoldCheckCondition cond = do
 -- not when the constant is at or beyond the limits of the range of the type of
 -- the expression, e.g., when an unsigned expression is checked to be less than
 -- zero.
-constFoldCheckComparison :: Location -> Op -> Expression SemanticAnn -> Expression SemanticAnn -> ConstFoldMonad ()
-constFoldCheckComparison loc op lhs rhs
+checkComparison :: Location -> Op -> Expression SemanticAnn -> Expression SemanticAnn -> ConstFoldMonad ()
+checkComparison loc op lhs rhs
   | op `elem` [RelationalLT, RelationalLTE, RelationalGT, RelationalGTE] = do
     lhsType <- getExprType lhs
     rhsType <- getExprType rhs
@@ -507,14 +507,14 @@ constFoldCheckComparison loc op lhs rhs
       | c <= lo = Just True
     fixedResult _ _ _ _ = Nothing
 
-constFoldBasicBlock :: BasicBlock SemanticAnn -> ConstFoldMonad (BasicBlock SemanticAnn)
-constFoldBasicBlock (RegularBlock stmts) =
-  RegularBlock <$> mapM constFoldStatement stmts
-constFoldBasicBlock (IfElseBlock ifCond elifs mElse ann) = do
-  ann' <- constFoldAnnotation ann
+foldBasicBlock :: BasicBlock SemanticAnn -> ConstFoldMonad (BasicBlock SemanticAnn)
+foldBasicBlock (RegularBlock stmts) =
+  RegularBlock <$> mapM foldStatement stmts
+foldBasicBlock (IfElseBlock ifCond elifs mElse ann) = do
+  ann' <- foldAnnotation ann
   ifCond' <- consSimplIfBlock ifCond
-  elifs' <- mapM constFoldElseIfBlock elifs
-  mElse' <- mapM constFoldElseBlock mElse
+  elifs' <- mapM foldElseIfBlock elifs
+  mElse' <- mapM foldElseBlock mElse
   return $ IfElseBlock ifCond' elifs' mElse' ann'
 
   where
@@ -522,34 +522,34 @@ constFoldBasicBlock (IfElseBlock ifCond elifs mElse ann) = do
 
     consSimplIfBlock :: CondIf SemanticAnn -> ConstFoldMonad (CondIf SemanticAnn)
     consSimplIfBlock (CondIf cond blk ann') = do
-      ann'' <- constFoldAnnotation ann'
-      cond' <- constFoldExpression cond
-      blk' <- constFoldBasicBlocks blk
-      constFoldCheckCondition cond'
+      ann'' <- foldAnnotation ann'
+      cond' <- foldExpression cond
+      blk' <- foldBasicBlocks blk
+      checkCondition cond'
       return $ CondIf cond' blk' ann''
     
-    constFoldElseIfBlock :: CondElseIf SemanticAnn -> ConstFoldMonad (CondElseIf SemanticAnn)
-    constFoldElseIfBlock (CondElseIf elifCond blk ann') = do
-      ann'' <- constFoldAnnotation ann'
-      blk' <- constFoldBasicBlocks blk
-      elifCond' <- constFoldExpression elifCond
-      constFoldCheckCondition elifCond'
+    foldElseIfBlock :: CondElseIf SemanticAnn -> ConstFoldMonad (CondElseIf SemanticAnn)
+    foldElseIfBlock (CondElseIf elifCond blk ann') = do
+      ann'' <- foldAnnotation ann'
+      blk' <- foldBasicBlocks blk
+      elifCond' <- foldExpression elifCond
+      checkCondition elifCond'
       return $ CondElseIf elifCond' blk' ann''
     
-    constFoldElseBlock :: CondElse SemanticAnn -> ConstFoldMonad (CondElse SemanticAnn)
-    constFoldElseBlock (CondElse blk ann') = do
-      ann'' <- constFoldAnnotation ann'
-      blk' <- constFoldBasicBlocks blk
+    foldElseBlock :: CondElse SemanticAnn -> ConstFoldMonad (CondElse SemanticAnn)
+    foldElseBlock (CondElse blk ann') = do
+      ann'' <- foldAnnotation ann'
+      blk' <- foldBasicBlocks blk
       return $ CondElse blk' ann''
 
-constFoldBasicBlock (ForLoopBlock iter ty from_expr to_expr mWhile body_stmt ann) = do
+foldBasicBlock (ForLoopBlock iter ty from_expr to_expr mWhile body_stmt ann) = do
   let stmtLoc = getLocation ann
-  ann' <- constFoldAnnotation ann
-  ty' <- constFoldType stmtLoc ty
-  from_expr' <- constFoldExpression from_expr
-  to_expr' <- constFoldExpression to_expr
-  body_stmt' <- constFoldBasicBlocks body_stmt
-  mWhile' <- mapM constFoldExpression mWhile
+  ann' <- foldAnnotation ann
+  ty' <- foldType stmtLoc ty
+  from_expr' <- foldExpression from_expr
+  to_expr' <- foldExpression to_expr
+  body_stmt' <- foldBasicBlocks body_stmt
+  mWhile' <- mapM foldExpression mWhile
   fromValue <- evalConstExpression from_expr
   toValue <- evalConstExpression to_expr
   case (fromValue, toValue) of
@@ -559,53 +559,53 @@ constFoldBasicBlock (ForLoopBlock iter ty from_expr to_expr mWhile body_stmt ann
       else if lhs > rhs then
         throwError $ annotateError stmtLoc (EForLoopStatementNegativeIterations lhs rhs)
       else do
-        mapM_ constFoldCheckCondition mWhile'
+        mapM_ checkCondition mWhile'
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
   return $ ForLoopBlock iter ty' from_expr' to_expr' mWhile' body_stmt' ann'
-constFoldBasicBlock (MatchBlock expr cases mDefaultCase ann) = do
-  expr' <- constFoldExpression expr
-  cases' <- mapM constFoldCase cases
-  mDefaultCase' <- maybe (return Nothing) constFoldDefaultCase mDefaultCase
+foldBasicBlock (MatchBlock expr cases mDefaultCase ann) = do
+  expr' <- foldExpression expr
+  cases' <- mapM foldCase cases
+  mDefaultCase' <- maybe (return Nothing) foldDefaultCase mDefaultCase
   return $ MatchBlock expr' cases' mDefaultCase' ann
 
   where
 
-    constFoldDefaultCase :: DefaultCase SemanticAnn -> ConstFoldMonad (Maybe (DefaultCase SemanticAnn))
-    constFoldDefaultCase (DefaultCase blk ann') = do
-      ann'' <- constFoldAnnotation ann'
-      blk' <- constFoldBasicBlocks blk
+    foldDefaultCase :: DefaultCase SemanticAnn -> ConstFoldMonad (Maybe (DefaultCase SemanticAnn))
+    foldDefaultCase (DefaultCase blk ann') = do
+      ann'' <- foldAnnotation ann'
+      blk' <- foldBasicBlocks blk
       return . Just $ DefaultCase blk' ann''
 
-    constFoldCase :: MatchCase SemanticAnn -> ConstFoldMonad (MatchCase SemanticAnn)
-    constFoldCase (MatchCase variantId vars blk ann') = do
-      blk' <- constFoldBasicBlocks blk
+    foldCase :: MatchCase SemanticAnn -> ConstFoldMonad (MatchCase SemanticAnn)
+    foldCase (MatchCase variantId vars blk ann') = do
+      blk' <- foldBasicBlocks blk
       return $ MatchCase variantId vars blk' ann'
 
-constFoldBasicBlock (SendMessage obj expr ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
-  expr' <- constFoldExpression expr
+foldBasicBlock (SendMessage obj expr ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  expr' <- foldExpression expr
   return $ SendMessage obj' expr' ann'
-constFoldBasicBlock (ProcedureInvoke obj procName exprs ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
-  exprs' <- mapM constFoldExpression exprs
+foldBasicBlock (ProcedureInvoke obj procName exprs ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  exprs' <- mapM foldExpression exprs
   return $ ProcedureInvoke obj' procName exprs' ann'
-constFoldBasicBlock (AtomicLoad obj expr ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
-  expr' <- constFoldExpression expr
+foldBasicBlock (AtomicLoad obj expr ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  expr' <- foldExpression expr
   return $ AtomicLoad obj' expr' ann'
-constFoldBasicBlock (AtomicStore obj expr ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
-  expr' <- constFoldExpression expr
+foldBasicBlock (AtomicStore obj expr ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  expr' <- foldExpression expr
   return $ AtomicStore obj' expr' ann'
-constFoldBasicBlock (AtomicArrayLoad obj indexExpr expr ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
-  index' <- constFoldExpression indexExpr
-  expr' <- constFoldExpression expr
+foldBasicBlock (AtomicArrayLoad obj indexExpr expr ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  index' <- foldExpression indexExpr
+  expr' <- foldExpression expr
   objType <- getObjType obj'
   indexExprType <- getExprType index'
   case (objType, indexExprType) of
@@ -619,11 +619,11 @@ constFoldBasicBlock (AtomicArrayLoad obj indexExpr expr ann) = do
           return $ AtomicArrayLoad obj' index' expr' ann'
         _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
     _ -> return $ AtomicArrayLoad obj' index' expr' ann'
-constFoldBasicBlock (AtomicArrayStore obj indexExpr expr ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
-  index' <- constFoldExpression indexExpr
-  expr' <- constFoldExpression expr
+foldBasicBlock (AtomicArrayStore obj indexExpr expr ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  index' <- foldExpression indexExpr
+  expr' <- foldExpression expr
   objType <- getObjType obj'
   indexExprType <- getExprType index'
   case (objType, indexExprType) of
@@ -637,121 +637,121 @@ constFoldBasicBlock (AtomicArrayStore obj indexExpr expr ann) = do
           return $ AtomicArrayStore obj' index' expr' ann'
         _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
     _ -> return $ AtomicArrayStore obj' index' expr' ann'
-constFoldBasicBlock (AllocBox obj expr ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
-  expr' <- constFoldExpression expr
+foldBasicBlock (AllocBox obj expr ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  expr' <- foldExpression expr
   return $ AllocBox obj' expr' ann'
-constFoldBasicBlock (FreeBox obj expr ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
-  expr' <- constFoldExpression expr
+foldBasicBlock (FreeBox obj expr ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  expr' <- foldExpression expr
   return $ FreeBox obj' expr' ann'
-constFoldBasicBlock (ReturnBlock Nothing ann) = do
-  ann' <- constFoldAnnotation ann
+foldBasicBlock (ReturnBlock Nothing ann) = do
+  ann' <- foldAnnotation ann
   return $ ReturnBlock Nothing ann'
-constFoldBasicBlock (ReturnBlock (Just expr) ann) = do
-  ann' <- constFoldAnnotation ann
-  expr' <- constFoldExpression expr
+foldBasicBlock (ReturnBlock (Just expr) ann) = do
+  ann' <- foldAnnotation ann
+  expr' <- foldExpression expr
   return $ ReturnBlock (Just expr') ann'
-constFoldBasicBlock (ContinueBlock expr ann) = do
-  ann' <- constFoldAnnotation ann
-  expr' <- constFoldExpression expr
+foldBasicBlock (ContinueBlock expr ann) = do
+  ann' <- foldAnnotation ann
+  expr' <- foldExpression expr
   return $ ContinueBlock expr' ann'
-constFoldBasicBlock (RebootBlock ann) = do
-  ann' <- constFoldAnnotation ann
+foldBasicBlock (RebootBlock ann) = do
+  ann' <- foldAnnotation ann
   return $ RebootBlock ann'
-constFoldBasicBlock (SystemCall obj ident exprs ann) = do
-  ann' <- constFoldAnnotation ann
-  obj' <- constFoldObject obj
-  exprs' <- mapM constFoldExpression exprs
+foldBasicBlock (SystemCall obj ident exprs ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  exprs' <- mapM foldExpression exprs
   return $ SystemCall obj' ident exprs' ann'
 
-constFoldBasicBlocks :: Block SemanticAnn -> ConstFoldMonad (Block SemanticAnn)
-constFoldBasicBlocks (Block body ann) = do
-  body' <- mapM constFoldBasicBlock body
+foldBasicBlocks :: Block SemanticAnn -> ConstFoldMonad (Block SemanticAnn)
+foldBasicBlocks (Block body ann) = do
+  body' <- mapM foldBasicBlock body
   return $ Block body' ann
 
 
-constFoldFieldDefinition :: FieldDefinition SemanticAnn -> ConstFoldMonad (FieldDefinition SemanticAnn)
-constFoldFieldDefinition (FieldDefinition name ty ann) = do
+foldFieldDefinition :: FieldDefinition SemanticAnn -> ConstFoldMonad (FieldDefinition SemanticAnn)
+foldFieldDefinition (FieldDefinition name ty ann) = do
   let defLoc = getLocation ann
-  ann' <- constFoldAnnotation ann
-  ty' <- constFoldType defLoc ty
+  ann' <- foldAnnotation ann
+  ty' <- foldType defLoc ty
   return $ FieldDefinition name ty' ann'
 
-constFoldTypeDef :: Location -> TypeDef SemanticAnn -> ConstFoldMonad (TypeDef SemanticAnn)
-constFoldTypeDef _loc (Struct ident fieldDefs mods) = do
-  fieldDefs' <- mapM constFoldFieldDefinition fieldDefs
+foldTypeDef :: Location -> TypeDef SemanticAnn -> ConstFoldMonad (TypeDef SemanticAnn)
+foldTypeDef _loc (Struct ident fieldDefs mods) = do
+  fieldDefs' <- mapM foldFieldDefinition fieldDefs
   return $ Struct ident fieldDefs' mods
-constFoldTypeDef loc (Enum ident variants mods) = do
-  variants' <- mapM constFoldEnumVariant variants
+foldTypeDef loc (Enum ident variants mods) = do
+  variants' <- mapM foldEnumVariant variants
   return $ Enum ident variants' mods
 
   where 
 
-    constFoldEnumVariant :: EnumVariant SemanticAnn -> ConstFoldMonad (EnumVariant SemanticAnn)
-    constFoldEnumVariant (EnumVariant variantId tys) = do
-      tys' <- mapM (constFoldType loc) tys
+    foldEnumVariant :: EnumVariant SemanticAnn -> ConstFoldMonad (EnumVariant SemanticAnn)
+    foldEnumVariant (EnumVariant variantId tys) = do
+      tys' <- mapM (foldType loc) tys
       return $ EnumVariant variantId tys'
 
-constFoldTypeDef loc (Class ck classId members provides mods) = do
-  members' <- mapM constFoldClassMember members
+foldTypeDef loc (Class ck classId members provides mods) = do
+  members' <- mapM foldClassMember members
   return $ Class ck classId members' provides mods
 
   where
 
-    constFoldClassMember :: ClassMember SemanticAnn -> ConstFoldMonad (ClassMember SemanticAnn)
-    constFoldClassMember (ClassField fdef) = 
-      ClassField <$> constFoldFieldDefinition fdef
-    constFoldClassMember (ClassMethod ak ident params mrty body ann) = do
-      params' <- mapM (constFoldParam loc) params
-      mrty' <- mapM (constFoldType loc) mrty
-      body' <- constFoldBasicBlocks body
+    foldClassMember :: ClassMember SemanticAnn -> ConstFoldMonad (ClassMember SemanticAnn)
+    foldClassMember (ClassField fdef) = 
+      ClassField <$> foldFieldDefinition fdef
+    foldClassMember (ClassMethod ak ident params mrty body ann) = do
+      params' <- mapM (foldParam loc) params
+      mrty' <- mapM (foldType loc) mrty
+      body' <- foldBasicBlocks body
       return $ ClassMethod ak ident params' mrty' body' ann
-    constFoldClassMember (ClassProcedure ak ident params body ann) = do
-      params' <- mapM (constFoldParam loc) params
-      body' <- constFoldBasicBlocks body
+    foldClassMember (ClassProcedure ak ident params body ann) = do
+      params' <- mapM (foldParam loc) params
+      body' <- foldBasicBlocks body
       return $ ClassProcedure ak ident params' body' ann
-    constFoldClassMember (ClassViewer ident params mrty body ann) = do
-      params' <- mapM (constFoldParam loc) params
-      mrty' <- mapM (constFoldType loc) mrty
-      body' <- constFoldBasicBlocks body
+    foldClassMember (ClassViewer ident params mrty body ann) = do
+      params' <- mapM (foldParam loc) params
+      mrty' <- mapM (foldType loc) mrty
+      body' <- foldBasicBlocks body
       return $ ClassViewer ident params' mrty' body' ann
-    constFoldClassMember (ClassAction ak ident params rty body ann) = do
-      params' <- mapM (constFoldParam loc) params
-      rty' <- constFoldType loc rty
-      body' <- constFoldBasicBlocks body
+    foldClassMember (ClassAction ak ident params rty body ann) = do
+      params' <- mapM (foldParam loc) params
+      rty' <- foldType loc rty
+      body' <- foldBasicBlocks body
       return $ ClassAction ak ident params' rty' body' ann
     
-constFoldTypeDef _loc (Interface ik ident extends procs mods) = do
-  procs' <- mapM constFoldInterfaceMember procs
+foldTypeDef _loc (Interface ik ident extends procs mods) = do
+  procs' <- mapM foldInterfaceMember procs
   return $ Interface ik ident extends procs' mods
 
-constFoldGlobal :: Global SemanticAnn -> ConstFoldMonad (Global SemanticAnn)
-constFoldGlobal (Resource ident ty mInitExpr mods ann) = do
+foldGlobal :: Global SemanticAnn -> ConstFoldMonad (Global SemanticAnn)
+foldGlobal (Resource ident ty mInitExpr mods ann) = do
   let glbLoc = getLocation ann
-  ann' <- constFoldAnnotation ann
-  ty' <- constFoldType glbLoc ty
-  mInitExpr' <- mapM constFoldExpression mInitExpr
+  ann' <- foldAnnotation ann
+  ty' <- foldType glbLoc ty
+  mInitExpr' <- mapM foldExpression mInitExpr
   return $ Resource ident ty' mInitExpr' mods ann'
-constFoldGlobal (Task ident ty mInitExpr mods ann) = do
+foldGlobal (Task ident ty mInitExpr mods ann) = do
   let glbLoc = getLocation ann
-  ann' <- constFoldAnnotation ann
-  ty' <- constFoldType glbLoc ty
-  mInitExpr' <- mapM constFoldExpression mInitExpr
+  ann' <- foldAnnotation ann
+  ty' <- foldType glbLoc ty
+  mInitExpr' <- mapM foldExpression mInitExpr
   return $ Task ident ty' mInitExpr' mods ann'
-constFoldGlobal (Handler ident ty mInitExpr mods ann) = do
+foldGlobal (Handler ident ty mInitExpr mods ann) = do
   let glbLoc = getLocation ann
-  ann' <- constFoldAnnotation ann
-  ty' <- constFoldType glbLoc ty
-  mInitExpr' <- mapM constFoldExpression mInitExpr
+  ann' <- foldAnnotation ann
+  ty' <- foldType glbLoc ty
+  mInitExpr' <- mapM foldExpression mInitExpr
   return $ Handler ident ty' mInitExpr' mods ann'
-constFoldGlobal (Const identifier ty expr mods ann) = do
+foldGlobal (Const identifier ty expr mods ann) = do
   let glbLoc = getLocation ann
-  ann' <- constFoldAnnotation ann
-  ty' <- constFoldType glbLoc ty
-  expr' <- constFoldExpression expr
+  ann' <- foldAnnotation ann
+  ty' <- foldType glbLoc ty
+  expr' <- foldExpression expr
   -- | Record scalar constants in the environment so that later elements (and
   -- later modules, since the environment is threaded across them) can resolve
   -- references to them. Aggregate constants (arrays, structs) have no scalar
@@ -762,41 +762,41 @@ constFoldGlobal (Const identifier ty expr mods ann) = do
       ST.modify $ \st -> st { constEnv = M.insert identifier constValue (constEnv st) }
     _ -> return ()
   return $ Const identifier ty' expr' mods ann'
-constFoldGlobal (Channel ident ty mInitExpr mods ann) = do
+foldGlobal (Channel ident ty mInitExpr mods ann) = do
   let glbLoc = getLocation ann
-  ann' <- constFoldAnnotation ann
-  ty' <- constFoldType glbLoc ty
-  mInitExpr' <- mapM constFoldExpression mInitExpr
+  ann' <- foldAnnotation ann
+  ty' <- foldType glbLoc ty
+  mInitExpr' <- mapM foldExpression mInitExpr
   return $ Channel ident ty' mInitExpr' mods ann'
-constFoldGlobal (Emitter ident ty mInitExpr mods ann) = do
+foldGlobal (Emitter ident ty mInitExpr mods ann) = do
   let glbLoc = getLocation ann
-  ann' <- constFoldAnnotation ann
-  ty' <- constFoldType glbLoc ty
-  mInitExpr' <- mapM constFoldExpression mInitExpr
+  ann' <- foldAnnotation ann
+  ty' <- foldType glbLoc ty
+  mInitExpr' <- mapM foldExpression mInitExpr
   return $ Emitter ident ty' mInitExpr' mods ann'
-constFoldGlobal g = return g -- This should not happen
+foldGlobal g = return g -- This should not happen
 
-constFoldElement :: AnnASTElement SemanticAnn -> ConstFoldMonad (AnnASTElement SemanticAnn)
-constFoldElement (GlobalDeclaration g) =
-  GlobalDeclaration <$> constFoldGlobal g
-constFoldElement (TypeDefinition td ann) = do
+foldElement :: AnnASTElement SemanticAnn -> ConstFoldMonad (AnnASTElement SemanticAnn)
+foldElement (GlobalDeclaration g) =
+  GlobalDeclaration <$> foldGlobal g
+foldElement (TypeDefinition td ann) = do
   let tdLoc = getLocation ann
-  ann' <- constFoldAnnotation ann
-  td' <- constFoldTypeDef tdLoc td
+  ann' <- foldAnnotation ann
+  td' <- foldTypeDef tdLoc td
   return $ TypeDefinition td' ann'
-constFoldElement (Function ident params mrty body mods ann) = do
+foldElement (Function ident params mrty body mods ann) = do
   let funLoc = getLocation ann
-  ann' <- constFoldAnnotation ann
-  params' <- mapM (constFoldParam funLoc) params
-  mrty' <- mapM (constFoldType funLoc) mrty
-  body' <- constFoldBasicBlocks body
+  ann' <- foldAnnotation ann
+  params' <- mapM (foldParam funLoc) params
+  mrty' <- mapM (foldType funLoc) mrty
+  body' <- foldBasicBlocks body
   return $ Function ident params' mrty' body' mods ann'
 
 constFoldModule :: BasicBlocksModule -> ConstFoldMonad BasicBlocksModule
 constFoldModule (TerminaModuleData modQualifiedName modFullPath 
     modModificationTime modImportedModules modVisibleModules modSourcecode (BasicBlockData ast)) =
     TerminaModuleData modQualifiedName modFullPath 
-        modModificationTime modImportedModules modVisibleModules modSourcecode . BasicBlockData <$> mapM constFoldElement ast
+        modModificationTime modImportedModules modVisibleModules modSourcecode . BasicBlockData <$> mapM foldElement ast
 
 runConstFolding
   :: ConstFoldEnv

@@ -89,36 +89,36 @@ registerMutableSelfReceiver method obj = do
   when mutable $
     insertMutableReference (objectPath obj) (getLocation (getAnnotation obj))
 
-checkSideEffExpression :: Expression SemanticAnn -> SideEffectsMonad ()
-checkSideEffExpression expr = case expr of
+checkExpression :: Expression SemanticAnn -> SideEffectsMonad ()
+checkExpression expr = case expr of
   ReferenceExpression Mutable obj ann -> do
     insertMutableReference (objectPath obj) (getLocation ann)
-    mapM_ checkSideEffExpression (indexExpressions obj)
-  ReferenceExpression _ obj _ -> mapM_ checkSideEffExpression (indexExpressions obj)
+    mapM_ checkExpression (indexExpressions obj)
+  ReferenceExpression _ obj _ -> mapM_ checkExpression (indexExpressions obj)
   ArraySliceExpression Mutable obj lower upper ann -> do
     insertMutableReference (objectPath obj) (getLocation ann)
-    mapM_ checkSideEffExpression (lower : upper : indexExpressions obj)
+    mapM_ checkExpression (lower : upper : indexExpressions obj)
   ArraySliceExpression _ obj lower upper _ ->
-    mapM_ checkSideEffExpression (lower : upper : indexExpressions obj)
+    mapM_ checkExpression (lower : upper : indexExpressions obj)
   BinOp _ left right _ -> do
-    checkSideEffExpression left
-    checkSideEffExpression right
-  Casting e _ _ -> checkSideEffExpression e
-  FunctionCall _ args _ -> mapM_ checkSideEffExpression args
+    checkExpression left
+    checkExpression right
+  Casting e _ _ -> checkExpression e
+  FunctionCall _ args _ -> mapM_ checkExpression args
   MemberFunctionCall obj method args _ -> do
     registerMutableSelfReceiver method obj
-    mapM_ checkSideEffExpression (args ++ indexExpressions obj)
+    mapM_ checkExpression (args ++ indexExpressions obj)
   DerefMemberFunctionCall obj method args _ -> do
     registerMutableSelfReceiver method obj
-    mapM_ checkSideEffExpression (args ++ indexExpressions obj)
+    mapM_ checkExpression (args ++ indexExpressions obj)
   ArrayInitializer e size _ -> do
-    checkSideEffExpression e
-    checkSideEffExpression size
-  ArrayExprListInitializer es _ -> mapM_ checkSideEffExpression es
+    checkExpression e
+    checkExpression size
+  ArrayExprListInitializer es _ -> mapM_ checkExpression es
   StructInitializer fields _ -> mapM_ checkFieldAssignment fields
-  EnumVariantInitializer _ _ args _ -> mapM_ checkSideEffExpression args
+  EnumVariantInitializer _ _ args _ -> mapM_ checkExpression args
   MonadicVariantInitializer mv _ -> checkMonadicVariant mv
-  AccessObject obj -> mapM_ checkSideEffExpression (indexExpressions obj)
+  AccessObject obj -> mapM_ checkExpression (indexExpressions obj)
   Constant _ _ -> return ()
   StringInitializer _ _ -> return ()
   IsEnumVariantExpression {} -> return ()
@@ -127,15 +127,15 @@ checkSideEffExpression expr = case expr of
   where
 
     checkFieldAssignment :: FieldAssignment' Expression SemanticAnn -> SideEffectsMonad ()
-    checkFieldAssignment (FieldValueAssignment _ e _) = checkSideEffExpression e
-    checkFieldAssignment (FieldAddressAssignment _ e _) = checkSideEffExpression e
+    checkFieldAssignment (FieldValueAssignment _ e _) = checkExpression e
+    checkFieldAssignment (FieldAddressAssignment _ e _) = checkExpression e
     checkFieldAssignment FieldPortConnection {} = return ()
 
     checkMonadicVariant :: MonadicVariant' Expression SemanticAnn -> SideEffectsMonad ()
-    checkMonadicVariant (Some e) = checkSideEffExpression e
-    checkMonadicVariant (Ok e) = checkSideEffExpression e
-    checkMonadicVariant (Error e) = checkSideEffExpression e
-    checkMonadicVariant (Failure e) = checkSideEffExpression e
+    checkMonadicVariant (Some e) = checkExpression e
+    checkMonadicVariant (Ok e) = checkExpression e
+    checkMonadicVariant (Error e) = checkExpression e
+    checkMonadicVariant (Failure e) = checkExpression e
     checkMonadicVariant None = return ()
     checkMonadicVariant Success = return ()
 
@@ -236,7 +236,7 @@ checkEffectOrdering e = case e of
 checkFullExpression :: Expression SemanticAnn -> SideEffectsMonad ()
 checkFullExpression e = do
   resetMutableReferences
-  checkSideEffExpression e
+  checkExpression e
   checkEffectOrdering e
 
 -- | Several expressions that together make up one full expression (e.g. the
@@ -245,37 +245,37 @@ checkFullExpression e = do
 checkFullExpressions :: [Expression SemanticAnn] -> SideEffectsMonad ()
 checkFullExpressions es = do
   resetMutableReferences
-  mapM_ checkSideEffExpression es
+  mapM_ checkExpression es
   atMostOneEffect es
   checkInterference es
   mapM_ checkEffectOrdering es
 
-checkSideEffStatement :: Statement SemanticAnn -> SideEffectsMonad ()
-checkSideEffStatement stmt = case stmt of
+checkStatement :: Statement SemanticAnn -> SideEffectsMonad ()
+checkStatement stmt = case stmt of
   Declaration _ _ _ initExpr _ -> mapM_ checkFullExpression initExpr
   AssignmentStmt _ rhs _       -> checkFullExpression rhs
   SingleExpStmt e _            -> checkFullExpression e
 
-checkSideEffBlock :: Block SemanticAnn -> SideEffectsMonad ()
-checkSideEffBlock = mapM_ checkSideEffBasicBlock . blockBody
+checkBlock :: Block SemanticAnn -> SideEffectsMonad ()
+checkBlock = mapM_ checkBasicBlock . blockBody
 
-checkSideEffBasicBlock :: BasicBlock SemanticAnn -> SideEffectsMonad ()
-checkSideEffBasicBlock bb = case bb of
-  RegularBlock stmts -> mapM_ checkSideEffStatement stmts
+checkBasicBlock :: BasicBlock SemanticAnn -> SideEffectsMonad ()
+checkBasicBlock bb = case bb of
+  RegularBlock stmts -> mapM_ checkStatement stmts
   IfElseBlock condIf elseIfs mElse _ -> do
     checkFullExpression (condIfCond condIf)
-    checkSideEffBlock (condIfBody condIf)
-    mapM_ (\ei -> checkFullExpression (condElseIfCond ei) >> checkSideEffBlock (condElseIfBody ei)) elseIfs
-    mapM_ (\(CondElse blk _) -> checkSideEffBlock blk) mElse
+    checkBlock (condIfBody condIf)
+    mapM_ (\ei -> checkFullExpression (condElseIfCond ei) >> checkBlock (condElseIfBody ei)) elseIfs
+    mapM_ (\(CondElse blk _) -> checkBlock blk) mElse
   ForLoopBlock _ _ initV endV mBreak body _ -> do
     checkFullExpression initV
     checkFullExpression endV
     mapM_ checkFullExpression mBreak
-    checkSideEffBlock body
+    checkBlock body
   MatchBlock subject cases mDefault _ -> do
     checkFullExpression subject
-    mapM_ (checkSideEffBlock . matchBody) cases
-    mapM_ (\(DefaultCase blk _) -> checkSideEffBlock blk) mDefault
+    mapM_ (checkBlock . matchBody) cases
+    mapM_ (\(DefaultCase blk _) -> checkBlock blk) mDefault
   SendMessage _ payload _        -> checkFullExpression payload
   ProcedureInvoke _ _ args _     -> checkFullExpressions args
   SystemCall _ _ args _          -> checkFullExpressions args
@@ -289,18 +289,18 @@ checkSideEffBasicBlock bb = case bb of
   ContinueBlock e _              -> checkFullExpression e
   RebootBlock _                  -> return ()
 
-checkSideEffClassMember :: ClassMember SemanticAnn -> SideEffectsMonad ()
-checkSideEffClassMember (ClassMethod _ak _ident _ps _tyret body _ann)  = checkSideEffBlock body
-checkSideEffClassMember (ClassProcedure _ak _ident _ps body _ann)      = checkSideEffBlock body
-checkSideEffClassMember (ClassViewer _ident _ps _tyret body _ann)      = checkSideEffBlock body
-checkSideEffClassMember (ClassAction _ak _ident _mp _tyret body _ann)  = checkSideEffBlock body
-checkSideEffClassMember (ClassField {})                                = return ()
+checkClassMember :: ClassMember SemanticAnn -> SideEffectsMonad ()
+checkClassMember (ClassMethod _ak _ident _ps _tyret body _ann)  = checkBlock body
+checkClassMember (ClassProcedure _ak _ident _ps body _ann)      = checkBlock body
+checkClassMember (ClassViewer _ident _ps _tyret body _ann)      = checkBlock body
+checkClassMember (ClassAction _ak _ident _mp _tyret body _ann)  = checkBlock body
+checkClassMember (ClassField {})                                = return ()
 
-checkSideEffTypeDef :: TypeDef SemanticAnn -> SideEffectsMonad ()
-checkSideEffTypeDef (Class _kind _ident members _provides _mods) = do
+checkTypeDef :: TypeDef SemanticAnn -> SideEffectsMonad ()
+checkTypeDef (Class _kind _ident members _provides _mods) = do
     setMutableSelfMethods (mutableSelfMethodNames members)
-    mapM_ checkSideEffClassMember members
-checkSideEffTypeDef _ = return ()
+    mapM_ checkClassMember members
+checkTypeDef _ = return ()
 
 -- | The names of the methods that take a @&mut self@ receiver, i.e. a mutable
 -- reference to the whole state. A @&priv self@ method is not a mutable
@@ -310,15 +310,15 @@ mutableSelfMethodNames :: [ClassMember SemanticAnn] -> S.Set Identifier
 mutableSelfMethodNames members = S.fromList
     [ ident | ClassMethod Mutable ident _ _ _ _ <- members ]
 
-checkSideEffElement :: AnnASTElement SemanticAnn -> SideEffectsMonad ()
-checkSideEffElement (Function _ident _ps _ty body _mods _ann) = checkSideEffBlock body
-checkSideEffElement (TypeDefinition tyDef _ann)               = checkSideEffTypeDef tyDef
-checkSideEffElement (GlobalDeclaration {})                    = return ()
+checkElement :: AnnASTElement SemanticAnn -> SideEffectsMonad ()
+checkElement (Function _ident _ps _ty body _mods _ann) = checkBlock body
+checkElement (TypeDefinition tyDef _ann)               = checkTypeDef tyDef
+checkElement (GlobalDeclaration {})                    = return ()
 
 -- | Run the side-effect check over a single top-level element.
 runSideEffectElement :: Platform -> AnnASTElement SemanticAnn -> Maybe SideEffectsError
 runSideEffectElement plt =
-    either Just (const Nothing) . runSideEffects plt . checkSideEffElement
+    either Just (const Nothing) . runSideEffects plt . checkElement
 
 -- | Run the side-effect check over a whole module, returning the first error.
 runSideEffectCheck :: Platform -> AnnotatedProgram SemanticAnn -> Maybe SideEffectsError

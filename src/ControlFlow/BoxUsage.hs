@@ -12,7 +12,7 @@ That is, given a block, i.e. a sequence of statements, we go to the last
 statement and build our sets and maps backwards.
 --}
 
-import ControlFlow.BoxUsage.Computation
+import ControlFlow.BoxUsage.Monad
 import ControlFlow.BoxUsage.Errors
 
 import Utils.Annotations
@@ -36,7 +36,7 @@ import qualified Data.Set as S
 -- There are two types of arguments :
 -- + Moving out variables of type box T and TOption<box T>
 -- + Copying expressions, everything.
-useArguments :: Expression SemanticAnn -> UDM BoxUsageError ()
+useArguments :: Expression SemanticAnn -> BoxUsageM BoxUsageError ()
 -- If we are giving a variable of type box T, we moving it out.
 useArguments e@(AccessObject (Variable ident ann))
   = case getTypeSemAnn ann of
@@ -49,7 +49,7 @@ useArguments (ReferenceExpression _ (Variable ident _ann) _a) =
 -- Box variables inside expressions are read as values.
 useArguments e = useExpression e
 
-useObject :: Object SemanticAnn -> UDM BoxUsageError ()
+useObject :: Object SemanticAnn -> BoxUsageM BoxUsageError ()
 useObject = walkObject ObjectVisitor
   {
     atRoot = \ident ann ->
@@ -69,16 +69,16 @@ useObject = walkObject ObjectVisitor
   , atIndex = useExpression
   }
 
-getObjType :: Object SemanticAnn -> UDM Error (AccessKind, TerminaType SemanticAnn)
+getObjType :: Object SemanticAnn -> BoxUsageM Error (AccessKind, TerminaType SemanticAnn)
 getObjType = maybe (throwError EInvalidObjectTypeAnnotation) return . getObjectSAnns . getAnnotation
 
-useExpression :: Expression SemanticAnn -> UDM BoxUsageError ()
+useExpression :: Expression SemanticAnn -> BoxUsageM BoxUsageError ()
 useExpression = mapM_ useChild . expressionChildren
 
 -- | A reference to a bare variable only uses it, without going through the
 -- option-box protocol, and a constant expression that belongs to a type is not
 -- part of the computation.
-useChild :: Child SemanticAnn -> UDM BoxUsageError ()
+useChild :: Child SemanticAnn -> BoxUsageM BoxUsageError ()
 useChild (ChildObject obj) = useObject obj
 useChild (ChildReference _ (Variable ident _)) = safeUseVariable ident
 useChild (ChildReference _ obj) = useObject obj
@@ -86,11 +86,11 @@ useChild (ChildExpr e) = useExpression e
 useChild (ChildArg e) = useArguments e
 useChild (ChildConstExpr _) = return ()
 
-useDefBlockRet :: Block SemanticAnn -> UDM BoxUsageError ()
-useDefBlockRet bret = useDefBasicBlocks (blockBody bret)
+checkBlock :: Block SemanticAnn -> BoxUsageM BoxUsageError ()
+checkBlock bret = checkBasicBlocks (blockBody bret)
 
-useDefStmt :: Statement SemanticAnn -> UDM BoxUsageError ()
-useDefStmt (Declaration ident _accK tyS initE ann)
+checkStatement :: Statement SemanticAnn -> BoxUsageM BoxUsageError ()
+checkStatement (Declaration ident _accK tyS initE ann)
   -- variable def is defined
   = let loc = getLocation ann in
   case tyS of
@@ -103,7 +103,7 @@ useDefStmt (Declaration ident _accK tyS initE ann)
   -- Use everithing in the |initE| if included
   >> mapM_ useExpression initE
 -- All branches should have the same used Only ones.
-useDefStmt (AssignmentStmt obj e ann) = do
+checkStatement (AssignmentStmt obj e ann) = do
   -- | We need to check if the object is an option-box
   obj_ty <- withLocation (getLocation ann) (getObjType obj)
   case obj_ty of
@@ -130,24 +130,24 @@ useDefStmt (AssignmentStmt obj e ann) = do
     _ -> case obj of
       Variable ident _ -> safeUseVariable ident >> useExpression e
       _ -> useObject obj >> useExpression e
-useDefStmt (SingleExpStmt e _ann)
+checkStatement (SingleExpStmt e _ann)
   = useExpression e
 
-useDefBasicBlocks :: [BasicBlock SemanticAnn] -> UDM BoxUsageError ()
-useDefBasicBlocks = mapM_ useDefBasicBlock . reverse
+checkBasicBlocks :: [BasicBlock SemanticAnn] -> BoxUsageM BoxUsageError ()
+checkBasicBlocks = mapM_ checkBasicBlock . reverse
 
-useDefStatements :: [Statement SemanticAnn] -> UDM BoxUsageError ()
-useDefStatements = mapM_ useDefStmt . reverse
+checkStatements :: [Statement SemanticAnn] -> BoxUsageM BoxUsageError ()
+checkStatements = mapM_ checkStatement . reverse
 
-useDefBasicBlock :: BasicBlock SemanticAnn -> UDM BoxUsageError ()
-useDefBasicBlock (IfElseBlock condIf elseIfs bFalse _ann)
+checkBasicBlock :: BasicBlock SemanticAnn -> BoxUsageM BoxUsageError ()
+checkBasicBlock (IfElseBlock condIf elseIfs bFalse _ann)
   = do
   let blocks = condIfBody condIf : map condElseIfBody elseIfs ++ (condElseBody <$> maybeToList bFalse)
       bodiesWithLocs = map (\b -> (blockBody b, getLocation (blockAnnotation b))) blocks
   prevSt <- ST.get
   -- All sets generated for all different branches.
   sets <- mapM (\(body, loc) -> do
-    blockSt <- runEncapsWithEmptyVars (useDefBasicBlocks body >> ST.get)
+    blockSt <- runEncapsWithEmptyVars (checkBasicBlocks body >> ST.get)
     return (blockSt, loc)) bodiesWithLocs
    -- Rule here is, when entering, the state of all the boxes must be the same and the
    -- set of used boxes must be equal.
@@ -157,10 +157,10 @@ useDefBasicBlock (IfElseBlock condIf elseIfs bFalse _ann)
   mapM_ (useExpression . condElseIfCond) elseIfs
   -- Finally, use the if conditional expression
   useExpression (condIfCond condIf)
-useDefBasicBlock (ForLoopBlock  _itIdent _itTy eB eE mBrk block ann) = do
+checkBasicBlock (ForLoopBlock  _itIdent _itTy eB eE mBrk block ann) = do
     prevSt <- ST.get
     -- What happens inside the body of a for, may not happen at all.
-    loopSt <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody block) >> ST.get)
+    loopSt <- runEncapsWithEmptyVars (checkBasicBlocks (blockBody block) >> ST.get)
     finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) [(loopSt, getLocation ann)]
     unifyState (optionBoxesMap finalState, movedBoxes finalState, S.union (usedVarSet prevSt) (usedVarSet finalState))
     mapM_ useExpression mBrk
@@ -168,7 +168,7 @@ useDefBasicBlock (ForLoopBlock  _itIdent _itTy eB eE mBrk block ann) = do
     -- references to const input parameters.
     useExpression eB
     useExpression eE
-useDefBasicBlock (MatchBlock e mcase mDefaultCase ann) = do
+checkBasicBlock (MatchBlock e mcase mDefaultCase ann) = do
   prevSt <- ST.get
   caseSets <- maybe (throwError $ annotateError (getLocation ann) EInvalidExprTypeAnnotation)
     (\case
@@ -176,12 +176,12 @@ useDefBasicBlock (MatchBlock e mcase mDefaultCase ann) = do
             case mcase of
               [ml,mr] -> do
                 let (mSome, mNone) = if matchIdentifier ml == "Some" then (ml,mr) else (mr,ml)
-                someBlk <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody . matchBody $ mSome)
+                someBlk <- runEncapsWithEmptyVars (checkBasicBlocks (blockBody . matchBody $ mSome)
                   >> defBox (head (matchBVars mSome)) (getLocation (matchAnnotation mSome)) >> ST.get)
-                noneBlk <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody . matchBody $ mNone) >> ST.get)
+                noneBlk <- runEncapsWithEmptyVars (checkBasicBlocks (blockBody . matchBody $ mNone) >> ST.get)
                 return [(someBlk, getLocation . matchAnnotation $ mSome), (noneBlk, getLocation . matchAnnotation $ mNone)]
               [mSome@(MatchCase "Some" _ _ _)] -> do
-                someBlk <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody . matchBody $ mSome)
+                someBlk <- runEncapsWithEmptyVars (checkBasicBlocks (blockBody . matchBody $ mSome)
                   >> defBox (head (matchBVars mSome)) (getLocation (matchAnnotation mSome)) >> ST.get)
                 return [(someBlk, getLocation . matchAnnotation $ mSome)]
               [MatchCase "None" _ _ _] -> 
@@ -190,18 +190,18 @@ useDefBasicBlock (MatchBlock e mcase mDefaultCase ann) = do
         -- Otherwise, it is a simple use variable.
         _ -> runMultipleEncapsWithEmptyVars (
           map (\c -> do
-            blockSt <- useMCase c >> ST.get
+            blockSt <- checkMatchCase c >> ST.get
             return (blockSt, getLocation . matchAnnotation $ c)) mcase);
     ) (getResultingType $ getSemanticAnn $ getAnnotation e)
   sets <- case mDefaultCase of
     Just (DefaultCase blk ann') -> do
-      defaultBlk <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody blk) >> ST.get)
+      defaultBlk <- runEncapsWithEmptyVars (checkBasicBlocks (blockBody blk) >> ST.get)
       return $ (defaultBlk, getLocation ann') : caseSets
     Nothing -> return caseSets
   finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) sets
   unifyState (optionBoxesMap finalState, movedBoxes finalState, S.union (usedVarSet prevSt) (usedVarSet finalState))
   useExpression e
-useDefBasicBlock (SendMessage obj arg ann) = useObject obj >>
+checkBasicBlock (SendMessage obj arg ann) = useObject obj >>
   case arg of
     AccessObject input_obj@(Variable var _) -> do
       input_obj_type <- withLocation (getLocation ann) (getObjType input_obj)
@@ -210,7 +210,7 @@ useDefBasicBlock (SendMessage obj arg ann) = useObject obj >>
           safeMoveBox var loc
         _ -> useObject input_obj
     _ -> useExpression arg
-useDefBasicBlock (AllocBox obj arg ann) = useObject obj >>
+checkBasicBlock (AllocBox obj arg ann) = useObject obj >>
   case arg of
     -- I don't think we can have expression computing variables here.
     ReferenceExpression Mutable (Variable avar _anni) _ann ->
@@ -218,24 +218,24 @@ useDefBasicBlock (AllocBox obj arg ann) = useObject obj >>
     AccessObject (Variable avar _anni) ->
       allocOptionBox avar (getLocation ann)
     _ -> throwError $ annotateError (getLocation ann) EBadAllocArg
-useDefBasicBlock (FreeBox obj arg ann)
+checkBasicBlock (FreeBox obj arg ann)
   = useObject obj >>
   case arg of
     AccessObject (Variable var _anni) ->
       let loc = getLocation ann in
       safeMoveBox var loc
     _ -> withLocation (getLocation ann) (throwError EBadFreeArg)
-useDefBasicBlock (RegularBlock stmts) = useDefStatements stmts
+checkBasicBlock (RegularBlock stmts) = checkStatements stmts
 -- | Every other block only evaluates the expressions it holds, and none of them
 -- hands over a box other than through a call argument.
-useDefBasicBlock block = mapM_ (mapM_ useChild) (simpleBlockChildren block)
+checkBasicBlock block = mapM_ (mapM_ useChild) (simpleBlockChildren block)
 
 -- General case, not when it is TOption Box
-useMCase :: MatchCase SemanticAnn -> UDM BoxUsageError ()
-useMCase (MatchCase _mIdent _bvars blk _ann)
-  = useDefBasicBlocks (blockBody blk)
+checkMatchCase :: MatchCase SemanticAnn -> BoxUsageM BoxUsageError ()
+checkMatchCase (MatchCase _mIdent _bvars blk _ann)
+  = checkBasicBlocks (blockBody blk)
 
-useArraySize :: TerminaType SemanticAnn -> UDM BoxUsageError ()
+useArraySize :: TerminaType SemanticAnn -> BoxUsageM BoxUsageError ()
 useArraySize (TReference _ (TArray ty size)) = do
   useArraySize ty
   useExpression size
@@ -244,13 +244,13 @@ useArraySize (TArray ty size) = do
   useExpression size
 useArraySize _ty = return ()
 
-checkUseVariableStates :: UDSt -> [(UDSt, Location)] -> UDM BoxUsageError UDSt
+checkUseVariableStates :: BoxUsageSt -> [(BoxUsageSt, Location)] -> BoxUsageM BoxUsageError BoxUsageSt
 checkUseVariableStates prevSt sets = do
   finalSt <- checkOptionBoxStates prevSt sets 
   checkSameMovedBoxes (map (first (flip M.difference (movedBoxes prevSt) . movedBoxes)) sets)
   return finalSt
 
-checkSameMovedBoxes :: [(VarMap, Location)] -> UDM BoxUsageError ()
+checkSameMovedBoxes :: [(VarMap, Location)] -> BoxUsageM BoxUsageError ()
 checkSameMovedBoxes [] = return ()
 checkSameMovedBoxes [(boxes, _)] = 
   case M.toList boxes of
@@ -260,7 +260,7 @@ checkSameMovedBoxes (x:xs) = mapM_ (sameMovedBoxes x) xs
 
   where
 
-    sameMovedBoxes :: (VarMap, Location) -> (VarMap, Location) -> UDM BoxUsageError ()
+    sameMovedBoxes :: (VarMap, Location) -> (VarMap, Location) -> BoxUsageM BoxUsageError ()
     sameMovedBoxes (lmap, lloc) (rmap, rloc) = do
       mapM_ (\k ->
         case (M.lookup k lmap, M.lookup k rmap) of
@@ -269,7 +269,7 @@ checkSameMovedBoxes (x:xs) = mapM_ (sameMovedBoxes x) xs
           (Just vloc, Nothing)  -> throwError $ annotateError rloc (EMissingBoxMove k vloc)
           _ -> return ()) (M.keys $ M.union lmap rmap)
 
-checkOptionBoxStates :: UDSt -> [(UDSt, Location)] -> UDM BoxUsageError UDSt
+checkOptionBoxStates :: BoxUsageSt -> [(BoxUsageSt, Location)] -> BoxUsageM BoxUsageError BoxUsageSt
 checkOptionBoxStates prevSt [] = return prevSt
 checkOptionBoxStates prevSt [(state, loc)] = do
   let lmap = optionBoxesMap prevSt
@@ -314,55 +314,55 @@ checkOptionBoxStates lSt ((rSt, rloc):xs) = do
   nextSt <- unifyStates lSt rSt
   checkOptionBoxStates nextSt xs
 
-useDefCMemb :: ClassMember SemanticAnn -> UDM BoxUsageError ()
-useDefCMemb (ClassField {}) = return ()
-useDefCMemb (ClassMethod _ak _ident ps _tyret bret _ann)
-  = useDefBlockRet bret
+checkClassMember :: ClassMember SemanticAnn -> BoxUsageM BoxUsageError ()
+checkClassMember (ClassField {}) = return ()
+checkClassMember (ClassMethod _ak _ident ps _tyret bret _ann)
+  = checkBlock bret
   >> mapM_ (useArraySize . paramType) ps
-useDefCMemb (ClassProcedure _ak _ident ps blk ann)
-  = useDefBlockRet blk
+checkClassMember (ClassProcedure _ak _ident ps blk ann)
+  = checkBlock blk
   >> mapM_ (useArraySize . paramType) ps
   >> mapM_ (`defArgumentsProc` getLocation ann) ps
-useDefCMemb (ClassViewer _ident ps _tyret bret _ann)
-  = useDefBlockRet bret
+checkClassMember (ClassViewer _ident ps _tyret bret _ann)
+  = checkBlock bret
   >> mapM_ (useArraySize . paramType) ps
-useDefCMemb (ClassAction _ak _ident Nothing _tyret bret _ann)
-  = useDefBlockRet bret
-useDefCMemb (ClassAction _ak _ident (Just p) _tyret bret ann)
-  = useDefBlockRet bret
+checkClassMember (ClassAction _ak _ident Nothing _tyret bret _ann)
+  = checkBlock bret
+checkClassMember (ClassAction _ak _ident (Just p) _tyret bret ann)
+  = checkBlock bret
   >> mapM_ (`defArgumentsProc` getLocation ann) [p]
 
-useDefTypeDef :: TypeDef SemanticAnn -> UDM BoxUsageError ()
-useDefTypeDef (Class _k _id members _provides _mods)
-  = mapM_ useDefCMemb members
-useDefTypeDef (Struct {}) = return ()
-useDefTypeDef (Interface {}) = return ()
-useDefTypeDef (Enum {}) = return ()
+checkTypeDef :: TypeDef SemanticAnn -> BoxUsageM BoxUsageError ()
+checkTypeDef (Class _k _id members _provides _mods)
+  = mapM_ checkClassMember members
+checkTypeDef (Struct {}) = return ()
+checkTypeDef (Interface {}) = return ()
+checkTypeDef (Enum {}) = return ()
 
 -- Globals
-useDefFrag :: AnnASTElement SemanticAnn -> UDM BoxUsageError ()
-useDefFrag (Function _ident ps _ty blk _mods anns)
- = useDefBlockRet blk
+checkElement :: AnnASTElement SemanticAnn -> BoxUsageM BoxUsageError ()
+checkElement (Function _ident ps _ty blk _mods anns)
+ = checkBlock blk
  >> mapM_ (useArraySize . paramType) ps
  >> mapM_ (`defArgumentsProc` getLocation anns) ps
  -- >> mapM_ ((annotateError (location anns)) . defVariable . paramIdentifier) ps
-useDefFrag (GlobalDeclaration {})
+checkElement (GlobalDeclaration {})
   = return ()
-useDefFrag (TypeDefinition tyDef _ann)
-  = useDefTypeDef tyDef
+checkElement (TypeDefinition tyDef _ann)
+  = checkTypeDef tyDef
 
-runUDFrag :: AnnASTElement SemanticAnn -> Maybe BoxUsageError
-runUDFrag =
+runBoxUsageElement :: AnnASTElement SemanticAnn -> Maybe BoxUsageError
+runBoxUsageElement =
   either Just (const Nothing)
   . fst
-  . runComputation
-  . useDefFrag
+  . runBoxUsage
+  . checkElement
 
 runBoxUsageCheck :: AnnotatedProgram  SemanticAnn -> Maybe BoxUsageError
 runBoxUsageCheck
   = safeHead
   . filter isJust
-  . map runUDFrag
+  . map runBoxUsageElement
   where
     safeHead []     = Nothing
     safeHead (x:_) = x
