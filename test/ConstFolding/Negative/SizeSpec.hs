@@ -13,7 +13,7 @@ spec :: Spec
 spec = do
   describe "ConstFolding: array size and slice errors" $ do
 
-    it "CPE-002: array fill initializer size mismatch" $ do
+    it "CFE-002: array fill initializer size mismatch" $ do
       let src = "constexpr n : usize = 4;\n" ++
                 "constexpr k : usize = 5;\n" ++
                 "function f() -> u8 {\n" ++
@@ -21,20 +21,20 @@ spec = do
                 "    a[0] = 1 : u8;\n" ++
                 "    return a[0];\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-002")
+      compileErrorCode src `shouldBe` Just (pack "CFE-002")
 
-    it "CPE-002: array expression-list initializer size mismatch" $ do
+    it "CFE-002: array expression-list initializer size mismatch" $ do
       -- Both fill and expression-list initializer size mismatches report the
-      -- same code (CPE-002, EArrayInitializerSizeMismatch).
+      -- same code (CFE-002, EArrayInitializerSizeMismatch).
       let src = "constexpr n : usize = 4;\n" ++
                 "function f() -> u8 {\n" ++
                 "    var a : [u8; n] = {1 : u8, 2 : u8, 3 : u8};\n" ++
                 "    a[0] = 0 : u8;\n" ++
                 "    return a[0];\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-002")
+      compileErrorCode src `shouldBe` Just (pack "CFE-002")
 
-    it "CPE-003: string initializer larger than the array" $ do
+    it "CFE-003: string initializer larger than the array" $ do
       let src = "constexpr n : usize = 4;\n" ++
                 "function use_chars(_c : &[char; n]) {\n" ++
                 "    return;\n" ++
@@ -44,9 +44,9 @@ spec = do
                 "    use_chars(&s);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-003")
+      compileErrorCode src `shouldBe` Just (pack "CFE-003")
 
-    it "CPE-010: array slice out of bounds" $ do
+    it "CFE-010: array slice out of bounds" $ do
       let src = "function take2(_data : &[u8; 2]) {\n" ++
                 "    return;\n" ++
                 "}\n" ++
@@ -57,9 +57,9 @@ spec = do
                 "    take2(&a[lo .. hi]);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-010")
+      compileErrorCode src `shouldBe` Just (pack "CFE-010")
 
-    it "CPE-011: array slice with lower bound above upper bound" $ do
+    it "CFE-011: array slice with lower bound above upper bound" $ do
       let src = "function take2(_data : &[u8; 2]) {\n" ++
                 "    return;\n" ++
                 "}\n" ++
@@ -70,9 +70,9 @@ spec = do
                 "    take2(&a[lo .. hi]);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-011")
+      compileErrorCode src `shouldBe` Just (pack "CFE-011")
 
-    it "CPE-012: array slice length does not match the expected size" $ do
+    it "CFE-012: array slice length does not match the expected size" $ do
       let src = "function take2(_data : &[u8; 2]) {\n" ++
                 "    return;\n" ++
                 "}\n" ++
@@ -83,9 +83,9 @@ spec = do
                 "    take2(&a[lo .. hi]);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-012")
+      compileErrorCode src `shouldBe` Just (pack "CFE-012")
 
-    it "CPE-015: referenced array size mismatch" $ do
+    it "CFE-015: referenced array size mismatch" $ do
       let src = "constexpr n : usize = 4;\n" ++
                 "constexpr m : usize = 5;\n" ++
                 "function take(_data : &[u8; m]) {\n" ++
@@ -96,9 +96,9 @@ spec = do
                 "    take(&a);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-015")
+      compileErrorCode src `shouldBe` Just (pack "CFE-015")
 
-    it "CPE-015: referenced multidimensional array inner size mismatch" $ do
+    it "CFE-015: referenced multidimensional array inner size mismatch" $ do
       let src = "constexpr n : usize = 4;\n" ++
                 "constexpr i : usize = 3;\n" ++
                 "constexpr j : usize = 2;\n" ++
@@ -110,9 +110,9 @@ spec = do
                 "    take(&a);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-015")
+      compileErrorCode src `shouldBe` Just (pack "CFE-015")
 
-    it "CPE-015: referenced three-dimensional array innermost size mismatch" $ do
+    it "CFE-015: referenced three-dimensional array innermost size mismatch" $ do
       let src = "constexpr a : usize = 4;\n" ++
                 "constexpr b : usize = 3;\n" ++
                 "constexpr i : usize = 2;\n" ++
@@ -125,4 +125,4 @@ spec = do
                 "    take(&arr);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-015")
+      compileErrorCode src `shouldBe` Just (pack "CFE-015")

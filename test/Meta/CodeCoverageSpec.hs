@@ -56,7 +56,7 @@ families =
       "src/ControlFlow/BasicBlocks/Checks/ExitPaths/Errors.hs"
       [] ["test/ExitPaths/fixtures"]
       []
-  , Family "ConstFolding (CPE)" "CPE"
+  , Family "ConstFolding (CFE)" "CFE"
       "src/ControlFlow/ConstFolding/Errors.hs"
       [ "test/ConstFolding/Negative/ConstEvalSpec.hs"
       , "test/ConstFolding/Negative/AtomicSpec.hs"

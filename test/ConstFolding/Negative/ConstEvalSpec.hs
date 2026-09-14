@@ -9,25 +9,25 @@ spec :: Spec
 spec = do
   describe "ConstFolding: constant-evaluation errors" $ do
 
-    it "CPE-004: constant integer overflow on cast" $ do
+    it "CFE-004: constant integer overflow on cast" $ do
       let src = "function f() -> u8 {\n" ++
                 "    return 256 : u16 as u8;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-004")
+      compileErrorCode src `shouldBe` Just (pack "CFE-004")
 
-    it "CPE-005: constant integer underflow" $ do
+    it "CFE-005: constant integer underflow" $ do
       let src = "function f() -> u8 {\n" ++
                 "    return 0 : u8 - 1 : u8;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-005")
+      compileErrorCode src `shouldBe` Just (pack "CFE-005")
 
-    it "CPE-006: constant division by zero" $ do
+    it "CFE-006: constant division by zero" $ do
       let src = "function f() -> u32 {\n" ++
                 "    return 1 : u32 / 0 : u32;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-006")
+      compileErrorCode src `shouldBe` Just (pack "CFE-006")
 
-    it "CPE-007: condition folds to a constant" $ do
+    it "CFE-007: condition folds to a constant" $ do
       let src = "function f() -> u32 {\n" ++
                 "    var x : u32 = 0 : u32;\n" ++
                 "    if (1 : u32 == 1 : u32) {\n" ++
@@ -35,42 +35,42 @@ spec = do
                 "    }\n" ++
                 "    return x;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-007")
+      compileErrorCode src `shouldBe` Just (pack "CFE-007")
 
-    it "CPE-008: for loop with zero iterations" $ do
+    it "CFE-008: for loop with zero iterations" $ do
       let src = "function f() {\n" ++
                 "    for i : usize in 3 : usize .. 3 : usize {\n" ++
                 "    }\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-008")
+      compileErrorCode src `shouldBe` Just (pack "CFE-008")
 
-    it "CPE-009: for loop with negative iterations" $ do
+    it "CFE-009: for loop with negative iterations" $ do
       let src = "function f() {\n" ++
                 "    for i : usize in 5 : usize .. 3 : usize {\n" ++
                 "    }\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-009")
+      compileErrorCode src `shouldBe` Just (pack "CFE-009")
 
-    it "CPE-013: array index out of bounds with constant index" $ do
+    it "CFE-013: array index out of bounds with constant index" $ do
       let src = "const bad_idx : usize = 10;\n" ++
                 "function f() -> u8 {\n" ++
                 "    var a : [u8; 4] = [0; 4];\n" ++
                 "    a[bad_idx] = 0 : u8;\n" ++
                 "    return a[0];\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-013")
+      compileErrorCode src `shouldBe` Just (pack "CFE-013")
 
-    it "CPE-016: shift amount greater than or equal to the type width" $ do
+    it "CFE-016: shift amount greater than or equal to the type width" $ do
       let src = "function f() -> u8 {\n" ++
                 "    var x : u8 = 0 : u8;\n" ++
                 "    x = x << 8 : usize;\n" ++
                 "    return x;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-016")
+      compileErrorCode src `shouldBe` Just (pack "CFE-016")
 
-    it "CPE-017: comparison against a constant at the limit of the type range" $ do
+    it "CFE-017: comparison against a constant at the limit of the type range" $ do
       let src = "function f(x : u32) -> u32 {\n" ++
                 "    var y : u32 = 0 : u32;\n" ++
                 "    if (x < 0 : u32) {\n" ++
@@ -78,4 +78,4 @@ spec = do
                 "    }\n" ++
                 "    return y;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-017")
+      compileErrorCode src `shouldBe` Just (pack "CFE-017")
