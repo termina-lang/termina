@@ -73,14 +73,16 @@ stripAnsi = T.concat . go
 -- | The message of an annotated error, from its description.
 errorToText :: Diagnosable e
     => AnnotatedError e Location -> M.Map FilePath T.Text -> T.Text
-errorToText (AnnotatedError err pos@(Position _ start _end)) files =
-    let fileName = sourceName start
-        sourceLines = files M.! fileName
-        diagnostic = describe err
+-- | The source of the file the error points at is quoted when it is at hand. It
+-- is not when the error comes from a stage that is given no sources, such as the
+-- generation of the scheduling model.
+errorToText (AnnotatedError err pos@(Position _ start _end)) files
+    | M.member (sourceName start) files =
+    let diagnostic = describe err
         title = "\x1b[31merror [" <> diagCode diagnostic <> "]\x1b[0m: "
             <> diagTitle diagnostic <> "."
     in
-        pprintError sourceLines title fileName pos
+        pprintError files title pos
             (diagRelated diagnostic) (diagDetail diagnostic)
 -- | An error with no position in the source has nothing to quote, so it prints
 -- its message alone. An internal error has no message either, and then the value
@@ -164,30 +166,55 @@ loc2Range (Position _ start end) =
         (LSP.Position (fromIntegral (sourceLine end) - 1) (fromIntegral (sourceColumn end) - 1))
 loc2Range _ = emptyRange
 
+-- | The message of an error that quotes one piece of source and nothing else.
 pprintSimpleError :: T.Text -> T.Text -> String -> Location -> Maybe T.Text -> T.Text
 pprintSimpleError sourceLines errorMessage fileName pos =
-    pprintError sourceLines errorMessage fileName pos []
+    pprintError (M.singleton fileName sourceLines) errorMessage pos []
 
 -- | The message of an error: the piece of source it points at, one more pointer
 -- for each position related to it, and the explanation underneath. A related
--- position carries its own label, and one in another file is left out, since a
--- block quotes a single source.
-pprintError :: T.Text -> T.Text -> String -> Location
+-- position carries its own label, and one that quotes another file goes in a
+-- block of its own, since a block quotes a single source.
+pprintError :: M.Map FilePath T.Text -> T.Text -> Location
     -> [(Location, T.Text)] -> Maybe T.Text -> T.Text
-pprintError sourceLines errorMessage fileName pos related msg =
-    case mkPointer Nothing pos of
-        Nothing -> error "Internal error: invalid error position"
-        Just mainPointer ->
-            let pointers = sortOn pointerLine
-                    (mainPointer : mapMaybe (\(loc, what) -> mkPointer (Just what) loc) sameFile)
-            in
-                TL.toStrict $ prettyErrors sourceLines [genErrata pointers]
+pprintError files errorMessage pos related msg =
+    mainMessage <> T.concat (map otherFileMessage otherFile)
 
     where
 
-        -- | A related position is drawn in the same block, so it has to quote the
+        sourceLines = M.findWithDefault "" fileName files
+
+        fileName =
+            case pos of
+                Position _ start _ -> sourceName start
+                _ -> ""
+
+        mainMessage =
+            case mkPointer Nothing pos of
+                Nothing -> error "Internal error: invalid error position"
+                Just mainPointer ->
+                    let pointers = sortOn pointerLine
+                            (mainPointer : mapMaybe (\(loc, what) -> mkPointer (Just what) loc) sameFile)
+                    in
+                        TL.toStrict $ prettyErrors sourceLines [genErrata pointers]
+
+        -- | A position in another file is quoted on its own, with its label as
+        -- the heading.
+        otherFileMessage :: (Location, T.Text) -> T.Text
+        otherFileMessage (loc@(Position _ start _), what) =
+            pprintSimpleError (M.findWithDefault "" (sourceName start) files)
+                ("\n" <> emph what <> ":") (sourceName start) loc Nothing
+        otherFileMessage _ = ""
+
+        (sameFile, otherFile) = span' related
+
+        -- | A related position is drawn in the same block only when it quotes the
         -- same source.
-        sameFile = [ (loc, what) | (loc, what) <- related, sameSource pos loc ]
+        span' rs = ([ r | r@(loc, _) <- rs, sameSource pos loc ]
+                   ,[ r | r@(loc, _) <- rs, not (sameSource pos loc), isPosition loc ])
+
+        isPosition (Position {}) = True
+        isPosition _ = False
 
         merged = not (null sameFile)
 
