@@ -76,12 +76,6 @@ useFieldAssignment _ = return ()
 getObjType :: Object SemanticAnn -> UDM Error (AccessKind, TerminaType SemanticAnn)
 getObjType = maybe (throwError EInvalidObjectTypeAnnotation) return . getObjectSAnns . getAnnotation
 
--- | Records the calls to member functions of the class made through self.
-useSelfMemberFunction :: Object SemanticAnn -> Identifier -> UDM VarUsageError ()
-useSelfMemberFunction (Variable "self" _) ident = safeUseMemberFunction ident
-useSelfMemberFunction (Dereference (Variable "self" _) _) ident = safeUseMemberFunction ident
-useSelfMemberFunction _ _ = return ()
-
 useExpression :: Expression SemanticAnn -> UDM VarUsageError ()
 useExpression (AccessObject obj)
   = useObject obj
@@ -101,10 +95,10 @@ useExpression (IsMonadicVariantExpression obj _ _)
   = useObject obj
 useExpression (ArraySliceExpression _aK obj eB eT _ann)
   = useObject obj >> useExpression eB >> useExpression eT
-useExpression (MemberFunctionCall obj ident args _ann) = do
-    useSelfMemberFunction obj ident >> useObject obj >> mapM_ useArguments args
-useExpression (DerefMemberFunctionCall obj ident args _ann)
-  = useSelfMemberFunction obj ident >> useObject obj >> mapM_ useArguments args
+useExpression (MemberFunctionCall obj _ident args _ann) =
+    useObject obj >> mapM_ useArguments args
+useExpression (DerefMemberFunctionCall obj _ident args _ann)
+  = useObject obj >> mapM_ useArguments args
 useExpression (ArrayInitializer e _size _ann)
   = useExpression e
 useExpression (ArrayExprListInitializer exprs _ann) = mapM_ useExpression exprs
@@ -137,8 +131,8 @@ useDefStmt (Declaration ident _accK tyS initE ann)
     TOption (TBoxSubtype _) -> defVariableOptionBox ident loc
     -- Box are not possible, they come from somewhere else.
     TBoxSubtype _ -> throwError $ annotateError loc EDefiningBox
-    --Everything else
-    _        -> defVariable ident loc
+    -- | Everything else is a plain variable, which the forward pass owns
+    _        -> return ()
   -- Use everithing in the |initE| if included
   >> mapM_ useExpression initE
 -- All branches should have the same used Only ones.
@@ -309,9 +303,8 @@ useDefBasicBlock (SystemCall obj _ident args _ann) =
 
 -- General case, not when it is TOption Box
 useMCase :: MatchCase SemanticAnn -> UDM VarUsageError ()
-useMCase (MatchCase _mIdent bvars blk ann)
+useMCase (MatchCase _mIdent _bvars blk _ann)
   = useDefBasicBlocks (blockBody blk)
-  >> mapM_ (`defVariable` getLocation ann) bvars
 
 useArraySize :: TerminaType SemanticAnn -> UDM VarUsageError ()
 useArraySize (TReference _ (TArray ty size)) = do
@@ -393,49 +386,26 @@ checkOptionBoxStates lSt ((rSt, rloc):xs) = do
   checkOptionBoxStates nextSt xs
 
 useDefCMemb :: ClassMember SemanticAnn -> UDM VarUsageError ()
-useDefCMemb (ClassField fdef)
-  = defVariable (fieldIdentifier fdef) (getLocation (fieldAnnotation fdef))
-useDefCMemb (ClassMethod _ak ident ps _tyret bret ann)
-  = useDefSelfBody (ESelfNotUsed ident) (getLocation ann) (useDefBlockRet bret)
+useDefCMemb (ClassField {}) = return ()
+useDefCMemb (ClassMethod _ak _ident ps _tyret bret _ann)
+  = useDefBlockRet bret
   >> mapM_ (useArraySize . paramType) ps
-  >> mapM_ ((`defVariable` getLocation ann) . paramIdentifier) ps
 useDefCMemb (ClassProcedure _ak _ident ps blk ann)
   = useDefBlockRet blk
   >> mapM_ (useArraySize . paramType) ps
   >> mapM_ (`defArgumentsProc` getLocation ann) ps
-  -- >> mapM_ (annotateError (location ann) . defVariable . paramIdentifier) ps
-useDefCMemb (ClassViewer ident ps _tyret bret ann)
-  = useDefSelfBody (ESelfNotUsed ident) (getLocation ann) (useDefBlockRet bret)
+useDefCMemb (ClassViewer _ident ps _tyret bret _ann)
+  = useDefBlockRet bret
   >> mapM_ (useArraySize . paramType) ps
-  >> mapM_ ((`defVariable` getLocation ann) . paramIdentifier) ps
-useDefCMemb (ClassAction _ak ident Nothing _tyret bret ann)
-  = useDefSelfBody (EActionSelfNotUsed ident) (getLocation ann) (useDefBlockRet bret)
-useDefCMemb (ClassAction _ak ident (Just p) _tyret bret ann)
-  = useDefSelfBody (EActionSelfNotUsed ident) (getLocation ann) (useDefBlockRet bret)
+useDefCMemb (ClassAction _ak _ident Nothing _tyret bret _ann)
+  = useDefBlockRet bret
+useDefCMemb (ClassAction _ak _ident (Just p) _tyret bret ann)
+  = useDefBlockRet bret
   >> mapM_ (`defArgumentsProc` getLocation ann) [p]
-
--- | Checks that the methods and viewers are called by some member of the class.
-useDefMemberFunction :: ClassMember SemanticAnn -> UDM VarUsageError ()
-useDefMemberFunction (ClassMethod _ak ident _ps _tyret _bret ann) = defMemberFunction ident (getLocation ann)
-useDefMemberFunction (ClassViewer ident _ps _tyret _bret ann) = defMemberFunction ident (getLocation ann)
-useDefMemberFunction _ = return ()
 
 useDefTypeDef :: TypeDef SemanticAnn -> UDM VarUsageError ()
 useDefTypeDef (Class _k _id members _provides _mods)
-  -- First we go through uses
-  = mapM_ useDefCMemb muses
-  -- Then the calls to the methods and viewers
-  >> mapM_ useDefMemberFunction muses
-  -- Then all definitions (ClassFields)
-  >> mapM_ useDefCMemb mdefs
-  where
-    (muses,mdefs) = foldr (\m (u,d)->
-                             case m of {
-                               ClassField (FieldDefinition _ (TSinkPort {}) _) -> (u, d);
-                               ClassField (FieldDefinition _ (TInPort {}) _) -> (u, d);
-                               ClassField {} -> (u, m:d);
-                               _             -> (m:u, d)
-                                       }) ([],[]) members
+  = mapM_ useDefCMemb members
 useDefTypeDef (Struct {}) = return ()
 useDefTypeDef (Interface {}) = return ()
 useDefTypeDef (Enum {}) = return ()

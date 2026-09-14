@@ -421,11 +421,11 @@ spec :: Spec
 spec = do
   describe "Semantic Errors" $ do
     it "VE-001: invalid array indexing" $ do
-     runNegativeTestVarUsage testVE001
+     runNegativeTestInit testVE001
        `shouldSatisfy`
         isEUsedIgnoredParameter "_data"
     it "VE-002: invalid array indexing" $ do
-     runNegativeTestVarUsage testVE002
+     runNegativeTestInit testVE002
        `shouldSatisfy`
         isENotUsed "opt"
     it "VE-003: box variable not moved (matched Some payload)" $ do
@@ -485,23 +485,23 @@ spec = do
         `shouldSatisfy`
           isEOptionBoxMatchMissingSomeCase
     it "VE-016: method does not use self" $ do
-      runNegativeTestVarUsage testVE016
+      runNegativeTestInit testVE016
         `shouldSatisfy`
           isESelfNotUsed "method0"
     it "VE-016: viewer does not use self" $ do
-      runNegativeTestVarUsage testVE016_1
+      runNegativeTestInit testVE016_1
         `shouldSatisfy`
           isESelfNotUsed "viewer0"
     it "VE-015: action does not use self" $ do
-      runNegativeTestVarUsage testVE015
+      runNegativeTestInit testVE015
         `shouldSatisfy`
           isEActionSelfNotUsed "action0"
     it "VE-017: method never called" $ do
-      runNegativeTestVarUsage testVE017
+      runNegativeTestInit testVE017
         `shouldSatisfy`
           isEMemberFunctionNotUsed "method0"
     it "VE-017: viewer never called" $ do
-      runNegativeTestVarUsage testVE017_1
+      runNegativeTestInit testVE017_1
         `shouldSatisfy`
           isEMemberFunctionNotUsed "viewer0"
     it "VE-018: value assigned and overwritten before being read" $ do

@@ -47,7 +47,7 @@ data Error
   | EMovedWithoutAlloc Identifier Location -- ^ Option-box moved but not allocated (VE-013)
   | EOptionBoxMatchMissingSomeCase
   | EActionSelfNotUsed Identifier -- ^ Action does not use self (VE-015)
-  | ESelfNotUsed Identifier -- ^ Method or viewer does not use self (VE-016)
+  | ESelfNotUsed Identifier -- ^ Method, viewer or procedure does not use self (VE-016)
   | EMemberFunctionNotUsed Identifier -- ^ Method or viewer is never called (VE-017)
   | EAssignedValueNotUsed Identifier -- ^ Value assigned to a variable is never read (VE-018)
   | EReadBeforeAssignment Identifier -- ^ Object read on a path where it has not been assigned (VE-019)

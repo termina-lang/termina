@@ -27,7 +27,7 @@ timerTaskClass =
     "    ticks : u32;\n" ++
     "    timer_port : sink TimeVal triggers timeout;\n" ++
     "    action timeout(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-    "        self->ticks = 1 : u32;\n" ++
+    "        self->ticks = self->ticks + 1 : u32;\n" ++
     returnSuccess ++
     "    }\n" ++
     "};\n"
@@ -102,7 +102,7 @@ spec = do
             "    last : u32;\n" ++
             "    in_port : in u32 triggers handle;\n" ++
             "    action handle(&priv self, msg : u32) -> Status<i32> {\n" ++
-            "        self->last = msg;\n" ++
+            "        self->last = self->last + msg;\n" ++
             returnSuccess ++
             "    }\n" ++
             "};\n" ++
@@ -126,7 +126,7 @@ spec = do
             "    last : u32;\n" ++
             "    in_port : in u32 triggers handle;\n" ++
             "    action handle(&priv self, msg : u32) -> Status<i32> {\n" ++
-            "        self->last = msg;\n" ++
+            "        self->last = self->last + msg;\n" ++
             returnSuccess ++
             "    }\n" ++
             "};\n" ++

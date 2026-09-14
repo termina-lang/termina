@@ -3,10 +3,9 @@
 module ControlFlow.VarUsage.Computation (
   UDM, UDSt(..), VarMap, VarSet, OptionBoxMap,
   runEncapsWithEmptyVars, runMultipleEncapsWithEmptyVars, unionUsed, unifyState,
-  unifyStates, defVariableOptionBox, defBox, defVariable, safeUseVariable,
+  unifyStates, defVariableOptionBox, defBox, safeUseVariable,
   initializeOptionBox, moveOptionBox, safeMoveBox, allocOptionBox,
-  defArgumentsProc, runComputation, emptyUDSt, useDefSelfBody,
-  safeUseMemberFunction, defMemberFunction, defAssignedVariable,
+  defArgumentsProc, runComputation, emptyUDSt, defAssignedVariable,
   withUncheckedAssignments, putLiveVarSet
 ) where
 
@@ -124,9 +123,6 @@ unionUsed optionBoxes regular =
     optionBoxesMap = M.union optionBoxes (optionBoxesMap st),
     usedVarSet = S.union regular (usedVarSet st)})
 
-removeUsed :: Identifier -> UDSt -> UDSt
-removeUsed s st = st {usedVarSet = S.delete s (usedVarSet st)}
-
 removeLive :: Identifier -> UDSt -> UDSt
 removeLive s st = st {liveVarSet = S.delete s (liveVarSet st)}
 
@@ -210,10 +206,12 @@ allocOptionBox ident loc
         Defined _ -> throwError $ annotateError Internal EVarRedefinition;
       }) . M.lookup ident =<< ST.gets optionBoxesMap
 
+-- | An option-box that nobody mentions is reported as an unused variable by
+-- the forward pass, so here it is simply not tracked.
 defVariableOptionBox :: Identifier -> Location -> UDM VarUsageError ()
 defVariableOptionBox ident loc =
   maybe
-    (throwError $ annotateError loc (ENotUsed ident))
+    (return ())
     (\case{
         -- Allocated after defined.
         Allocated _ -> safeUpdateOptionBox ident (Defined loc);
@@ -222,19 +220,6 @@ defVariableOptionBox ident loc =
         -- Defined;Defined not allowed,
         Defined _ -> throwError $ annotateError Internal EDefinedTwice 
         }) . M.lookup ident =<< ST.gets optionBoxesMap
-
--- If we define a variable that was not used, then error.
-defVariable :: Identifier -> Location -> UDM VarUsageError ()
-defVariable ident loc =
-  ST.modify (removeLive ident) >>
-  ST.gets usedVarSet >>=
-  \i ->
-    case head ident of
-      -- If the argument starts with an underscore, then the parameter must be ignored and not used.
-      '_' -> when (S.member ident i) (throwError $ annotateError loc (EUsedIgnoredParameter ident))
-      _ -> if S.member ident i
-           then ST.modify (removeUsed ident)
-           else throwError $ annotateError loc (ENotUsed ident)
 
 -- | Assignment to a whole variable. The value assigned must be read afterwards.
 -- The assignment still counts as a use of the variable.
@@ -260,37 +245,10 @@ withUncheckedAssignments m = do
 -- box.
 defArgumentsProc :: Parameter a -> Location -> UDM VarUsageError ()
 defArgumentsProc ps loc
-  = (case paramType ps of
-        TBoxSubtype _ -> flip defBox loc
-        _ -> flip defVariable loc)
-    (paramIdentifier ps)
-
--- | Methods, viewers and actions must use self. Otherwise, the error given is
--- raised. Since the set of used variables is shared among all the members of
--- the class, self is removed from it before computing the body.
-useDefSelfBody :: Error -> Location -> UDM VarUsageError () -> UDM VarUsageError ()
-useDefSelfBody err loc body = do
-  ST.modify (removeUsed "self")
-  body
-  used <- ST.gets (S.member "self" . usedVarSet)
-  unless used (throwError $ annotateError loc err)
-
--- | Key under which a call to a member function through self is recorded in
--- the set of used variables. It is not a valid identifier, so it cannot clash
--- with the name of a variable.
-memberFunctionKey :: Identifier -> Identifier
-memberFunctionKey ident = "self->" ++ ident
-
--- | Records a call to a member function of the class made through self.
-safeUseMemberFunction :: Identifier -> UDM VarUsageError ()
-safeUseMemberFunction = safeUseVariable . memberFunctionKey
-
--- | Methods and viewers can only be called through self by the members of
--- their own class, so a method or a viewer that no member calls is never used.
-defMemberFunction :: Identifier -> Location -> UDM VarUsageError ()
-defMemberFunction ident loc = do
-  used <- ST.gets (S.member (memberFunctionKey ident) . usedVarSet)
-  unless used (throwError $ annotateError loc (EMemberFunctionNotUsed ident))
+  = case paramType ps of
+      TBoxSubtype _ -> defBox (paramIdentifier ps) loc
+      -- | A plain parameter is a variable, which the forward pass owns
+      _ -> return ()
 
 ----------------------------------------
 -- Run computation and get its result.

@@ -10,10 +10,10 @@ import Test.Hspec
 matchingArraySize :: String
 matchingArraySize =
   "constexpr n : usize = 4;\n" ++
-  "function f() {\n" ++
+  "function f() -> u8 {\n" ++
   "    var a : [u8; n] = [0 : u8; n];\n" ++
   "    a[0] = 1 : u8;\n" ++
-  "    return;\n" ++
+  "    return a[0];\n" ++
   "}"
 
 -- A constant arithmetic expression that folds without overflow.

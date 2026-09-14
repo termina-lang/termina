@@ -55,10 +55,10 @@ spec = do
 
     it "CPE-013: array index out of bounds with constant index" $ do
       let src = "const bad_idx : usize = 10;\n" ++
-                "function f() {\n" ++
+                "function f() -> u8 {\n" ++
                 "    var a : [u8; 4] = [0; 4];\n" ++
                 "    a[bad_idx] = 0 : u8;\n" ++
-                "    return;\n" ++
+                "    return a[0];\n" ++
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CPE-013")
 

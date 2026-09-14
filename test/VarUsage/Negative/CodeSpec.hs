@@ -16,9 +16,7 @@ import Test.Hspec
 -- | (code, title, source) for every reachable VarUsage error.
 cases :: [(Text, String, String)]
 cases =
-  [ ("VE-001", "ignored parameter is used", testVE001)
-  , ("VE-002", "variable not used", testVE002)
-  , ("VE-003", "box variable not moved", testVE003)
+  [ ("VE-003", "box variable not moved", testVE003)
   , ("VE-004", "box variable moved twice", testVE004)
   , ("VE-005", "option-box variable moved twice", testVE005)
   , ("VE-006", "option-box final state mismatch across branches", testVE006)
@@ -30,17 +28,19 @@ cases =
   , ("VE-012", "option-box allocated twice", testVE012)
   , ("VE-013", "option-box moved without being allocated", testVE013)
   , ("VE-014", "option-box match missing the Some case", testVE014)
-  , ("VE-015", "action does not use self", testVE015)
-  , ("VE-016", "method or viewer does not use self", testVE016)
-  , ("VE-017", "method or viewer never called", testVE017)
   , ("VE-018", "assigned value never read", testVE018)
   ]
 
--- | (code, title, source) for the codes raised by the definite assignment
--- check, which is a pass of its own and therefore has its own runner.
+-- | (code, title, source) for the codes raised by the forward pass, which owns
+-- initialization and the usage of variables, fields and member functions.
 initCases :: [(Text, String, String)]
 initCases =
-  [ ("VE-019", "object read before it is assigned", testVE019)
+  [ ("VE-001", "ignored parameter is used", testVE001)
+  , ("VE-002", "variable not used", testVE002)
+  , ("VE-015", "action does not use self", testVE015)
+  , ("VE-016", "method or viewer does not use self", testVE016)
+  , ("VE-017", "method or viewer never called", testVE017)
+  , ("VE-019", "object read before it is assigned", testVE019)
   , ("VE-020", "partial write before the object is assigned", testVE020)
   ]
 

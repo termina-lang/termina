@@ -16,10 +16,10 @@ spec = do
     it "CPE-002: array fill initializer size mismatch" $ do
       let src = "constexpr n : usize = 4;\n" ++
                 "constexpr k : usize = 5;\n" ++
-                "function f() {\n" ++
+                "function f() -> u8 {\n" ++
                 "    var a : [u8; n] = [0 : u8; k];\n" ++
                 "    a[0] = 1 : u8;\n" ++
-                "    return;\n" ++
+                "    return a[0];\n" ++
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CPE-002")
 
@@ -27,10 +27,10 @@ spec = do
       -- Both fill and expression-list initializer size mismatches report the
       -- same code (CPE-002, EArrayInitializerSizeMismatch).
       let src = "constexpr n : usize = 4;\n" ++
-                "function f() {\n" ++
+                "function f() -> u8 {\n" ++
                 "    var a : [u8; n] = {1 : u8, 2 : u8, 3 : u8};\n" ++
                 "    a[0] = 0 : u8;\n" ++
-                "    return;\n" ++
+                "    return a[0];\n" ++
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CPE-002")
 
