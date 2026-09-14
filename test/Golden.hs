@@ -1,4 +1,4 @@
-module Pipeline.Golden (goldenC) where
+module Golden (goldenC, goldenMessage) where
 
 import Data.Text (Text)
 import qualified Data.Text.IO as TIO
@@ -7,10 +7,11 @@ import System.Environment (lookupEnv)
 import System.FilePath ((</>), (<.>), takeDirectory)
 import Test.Hspec (Expectation, expectationFailure, shouldBe)
 
--- | Directory holding the golden C files, relative to the package root (which
+-- | Directories holding the golden files, relative to the package root (which
 -- is the working directory @stack test@ runs in).
-goldenDir :: FilePath
-goldenDir = "test" </> "Pipeline" </> "golden"
+goldenCDir, goldenMessageDir :: FilePath
+goldenCDir = "test" </> "Pipeline" </> "golden"
+goldenMessageDir = "test" </> "Errors" </> "golden"
 
 -- | Assert that rendered C matches the golden file
 -- @test\/Pipeline\/golden\/\<name\>.c@.
@@ -31,7 +32,16 @@ goldenDir = "test" </> "Pipeline" </> "golden"
 --     notice, so a brand-new fixture never silently passes.
 --   * Otherwise the actual output is compared against the committed golden.
 goldenC :: String -> Text -> Expectation
-goldenC name actual = do
+goldenC = goldenIn goldenCDir "c"
+
+-- | Assert that the message the compiler prints for an error matches the golden
+-- file @test\/Errors\/golden\/\<name\>.txt@. It fixes the text a user reads,
+-- colour escapes included, which no other test looks at.
+goldenMessage :: String -> Text -> Expectation
+goldenMessage = goldenIn goldenMessageDir "txt"
+
+goldenIn :: FilePath -> String -> String -> Text -> Expectation
+goldenIn dir ext name actual = do
   update <- lookupEnv "GOLDEN_UPDATE"
   exists <- doesFileExist path
   case update of
@@ -49,7 +59,7 @@ goldenC name actual = do
   where
 
     path :: FilePath
-    path = goldenDir </> name <.> "c"
+    path = dir </> name <.> ext
 
     writeGolden :: Text -> IO ()
     writeGolden content = do

@@ -1,0 +1,6 @@
+[31merror [SE-118][0m: assignment expression type mismatch.
+[34m→[0m test:3:9
+  [34m│[0m
+3 [34m│[0m     x = [31mtrue[0m;
+  [34m│[0m         [31m^[0m[31m^[0m[31m^[0m[31m^[0m
+The expected type of the assignment is [31mu32[0m but it is of type [31mbool[0m.

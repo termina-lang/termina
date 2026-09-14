@@ -1,0 +1,7 @@
+[31merror [EE-003][0m: missing return statement.
+[34m→[0m test:1:1
+  [34m│[0m
+1 [34m│[0m [31mfunction f(x : u32) -> u32 {[0m
+  [34m│[0m [31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m
+Missing return statement.
+All functions must have a return statement, even if they return nothing.

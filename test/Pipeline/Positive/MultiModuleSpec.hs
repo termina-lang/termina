@@ -1,7 +1,7 @@
 module Pipeline.Positive.MultiModuleSpec (spec) where
 
 import Pipeline.Common
-import Pipeline.Golden
+import Golden
 
 import Test.Hspec
 

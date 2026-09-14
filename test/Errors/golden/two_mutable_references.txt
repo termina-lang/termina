@@ -1,0 +1,9 @@
+[31merror [SEF-001][0m: second mutable reference to the same object.
+[34m→[0m test:8:18
+  [34m│[0m
+8 [34m│[0m     set2([31m&mut x[0m, [31m&mut x[0m);
+  [34m│[0m          [31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m─[0m[31m─[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m
+  [34m│[0m          [31m│[0m
+  [34m│[0m          [31m└[0m  [31mthe other mutable reference[0m
+A mutable reference to this object is taken while another mutable reference to it is still live in the same expression.
+At most one mutable reference to a given object may appear in a single expression.

@@ -63,7 +63,9 @@ parserStageError sources =
         Right _ -> Nothing
   where
     parseOne (qname, src) =
-      case runParser terminaModuleParser qname "" src of
+      -- | As in a real build, every position carries the name of its module, so
+      -- that a rendered message finds the source it quotes.
+      case runParser terminaModuleParser qname qname src of
         Left err -> Left (annotateError Internal (EParseError err))
         Right (Termina imports _) -> (qname,) <$> mapM toDep imports
     toDep (ModuleImport ident ann) =

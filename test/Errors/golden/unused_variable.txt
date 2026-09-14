@@ -1,0 +1,6 @@
+[31merror [VE-002][0m: variable not used.
+[34m→[0m test:2:5
+  [34m│[0m
+2 [34m│[0m     [31mvar never_read : u32 = 0[0m;
+  [34m│[0m     [31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m
+Variable [31mnever_read[0m is declared but not used.

@@ -10,7 +10,7 @@
 module Pipeline.Positive.ReactiveGlueSpec (spec) where
 
 import Pipeline.Common
-import Pipeline.Golden
+import Golden
 
 import Data.Text (unpack)
 import Test.Hspec
@@ -49,7 +49,7 @@ spec = describe "Full pipeline: reactive application glue" $
   case runFullProjectApp [("test", reactiveApp)] of
     Left err ->
       it "builds the reactive application" $
-        expectationFailure $ "pipeline failed: " ++ unpack err
+        expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
     Right (progArch, prjprogs) -> do
       it "installs the task entry as an explicit function pointer (main file)" $
         either (expectationFailure . unpack) (goldenC "reactive_glue_main")
