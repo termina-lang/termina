@@ -28,7 +28,7 @@ import Text.Parsec.Error
 import Semantic.Environment
 import ControlFlow.ConstFolding (runConstFolding, constFoldModule)
 import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
-import ControlFlow.ConstPropagation (runConstPropagationCheck)
+import ControlFlow.ValueAnalysis (runValueAnalysisCheck)
 import Data.Maybe (listToMaybe, mapMaybe)
 import qualified Data.Set as S
 import qualified Data.ByteString as BS
@@ -238,11 +238,11 @@ constFolding plt bbProject =
             (M.insert m (constEnv env') constEnvs) ms
 
 -- | Checks that no condition of the project has the same value every time it
--- is evaluated (CPE-001). The check runs after the folding and not with the
+-- is evaluated (VAE-001). The check runs after the folding and not with the
 -- rest of the basic-block checks because it needs the constants of each
 -- module, which the folding is what builds.
-constPropagationCheck :: Platform -> ProjectConstEnvs -> BasicBlocksProject -> IO ()
-constPropagationCheck plt constEnvs bbProject =
+valueAnalysisCheck :: Platform -> ProjectConstEnvs -> BasicBlocksProject -> IO ()
+valueAnalysisCheck plt constEnvs bbProject =
   case checkModules (M.toList bbProject) of
     Nothing -> return ()
     Just err -> TIO.putStrLn (toText err (projectSourceFiles bbProject)) >> exitFailure
@@ -251,6 +251,6 @@ constPropagationCheck plt constEnvs bbProject =
 
     checkModules mods = listToMaybe (mapMaybe checkModule mods)
 
-    checkModule (m, bbModule) = runConstPropagationCheck plt
+    checkModule (m, bbModule) = runValueAnalysisCheck plt
       (M.findWithDefault M.empty m constEnvs)
       (basicBlocksAST . metadata $ bbModule)

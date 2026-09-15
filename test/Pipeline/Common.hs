@@ -51,7 +51,7 @@ import ControlFlow.Architecture.Types (TerminaProgArch)
 import ControlFlow.Architecture.Checks
 import ControlFlow.ConstFolding (runConstFolding, constFoldModule)
 import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
-import ControlFlow.ConstPropagation (runConstPropagationCheck)
+import ControlFlow.ValueAnalysis (runValueAnalysisCheck)
 import Utils.Errors (ErrorMessage(errorIdent, toText))
 
 -- | Drives a set of in-memory modules through the *full* transpiler pipeline,
@@ -109,7 +109,7 @@ runProjectPipeline sources = do
   (foldedProject, constEnvs) <- foldProject files bbProject ordered
   -- | The constant propagation check follows the folding, which is what gives
   -- it the constants of each module.
-  propagateConstants files foldedProject constEnvs
+  analyseValues files foldedProject constEnvs
   progArch <- genProjectArchitecture files foldedProject ordered
   runChecks files progArch
   pure (foldedProject, ordered, progArch)
@@ -146,19 +146,19 @@ foldProject files bbProject = go (ConstFoldEnv M.empty TestPlatform) M.empty M.e
         Right (foldedModule, env') ->
           go env' (M.insert m foldedModule folded) (M.insert m (constEnv env') constEnvs) ms
 
--- | Report a condition that always has the same value, which is what the
--- constant propagation check looks for. Mirrors
--- @Command.Common.constPropagationCheck@ but stays in 'Either'.
-propagateConstants :: M.Map FilePath Text -> BasicBlocksProject -> ProjectConstEnvs
+-- | Report a condition that always has the same value, which is what the value
+-- analysis check looks for. Mirrors @Command.Common.valueAnalysisCheck@ but
+-- stays in 'Either'.
+analyseValues :: M.Map FilePath Text -> BasicBlocksProject -> ProjectConstEnvs
   -> Either Failure ()
-propagateConstants files bbProject constEnvs =
+analyseValues files bbProject constEnvs =
   case mapMaybe checkModule (M.toList bbProject) of
     [] -> Right ()
     (err : _) -> Left (failure files err)
 
   where
 
-    checkModule (m, bbModule) = runConstPropagationCheck TestPlatform
+    checkModule (m, bbModule) = runValueAnalysisCheck TestPlatform
       (M.findWithDefault M.empty m constEnvs)
       (basicBlocksAST . metadata $ bbModule)
 

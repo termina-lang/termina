@@ -1,11 +1,11 @@
--- | Constant propagation positive tests: a condition the pass cannot show to
--- be invariant raises no error.
+-- | Value analysis positive tests: a condition the pass cannot show to be
+-- invariant raises no error.
 --
 -- These are the cases that decide whether the pass is usable at all, since
--- CPE-001 stops a build: a value the walk of a loop has not settled yet, a
+-- VAE-001 stops a build: a value the walk of a loop has not settled yet, a
 -- variable two branches disagree on, one that a call may have written behind
 -- the pass's back, and one whose value comes from outside the body.
-module ConstPropagation.Positive.PropagationSpec (spec) where
+module ValueAnalysis.Positive.ValuesSpec (spec) where
 
 import Pipeline.Common (compileErrorCode)
 
@@ -13,7 +13,7 @@ import Test.Hspec
 
 spec :: Spec
 spec = do
-  describe "ConstPropagation: a condition that is not invariant raises no error" $ do
+  describe "ValueAnalysis: a condition that is not invariant raises no error" $ do
 
     it "accepts a condition that only the first turn of a loop decides" $ do
       let src = "function f() -> u32 {\n" ++

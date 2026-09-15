@@ -714,8 +714,8 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
     runBasicBlockChecks chatty plt rawBBProject
     when chatty (putStrLn . debugMessage $ "Performing constant folding")
     (bbProject, constEnvs) <- constFolding plt rawBBProject
-    when chatty (putStrLn . debugMessage $ "Propagating constants through project modules")
-    constPropagationCheck plt constEnvs bbProject
+    when chatty (putStrLn . debugMessage $ "Analysing the values of the project modules")
+    valueAnalysisCheck plt constEnvs bbProject
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
     programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram config plt) orderedDependencies

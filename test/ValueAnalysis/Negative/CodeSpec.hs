@@ -1,7 +1,7 @@
--- | Constant propagation negative tests: a condition whose value is the same
--- every time it is evaluated (CPE-001), whichever of the four sources the
--- value comes from.
-module ConstPropagation.Negative.CodeSpec (spec) where
+-- | Value analysis negative tests: a condition whose value is the same every
+-- time it is evaluated (VAE-001), whichever of the four sources the value
+-- comes from.
+module ValueAnalysis.Negative.CodeSpec (spec) where
 
 import Pipeline.Common (compileErrorCode)
 
@@ -10,9 +10,9 @@ import Data.Text (pack)
 
 spec :: Spec
 spec = do
-  describe "ConstPropagation: invariant control expressions" $ do
+  describe "ValueAnalysis: invariant control expressions" $ do
 
-    it "CPE-001: condition built from literals alone" $ do
+    it "VAE-001: condition built from literals alone" $ do
       let src = "function f() -> u32 {\n" ++
                 "    var x : u32 = 0 : u32;\n" ++
                 "    if (1 : u32 == 1 : u32) {\n" ++
@@ -20,9 +20,9 @@ spec = do
                 "    }\n" ++
                 "    return x;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-001")
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
-    it "CPE-001: condition that reads a constant of the module" $ do
+    it "VAE-001: condition that reads a constant of the module" $ do
       let src = "const enabled : bool = true;\n" ++
                 "function f() -> u32 {\n" ++
                 "    var x : u32 = 0 : u32;\n" ++
@@ -31,9 +31,9 @@ spec = do
                 "    }\n" ++
                 "    return x;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-001")
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
-    it "CPE-001: condition that reads a local whose value is known" $ do
+    it "VAE-001: condition that reads a local whose value is known" $ do
       let src = "function f() -> u32 {\n" ++
                 "    var x : u32 = 0 : u32;\n" ++
                 "    var flag : bool = true;\n" ++
@@ -42,9 +42,9 @@ spec = do
                 "    }\n" ++
                 "    return x;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-001")
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
-    it "CPE-001: comparison of a local against the value it holds" $ do
+    it "VAE-001: comparison of a local against the value it holds" $ do
       let src = "function f() -> u32 {\n" ++
                 "    var x : u32 = 0 : u32;\n" ++
                 "    if (x == 0 : u32) {\n" ++
@@ -52,9 +52,9 @@ spec = do
                 "    }\n" ++
                 "    return x;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-001")
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
-    it "CPE-001: condition the branch it is nested in has already decided" $ do
+    it "VAE-001: condition the branch it is nested in has already decided" $ do
       let src = "function f(flag : bool) -> u32 {\n" ++
                 "    var x : u32 = 0 : u32;\n" ++
                 "    if (flag) {\n" ++
@@ -64,9 +64,9 @@ spec = do
                 "    }\n" ++
                 "    return x;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-001")
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
-    it "CPE-001: comparison refined by the branch it is nested in" $ do
+    it "VAE-001: comparison refined by the branch it is nested in" $ do
       let src = "function f(n : u32) -> u32 {\n" ++
                 "    var x : u32 = 0 : u32;\n" ++
                 "    if (n == 3 : u32) {\n" ++
@@ -76,9 +76,9 @@ spec = do
                 "    }\n" ++
                 "    return x;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-001")
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
-    it "CPE-001: break condition of a loop that nothing in it changes" $ do
+    it "VAE-001: break condition of a loop that nothing in it changes" $ do
       let src = "function f() -> u32 {\n" ++
                 "    var x : u32 = 0 : u32;\n" ++
                 "    var go : bool = true;\n" ++
@@ -87,9 +87,9 @@ spec = do
                 "    }\n" ++
                 "    return x;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-001")
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
-    it "CPE-001: condition of an else-if that reads a constant" $ do
+    it "VAE-001: condition of an else-if that reads a constant" $ do
       let src = "const enabled : bool = false;\n" ++
                 "function f(flag : bool) -> u32 {\n" ++
                 "    var x : u32 = 0 : u32;\n" ++
@@ -102,4 +102,4 @@ spec = do
                 "    }\n" ++
                 "    return x;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-001")
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")

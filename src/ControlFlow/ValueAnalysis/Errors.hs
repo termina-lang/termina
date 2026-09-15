@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module ControlFlow.ConstPropagation.Errors where
+module ControlFlow.ValueAnalysis.Errors where
 
 import Semantic.AST
 import Semantic.Types
@@ -10,19 +10,19 @@ import Utils.Errors
 import Utils.Printer
 
 data Error =
-    EInvariantCondition (Const SemanticAnn) -- ^ Condition with the same value on every evaluation (CPE-001)
+    EInvariantCondition (Const SemanticAnn) -- ^ Condition with the same value on every evaluation (VAE-001)
   deriving Show
 
-type ConstPropError = AnnotatedError Error Location
+type ValueAnalysisError = AnnotatedError Error Location
 
 instance Diagnosable Error where
 
     describe (EInvariantCondition value) =
-        diagnostic "CPE-001" "invariant control expression"
+        diagnostic "VAE-001" "invariant control expression"
             ("This condition evaluates to " <> emph (showText value) <>
                 " every time it is reached, so one of the paths it guards is never taken.")
 
-instance ErrorMessage ConstPropError where
+instance ErrorMessage ValueAnalysisError where
 
     errorIdent = diagCode . describe . getError
     errorTitle = diagTitle . describe . getError
