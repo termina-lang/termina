@@ -3,12 +3,12 @@
 -- This pass walks the basic blocks, checking that: 
 -- - An object declared without an initializer may not be read, nor may one of
 -- its fields or elements be written, before the whole object is assigned
--- (VE-007, VE-008).  
+-- (VUE-007, VUE-008).  
 -- - Whether an identifier is read at all somewhere, which is what the unused
--- variable, unused field and uncalled member function checks need (VE-001,
--- VE-002, VE-003, VE-004, VE-005).  
+-- variable, unused field and uncalled member function checks need (VUE-001,
+-- VUE-002, VUE-003, VUE-004, VUE-005).  
 -- - A value that nobody reads before it is overwritten is a dead store
--- (VE-006).
+-- (VUE-006).
 --
 -- Accordingly the state is split the way 'ControlFlow.Dataflow' asks for it:
 -- what a branch has to give back when it ends (the objects not assigned yet and

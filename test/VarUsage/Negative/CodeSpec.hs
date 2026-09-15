@@ -6,10 +6,10 @@ module VarUsage.Negative.CodeSpec (spec) where
 
 import VarUsage.Common (boxUsageErrorCode, varUsageErrorCode)
 import VarUsage.Negative.DetailSpec
-  ( testVE001, testVE002, testBE001, testBE002, testBE003, testBE004, testBE005
+  ( testVUE001, testVUE002, testBE001, testBE002, testBE003, testBE004, testBE005
   , testBE006, testBE006_1, testBE007, testBE008, testBE009, testBE010, testBE011, testBE012
-  , testVE003, testVE004, testVE005, testVE006, testVE007, testVE008
-  , testVE006_3 )
+  , testVUE003, testVUE004, testVUE005, testVUE006, testVUE007, testVUE008
+  , testVUE006_3 )
 
 import Data.Text (Text, unpack)
 import Control.Monad (forM_)
@@ -38,15 +38,15 @@ boxCases =
 -- definite assignment and the usage of variables, fields and member functions.
 varCases :: [(Text, String, String)]
 varCases =
-  [ ("VE-001", "ignored parameter is used", testVE001)
-  , ("VE-002", "variable not used", testVE002)
-  , ("VE-003", "action does not use self", testVE003)
-  , ("VE-004", "method or viewer does not use self", testVE004)
-  , ("VE-005", "method or viewer never called", testVE005)
-  , ("VE-006", "assigned value never read", testVE006)
-  , ("VE-007", "object read before it is assigned", testVE007)
-  , ("VE-008", "partial write before the object is assigned", testVE008)
-  , ("VE-009", "initializer never read", testVE006_3)
+  [ ("VUE-001", "ignored parameter is used", testVUE001)
+  , ("VUE-002", "variable not used", testVUE002)
+  , ("VUE-003", "action does not use self", testVUE003)
+  , ("VUE-004", "method or viewer does not use self", testVUE004)
+  , ("VUE-005", "method or viewer never called", testVUE005)
+  , ("VUE-006", "assigned value never read", testVUE006)
+  , ("VUE-007", "object read before it is assigned", testVUE007)
+  , ("VUE-008", "partial write before the object is assigned", testVUE008)
+  , ("VUE-009", "initializer never read", testVUE006_3)
   ]
 
 spec :: Spec

@@ -41,7 +41,7 @@ families =
       ["test/Semantic/Negative/FloatSpec.hs", "test/Semantic/Negative/DetailSpec.hs"]
       ["test/Semantic/fixtures", "test/Semantic/fixtures-multi"]
       []
-  , Family "VarUsage (VE)" "VE"
+  , Family "VarUsage (VUE)" "VUE"
       "src/ControlFlow/VarUsage/Errors.hs"
       ["test/VarUsage/Negative/CodeSpec.hs"] []
       []

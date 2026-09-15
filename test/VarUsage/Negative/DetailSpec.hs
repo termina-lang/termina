@@ -1,15 +1,15 @@
 -- | VarUsage (move/borrow) negative tests, *detail* flavour: each case asserts
 -- the exact error constructor and the identifier it blames. The source programs
--- are exported so 'VarUsage.Negative.CodeSpec' can assert their VE-NNN codes
+-- are exported so 'VarUsage.Negative.CodeSpec' can assert their VUE-NNN codes
 -- over the same inputs without duplicating them.
 module VarUsage.Negative.DetailSpec
   ( spec
-  , testVE001, testVE002, testBE001, testBE001_1, testBE002, testBE002_1
+  , testVUE001, testVUE002, testBE001, testBE001_1, testBE002, testBE002_1
   , testBE003, testBE004, testBE005, testBE006, testBE006_1, testBE007, testBE008
-  , testBE009, testBE010, testBE011, testBE012, testVE004, testVE004_1
-  , testVE003, testVE005, testVE005_1, testVE005_2, testVE006, testVE006_1
-  , testVE006_2, testVE006_3, testVE006_4, testVE006_5, testVE002_1, testVE002_2
-  , testVE007, testVE008
+  , testBE009, testBE010, testBE011, testBE012, testVUE004, testVUE004_1
+  , testVUE003, testVUE005, testVUE005_1, testVUE005_2, testVUE006, testVUE006_1
+  , testVUE006_2, testVUE006_3, testVUE006_4, testVUE006_5, testVUE002_1, testVUE002_2
+  , testVUE007, testVUE008
   ) where
 
 import Test.Hspec
@@ -20,8 +20,8 @@ import qualified ControlFlow.BoxUsage.Errors as BE
 import qualified ControlFlow.VarUsage.Errors as VE
 import VarUsage.Common
 
-testVE001 :: String
-testVE001 = "function fun0(_data : u32) -> u32 {\n" ++
+testVUE001 :: String
+testVUE001 = "function fun0(_data : u32) -> u32 {\n" ++
        "\n" ++
        "    let ret : u32 = _data + 1;\n" ++
        "\n" ++
@@ -29,8 +29,8 @@ testVE001 = "function fun0(_data : u32) -> u32 {\n" ++
        "\n" ++
        "}\n"
 
-testVE002 :: String
-testVE002 = "interface Interface0 {\n" ++
+testVUE002 :: String
+testVUE002 = "interface Interface0 {\n" ++
        "\n" ++
        "    procedure proc0(&mut self, _data : box u32);\n" ++
        "\n" ++
@@ -310,8 +310,8 @@ testBE012 =
   "    }\n" ++
   "};\n"
 
-testVE004 :: String
-testVE004 = "interface Interface0 {\n" ++
+testVUE004 :: String
+testVUE004 = "interface Interface0 {\n" ++
        "\n" ++
        "    procedure proc0(&mut self);\n" ++
        "\n" ++
@@ -333,8 +333,8 @@ testVE004 = "interface Interface0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE004_1 :: String
-testVE004_1 = "task class TaskClass0 {\n" ++
+testVUE004_1 :: String
+testVUE004_1 = "task class TaskClass0 {\n" ++
        "\n" ++
        "    field0 : u32;\n" ++
        "\n" ++
@@ -352,8 +352,8 @@ testVE004_1 = "task class TaskClass0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE003 :: String
-testVE003 = "task class TaskClass0 {\n" ++
+testVUE003 :: String
+testVUE003 = "task class TaskClass0 {\n" ++
        "\n" ++
        "    snk0 : sink u32 triggers action0;\n" ++
        "\n" ++
@@ -364,8 +364,8 @@ testVE003 = "task class TaskClass0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE005 :: String
-testVE005 = "interface Interface0 {\n" ++
+testVUE005 :: String
+testVUE005 = "interface Interface0 {\n" ++
        "\n" ++
        "    procedure proc0(&mut self);\n" ++
        "\n" ++
@@ -387,8 +387,8 @@ testVE005 = "interface Interface0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE005_1 :: String
-testVE005_1 = "task class TaskClass0 {\n" ++
+testVUE005_1 :: String
+testVUE005_1 = "task class TaskClass0 {\n" ++
        "\n" ++
        "    field0 : u32;\n" ++
        "\n" ++
@@ -406,8 +406,8 @@ testVE005_1 = "task class TaskClass0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE006 :: String
-testVE006 = "function fun0() -> u32 {\n" ++
+testVUE006 :: String
+testVUE006 = "function fun0() -> u32 {\n" ++
        "    var x : u32 = 0 : u32;\n" ++
        "    let first : u32 = x;\n" ++
        "    x = 1 : u32;\n" ++
@@ -415,8 +415,8 @@ testVE006 = "function fun0() -> u32 {\n" ++
        "    return x + first;\n" ++
        "}\n"
 
-testVE006_1 :: String
-testVE006_1 = "function fun0(c : bool) -> u32 {\n" ++
+testVUE006_1 :: String
+testVUE006_1 = "function fun0(c : bool) -> u32 {\n" ++
        "    var x : u32 = 0 : u32;\n" ++
        "    let first : u32 = x;\n" ++
        "    if (c) {\n" ++
@@ -428,8 +428,8 @@ testVE006_1 = "function fun0(c : bool) -> u32 {\n" ++
 
 -- | The variable is read after the loop, so it is not an unused one, but the
 -- value the loop assigns to it is overwritten before anybody reads it.
-testVE006_2 :: String
-testVE006_2 = "function fun0(array0 : &[u32; 10]) -> u32 {\n" ++
+testVUE006_2 :: String
+testVUE006_2 = "function fun0(array0 : &[u32; 10]) -> u32 {\n" ++
        "    var last : u32 = 0 : u32;\n" ++
        "    let first : u32 = last;\n" ++
        "    for i : usize in 0 : usize .. 10 : usize {\n" ++
@@ -442,8 +442,8 @@ testVE006_2 = "function fun0(array0 : &[u32; 10]) -> u32 {\n" ++
 -- | The value the declaration gives the object is overwritten before anybody
 -- reads it, so either the real value belongs in the declaration or the object
 -- is to be declared without an initializer.
-testVE006_3 :: String
-testVE006_3 = "function fun0() -> u32 {\n" ++
+testVUE006_3 :: String
+testVUE006_3 = "function fun0() -> u32 {\n" ++
        "    var x : u32 = 0 : u32;\n" ++
        "    x = 1 : u32;\n" ++
        "    return x;\n" ++
@@ -451,8 +451,8 @@ testVE006_3 = "function fun0() -> u32 {\n" ++
 
 -- | A field and a variable of the same name: reading the field must not
 -- rescue the value the declaration gives the variable.
-testVE006_4 :: String
-testVE006_4 = "struct Struct0 {\n" ++
+testVUE006_4 :: String
+testVUE006_4 = "struct Struct0 {\n" ++
        "    field0 : u8;\n" ++
        "};\n" ++
        "\n" ++
@@ -467,8 +467,8 @@ testVE006_4 = "struct Struct0 {\n" ++
        "}\n"
 
 -- | The same, with the field reached through the other spelling.
-testVE006_5 :: String
-testVE006_5 = "struct Struct0 {\n" ++
+testVUE006_5 :: String
+testVUE006_5 = "struct Struct0 {\n" ++
        "    field0 : u8;\n" ++
        "};\n" ++
        "\n" ++
@@ -484,8 +484,8 @@ testVE006_5 = "struct Struct0 {\n" ++
 
 -- | A field of the class that nobody reads, while a field of the same name is
 -- read from another object. The read of the latter must not answer for it.
-testVE002_1 :: String
-testVE002_1 = "struct Struct0 {\n" ++
+testVUE002_1 :: String
+testVUE002_1 = "struct Struct0 {\n" ++
        "    field0 : u8;\n" ++
        "};\n" ++
        "\n" ++
@@ -506,8 +506,8 @@ testVE002_1 = "struct Struct0 {\n" ++
 
 -- | The same, with the field of the other object reached through @(*s).@ and
 -- the field of the class written through @self->@.
-testVE002_2 :: String
-testVE002_2 = "struct Struct0 {\n" ++
+testVUE002_2 :: String
+testVUE002_2 = "struct Struct0 {\n" ++
        "    field0 : u8;\n" ++
        "};\n" ++
        "\n" ++
@@ -528,8 +528,8 @@ testVE002_2 = "struct Struct0 {\n" ++
 
 -- | A method that nobody calls, while a field of the class has its name. The
 -- read of the field must not pass for a call to the method.
-testVE005_2 :: String
-testVE005_2 = "interface Interface0 {\n" ++
+testVUE005_2 :: String
+testVUE005_2 = "interface Interface0 {\n" ++
        "    procedure proc0(&mut self, data : &mut u8);\n" ++
        "};\n" ++
        "\n" ++
@@ -551,8 +551,8 @@ testVE005_2 = "interface Interface0 {\n" ++
 
 -- | The declaration has no initializer and the branch that assigns it may not
 -- be taken.
-testVE007 :: String
-testVE007 = "function fun0(c : bool) -> u32 {\n" ++
+testVUE007 :: String
+testVUE007 = "function fun0(c : bool) -> u32 {\n" ++
        "    var x : u32;\n" ++
        "    if (c) {\n" ++
        "        x = 1 : u32;\n" ++
@@ -561,8 +561,8 @@ testVE007 = "function fun0(c : bool) -> u32 {\n" ++
        "}\n"
 
 -- | An element is written before the array is assigned as a whole.
-testVE008 :: String
-testVE008 = "function fun0() -> u32 {\n" ++
+testVUE008 :: String
+testVUE008 = "function fun0() -> u32 {\n" ++
        "    var buf : [u8; 4];\n" ++
        "    buf[0] = 1 : u8;\n" ++
        "    return 0 : u32;\n" ++
@@ -571,12 +571,12 @@ testVE008 = "function fun0() -> u32 {\n" ++
 spec :: Spec
 spec = do
   describe "Semantic Errors" $ do
-    it "VE-001: invalid array indexing" $ do
-     runNegativeTestVarUsage testVE001
+    it "VUE-001: invalid array indexing" $ do
+     runNegativeTestVarUsage testVUE001
        `shouldSatisfy`
         isEUsedIgnoredParameter "_data"
-    it "VE-002: invalid array indexing" $ do
-     runNegativeTestVarUsage testVE002
+    it "VUE-002: invalid array indexing" $ do
+     runNegativeTestVarUsage testVUE002
        `shouldSatisfy`
         isENotUsed "opt"
     it "BE-001: box variable not moved (matched Some payload)" $ do
@@ -635,68 +635,68 @@ spec = do
       runNegativeTestBoxUsage testBE012
         `shouldSatisfy`
           isEOptionBoxMatchMissingSomeCase
-    it "VE-004: method does not use self" $ do
-      runNegativeTestVarUsage testVE004
+    it "VUE-004: method does not use self" $ do
+      runNegativeTestVarUsage testVUE004
         `shouldSatisfy`
           isESelfNotUsed "method0"
-    it "VE-004: viewer does not use self" $ do
-      runNegativeTestVarUsage testVE004_1
+    it "VUE-004: viewer does not use self" $ do
+      runNegativeTestVarUsage testVUE004_1
         `shouldSatisfy`
           isESelfNotUsed "viewer0"
-    it "VE-003: action does not use self" $ do
-      runNegativeTestVarUsage testVE003
+    it "VUE-003: action does not use self" $ do
+      runNegativeTestVarUsage testVUE003
         `shouldSatisfy`
           isEActionSelfNotUsed "action0"
-    it "VE-005: method never called" $ do
-      runNegativeTestVarUsage testVE005
+    it "VUE-005: method never called" $ do
+      runNegativeTestVarUsage testVUE005
         `shouldSatisfy`
           isEMemberFunctionNotUsed "method0"
-    it "VE-005: viewer never called" $ do
-      runNegativeTestVarUsage testVE005_1
+    it "VUE-005: viewer never called" $ do
+      runNegativeTestVarUsage testVUE005_1
         `shouldSatisfy`
           isEMemberFunctionNotUsed "viewer0"
-    it "VE-006: value assigned and overwritten before being read" $ do
-      runNegativeTestVarUsage testVE006
+    it "VUE-006: value assigned and overwritten before being read" $ do
+      runNegativeTestVarUsage testVUE006
         `shouldSatisfy`
           isEAssignedValueNotUsed "x"
-    it "VE-006: value assigned in a branch and overwritten after it" $ do
-      runNegativeTestVarUsage testVE006_1
+    it "VUE-006: value assigned in a branch and overwritten after it" $ do
+      runNegativeTestVarUsage testVUE006_1
         `shouldSatisfy`
           isEAssignedValueNotUsed "x"
-    it "VE-006: value assigned in a loop and never read" $ do
-      runNegativeTestVarUsage testVE006_2
+    it "VUE-006: value assigned in a loop and never read" $ do
+      runNegativeTestVarUsage testVUE006_2
         `shouldSatisfy`
           isEAssignedValueNotUsed "last"
-    it "VE-009: initializer overwritten before being read" $ do
-      runNegativeTestVarUsage testVE006_3
+    it "VUE-009: initializer overwritten before being read" $ do
+      runNegativeTestVarUsage testVUE006_3
         `shouldSatisfy`
           isEInitializerNotUsed "x"
-    it "VE-009: initializer overwritten while a field of the same name is read" $ do
-      runNegativeTestVarUsage testVE006_4
+    it "VUE-009: initializer overwritten while a field of the same name is read" $ do
+      runNegativeTestVarUsage testVUE006_4
         `shouldSatisfy`
           isEInitializerNotUsed "field0"
-    it "VE-009: the same, with the field reached through (*s).field" $ do
-      runNegativeTestVarUsage testVE006_5
+    it "VUE-009: the same, with the field reached through (*s).field" $ do
+      runNegativeTestVarUsage testVUE006_5
         `shouldSatisfy`
           isEInitializerNotUsed "field0"
-    it "VE-002: class field not read while another object's field of the same name is" $ do
-      runNegativeTestVarUsage testVE002_1
+    it "VUE-002: class field not read while another object's field of the same name is" $ do
+      runNegativeTestVarUsage testVUE002_1
         `shouldSatisfy`
           isENotUsed "field0"
-    it "VE-002: the same, with the other field reached through (*s).field" $ do
-      runNegativeTestVarUsage testVE002_2
+    it "VUE-002: the same, with the other field reached through (*s).field" $ do
+      runNegativeTestVarUsage testVUE002_2
         `shouldSatisfy`
           isENotUsed "field0"
-    it "VE-005: method never called while a field of the class has its name" $ do
-      runNegativeTestVarUsage testVE005_2
+    it "VUE-005: method never called while a field of the class has its name" $ do
+      runNegativeTestVarUsage testVUE005_2
         `shouldSatisfy`
           isEMemberFunctionNotUsed "method0"
-    it "VE-007: object read on a path where it is not assigned" $ do
-      runNegativeTestVarUsage testVE007
+    it "VUE-007: object read on a path where it is not assigned" $ do
+      runNegativeTestVarUsage testVUE007
         `shouldSatisfy`
           isEReadBeforeAssignment "x"
-    it "VE-008: element written before the array is assigned as a whole" $ do
-      runNegativeTestVarUsage testVE008
+    it "VUE-008: element written before the array is assigned as a whole" $ do
+      runNegativeTestVarUsage testVUE008
         `shouldSatisfy`
           isEPartialWriteBeforeAssignment "buf"
 
