@@ -123,4 +123,4 @@ spec = do
                 "}"
       let message = compileErrorMessage src
       fmap (pack "test:5:9" `isInfixOf`) message `shouldBe` Just True
-      fmap (pack "evaluates to " `isInfixOf`) message `shouldBe` Just True
+      fmap (pack "yes takes that value here" `isInfixOf`) message `shouldBe` Just True

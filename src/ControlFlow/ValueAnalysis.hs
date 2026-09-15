@@ -30,6 +30,7 @@
 module ControlFlow.ValueAnalysis (runValueAnalysisCheck) where
 
 import qualified Data.Map.Strict as M
+import Data.List (nub)
 import Data.Maybe (listToMaybe, mapMaybe)
 import Data.Ord (comparing)
 import qualified Data.Set as S
@@ -92,8 +93,17 @@ data Known = Known
   {
     typeRange :: Maybe (Integer, Integer)
   , varValues :: Values
+    -- | The places that gave the variable what it holds, which the message
+    -- points at. They are carried along and never read by the walk, so the
+    -- equality below leaves them out: two states that agree on the values are
+    -- the same state, and letting the origins decide would spend turns of the
+    -- fixed point on information nobody iterates over.
+  , valueOrigins :: S.Set Origin
   }
-  deriving Eq
+
+instance Eq Known where
+  left == right =
+    typeRange left == typeRange right && varValues left == varValues right
 
 -- | What belongs to the path being walked: the local variables whose value the
 -- path constrains. A variable that is not here is unknown, so joining two paths
@@ -107,7 +117,10 @@ instance Lattice ValueAnalysisPath where
 
     where
 
-      agree x y = Known (typeRange x) <$> joinValues (typeRange x) (varValues x) (varValues y)
+      agree x y = do
+        values <- joinValues (typeRange x) (varValues x) (varValues y)
+        return (Known (typeRange x) values
+                  (S.union (valueOrigins x) (valueOrigins y)))
 
 -- | Two sets whose union stays under the limit join exactly. Past the limit
 -- the union gives way to the interval of the type, and so does a join in which
@@ -220,11 +233,15 @@ rangeOfVariable obj =
 setValue ::
   Identifier
   -> Maybe (Integer, Integer)
+  -> Origin
   -> Maybe (Const SemanticAnn)
   -> ValueAnalysisMonad ()
-setValue ident range mValue = modifyPath $ \p -> ValueAnalysisPath $
+setValue ident range origin mValue = modifyPath $ \p -> ValueAnalysisPath $
   case mValue >>= scalar of
-    Just value -> M.insert ident (Known range (Discrete (S.singleton value))) (known p)
+    Just value ->
+      M.insert ident
+        (Known range (Discrete (S.singleton value)) (S.singleton origin))
+        (known p)
     Nothing -> M.delete ident (known p)
 
   where
@@ -266,19 +283,22 @@ observeCondition cond = do
 -- that value on the side where the comparison holds. The other sides teach
 -- nothing, since a refinement here only ever fixes a variable at a value.
 refine :: Bool -> Expression SemanticAnn -> ValueAnalysisMonad ()
-refine holds (AccessObject obj@(Variable ident _)) = do
+refine holds cond@(AccessObject obj@(Variable ident _)) = do
   range <- rangeOfVariable obj
-  setValue ident range (Just (B holds))
-refine True (BinOp RelationalEqual left right _) = refineEquality left right
-refine False (BinOp RelationalNotEqual left right _) = refineEquality left right
+  setValue ident range (Refined (getLocation . getAnnotation $ cond)) (Just (B holds))
+refine True (BinOp RelationalEqual left right ann) =
+  refineEquality (getLocation ann) left right
+refine False (BinOp RelationalNotEqual left right ann) =
+  refineEquality (getLocation ann) left right
 refine _ _ = return ()
 
 -- | Which operand of the comparison is the variable and which the value is not
 -- fixed by the syntax, so both orders are tried. A refinement only adds what
 -- is known: an evaluation that fails leaves the variable as it was, instead of
 -- forgetting it.
-refineEquality :: Expression SemanticAnn -> Expression SemanticAnn -> ValueAnalysisMonad ()
-refineEquality left right = do
+refineEquality ::
+  Location -> Expression SemanticAnn -> Expression SemanticAnn -> ValueAnalysisMonad ()
+refineEquality loc left right = do
   refineAgainst left right
   refineAgainst right left
 
@@ -286,22 +306,23 @@ refineEquality left right = do
 
     refineAgainst (AccessObject obj@(Variable ident _)) other = do
       range <- rangeOfVariable obj
-      valueOf other >>= maybe (return ()) (setValue ident range . Just)
+      valueOf other
+        >>= maybe (return ()) (setValue ident range (Refined loc) . Just)
     refineAgainst _ _ = return ()
 
 checkStatement :: Statement SemanticAnn -> ValueAnalysisMonad ()
-checkStatement (Declaration ident _ ty mInitExpr _) = do
+checkStatement (Declaration ident _ ty mInitExpr ann) = do
   mapM_ noteEscapes mInitExpr
   range <- rangeOfType ty
   value <- maybe (return Nothing) valueOf mInitExpr
-  setValue ident range value
-checkStatement (AssignmentStmt obj expr _) = do
+  setValue ident range (Assigned (getLocation ann)) value
+checkStatement (AssignmentStmt obj expr ann) = do
   noteEscapes expr
   case obj of
     -- | The whole variable takes the value of the expression.
     Variable ident _ -> do
       range <- rangeOfVariable obj
-      valueOf expr >>= setValue ident range
+      valueOf expr >>= setValue ident range (Assigned (getLocation ann))
     -- | A write into a field or an element of an object, which is not a scalar
     -- and is therefore outside the lattice.
     _ -> return ()
@@ -316,7 +337,7 @@ transfer :: Transfer ValueAnalysisPath ValueAnalysisGlobal ValueAnalysisError
 transfer = Transfer
   {
     onStatement = checkStatement
-  , onSimpleBlock = \block -> mapM_ (mapM_ escapesIn) (simpleBlockChildren block)
+  , onSimpleBlock = mapM_ (mapM_ escapesIn) . simpleBlockChildren
   , onExpression = noteEscapes
   , onCondition = observeCondition
     -- | The variables a case binds are declared by the case, with a value that
@@ -349,12 +370,48 @@ checkElement (Function _ident _ps _ty body _mods _ann) = checkBody body
 checkElement (TypeDefinition tyDef _ann) = checkTypeDef tyDef
 checkElement (GlobalDeclaration {}) = return ()
 
+-- | The plain variables an expression reads, in the order it reads them. A
+-- field or an element of an array is left out, since the pass follows neither
+-- and so has nothing to say about them.
+variablesIn :: Expression SemanticAnn -> [Identifier]
+variablesIn = concatMap inChild . expressionChildren
+
+  where
+
+    inChild (ChildObject (Variable ident _)) = [ident]
+    inChild (ChildObject _) = []
+    inChild (ChildReference _ _) = []
+    inChild (ChildExpr expr) = variablesIn expr
+    inChild (ChildArg expr) = variablesIn expr
+    inChild (ChildConstExpr _) = []
+
+-- | What the message says about each name of a condition: the value it holds
+-- and where it got it. A name the path pins answers with the places that gave
+-- it the value; a constant of the module answers with no place, since it has
+-- none inside the body.
+reasonsFor ::
+  ValueAnalysisGlobal -> ValueAnalysisPath -> Expression SemanticAnn -> [Reason]
+reasonsFor global locals cond =
+  mapMaybe reasonOf (nub (variablesIn cond))
+
+  where
+
+    reasonOf ident =
+      case M.lookup ident (known locals) >>= withValue ident of
+        Just reason -> Just reason
+        Nothing ->
+          (\value -> Reason ident value []) <$> M.lookup ident (moduleConsts global)
+
+    withValue ident entry =
+      (\value -> Reason ident value (S.toList (valueOrigins entry)))
+        <$> singleValue entry
+
 -- | The diagnostic: of the conditions the walk recorded, the ones whose value
 -- the state at them determines, in the order the source has them, which is the
 -- order of their positions.
 invariantConditions :: ValueAnalysisGlobal -> [ValueAnalysisError]
 invariantConditions global =
-  [ annotateError loc (EInvariantCondition value)
+  [ annotateError loc (EInvariantCondition value (reasonsFor global locals cond))
   | (loc, (cond, locals)) <- M.toAscList (observed global)
   , Just value@(B _) <-
       [evaluate (platform global) (moduleConsts global) locals cond]

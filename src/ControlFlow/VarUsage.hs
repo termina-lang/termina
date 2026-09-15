@@ -52,7 +52,7 @@ instance Lattice VarUsagePath where
     (S.union (pending left) (pending right))
     (M.unionWith S.union (unread left) (unread right))
 
--- | What belongs to the program, and no branch takes back.
+-- | What belongs to the program itself.
 data VarUsageGlobal = VarUsageGlobal
   {
     -- | Identifiers read so far. Besides variables, it holds the names of the
@@ -306,7 +306,7 @@ transfer = Transfer
   {
     onStatement = checkStatement
     -- | Every other block only evaluates the expressions it holds, in order.
-  , onSimpleBlock = \block -> mapM_ (mapM_ readChild) (simpleBlockChildren block)
+  , onSimpleBlock = mapM_ (mapM_ readChild) . simpleBlockChildren
   , onExpression = readExpression
   , onCondition = readExpression
     -- | The variables a case binds are declared by the case itself.

@@ -6,7 +6,7 @@ import ControlFlow.SideEffects.Monad
 import ControlFlow.SideEffects.Errors (SideEffectsError, Error(..))
 import ControlFlow.BasicBlocks.AST
 import ControlFlow.BasicBlocks.Traversal (childExpressions, indexExpressions)
-import ControlFlow.Dataflow (Transfer(..), walkForward, fixpoint)
+import ControlFlow.Dataflow (Transfer(..), walkForward)
 import Semantic.Types
 import Semantic.Utils (objectPath, mayAlias, AccessPath)
 import Utils.Annotations (Location, getLocation, getAnnotation, annotateError)

@@ -195,7 +195,7 @@ pprintError files errorMessage pos related msg =
                     let pointers = sortOn pointerLine
                             (mainPointer : mapMaybe (\(loc, what) -> mkPointer (Just what) loc) sameFile)
                     in
-                        TL.toStrict $ prettyErrors sourceLines [genErrata pointers]
+                        TL.toStrict $ prettyErrors sourceLines [genErrata mainPointer pointers]
 
         -- | A position in another file is quoted on its own, with its label as
         -- the heading.
@@ -232,12 +232,17 @@ pprintError files errorMessage pos related msg =
                     ((\what -> " " <> emph what) <$> label) fancyRedPointer
         mkPointer _ _ = Nothing
 
-        genErrata :: [Pointer] -> Errata
-        genErrata pointers = Errata
+        -- | The pointers are drawn in line order, but the heading of the block
+        -- names the position the error is about, which is what a reader and an
+        -- editor go to first. A related position that sits above it, such as
+        -- the assignment that gave a variable its value, would otherwise put
+        -- its own line in the heading.
+        genErrata :: Pointer -> [Pointer] -> Errata
+        genErrata mainPointer pointers = Errata
             (Just errorMessage)
             [Errata.Block
                 fancyRedStyle
-                (fileName, pointerLine (head pointers), pointerColStart (head pointers))
+                (fileName, pointerLine mainPointer, pointerColStart mainPointer)
                 Nothing
                 pointers
                 Nothing]
