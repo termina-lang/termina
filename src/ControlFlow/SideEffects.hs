@@ -270,9 +270,6 @@ transfer = Transfer
   , onCaseEntry = const (return ())
   , refineTrue = const (return ())
   , refineFalse = const (return ())
-    -- | Every finding is about one expression, so the turn it is found in does
-    -- not change it.
-  , onLoopBody = fixpoint
   }
 
 checkBlock :: Block SemanticAnn -> SideEffectsMonad ()

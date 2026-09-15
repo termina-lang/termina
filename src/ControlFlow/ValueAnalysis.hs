@@ -8,6 +8,10 @@
 -- folding builds and runs after it, apart from the rest of the basic-block
 -- checks.
 --
+-- The walk and the finding are separate. The walk records, for every condition
+-- it meets, the state of the path there, and reports nothing; the diagnostic
+-- then reads those records and decides.
+--
 -- What a variable holds is a set of at most 'valueLimit' values or, once the
 -- set has outgrown that, the interval its declared type allows; a variable
 -- with no entry in the map is unknown. Where paths meet the two sets are
@@ -25,8 +29,6 @@
 -- transpiler may be wrong in.
 module ControlFlow.ValueAnalysis (runValueAnalysisCheck) where
 
-import Control.Monad (unless)
-import Control.Monad.Except
 import qualified Data.Map.Strict as M
 import Data.Maybe (listToMaybe, mapMaybe)
 import Data.Ord (comparing)
@@ -146,10 +148,12 @@ data ValueAnalysisGlobal = ValueAnalysisGlobal
     -- makes this pass answer for the case a condition is constant outright.
     moduleConsts :: M.Map Identifier (Const SemanticAnn),
     platform :: Platform,
-    -- | Whether the walk is inside a loop whose state has not settled yet, in
-    -- which case what is known of a variable may still fall and a finding may
-    -- not survive the next turn.
-    settling :: Bool
+    -- | Every condition the walk has met, with the state of the path where it
+    -- met it, under the position of the condition. A loop meets the same
+    -- condition once per turn and each turn overwrites the one before, so what
+    -- is left is what the last turn saw, which is the turn that starts from
+    -- the settled state of the head.
+    observed :: M.Map Location (Expression SemanticAnn, ValueAnalysisPath)
   }
 
 type ValueAnalysisMonad = DataflowM ValueAnalysisPath ValueAnalysisGlobal ValueAnalysisError
@@ -162,24 +166,39 @@ singleValue entry = case varValues entry of
   Discrete values | [Value value] <- S.toList values -> Just value
   _ -> Nothing
 
--- | The value of an expression, when the constants of the module and what this
+-- | The value of an expression, when the constants of the module and what a
 -- path knows of the local variables determine it.
 --
 -- The evaluation is the one of the folding, seeded with the local variables
 -- pinned to a single value: such a variable answers a lookup exactly as a
 -- module constant does, and one that is unknown is absent, which makes the
--- evaluation fail and the pass keep quiet. The two names cannot be confused,
+-- evaluation fail and the caller keep quiet. The two names cannot be confused,
 -- since a local may not shadow a global (SE-081).
+--
+-- It takes what it reads instead of getting it from the state, since the
+-- diagnostic evaluates the recorded conditions once the walk is over.
+evaluate ::
+  Platform
+  -> M.Map Identifier (Const SemanticAnn)
+  -> ValueAnalysisPath
+  -> Expression SemanticAnn
+  -> Maybe (Const SemanticAnn)
+evaluate plt consts locals expr =
+  case runConstFolding env (evalConstExpression expr) of
+    Left _ -> Nothing
+    Right (value, _) -> Just value
+
+  where
+
+    env = ConstFoldEnv
+      (M.union (M.mapMaybe singleValue (known locals)) consts)
+      plt
+
 valueOf :: Expression SemanticAnn -> ValueAnalysisMonad (Maybe (Const SemanticAnn))
 valueOf expr = do
   global <- getGlobal
-  locals <- known <$> getPath
-  let env = ConstFoldEnv
-        (M.union (M.mapMaybe singleValue locals) (moduleConsts global))
-        (platform global)
-  return $ case runConstFolding env (evalConstExpression expr) of
-    Left _ -> Nothing
-    Right (value, _) -> Just value
+  locals <- getPath
+  return (evaluate (platform global) (moduleConsts global) locals expr)
 
 -- | The interval the type of a variable allows, which is where its set of
 -- values goes once the set outgrows the limit. A type that is not an integer
@@ -231,21 +250,15 @@ escapesIn (ChildExpr expr) = noteEscapes expr
 escapesIn (ChildArg expr) = noteEscapes expr
 escapesIn (ChildConstExpr _) = return ()
 
--- | Reports a finding, unless the walk is still settling the state of a loop.
-report :: Location -> Error -> ValueAnalysisMonad ()
-report loc err = do
-  quiet <- settling <$> getGlobal
-  unless quiet (throwError $ annotateError loc err)
-
--- | A condition whose value this path already determines guards a path that is
--- never taken.
-checkCondition :: Expression SemanticAnn -> ValueAnalysisMonad ()
-checkCondition cond = do
+-- | Takes down a condition and the state of the path that reaches it, for the
+-- diagnostic to read once the walk is over. It goes to the global state, which
+-- a branch does not put back, so a record outlives the branch that made it.
+observeCondition :: Expression SemanticAnn -> ValueAnalysisMonad ()
+observeCondition cond = do
   noteEscapes cond
-  mValue <- valueOf cond
-  case mValue of
-    Just value@(B _) -> report (getLocation . getAnnotation $ cond) (EInvariantCondition value)
-    _ -> return ()
+  locals <- getPath
+  let loc = getLocation . getAnnotation $ cond
+  modifyGlobal (\g -> g { observed = M.insert loc (cond, locals) (observed g) })
 
 -- | What a condition says about the variables in it inside the branch it
 -- guards, in two forms: a boolean variable holds the value that took the path
@@ -276,31 +289,6 @@ refineEquality left right = do
       valueOf other >>= maybe (return ()) (setValue ident range . Just)
     refineAgainst _ _ = return ()
 
--- | The body of a loop is walked twice: in silence until what is known at its
--- head stops falling, and once more from that settled state, which is the walk
--- that reports. Reporting while the state settles would blame a condition for
--- what a turn that is not the last one happens to know, as in
--- @var x = 0; for i in 0 .. 4 { if (x == 0) { … } x = 1; }@, where the first
--- turn alone sees an invariant condition.
---
--- The second walk goes through 'branch', which puts the state of the head back
--- afterwards: what the last turn assigns does not hold after a loop that may
--- run no turns at all.
-walkLoopBody :: ValueAnalysisMonad () -> ValueAnalysisMonad ()
-walkLoopBody body = do
-  settle (fixpoint body)
-  _ <- branch body
-  return ()
-
-  where
-
-    settle m = do
-      previous <- settling <$> getGlobal
-      modifyGlobal (\g -> g { settling = True })
-      result <- m
-      modifyGlobal (\g -> g { settling = previous })
-      return result
-
 checkStatement :: Statement SemanticAnn -> ValueAnalysisMonad ()
 checkStatement (Declaration ident _ ty mInitExpr _) = do
   mapM_ noteEscapes mInitExpr
@@ -320,7 +308,7 @@ checkStatement (AssignmentStmt obj expr _) = do
 checkStatement (SingleExpStmt expr _) = noteEscapes expr
 
 -- | What each node means to this pass. Only the expressions that decide a path
--- are checked, which is the condition of an @if@, of each of its @else if@ and
+-- are recorded, which is the condition of an @if@, of each of its @else if@ and
 -- the break condition of a @for@; the object a @match@ inspects is not, since
 -- following it means following the variants of an enumeration and not the
 -- value of a scalar.
@@ -330,13 +318,12 @@ transfer = Transfer
     onStatement = checkStatement
   , onSimpleBlock = \block -> mapM_ (mapM_ escapesIn) (simpleBlockChildren block)
   , onExpression = noteEscapes
-  , onCondition = checkCondition
+  , onCondition = observeCondition
     -- | The variables a case binds are declared by the case, with a value that
     -- comes from the variant it matched.
   , onCaseEntry = \(MatchCase _ bvars _ _) -> mapM_ forget bvars
   , refineTrue = refine True
   , refineFalse = refine False
-  , onLoopBody = walkLoopBody
   }
 
 -- | Runs the body of a member or of a function, which knows nothing of its
@@ -362,8 +349,19 @@ checkElement (Function _ident _ps _ty body _mods _ann) = checkBody body
 checkElement (TypeDefinition tyDef _ann) = checkTypeDef tyDef
 checkElement (GlobalDeclaration {}) = return ()
 
+-- | The diagnostic: of the conditions the walk recorded, the ones whose value
+-- the state at them determines, in the order the source has them, which is the
+-- order of their positions.
+invariantConditions :: ValueAnalysisGlobal -> [ValueAnalysisError]
+invariantConditions global =
+  [ annotateError loc (EInvariantCondition value)
+  | (loc, (cond, locals)) <- M.toAscList (observed global)
+  , Just value@(B _) <-
+      [evaluate (platform global) (moduleConsts global) locals cond]
+  ]
+
 -- | Runs the check over a whole module, with the constants it sees, returning
--- the first error.
+-- the first error. Only the first, since a user resolves them one at a time.
 runValueAnalysisCheck ::
   Platform
   -> M.Map Identifier (Const SemanticAnn)
@@ -373,6 +371,9 @@ runValueAnalysisCheck plt consts = listToMaybe . mapMaybe checkOne
 
   where
 
-    initialSt = DFState (ValueAnalysisPath M.empty) (ValueAnalysisGlobal consts plt False)
+    initialSt =
+      DFState (ValueAnalysisPath M.empty) (ValueAnalysisGlobal consts plt M.empty)
 
-    checkOne = either Just (const Nothing) . fst . runDataflow initialSt . checkElement
+    checkOne =
+      listToMaybe . invariantConditions . globalState
+        . snd . runDataflow initialSt . checkElement

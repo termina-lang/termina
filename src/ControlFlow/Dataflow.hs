@@ -124,13 +124,6 @@ data Transfer p g e = Transfer
     -- @pure ()@.
   , refineTrue :: Expression SemanticAnn -> DataflowM p g e ()
   , refineFalse :: Expression SemanticAnn -> DataflowM p g e ()
-    -- | How the body of a loop is walked, which is 'fixpoint' for a pass whose
-    -- findings do not depend on the turn they are found in. A pass that reports
-    -- what holds at a point of the program cannot report while it iterates,
-    -- because a turn that is not the last one works with a state that is not
-    -- valid yet, so it wraps the iteration in whatever keeps it quiet until the
-    -- state settles.
-  , onLoopBody :: DataflowM p g e () -> DataflowM p g e ()
   }
 
 -- | Walks a block forwards.
@@ -174,7 +167,7 @@ walkForward transfer = walkBlock
     walkBasicBlock (ForLoopBlock _ _ initE endE mBreak blk _) = do
       onExpression transfer initE
       onExpression transfer endE
-      onLoopBody transfer (mapM_ (onCondition transfer) mBreak >> walkBlock blk)
+      fixpoint (mapM_ (onCondition transfer) mBreak >> walkBlock blk)
 
     walkBasicBlock block = onSimpleBlock transfer block
 
