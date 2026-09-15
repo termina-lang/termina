@@ -27,7 +27,23 @@
 -- variable known to hold several answers nothing. An evaluation that does not
 -- succeed leaves the pass silent, which is the only direction an error of the
 -- transpiler may be wrong in.
-module ControlFlow.ValueAnalysis (runValueAnalysisCheck) where
+module ControlFlow.ValueAnalysis
+  (
+    runValueAnalysisCheck
+    -- * For the tests
+    --
+    -- | The verdict of a comparison has two tables of six operators that no
+    -- source program can reach yet, and the bound a branch puts on a variable
+    -- is the one operation that makes the pass claim more, so their tests
+    -- drive them from here.
+  , Integers(..)
+  , compareValues
+  , Bound(..)
+  , Values(..)
+  , Value(..)
+  , boundOf
+  , narrow
+  ) where
 
 import qualified Data.Map.Strict as M
 import Data.List (nub)
@@ -58,6 +74,7 @@ valueLimit = 8
 -- paths that reach the same number agree whether or not it was written the
 -- same way, and the type a constant carries is not part of what they agree on.
 newtype Value = Value { valueConst :: Const SemanticAnn }
+  deriving Show
 
 instance Eq Value where
   left == right = compare left right == EQ
@@ -81,7 +98,7 @@ integerOf _ = Nothing
 data Values =
     Discrete (S.Set Value)
   | Interval Integer Integer
-  deriving Eq
+  deriving (Eq, Show)
 
 -- | The values of a variable together with the interval its declared type
 -- allows, which is where a set that outgrows 'valueLimit' lands. Taking the
@@ -277,11 +294,76 @@ observeCondition cond = do
   let loc = getLocation . getAnnotation $ cond
   modifyGlobal (\g -> g { observed = M.insert loc (cond, locals) (observed g) })
 
+-- | A bound a branch puts on a variable, both ends included.
+data Bound = AtLeast Integer | AtMost Integer
+  deriving (Eq, Show)
+
+satisfies :: Bound -> Integer -> Bool
+satisfies (AtLeast low) value = value >= low
+satisfies (AtMost high) value = value <= high
+
+-- | What is left of the values of a variable once a bound applies to them.
+-- Nothing when the bound teaches nothing this can express, and also when it
+-- would leave no value at all: an empty set is the branch being unreachable,
+-- which is a different finding from the one this pass makes.
+narrow :: Bound -> Values -> Maybe Values
+narrow bound (Discrete values)
+  | S.null kept || kept == values = Nothing
+  | otherwise = Just (Discrete kept)
+
+  where
+
+    kept = S.filter (maybe False (satisfies bound) . integerOf) values
+
+narrow (AtLeast low) (Interval lo hi)
+  | raised > hi || raised <= lo = Nothing
+  | otherwise = Just (Interval raised hi)
+
+  where
+
+    raised = max lo low
+
+narrow (AtMost high) (Interval lo hi)
+  | lowered < lo || lowered >= hi = Nothing
+  | otherwise = Just (Interval lo lowered)
+
+  where
+
+    lowered = min hi high
+
+-- | The bound a comparison of a variable against a value puts on the variable,
+-- on the side of the branch that takes it and on the side that does not. The
+-- variable is the left operand here; 'mirrored' puts it there.
+boundOf :: Bool -> Op -> Integer -> Maybe Bound
+boundOf True RelationalLT limit = Just (AtMost (limit - 1))
+boundOf False RelationalLT limit = Just (AtLeast limit)
+boundOf True RelationalLTE limit = Just (AtMost limit)
+boundOf False RelationalLTE limit = Just (AtLeast (limit + 1))
+boundOf True RelationalGT limit = Just (AtLeast (limit + 1))
+boundOf False RelationalGT limit = Just (AtMost limit)
+boundOf True RelationalGTE limit = Just (AtLeast limit)
+boundOf False RelationalGTE limit = Just (AtMost (limit - 1))
+boundOf _ _ _ = Nothing
+
+-- | The comparison written the other way round, which is what a source that
+-- puts the value first asks for.
+mirrored :: Op -> Op
+mirrored RelationalLT = RelationalGT
+mirrored RelationalLTE = RelationalGTE
+mirrored RelationalGT = RelationalLT
+mirrored RelationalGTE = RelationalLTE
+mirrored op = op
+
 -- | What a condition says about the variables in it inside the branch it
--- guards, in two forms: a boolean variable holds the value that took the path
--- there, and a comparison against a determined value fixes the variable at
--- that value on the side where the comparison holds. The other sides teach
--- nothing, since a refinement here only ever fixes a variable at a value.
+-- guards. A boolean variable holds the value that took the path there; a
+-- comparison against a determined value fixes the variable at that value, or
+-- bounds it when the comparison is an order; and a conjunction that holds says
+-- both of its halves hold.
+--
+-- The sides that are missing are missing on purpose. From a conjunction that
+-- fails, and from a disjunction that holds, all that follows is that one of
+-- the two halves does, and a state that keeps one value per variable has no
+-- way to say "one of these two things".
 refine :: Bool -> Expression SemanticAnn -> ValueAnalysisMonad ()
 refine holds cond@(AccessObject obj@(Variable ident _)) = do
   range <- rangeOfVariable obj
@@ -290,7 +372,71 @@ refine True (BinOp RelationalEqual left right ann) =
   refineEquality (getLocation ann) left right
 refine False (BinOp RelationalNotEqual left right ann) =
   refineEquality (getLocation ann) left right
+refine True (BinOp LogicalAnd left right _) = do
+  refine True left
+  refine True right
+refine False (BinOp LogicalOr left right _) = do
+  refine False left
+  refine False right
+refine holds (BinOp op left right ann) =
+  refineOrder holds (getLocation ann) op left right
 refine _ _ = return ()
+
+-- | What an order comparison teaches about the variable in it, which is a
+-- bound and not a value. Unlike an equality, it teaches on both sides of the
+-- branch, since the values it rules out on one side are the ones it leaves on
+-- the other.
+refineOrder ::
+  Bool -> Location -> Op
+  -> Expression SemanticAnn -> Expression SemanticAnn
+  -> ValueAnalysisMonad ()
+refineOrder holds loc op left right =
+  case (asVariable left, asVariable right) of
+    (Just variable, Nothing) -> against variable op right
+    (Nothing, Just variable) -> against variable (mirrored op) left
+    -- | Two variables bound each other, which this does not follow yet, and
+    -- two values are not a refinement at all.
+    _ -> return ()
+
+  where
+
+    asVariable (AccessObject obj@(Variable ident _)) = Just (obj, ident)
+    asVariable _ = Nothing
+
+    against (obj, ident) direction other = do
+      mValue <- valueOf other
+      case mValue >>= integerValue >>= boundOf holds direction of
+        Nothing -> return ()
+        Just bound -> bindBound loc obj ident bound
+
+    integerValue (I (TInteger value _) _) = Just value
+    integerValue _ = Nothing
+
+-- | Applies a bound to what the path knows of a variable. A variable the path
+-- says nothing about starts from the interval its declared type allows, which
+-- is what lets a guard bound a parameter the body never assigns.
+bindBound ::
+  Location -> Object SemanticAnn -> Identifier -> Bound -> ValueAnalysisMonad ()
+bindBound loc obj ident bound = do
+  current <- M.lookup ident . known <$> getPath
+  range <- rangeOfVariable obj
+  let start = case current of
+        Just entry -> Just entry
+        Nothing -> (\(lo, hi) -> Known range (Interval lo hi) S.empty) <$> range
+  case start >>= bounded of
+    Nothing -> return ()
+    Just entry ->
+      modifyPath (\p -> ValueAnalysisPath (M.insert ident entry (known p)))
+
+  where
+
+    bounded entry = do
+      values <- narrow bound (varValues entry)
+      return entry
+        {
+          varValues = values
+        , valueOrigins = S.insert (Bounded loc) (valueOrigins entry)
+        }
 
 -- | Which operand of the comparison is the variable and which the value is not
 -- fixed by the syntax, so both orders are tried. A refinement only adds what
@@ -370,6 +516,136 @@ checkElement (Function _ident _ps _ty body _mods _ann) = checkBody body
 checkElement (TypeDefinition tyDef _ann) = checkTypeDef tyDef
 checkElement (GlobalDeclaration {}) = return ()
 
+-- | The integers an operand of a comparison may be. It is what the abstract
+-- evaluator works on, and it comes either from the lattice or from a value the
+-- folding evaluator pinned down.
+data Integers =
+    Listed (S.Set Integer)
+  | Spanning Integer Integer
+
+ends :: Integers -> (Integer, Integer)
+ends (Listed values) = (S.findMin values, S.findMax values)
+ends (Spanning lo hi) = (lo, hi)
+
+integersOf :: Values -> Maybe Integers
+integersOf (Discrete values) =
+  case mapMaybe integerOf (S.toList values) of
+    [] -> Nothing
+    integers -> Just (Listed (S.fromList integers))
+integersOf (Interval lo hi) = Just (Spanning lo hi)
+
+-- | What an operand of a comparison may be: the value the folding evaluator
+-- gives it, which covers a literal, a constant of the module and a variable
+-- the path pins, or else what the lattice holds for a plain variable. An
+-- operand of any other shape leaves the comparison undecided.
+operandOf ::
+  ValueAnalysisGlobal
+  -> ValueAnalysisPath
+  -> Expression SemanticAnn
+  -> Maybe Integers
+operandOf global locals expr =
+  case evaluate (platform global) (moduleConsts global) locals expr of
+    Just (I (TInteger value _) _) -> Just (Listed (S.singleton value))
+    _ -> case expr of
+      AccessObject (Variable ident _) ->
+        M.lookup ident (known locals) >>= integersOf . varValues
+      _ -> Nothing
+
+-- | Whether a comparison holds for every pair of values its operands may take,
+-- for no pair at all, or neither, which is when the pass has nothing to say.
+--
+-- Two listed operands are compared pair by pair, which is exact and cheap
+-- since neither list outgrows 'valueLimit'. Everything else is decided from
+-- the ends, which loses the gaps of a list but never claims more than the ends
+-- support.
+compareValues :: Op -> Integers -> Integers -> Maybe Bool
+compareValues op left right = do
+  decide <- comparison op
+  case (left, right) of
+    (Listed values, Listed others) -> pairwise decide values others
+    _ -> fromEnds op left right
+
+-- | Every value the left operand may take, against every value the right one
+-- may take. Exact, and cheap because neither list outgrows 'valueLimit'.
+pairwise ::
+  (Integer -> Integer -> Bool) -> S.Set Integer -> S.Set Integer -> Maybe Bool
+pairwise decide left right
+  -- | An operand with no values at all is not something the lattice builds,
+  -- and answering it would mean answering that every comparison holds.
+  | null outcomes = Nothing
+  | and outcomes = Just True
+  | all not outcomes = Just False
+  | otherwise = Nothing
+
+  where
+
+    outcomes = [decide a b | a <- S.toList left, b <- S.toList right]
+
+-- | The verdict the ends of the two operands support, which is all there is to
+-- go on once an interval takes part. It loses the gaps of a list and never
+-- claims more than the ends allow.
+fromEnds :: Op -> Integers -> Integers -> Maybe Bool
+fromEnds op left right
+  | always = Just True
+  | never = Just False
+  | otherwise = Nothing
+
+  where
+
+    (leftLow, leftHigh) = ends left
+    (rightLow, rightHigh) = ends right
+
+    apart = leftHigh < rightLow || rightHigh < leftLow
+
+    same =
+      leftLow == leftHigh && rightLow == rightHigh && leftLow == rightLow
+
+    always = case op of
+      RelationalLT -> leftHigh < rightLow
+      RelationalLTE -> leftHigh <= rightLow
+      RelationalGT -> leftLow > rightHigh
+      RelationalGTE -> leftLow >= rightHigh
+      RelationalEqual -> same
+      RelationalNotEqual -> apart
+      _ -> False
+
+    never = case op of
+      RelationalLT -> leftLow >= rightHigh
+      RelationalLTE -> leftLow > rightHigh
+      RelationalGT -> leftHigh <= rightLow
+      RelationalGTE -> leftHigh < rightLow
+      RelationalEqual -> apart
+      RelationalNotEqual -> same
+      _ -> False
+
+-- | How a pair of integers is compared, for the operators this evaluator
+-- answers. An operator that is not a comparison gets no answer at all, which
+-- is what keeps a verdict from being read out of an operator nobody meant to
+-- compare with.
+comparison :: Op -> Maybe (Integer -> Integer -> Bool)
+comparison RelationalLT = Just (<)
+comparison RelationalLTE = Just (<=)
+comparison RelationalGT = Just (>)
+comparison RelationalGTE = Just (>=)
+comparison RelationalEqual = Just (==)
+comparison RelationalNotEqual = Just (/=)
+comparison _ = Nothing
+
+-- | What a condition is worth when the folding evaluator cannot pin it down,
+-- which is where a variable that holds several values or a range still decides
+-- a comparison. Only a comparison of two integer operands is answered; every
+-- other shape leaves the pass quiet.
+abstractValue ::
+  ValueAnalysisGlobal
+  -> ValueAnalysisPath
+  -> Expression SemanticAnn
+  -> Maybe (Const SemanticAnn)
+abstractValue global locals (BinOp op left right _) = do
+  leftValues <- operandOf global locals left
+  rightValues <- operandOf global locals right
+  B <$> compareValues op leftValues rightValues
+abstractValue _ _ _ = Nothing
+
 -- | The plain variables an expression reads, in the order it reads them. A
 -- field or an element of an array is left out, since the pass follows neither
 -- and so has nothing to say about them.
@@ -397,14 +673,18 @@ reasonsFor global locals cond =
   where
 
     reasonOf ident =
-      case M.lookup ident (known locals) >>= withValue ident of
-        Just reason -> Just reason
+      case M.lookup ident (known locals) of
+        Just entry ->
+          Just (Reason ident (holdsOf entry) (S.toList (valueOrigins entry)))
         Nothing ->
-          (\value -> Reason ident value []) <$> M.lookup ident (moduleConsts global)
+          (\value -> Reason ident (OneValue value) [])
+            <$> M.lookup ident (moduleConsts global)
 
-    withValue ident entry =
-      (\value -> Reason ident value (S.toList (valueOrigins entry)))
-        <$> singleValue entry
+    holdsOf entry = case singleValue entry of
+      Just value -> OneValue value
+      Nothing -> case varValues entry of
+        Interval lo hi -> Between lo hi
+        Discrete values -> OneOf (mapMaybe integerOf (S.toList values))
 
 -- | The diagnostic: of the conditions the walk recorded, the ones whose value
 -- the state at them determines, in the order the source has them, which is the
@@ -413,9 +693,18 @@ invariantConditions :: ValueAnalysisGlobal -> [ValueAnalysisError]
 invariantConditions global =
   [ annotateError loc (EInvariantCondition value (reasonsFor global locals cond))
   | (loc, (cond, locals)) <- M.toAscList (observed global)
-  , Just value@(B _) <-
-      [evaluate (platform global) (moduleConsts global) locals cond]
+  , Just value@(B _) <- [verdict locals cond]
   ]
+
+  where
+
+    -- | The folding evaluator answers first, which keeps the arithmetic of a
+    -- condition it can work out whole, with its overflow and its division by
+    -- zero; the abstract one only gets what it leaves undecided.
+    verdict locals cond =
+      case evaluate (platform global) (moduleConsts global) locals cond of
+        Just value -> Just value
+        Nothing -> abstractValue global locals cond
 
 -- | Runs the check over a whole module, with the constants it sees, returning
 -- the first error. Only the first, since a user resolves them one at a time.

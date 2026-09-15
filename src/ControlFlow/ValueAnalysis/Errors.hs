@@ -18,17 +18,33 @@ data Origin =
     -- variable.
     Assigned Location
     -- | The condition of a branch the report sits inside of, which fixed the
-    -- variable on the way in.
+    -- variable at a value on the way in.
   | Refined Location
+    -- | The same, for a condition that bounds the variable instead of fixing
+    -- it, which is what an order comparison does.
+  | Bounded Location
   deriving (Eq, Ord, Show)
 
--- | Why the pass knows the value of one of the names a condition reads. The
+-- | What the pass knows a name holds, in the three shapes a message can say
+-- it. The pass fills this in from its own lattice, which the message does not
+-- need to know about.
+data Holds =
+    -- | A single value, which is what a condition read outright gives.
+    OneValue (Const SemanticAnn)
+    -- | A handful of values, none of which the paths rule out. Never empty and
+    -- never of one element, which is 'OneValue'.
+  | OneOf [Integer]
+    -- | Both ends included.
+  | Between Integer Integer
+  deriving Show
+
+-- | Why the pass knows what one of the names a condition reads may hold. The
 -- origins are empty when the name is a constant of the module, since a
 -- constant has no place in the body to point at.
 data Reason = Reason
   {
     reasonName :: Identifier
-  , reasonValue :: Const SemanticAnn
+  , reasonHolds :: Holds
   , reasonOrigins :: [Origin]
   }
   deriving Show
@@ -62,12 +78,25 @@ instance Diagnosable Error where
             _ -> "Here " <> T.intercalate ", " (map says reasons) <> ". "
 
         says reason = emph (T.pack (reasonName reason)) <> " holds "
-            <> emph (bareValue (reasonValue reason))
+            <> saysHolds (reasonHolds reason)
+
+        saysHolds (OneValue value) = emph (bareValue value)
+        saysHolds (OneOf values) = listed (map (emph . number) values)
+        saysHolds (Between lo hi) = "a value between " <> emph (number lo)
+            <> " and " <> emph (number hi)
 
         -- | The value without the type annotation a literal carries, since the
         -- declaration the message points at already gives the type.
         bareValue (I i _) = showText i
         bareValue other = showText other
+
+        number = T.pack . show
+
+        -- | The last of several values is joined with "or", since what the
+        -- reader has to take in is that any of them is possible.
+        listed [] = ""
+        listed [one] = one
+        listed values = T.intercalate ", " (init values) <> " or " <> last values
 
         point diag reason =
             foldl (sends (reasonName reason)) diag (reasonOrigins reason)
@@ -76,6 +105,8 @@ instance Diagnosable Error where
             relatedTo loc (T.pack name <> " takes that value here") diag
         sends name diag (Refined loc) =
             relatedTo loc (T.pack name <> " is fixed at that value by this condition") diag
+        sends name diag (Bounded loc) =
+            relatedTo loc (T.pack name <> " is bounded by this condition") diag
 
 instance ErrorMessage ValueAnalysisError where
 

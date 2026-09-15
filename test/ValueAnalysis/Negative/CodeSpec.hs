@@ -105,6 +105,86 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
+    -- | The comparison is not decided by a single value but by every value the
+    -- paths leave, which is what the abstract evaluator adds to the evaluator
+    -- of the folding.
+    it "VAE-001: comparison every value a variable may hold decides alike" $ do
+      let src = "function f(flag : bool) -> u32 {\n" ++
+                "    var x : u32 = 0 : u32;\n" ++
+                "    if (flag) {\n" ++
+                "        x = 1 : u32;\n" ++
+                "    }\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    if (x < 5 : u32) {\n" ++
+                "        y = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
+
+    -- | The values a variable may hold and the one it is compared against have
+    -- nothing in common, so the equality is false whichever of them it takes.
+    it "VAE-001: equality against a value the variable can never take" $ do
+      let src = "function f(flag : bool) -> u32 {\n" ++
+                "    var x : u32 = 0 : u32;\n" ++
+                "    if (flag) {\n" ++
+                "        x = 1 : u32;\n" ++
+                "    }\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    if (x == 7 : u32) {\n" ++
+                "        y = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
+
+    -- | Neither half of the guard pins the parameter to a value, but the two
+    -- together bound it, and the bound decides the condition inside.
+    it "VAE-001: condition the range its guard leaves already decides" $ do
+      let src = "function f(x : u32) -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    if (x > 0 : u32 && x < 20 : u32) {\n" ++
+                "        if (x < 30 : u32) {\n" ++
+                "            y = 1 : u32;\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
+
+    -- | An order comparison teaches on both sides of the branch, so the else
+    -- knows the bound the condition rules out.
+    it "VAE-001: condition the else of a comparison already decides" $ do
+      let src = "function f(x : u32) -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    if (x < 20 : u32) {\n" ++
+                "        y = 1 : u32;\n" ++
+                "    } else {\n" ++
+                "        if (x >= 20 : u32) {\n" ++
+                "            y = 2 : u32;\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
+
+    -- | Which side of the comparison the variable is on is not fixed by the
+    -- syntax, so the wiring has to read the operands whichever way round the
+    -- source writes them.
+    it "VAE-001: comparison with the variable on the right" $ do
+      let src = "function f(flag : bool) -> u32 {\n" ++
+                "    var x : u32 = 0 : u32;\n" ++
+                "    if (flag) {\n" ++
+                "        x = 1 : u32;\n" ++
+                "    }\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    if (5 : u32 > x) {\n" ++
+                "        y = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
+
     -- | Two invariant conditions in the same body: the one the source reaches
     -- first is the one reported, so the message names line 5 and the value it
     -- evaluates to there. The second one, on line 8, waits its turn.

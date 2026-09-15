@@ -108,3 +108,50 @@ spec = do
                 "    return x;\n" ++
                 "}"
       compileErrorCode src `shouldBe` Nothing
+
+    -- | From a disjunction that holds, all that follows is that one of its two
+    -- halves does, and which one is not known. Learning either of them would
+    -- be a finding on correct code, so this pins the silence.
+    it "accepts a condition under a disjunction, which bounds nothing" $ do
+      let src = "function f(x : u32) -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    if (x > 5 : u32 || x < 3 : u32) {\n" ++
+                "        if (x < 30 : u32) {\n" ++
+                "            y = 1 : u32;\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
+
+    -- | The mirror of the case above: from a conjunction that fails, all that
+    -- follows is that one of its halves does, so the else learns nothing.
+    it "accepts a condition in the else of a conjunction, which bounds nothing" $ do
+      let src = "function f(x : u32) -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    if (x > 0 : u32 && x < 20 : u32) {\n" ++
+                "        y = 1 : u32;\n" ++
+                "    } else {\n" ++
+                "        if (x < 30 : u32) {\n" ++
+                "            y = 2 : u32;\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
+
+    -- | The two values the paths leave decide the comparison in opposite ways,
+    -- which is the case the abstract evaluator has to leave alone.
+    it "accepts a comparison only some of the values a variable may hold decide" $ do
+      let src = "function f(flag : bool) -> u32 {\n" ++
+                "    var x : u32 = 0 : u32;\n" ++
+                "    if (flag) {\n" ++
+                "        x = 1 : u32;\n" ++
+                "    }\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    if (x < 1 : u32) {\n" ++
+                "        y = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
