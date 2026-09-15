@@ -60,12 +60,12 @@ useObject = walkObject ObjectVisitor
             TOption (TBoxSubtype _) -> moveOptionBox ident loc >> safeUseVariable ident;
             _ -> safeUseVariable ident
         }) (getTypeSemAnn ann)
-    -- A field reached through a reference is recorded, which is what tells
-    -- the two option-box errors apart; one reached directly is not.
-  , atField = \accessor _obj ident ->
-      case accessor of
-        ThroughReference -> safeUseVariable ident
-        Direct -> return ()
+    -- A field is not recorded. The set this pass keeps holds the names of the
+    -- variables a branch used, and it is read by one question only, which
+    -- option-box a branch touched; a field can never answer it, since a field
+    -- may not have an option-box type. Recording the bare name of a field made
+    -- @ref->opt@ pass for a use of a local option-box called @opt@.
+  , atField = \_obj _ident -> return ()
   , atIndex = useExpression
   }
 

@@ -5,7 +5,7 @@
 module VarUsage.Negative.DetailSpec
   ( spec
   , testVE001, testVE002, testBE001, testBE001_1, testBE002, testBE002_1
-  , testBE003, testBE004, testBE005, testBE006, testBE007, testBE008
+  , testBE003, testBE004, testBE005, testBE006, testBE006_1, testBE007, testBE008
   , testBE009, testBE010, testBE011, testBE012, testVE004, testVE004_1
   , testVE003, testVE005, testVE005_1, testVE005_2, testVE006, testVE006_1
   , testVE006_2, testVE006_3, testVE006_4, testVE006_5, testVE002_1, testVE002_2
@@ -260,6 +260,37 @@ testBE006 = veWrap (
   veDeclOpt ++
   "        if (data == 0) {\n" ++ veAlloc ++ "        } else {\n        }\n" ++
   veMatchMove ++ veFreeData)
+
+-- BE-006, with a field that shares the name of the option-box. The shape is
+-- the one of 'testBE006', and the only addition is that the @else@ branch
+-- reads @w->opt@, a field of a struct reached through a reference. The
+-- option-box @opt@ is a local of the procedure and the field @opt@ belongs to
+-- @Wrapper@, which is legal: a field may not have an option-box type, so the
+-- two can never be the same object. The backward pass used to record the bare
+-- name of a field, so the branch that only reads @w->opt@ passed for a branch
+-- that used the option-box, and the answer came out as BE-004 instead.
+testBE006_1 :: String
+testBE006_1 =
+  "struct Wrapper {\n" ++
+  "    opt : u32;\n" ++
+  "};\n" ++
+  "interface Interface0 {\n" ++
+  "    procedure proc0(&mut self, data : box u32, w : &Wrapper);\n" ++
+  "};\n" ++
+  "resource class ResourceClass0 provides Interface0 {\n" ++
+  "    data_pool : access Allocator<u32>;\n" ++
+  "    seen : u32;\n" ++
+  "    procedure proc0(&mut self, data : box u32, w : &Wrapper) {\n" ++
+  "        var opt : Option<box u32> = None;\n" ++
+  "        if (self->seen == 0) {\n" ++
+  veAlloc ++
+  "        } else {\n" ++
+  "            self->seen = w->opt;\n" ++
+  "        }\n" ++
+  veMatchMove ++ veFreeData ++
+  "        return;\n" ++
+  "    }\n" ++
+  "};\n"
 
 -- BE-012: matching an option-box with a default @case _@ instead of an explicit
 -- @Some@ case. The type checker accepts the match as exhaustive, but the usage

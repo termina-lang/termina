@@ -14,7 +14,6 @@
 -- four that branch, which every pass has to interpret for itself.
 module ControlFlow.BasicBlocks.Traversal (
     Child(..)
-  , FieldAccessor(..)
   , ObjectVisitor(..)
   , Rewriter(..)
   , expressionChildren
@@ -47,18 +46,16 @@ data Child a
     -- to the computation, such as the size of an array initializer.
   | ChildConstExpr (Expression a)
 
--- | How a field is reached, which the linearity check distinguishes and the
--- usage check deliberately does not.
-data FieldAccessor = Direct | ThroughReference
-  deriving (Eq, Show)
-
 -- | What to do at each position of an access path.
 data ObjectVisitor m a = ObjectVisitor
   {
     -- | The variable the access starts from, with its annotation.
     atRoot :: Identifier -> a -> m ()
-    -- | A field, with the object it is reached through.
-  , atField :: FieldAccessor -> Object a -> Identifier -> m ()
+    -- | A field, with the object it is reached through. How the field is
+    -- reached, directly or through a reference, is not passed: no pass
+    -- distinguishes them any more, and the one that did was recording the bare
+    -- name of a field in a set of variable names.
+  , atField :: Object a -> Identifier -> m ()
     -- | An index expression along the path.
   , atIndex :: Expression a -> m ()
   }
@@ -72,9 +69,9 @@ walkObject v = go
 
     go (Variable ident ann) = atRoot v ident ann
     go (ArrayIndexExpression obj index _) = go obj >> atIndex v index
-    go (MemberAccess obj ident _) = atField v Direct obj ident >> go obj
+    go (MemberAccess obj ident _) = atField v obj ident >> go obj
     go (Dereference obj _) = go obj
-    go (DereferenceMemberAccess obj ident _) = atField v ThroughReference obj ident >> go obj
+    go (DereferenceMemberAccess obj ident _) = atField v obj ident >> go obj
     go (Unbox obj _) = go obj
 
 -- | The variable an access path starts from.

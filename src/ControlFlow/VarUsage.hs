@@ -178,7 +178,7 @@ readObject :: Object SemanticAnn -> VarUsageMonad ()
 readObject = walkObject ObjectVisitor
   {
     atRoot = \ident ann -> checkRead ident (getLocation ann)
-  , atField = \_ obj ident -> markRead (fieldKey obj ident)
+  , atField = \obj ident -> markRead (fieldKey obj ident)
   , atIndex = readExpression
   }
 
@@ -240,7 +240,7 @@ markWrittenObject obj = do
     markChain = walkObject ObjectVisitor
       {
         atRoot = \ident _ -> markRead ident
-      , atField = \_ inner ident -> markRead (fieldKey inner ident)
+      , atField = \inner ident -> markRead (fieldKey inner ident)
       , atIndex = const (return ())
       }
 
@@ -250,7 +250,7 @@ readIndices :: Object SemanticAnn -> VarUsageMonad ()
 readIndices = walkObject ObjectVisitor
   {
     atRoot = \_ _ -> return ()
-  , atField = \_ _ _ -> return ()
+  , atField = \_ _ -> return ()
   , atIndex = readExpression
   }
 

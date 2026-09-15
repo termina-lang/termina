@@ -7,7 +7,7 @@ module VarUsage.Negative.CodeSpec (spec) where
 import VarUsage.Common (boxUsageErrorCode, varUsageErrorCode)
 import VarUsage.Negative.DetailSpec
   ( testVE001, testVE002, testBE001, testBE002, testBE003, testBE004, testBE005
-  , testBE006, testBE007, testBE008, testBE009, testBE010, testBE011, testBE012
+  , testBE006, testBE006_1, testBE007, testBE008, testBE009, testBE010, testBE011, testBE012
   , testVE003, testVE004, testVE005, testVE006, testVE007, testVE008
   , testVE006_3 )
 
@@ -25,6 +25,7 @@ boxCases =
   , ("BE-004", "option-box final state mismatch across branches", testBE004)
   , ("BE-005", "option-box used in a branch that may not run", testBE005)
   , ("BE-006", "option-box used in a previous branch but missing in another", testBE006)
+  , ("BE-006", "the same, with a field of the same name read through a reference", testBE006_1)
   , ("BE-007", "box variable not moved in all branches", testBE007)
   , ("BE-008", "box variable moved in a branch that may not run", testBE008)
   , ("BE-009", "option-box allocated but not moved", testBE009)
