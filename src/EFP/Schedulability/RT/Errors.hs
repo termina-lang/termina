@@ -88,379 +88,166 @@ data Error
 
 type RTErrors = AnnotatedError Error Location
 
+instance Diagnosable Error where
+
+    describe (EUnknownComponent ident) =
+        diagnostic "RTE-001" "unknown component"
+            ("Unknown component \x1b[31m" <> T.pack ident <> "\x1b[0m.")
+    describe (EDuplicatedStepName ident stepPos) =
+        relatedTo stepPos "the step was previoulsy defined here" $
+        diagnostic "RTE-002" "duplicated step name"
+            ("There is a step with the name \x1b[31m" <> T.pack ident <> "\x1b[0m in the current transaction.\n")
+    describe (EUnknownAction actionId (clsId, clsLoc)) =
+        relatedTo clsLoc "the component class is defined here" $
+        diagnostic "RTE-003" "unknown action"
+            ("Unknown action \x1b[31m" <> T.pack actionId <> "\x1b[0m in component class \x1b[34m" <> T.pack clsId <> "\x1b[0m.\n")
+    describe (EUnknownTransPath compId actionId pathId) =
+        diagnostic "RTE-004" "unknown transactional path"
+            ("Unknown transactional path \x1b[31m" <> T.pack compId <> "." <> T.pack actionId <> "::" <> T.pack pathId <> "\x1b[0m.")
+    describe (EActionMustContinue clsId actionId pathId continuations) =
+        let contText = T.intercalate ", " [ "\x1b[34m" <> T.pack tId <> "." <> T.pack aId <> "\x1b[0m" | (tId, aId) <- continuations ]
+        in
+            diagnostic "RTE-005" "action must continue"
+                ("The action \x1b[34m" <> T.pack actionId <> "\x1b[0m in component class \x1b[34m" <> T.pack clsId <> "\x1b[0m must continue according to transactional path \x1b[34m" <> T.pack pathId <> "\x1b[0m.\n" <> "Valid continuations are: " <> contText <> ".")
+    describe (EActionMustNotContinue clsId actionId pathId pathLoc) =
+        relatedTo pathLoc "the transactional path is defined here" $
+        diagnostic "RTE-006" "action must not continue"
+            ("The action \x1b[34m" <> T.pack actionId <> "\x1b[0m in component class \x1b[34m" <> T.pack clsId <> "\x1b[0m must not continue according to transactional path \x1b[34m" <> T.pack pathId <> "\x1b[0m.\n")
+    describe EExpectedStepActionContinuation =
+        diagnostic "RTE-007" "expected step action continuation"
+            ("Invalid continuation: expected a step action continuation.")
+    describe (EUnknownConstant ident) =
+        diagnostic "RTE-008" "unknown constant"
+            ("Unknown constant \x1b[31m" <> T.pack ident <> "\x1b[0m.")
+    describe (EConditionalComponentMismatch (compA, actA) (compB, actB)) =
+        diagnostic "RTE-009" "conditional component mismatch"
+            ("Conditional branches refer to different components/actions: " <> "\x1b[34m" <> T.pack compA <> "." <> T.pack actA <> "\x1b[0m and " <> "\x1b[34m" <> T.pack compB <> "." <> T.pack actB <> "\x1b[0m.")
+    describe EInvalidInitialStepMulticast =
+        diagnostic "RTE-010" "invalid initial step multicast"
+            ("The initial step of a transaction cannot be a multicast.")
+    describe (EInvalidMulticastSingleContinuation (compId, actId)) =
+        diagnostic "RTE-011" "invalid multicast single continuation"
+            ("A multicast step must have multiple continuations. This step has a single continuation: " <> "\x1b[34m" <> T.pack compId <> "." <> T.pack actId <> "\x1b[0m.")
+    describe (EUnknownTask ident) =
+        diagnostic "RTE-012" "unknown task"
+            ("Unknown task \x1b[31m" <> T.pack ident <> "\x1b[0m.")
+    describe (EInvalidContinuationTaskMismatch targetTask (taskId, actionId)) =
+        diagnostic "RTE-013" "invalid continuation task mismatch"
+            ("Continuation task mismatch: the target task is \x1b[31m" <> T.pack targetTask <> "\x1b[0m, but the only valid continuation is \x1b[31m" <> T.pack taskId <> "." <> T.pack actionId <> "\x1b[0m.")
+    describe (EInvalidContinuationActionMismatch targetAction (taskId, actionId)) =
+        diagnostic "RTE-014" "invalid continuation action mismatch"
+            ("Continuation action mismatch: the target action is \x1b[31m" <> T.pack taskId <> "." <> T.pack targetAction <> "\x1b[0m, but the only valid continuation is \x1b[31m" <> T.pack taskId <> "." <> T.pack actionId <> "\x1b[0m.")
+    describe (EDuplicatedMulticastContinuation (compId, actId) stepPos) =
+        relatedTo stepPos "the continuation was previously selected here" $
+        diagnostic "RTE-015" "duplicated multicast continuation"
+            ("The multicast continuation \x1b[34m" <> T.pack compId <> "::" <> T.pack actId <> "\x1b[0m is duplicated in the current multicast step.\n")
+    describe (EInvalidMulticastContinuation (compId, actId) validContinuations) =
+        let validContText = T.intercalate ", " [ "\x1b[34m" <> T.pack tId <> "::" <> T.pack aId <> "\x1b[0m" | (tId, aId) <- validContinuations ]
+        in
+            diagnostic "RTE-016" "invalid multicast continuation"
+                ("Invalid multicast continuation \x1b[31m" <> T.pack compId <> "::" <> T.pack actId <> "\x1b[0m. Valid continuations are: " <> validContText <> ".")
+    describe (EExpectedMulticastContinuation validContinuations) =
+        let validContText = T.intercalate ", " [ "\x1b[34m" <> T.pack tId <> "::" <> T.pack aId <> "\x1b[0m" | (tId, aId) <- validContinuations ]
+        in
+            diagnostic "RTE-017" "expected multicast continuation"
+                ("Expected a multicast continuation. Valid continuations are: " <> validContText <> ".")
+    describe (EPreviousTransactionWithSameName ident prevLoc) =
+        relatedTo prevLoc "the previous transaction is defined here" $
+        diagnostic "RTE-018" "previous transaction with same name"
+            ("There is a previous transaction with the name \x1b[31m" <> T.pack ident <> "\x1b[0m.\n")
+    describe (EPreviousSituationWithSameName ident prevLoc) =
+        relatedTo prevLoc "the previous situation is defined here" $
+        diagnostic "RTE-019" "previous situation with same name"
+            ("There is a previous situation with the name \x1b[31m" <> T.pack ident <> "\x1b[0m.\n")
+    describe (EConstExpressionTypeMismatch t1 t2) =
+        diagnostic "RTE-020" "constant expression type mismatch"
+            ("Constant expression type mismatch: found \x1b[31m" <> showText t1 <> "\x1b[0m and \x1b[31m" <> showText t2 <> "\x1b[0m.")
+    describe EConditionalStepsMustHaveMultipleBranches =
+        diagnostic "RTE-021" "conditional steps must have multiple branches"
+            ("Conditional steps must have multiple branches.")
+    describe (EMissingEventField fieldName) =
+        diagnostic "RTE-022" "missing event field"
+            ("Missing event field \x1b[31m" <> T.pack fieldName <> "\x1b[0m.")
+    describe (EInvalidEventFieldType fieldName) =
+        diagnostic "RTE-023" "invalid event field type"
+            ("Invalid type for field \x1b[31m" <> T.pack fieldName <> "\x1b[0m.")
+    describe (EUnknownTransaction ident) =
+        diagnostic "RTE-024" "unknown transaction"
+            ("Unknown transaction \x1b[31m" <> T.pack ident <> "\x1b[0m.")
+    describe (EUnknownTransactionStep stepId (transId, transLoc)) =
+        relatedTo transLoc "the transaction is defined here" $
+        diagnostic "RTE-025" "unknown transaction step"
+            ("Unknown step \x1b[31m" <> T.pack stepId <> "\x1b[0m in transaction \x1b[34m" <> T.pack transId <> "\x1b[0m.\n")
+    describe (EDuplicateEventField fieldName fieldLoc) =
+        relatedTo fieldLoc "the field was previously defined here" $
+        diagnostic "RTE-026" "duplicate event field"
+            ("The event field \x1b[34m" <> T.pack fieldName <> "\x1b[0m is duplicated in the current event definition.\n")
+    describe (EDuplicateEventDefinition eventId eventLoc) =
+        relatedTo eventLoc "the event was previously defined here" $
+        diagnostic "RTE-027" "duplicate event definition"
+            ("An event with name \x1b[34m" <> T.pack eventId <> "\x1b[0m already exists in the current situation.\n")
+    describe (EEmitterTargetMismatch emitterId targetCmp actualCmp) =
+        diagnostic "RTE-028" "emitter target mismatch"
+            ("Emitter \x1b[31m" <> T.pack emitterId <> "\x1b[0m is connected to component \x1b[31m" <> T.pack actualCmp <> "\x1b[0m, but the target component is \x1b[31m" <> T.pack targetCmp <> "\x1b[0m.")
+    describe (EUnknownEventEmitter emitterId) =
+        diagnostic "RTE-029" "unknown event emitter"
+            ("Unknown event emitter \x1b[31m" <> T.pack emitterId <> "\x1b[0m.")
+    describe EInvalidEventDefinitionType =
+        diagnostic "RTE-030" "invalid event definition type"
+            ("Invalid event definition type. Expected a multiple field assignment.")
+    describe EInvalidTransactionFieldType =
+        diagnostic "RTE-031" "invalid transaction field type"
+            ("Invalid transaction field type. Expected a transaction identifier.")
+    describe EUnsupportedEmitterType =
+        diagnostic "RTE-032" "unsupported emitter type"
+            ("Unsupported emitter type. Only interrupt and periodic timer emitters are supported.")
+    describe EInvalidDeadlineFieldType =
+        diagnostic "RTE-033" "invalid deadline field type"
+            ("Invalid deadline field type. Expected a multiple field assignment.")
+    describe (EInvalidEventField fieldName validNames) =
+        let validNamesText = T.intercalate ", " [ "\x1b[34m" <> T.pack name <> "\x1b[0m" | name <- validNames ]
+        in
+            diagnostic "RTE-034" "invalid event field"
+                ("Invalid event field name \x1b[31m" <> T.pack fieldName <> "\x1b[0m. Valid field names are: " <> validNamesText <> ".")
+    describe (EEmitterActionMismatch emitterId targetCmp targetAction (port, act, clsLoc)) =
+        relatedTo clsLoc "the component class is defined here" $
+        diagnostic "RTE-035" "emitter action mismatch"
+            ("Emitter \x1b[31m" <> T.pack emitterId <> "\x1b[0m is connected to port \x1b[31m" <> T.pack port <> "\x1b[0m that triggers action \x1b[31m" <> T.pack act <> "\x1b[0m in component \x1b[31m" <> T.pack targetCmp <> "\x1b[0m, but the starting action of the transaction is \x1b[31m" <> T.pack targetAction <> "\x1b[0m.\n")
+    describe EConditionalExpressionNotInteger =
+        diagnostic "RTE-036" "conditional expression not integer"
+            ("Conditional expression must evaluate to an integer between 1 and 100.")
+    describe (EConditionalExpressionOutOfRange value) =
+        diagnostic "RTE-037" "conditional expression out of range"
+            ("Conditional expression value \x1b[31m" <> T.pack (show value) <> "\x1b[0m is out of range. Expected an integer between 1 and 100.")
+    describe (EFlatConditionalExpressionOutOfRange value loc) =
+        relatedTo loc "the inner conditional expression is defined here" $
+        diagnostic "RTE-038" "conditional expression out of range in flattening"
+            ("Error when flattening conditional expression: the resulting value \x1b[31m" <> T.pack (show value) <> "\x1b[0m is out of range. Expected an integer between 1 and 100.")
+    describe EConstExpressionDivisionByZero =
+        diagnostic "RTE-039" "constant expression division by zero"
+            ("Division by zero in constant expression.")
+    describe EInvalidEmitterFieldType =
+        diagnostic "RTE-040" "invalid emitter field type"
+            ("Invalid emitter field type. Expected a multiple field assignment.")
+    describe EInvalidIntervalValue =
+        diagnostic "RTE-041" "invalid interval value"
+            ("Invalid interval value. Interval must be a positive number.")
+    describe (EInvalidArrivalsValue value) =
+        diagnostic "RTE-042" "invalid arrivals value"
+            ("Invalid arrivals value \x1b[31m" <> T.pack (show value) <> "\x1b[0m. Arrivals must be a positive integer.")
+    describe (EInvalidDeadlineValue value) =
+        diagnostic "RTE-043" "invalid deadline value"
+            ("Invalid deadline value \x1b[31m" <> T.pack (show value) <> "\x1b[0m. Deadline must be a positive number.")
+    describe EInvalidInitialEndStep =
+        diagnostic "RTE-044" "invalid initial end step"
+            ("The initial step of a transaction cannot be an end step.")
+
+    -- | Everything else is an error of the compiler, not of the model.
+    describe _ = diagnosticWithoutDetail "Internal" "internal error"
+
 instance ErrorMessage RTErrors where
 
-
-    errorIdent (AnnotatedError (EUnknownComponent {}) _pos) = "RTE-001"
-    errorIdent (AnnotatedError (EDuplicatedStepName {}) _pos) = "RTE-002"
-    errorIdent (AnnotatedError (EUnknownAction {}) _pos) = "RTE-003"
-    errorIdent (AnnotatedError (EUnknownTransPath {}) _pos) = "RTE-004"
-    errorIdent (AnnotatedError (EActionMustContinue {}) _pos) = "RTE-005"
-    errorIdent (AnnotatedError (EActionMustNotContinue {}) _pos) = "RTE-006"
-    errorIdent (AnnotatedError (EExpectedStepActionContinuation {}) _pos) = "RTE-007"
-    errorIdent (AnnotatedError (EUnknownConstant {}) _pos) = "RTE-008"
-    errorIdent (AnnotatedError (EConditionalComponentMismatch {}) _pos) = "RTE-009"
-    errorIdent (AnnotatedError (EInvalidInitialStepMulticast {}) _pos) = "RTE-010"
-    errorIdent (AnnotatedError (EInvalidMulticastSingleContinuation {}) _pos) = "RTE-011"
-    errorIdent (AnnotatedError (EUnknownTask {}) _pos) = "RTE-012"
-    errorIdent (AnnotatedError (EInvalidContinuationTaskMismatch {}) _pos) = "RTE-013"
-    errorIdent (AnnotatedError (EInvalidContinuationActionMismatch {}) _pos) = "RTE-014"
-    errorIdent (AnnotatedError (EDuplicatedMulticastContinuation {}) _pos) = "RTE-015"
-    errorIdent (AnnotatedError (EInvalidMulticastContinuation {}) _pos) = "RTE-016"
-    errorIdent (AnnotatedError (EExpectedMulticastContinuation {}) _pos) = "RTE-017"
-    errorIdent (AnnotatedError (EPreviousTransactionWithSameName {}) _pos) = "RTE-018"
-    errorIdent (AnnotatedError (EPreviousSituationWithSameName {}) _pos) = "RTE-019"
-    errorIdent (AnnotatedError (EConstExpressionTypeMismatch {}) _pos) = "RTE-020"
-    errorIdent (AnnotatedError (EConditionalStepsMustHaveMultipleBranches {}) _pos) = "RTE-021"
-    errorIdent (AnnotatedError (EMissingEventField {}) _pos) = "RTE-022"
-    errorIdent (AnnotatedError (EInvalidEventFieldType {}) _pos) = "RTE-023"
-    errorIdent (AnnotatedError (EUnknownTransaction {}) _pos) = "RTE-024"
-    errorIdent (AnnotatedError (EUnknownTransactionStep {}) _pos) = "RTE-025"
-    errorIdent (AnnotatedError (EDuplicateEventField {}) _pos) = "RTE-026"
-    errorIdent (AnnotatedError (EDuplicateEventDefinition {}) _pos) = "RTE-027"
-    errorIdent (AnnotatedError (EEmitterTargetMismatch {}) _pos) = "RTE-028"
-    errorIdent (AnnotatedError (EUnknownEventEmitter {}) _pos) = "RTE-029"
-    errorIdent (AnnotatedError (EInvalidEventDefinitionType {}) _pos) = "RTE-030"
-    errorIdent (AnnotatedError (EInvalidTransactionFieldType {}) _pos) = "RTE-031"
-    errorIdent (AnnotatedError (EUnsupportedEmitterType {}) _pos) = "RTE-032"
-    errorIdent (AnnotatedError (EInvalidDeadlineFieldType {}) _pos) = "RTE-033"
-    errorIdent (AnnotatedError (EInvalidEventField {}) _pos) = "RTE-034"
-    errorIdent (AnnotatedError (EEmitterActionMismatch {}) _pos) = "RTE-035"
-    errorIdent (AnnotatedError (EConditionalExpressionNotInteger {}) _pos) = "RTE-036"
-    errorIdent (AnnotatedError (EConditionalExpressionOutOfRange {}) _pos) = "RTE-037"
-    errorIdent (AnnotatedError (EFlatConditionalExpressionOutOfRange {}) _pos) = "RTE-038"
-    errorIdent (AnnotatedError (EConstExpressionDivisionByZero {}) _pos) = "RTE-039"
-    errorIdent (AnnotatedError (EInvalidEmitterFieldType {}) _pos) = "RTE-040"
-    errorIdent (AnnotatedError (EInvalidIntervalValue {}) _pos) = "RTE-041"
-    errorIdent (AnnotatedError (EInvalidArrivalsValue {}) _pos) = "RTE-042"
-    errorIdent (AnnotatedError (EInvalidDeadlineValue {}) _pos) = "RTE-043"
-    errorIdent (AnnotatedError (EInvalidInitialEndStep {}) _pos) = "RTE-044"
-    errorIdent _ = "Internal"
-
-    errorTitle (AnnotatedError (EUnknownComponent {}) _pos) = "unknown component"
-    errorTitle (AnnotatedError (EDuplicatedStepName {}) _pos) = "duplicated step name"
-    errorTitle (AnnotatedError (EUnknownAction {}) _pos) = "unknown action"
-    errorTitle (AnnotatedError (EUnknownTransPath {}) _pos) = "unknown transactional path"
-    errorTitle (AnnotatedError (EActionMustContinue {}) _pos) = "action must continue"
-    errorTitle (AnnotatedError (EActionMustNotContinue {}) _pos) = "action must not continue"
-    errorTitle (AnnotatedError (EExpectedStepActionContinuation {}) _pos) = "expected step action continuation"
-    errorTitle (AnnotatedError (EUnknownConstant {}) _pos) = "unknown constant"
-    errorTitle (AnnotatedError (EConditionalComponentMismatch {}) _pos) = "conditional component mismatch"
-    errorTitle (AnnotatedError (EInvalidInitialStepMulticast {}) _pos) = "invalid initial step multicast"
-    errorTitle (AnnotatedError (EInvalidMulticastSingleContinuation {}) _pos) = "invalid multicast single continuation"
-    errorTitle (AnnotatedError (EUnknownTask {}) _pos) = "unknown task"
-    errorTitle (AnnotatedError (EInvalidContinuationTaskMismatch {}) _pos) = "invalid continuation task mismatch"
-    errorTitle (AnnotatedError (EInvalidContinuationActionMismatch {}) _pos) = "invalid continuation action mismatch"
-    errorTitle (AnnotatedError (EDuplicatedMulticastContinuation {}) _pos) = "duplicated multicast continuation"
-    errorTitle (AnnotatedError (EInvalidMulticastContinuation {}) _pos) = "invalid multicast continuation"
-    errorTitle (AnnotatedError (EExpectedMulticastContinuation {}) _pos) = "expected multicast continuation"
-    errorTitle (AnnotatedError (EPreviousTransactionWithSameName {}) _pos) = "previous transaction with same name"
-    errorTitle (AnnotatedError (EPreviousSituationWithSameName {}) _pos) = "previous situation with same name"
-    errorTitle (AnnotatedError (EConstExpressionTypeMismatch {}) _pos) = "constant expression type mismatch"
-    errorTitle (AnnotatedError (EConditionalStepsMustHaveMultipleBranches {}) _pos) = "conditional steps must have multiple branches"
-    errorTitle (AnnotatedError (EMissingEventField {}) _pos) = "missing event field"
-    errorTitle (AnnotatedError (EInvalidEventFieldType {}) _pos) = "invalid event field type"
-    errorTitle (AnnotatedError (EUnknownTransaction {}) _pos) = "unknown transaction"
-    errorTitle (AnnotatedError (EUnknownTransactionStep {}) _pos) = "unknown transaction step"
-    errorTitle (AnnotatedError (EDuplicateEventField {}) _pos) = "duplicate event field"
-    errorTitle (AnnotatedError (EDuplicateEventDefinition {}) _pos) = "duplicate event definition"
-    errorTitle (AnnotatedError (EEmitterTargetMismatch {}) _pos) = "emitter target mismatch"
-    errorTitle (AnnotatedError (EUnknownEventEmitter {}) _pos) = "unknown event emitter"
-    errorTitle (AnnotatedError (EInvalidEventDefinitionType {}) _pos) = "invalid event definition type"
-    errorTitle (AnnotatedError (EInvalidTransactionFieldType {}) _pos) = "invalid transaction field type"
-    errorTitle (AnnotatedError (EUnsupportedEmitterType {}) _pos) = "unsupported emitter type"
-    errorTitle (AnnotatedError (EInvalidDeadlineFieldType {}) _pos) = "invalid deadline field type"
-    errorTitle (AnnotatedError (EInvalidEventField {}) _pos) = "invalid event field"
-    errorTitle (AnnotatedError (EEmitterActionMismatch {}) _pos) = "emitter action mismatch"
-    errorTitle (AnnotatedError (EConditionalExpressionNotInteger {}) _pos) = "conditional expression not integer"
-    errorTitle (AnnotatedError (EConditionalExpressionOutOfRange {}) _pos) = "conditional expression out of range"
-    errorTitle (AnnotatedError (EFlatConditionalExpressionOutOfRange {}) _pos) = "conditional expression out of range in flattening"
-    errorTitle (AnnotatedError (EConstExpressionDivisionByZero {}) _pos) = "constant expression division by zero"
-    errorTitle (AnnotatedError (EInvalidEmitterFieldType {}) _pos) = "invalid emitter field type"
-    errorTitle (AnnotatedError (EInvalidIntervalValue {}) _pos) = "invalid interval value"
-    errorTitle (AnnotatedError (EInvalidArrivalsValue {}) _pos) = "invalid arrivals value"
-    errorTitle (AnnotatedError (EInvalidDeadlineValue {}) _pos) = "invalid deadline value"
-    errorTitle (AnnotatedError (EInvalidInitialEndStep {}) _pos) = "invalid initial end step"
-    errorTitle (AnnotatedError _err _pos) = "internal error"
-
-    toText e@(AnnotatedError err pos@(Position _ start _end)) files =
-        let fileName = sourceName start
-            sourceLines = files M.! fileName
-            title = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."
-        in
-            case err of 
-                EUnknownComponent ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Unknown component \x1b[31m" <> T.pack ident <> "\x1b[0m."))
-                EDuplicatedStepName ident stepPos@(Position _ stepStart _stepEnd) ->
-                    let stepFileName = sourceName stepStart
-                        stepSourceLines = files M.! stepFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("There is a step with the name \x1b[31m" <> T.pack ident <> "\x1b[0m in the current transaction.\n")) <>
-                        pprintSimpleError
-                            stepSourceLines "The step was previoulsy defined here:" stepFileName
-                            stepPos Nothing
-                EUnknownAction actionId (clsId, clsLoc@(Position _ clsStart _clsEnd)) ->
-                    let clsFileName = sourceName clsStart
-                        clsSourceLines = files M.! clsFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Unknown action \x1b[31m" <> T.pack actionId <> "\x1b[0m in component class \x1b[34m" <> T.pack clsId <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            clsSourceLines "The component class is defined here:" clsFileName
-                            clsLoc Nothing
-                EUnknownTransPath compId actionId pathId ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Unknown transactional path \x1b[31m" <> T.pack compId <> "." <> T.pack actionId <> "::" <> T.pack pathId <> "\x1b[0m."))
-                EActionMustContinue clsId actionId pathId continuations ->
-                    let contText = T.intercalate ", " [ "\x1b[34m" <> T.pack tId <> "." <> T.pack aId <> "\x1b[0m" | (tId, aId) <- continuations ]
-                    in
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The action \x1b[34m" <> T.pack actionId <> 
-                            "\x1b[0m in component class \x1b[34m" <> T.pack clsId <>
-                            "\x1b[0m must continue according to transactional path \x1b[34m" <> T.pack pathId <> "\x1b[0m.\n"
-                            <> "Valid continuations are: " <> contText <> "."))
-                EActionMustNotContinue clsId actionId pathId pathLoc@(Position _ pathStart _pathEnd) ->
-                    let pathFileName = sourceName pathStart
-                        pathSourceLines = files M.! pathFileName
-                    in
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The action \x1b[34m" <> T.pack actionId <> 
-                            "\x1b[0m in component class \x1b[34m" <> T.pack clsId <>
-                            "\x1b[0m must not continue according to transactional path \x1b[34m" <> T.pack pathId <> "\x1b[0m.\n")) <>
-                    pprintSimpleError
-                        pathSourceLines "The transactional path is defined here:" pathFileName
-                        pathLoc Nothing
-                EExpectedStepActionContinuation ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "Invalid continuation: expected a step action continuation.")
-                EUnknownConstant ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Unknown constant \x1b[31m" <> T.pack ident <> "\x1b[0m."))
-                EConditionalComponentMismatch (compA, actA) (compB, actB) ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Conditional branches refer to different components/actions: " <>
-                            "\x1b[34m" <> T.pack compA <> "." <> T.pack actA <> "\x1b[0m and " <>
-                            "\x1b[34m" <> T.pack compB <> "." <> T.pack actB <> "\x1b[0m."))
-                EInvalidInitialStepMulticast ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "The initial step of a transaction cannot be a multicast.")
-                EInvalidMulticastSingleContinuation (compId, actId) ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("A multicast step must have multiple continuations. This step has a single continuation: " <>
-                            "\x1b[34m" <> T.pack compId <> "." <> T.pack actId <> "\x1b[0m."))
-                EUnknownTask ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Unknown task \x1b[31m" <> T.pack ident <> "\x1b[0m."))
-                EInvalidContinuationTaskMismatch targetTask (taskId, actionId) ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Continuation task mismatch: the target task is \x1b[31m" <> T.pack targetTask <> 
-                            "\x1b[0m, but the only valid continuation is \x1b[31m" <> T.pack taskId <> "." <> T.pack actionId <> "\x1b[0m."))
-                EInvalidContinuationActionMismatch targetAction (taskId, actionId) ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Continuation action mismatch: the target action is \x1b[31m" <> T.pack taskId <> "." <> T.pack targetAction <> 
-                            "\x1b[0m, but the only valid continuation is \x1b[31m" <> T.pack taskId <> "." <> T.pack actionId <> "\x1b[0m."))
-                EDuplicatedMulticastContinuation (compId, actId) stepPos@(Position _ stepStart _stepEnd) ->
-                    let stepFileName = sourceName stepStart
-                        stepSourceLines = files M.! stepFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("The multicast continuation \x1b[34m" <> T.pack compId <> "::" <> T.pack actId <> "\x1b[0m is duplicated in the current multicast step.\n")) <>
-                        pprintSimpleError
-                            stepSourceLines "The continuation was previously selected here:" stepFileName
-                            stepPos Nothing
-                EInvalidMulticastContinuation (compId, actId) validContinuations ->
-                    let validContText = T.intercalate ", " [ "\x1b[34m" <> T.pack tId <> "::" <> T.pack aId <> "\x1b[0m" | (tId, aId) <- validContinuations ]
-                    in
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Invalid multicast continuation \x1b[31m" <> T.pack compId <> "::" <> T.pack actId <> 
-                            "\x1b[0m. Valid continuations are: " <> validContText <> "."))
-                EExpectedMulticastContinuation validContinuations ->
-                    let validContText = T.intercalate ", " [ "\x1b[34m" <> T.pack tId <> "::" <> T.pack aId <> "\x1b[0m" | (tId, aId) <- validContinuations ]
-                    in
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Expected a multicast continuation. Valid continuations are: " <> validContText <> "."))
-                EPreviousTransactionWithSameName ident prevLoc@(Position _ prevStart _prevEnd) ->
-                    let prevFileName = sourceName prevStart
-                        prevSourceLines = files M.! prevFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("There is a previous transaction with the name \x1b[31m" <> T.pack ident <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            prevSourceLines "The previous transaction is defined here:" prevFileName
-                            prevLoc Nothing
-                EPreviousSituationWithSameName ident prevLoc@(Position _ prevStart _prevEnd) ->
-                    let prevFileName = sourceName prevStart
-                        prevSourceLines = files M.! prevFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("There is a previous situation with the name \x1b[31m" <> T.pack ident <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            prevSourceLines "The previous situation is defined here:" prevFileName
-                            prevLoc Nothing
-                EConstExpressionTypeMismatch t1 t2 ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Constant expression type mismatch: found \x1b[31m" <> showText t1 <> "\x1b[0m and \x1b[31m" <> showText t2 <> "\x1b[0m."))
-                EConditionalStepsMustHaveMultipleBranches ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "Conditional steps must have multiple branches.")
-                EMissingEventField fieldName ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Missing event field \x1b[31m" <> T.pack fieldName <> "\x1b[0m."))
-                EInvalidEventFieldType fieldName ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Invalid type for field \x1b[31m" <> T.pack fieldName <> "\x1b[0m."))
-                EUnknownTransaction ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Unknown transaction \x1b[31m" <> T.pack ident <> "\x1b[0m."))
-                EUnknownTransactionStep stepId (transId, transLoc@(Position _ transStart _transEnd)) ->
-                    let transFileName = sourceName transStart
-                        transSourceLines = files M.! transFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Unknown step \x1b[31m" <> T.pack stepId <> "\x1b[0m in transaction \x1b[34m" <> T.pack transId <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            transSourceLines "The transaction is defined here:" transFileName
-                            transLoc Nothing
-                EDuplicateEventField fieldName fieldLoc@(Position _ fieldStart _fieldEnd) ->
-                    let fieldFileName = sourceName fieldStart
-                        fieldSourceLines = files M.! fieldFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("The event field \x1b[34m" <> T.pack fieldName <> "\x1b[0m is duplicated in the current event definition.\n")) <> 
-                        pprintSimpleError
-                            fieldSourceLines "The field was previously defined here:" fieldFileName
-                            fieldLoc Nothing
-                EDuplicateEventDefinition eventId eventLoc@(Position _ eventStart _eventEnd) ->
-                    let eventFileName = sourceName eventStart
-                        eventSourceLines = files M.! eventFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("An event with name \x1b[34m" <> T.pack eventId <> "\x1b[0m already exists in the current situation.\n")) <>
-                        pprintSimpleError
-                            eventSourceLines "The event was previously defined here:" eventFileName
-                            eventLoc Nothing
-                EEmitterTargetMismatch emitterId targetCmp actualCmp ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Emitter \x1b[31m" <> T.pack emitterId <> "\x1b[0m is connected to component \x1b[31m" <> T.pack actualCmp <>
-                            "\x1b[0m, but the target component is \x1b[31m" <> T.pack targetCmp <> "\x1b[0m."))
-                EUnknownEventEmitter emitterId ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Unknown event emitter \x1b[31m" <> T.pack emitterId <> "\x1b[0m."))
-                EInvalidEventDefinitionType ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "Invalid event definition type. Expected a multiple field assignment.")
-                EInvalidTransactionFieldType ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "Invalid transaction field type. Expected a transaction identifier.")
-                EUnsupportedEmitterType ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "Unsupported emitter type. Only interrupt and periodic timer emitters are supported.")
-                EInvalidDeadlineFieldType ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "Invalid deadline field type. Expected a multiple field assignment.")
-                EInvalidEventField fieldName validNames ->
-                    let validNamesText = T.intercalate ", " [ "\x1b[34m" <> T.pack name <> "\x1b[0m" | name <- validNames ]
-                    in
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Invalid event field name \x1b[31m" <> T.pack fieldName <> "\x1b[0m. Valid field names are: " <> validNamesText <> "."))
-                EEmitterActionMismatch emitterId targetCmp targetAction (port, act, clsLoc@(Position _ clsStart _clsEnd)) ->
-                    let clsFileName = sourceName clsStart
-                        clsSourceLines = files M.! clsFileName
-                    in
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Emitter \x1b[31m" <> T.pack emitterId <> "\x1b[0m is connected to port \x1b[31m" <> T.pack port <>
-                            "\x1b[0m that triggers action \x1b[31m" <> T.pack act <> "\x1b[0m in component \x1b[31m" <> T.pack targetCmp <>
-                            "\x1b[0m, but the starting action of the transaction is \x1b[31m" <> T.pack targetAction <> "\x1b[0m.\n")) <>
-                    pprintSimpleError
-                        clsSourceLines "The component class is defined here:" clsFileName
-                        clsLoc Nothing
-                EConditionalExpressionNotInteger ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "Conditional expression must evaluate to an integer between 1 and 100.")
-                EConditionalExpressionOutOfRange value ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Conditional expression value \x1b[31m" <> T.pack (show value) <> "\x1b[0m is out of range. Expected an integer between 1 and 100."))
-                EFlatConditionalExpressionOutOfRange value loc@(Position _ locStart _locEnd) ->
-                    let locFileName = sourceName locStart
-                        locSourceLines = files M.! locFileName
-                    in
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Error when flattening conditional expression: the resulting value \x1b[31m" <> T.pack (show value) <> "\x1b[0m is out of range. Expected an integer between 1 and 100.")) <>
-                    pprintSimpleError
-                        locSourceLines "The inner conditional expression is defined here:" locFileName
-                        loc Nothing
-                EConstExpressionDivisionByZero ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "Division by zero in constant expression.")
-                EInvalidEmitterFieldType ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "Invalid emitter field type. Expected a multiple field assignment.")
-                EInvalidIntervalValue ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "Invalid interval value. Interval must be a positive number.")
-                EInvalidArrivalsValue value ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Invalid arrivals value \x1b[31m" <> T.pack (show value) <> "\x1b[0m. Arrivals must be a positive integer."))
-                EInvalidDeadlineValue value ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Invalid deadline value \x1b[31m" <> T.pack (show value) <> "\x1b[0m. Deadline must be a positive number."))
-                EInvalidInitialEndStep ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "The initial step of a transaction cannot be an end step.")
-                _ -> pprintSimpleError sourceLines title fileName pos Nothing
-    toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
-
-    toDiagnostics e@(AnnotatedError _ pos) _files =
-        [LSP.Diagnostic (loc2Range pos)
-            (Just LSP.DiagnosticSeverity_Error)
-            Nothing Nothing Nothing
-            text (Just []) Nothing Nothing]
-        
-        where 
-            text = "error [" <> errorIdent e <> "]: " <> errorTitle e <> "."
+    errorIdent = diagCode . describe . getError
+    errorTitle = diagTitle . describe . getError
+    toText = errorToText
+    toDiagnostics = errorToDiagnostics

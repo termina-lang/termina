@@ -273,2171 +273,774 @@ data Error
 
 type SemanticErrors = AnnotatedError Error Location
 
+instance Diagnosable Error where
+
+    describe (EInvalidArrayIndexing ty) =
+        diagnostic "SE-001" "invalid array indexing"
+            ("You are trying to index an object of type \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe (ENotNamedObject ident) =
+        diagnostic "SE-002" "object not found"
+            ("The variable \x1b[31m" <> T.pack ident <> "\x1b[0m has not been declared")
+    describe EExpressionNotConstant =
+        diagnostic "SE-003" "expected constant expression"
+            ("The expression is not constant.")
+    describe EAssignmentToImmutable =
+        diagnostic "SE-004" "assignment to immutable variable"
+            ("You are trying to assign a value to an immutable object.")
+    describe EIfElseNoOtherwise =
+        diagnostic "SE-005" "missing else clause"
+            ("You are missing the else clause in an if-else-if statement.\n" <> "You must provide an else clause if you are defining an else-if clause.")
+    describe (ENotCasteable ty1 ty2) =
+        diagnostic "SE-006" "invalid cast"
+            ("You cannot cast a value of type \x1b[31m" <> showText ty1 <> "\x1b[0m to type \x1b[31m" <> showText ty2 <> "\x1b[0m.")
+    describe (EInvalidParameterType (Parameter ident ts)) =
+        diagnostic "SE-007" "invalid parameter type"
+            ("Parameter \x1b[31m" <> T.pack ident <> "\x1b[0m has an invalid type \x1b[31m" <> showText ts <> "\x1b[0m.")
+    describe (EInvalidReturnType ty) =
+        diagnostic "SE-008" "invalid return type"
+            ("Invalid return type \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe (EProcedureCallExtraArgs (procId, params, procPos) numArgs) =
+        relatedTo procPos "\nThe interface of the procedure is defined here" $
+        diagnostic "SE-009" "extra arguments in procedure call"
+            ("Procedure \x1b[31m" <> T.pack procId <> "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show numArgs) <> "\x1b[0m.")
+    describe (EProcedureCallMissingArgs (ident, params, procPos) numArgs) =
+        relatedTo procPos ("Procedure \x1b[31m" <> T.pack ident <> "\x1b[0m is defined here:") $
+        diagnostic "SE-010" "missing arguments in procedure call"
+            ("Procedure \x1b[31m" <> T.pack ident <> "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show numArgs) <> "\x1b[0m.")
+    describe (EProcedureCallArgTypeMismatch (ident, Parameter _ expectedTy, procPos) numArgs actualTy) =
+        relatedTo procPos ("Procedure \x1b[31m" <> T.pack ident <> "\x1b[0m is defined here:") $
+        diagnostic "SE-011" "argument type mismatch in procedure call"
+            ("Argument \x1b[31m#" <> T.pack (show numArgs) <> "\x1b[0m of procedure \x1b[31m" <> T.pack ident <> "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe (EUnknownProcedure ident) =
+        diagnostic "SE-012" "unknown procedure"
+            ("Unknown procedure \x1b[31m" <> T.pack ident <> "\x1b[0m.")
+    describe (EResourceClassNoProvides ident) =
+        diagnostic "SE-013" "resource class does not provide any interface"
+            ("Resource class \x1b[31m" <> T.pack ident <> "\x1b[0m does not provide any interface.\n" <> "A resource class must provide at least one interface.")
+    describe (EResourceClassAction (classId, clsPos) ident) =
+        relatedTo clsPos "the class is defined here" $
+        diagnostic "SE-014" "resource class defines an action"
+            ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the action \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Resource classes cannot define actions.")
+    describe (EResourceClassInPort (classId, clsPos) ident) =
+        relatedTo clsPos "the class is defined here" $
+        diagnostic "SE-015" "resource class defines an in port"
+            ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the in port \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Resource classes cannot define in ports.")
+    describe (EResourceClassOutPort (classId, clsPos) ident) =
+        relatedTo clsPos "the class is defined here" $
+        diagnostic "SE-016" "resource class defines an out port"
+            ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the out port \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Resource classes cannot define out ports.")
+    describe (EInterfaceNotFound ident) =
+        diagnostic "SE-017" "interface not found"
+            ("Interface \x1b[31m" <> T.pack ident <> "\x1b[0m not found.")
+    describe (EGlobalNotInterface ident) =
+        diagnostic "SE-018" "identifier not an interface"
+            ("Identifier \x1b[31m" <> T.pack ident <> "\x1b[0m is not an interface.")
+    describe (EProcedureNotFromProvidedInterfaces (classId, clsPos) ident) =
+        relatedTo clsPos "the class is defined here" $
+        diagnostic "SE-019" "procedure not from provided interfaces"
+            ("The procedure \x1b[31m" <> T.pack ident <> "\x1b[0m does not belong to any of the provided interfaces of resource class \x1b[31m" <> T.pack classId <> "\x1b[0m.")
+    describe (EMissingProcedure ifaceId procId) =
+        diagnostic "SE-020" "missing procedure"
+            ("Procedure \x1b[31m" <> T.pack procId <> "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> "\x1b[0m is not being provided.")
+    describe (EProcedureExtraParams (ifaceId, procId, params, procPos) paramNumber) =
+        relatedTo procPos "the interface of the procedure is defined here" $
+        diagnostic "SE-021" "extra parameters in procedure definition"
+            ("Procedure \x1b[31m" <> T.pack procId <> "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.\n")
+    describe (EProcedureMissingParams (ifaceId, procId, params, procPos) paramNumber) =
+        relatedTo procPos "the interface of the procedure is defined here" $
+        diagnostic "SE-022" "missing parameters in procedure definition"
+            ("Procedure \x1b[31m" <> T.pack procId <> "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.\n")
+    describe (EProcedureParamTypeMismatch (ifaceId, procId, expectedTy, procPos) actualTy) =
+        relatedTo procPos ("The procedure \x1b[31m" <> T.pack procId <> "\x1b[0m of the interface \x1b[31m" <> T.pack ifaceId <> "\x1b[0m is defined here:") $
+        diagnostic "SE-023" "parameter type mismatch in procedure definition"
+            ("Parameter is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but you are defining it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")
+    describe (ETaskClassProvides ident) =
+        diagnostic "SE-024" "task class provides an interface"
+            ("Task class \x1b[31m" <> T.pack ident <> "\x1b[0m provides an interface.\n" <> "Task classes must not provide any interface.")
+    describe (ETaskClassProcedure (classId, clsPos) ident) =
+        relatedTo clsPos "the class is defined here" $
+        diagnostic "SE-025" "task class defines a procedure"
+            ("Task class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the procedure \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Task classes cannot define procedures.")
+    describe (ETaskClassNoActions ident) =
+        diagnostic "SE-026" "task class does not define any actions"
+            ("Task class \x1b[31m" <> T.pack ident <> "\x1b[0m does not define any actions.\n" <> "Task classes must define at least one action.")
+    describe (EHandlerClassProvides ident) =
+        diagnostic "SE-027" "handler class provides an interface"
+            ("Handler class \x1b[31m" <> T.pack ident <> "\x1b[0m provides an interface.\n" <> "Handler classes must not provide any interface.")
+    describe (EHandlerClassProcedure (classId, clsPos) ident) =
+        relatedTo clsPos "the class is defined here" $
+        diagnostic "SE-028" "handler class defines a procedure"
+            ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the procedure \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Handler classes cannot define procedures.")
+    describe (EHandlerClassNoAction ident) =
+        diagnostic "SE-029" "handler class does not define any actions"
+            ("Handler class \x1b[31m" <> T.pack ident <> "\x1b[0m does not define any actions.\n" <> "Handler classes must define exactly one action.")
+    describe (EHandlerClassMultipleActions classId prevActPos) =
+        relatedTo prevActPos "another action is defined here" $
+        diagnostic "SE-030" "handler class defines multiple actions"
+            ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines multiple actions.\n")
+    describe (EHandlerClassNoSinkPort classId) =
+        diagnostic "SE-031" "handler class does not define any sink port"
+            ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m does not define any sink port.\n" <> "Handler classes must define exactly one sink port.")
+    describe (EHandlerClassMultipleSinkPorts classId prevPortPos) =
+        relatedTo prevPortPos "another sink port is defined here" $
+        diagnostic "SE-032" "handler class defines multiple sink ports"
+            ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines multiple sink ports.\n")
+    describe (EHandlerClassInPort (classId, clsPos) ident) =
+        relatedTo clsPos "the class is defined here" $
+        diagnostic "SE-033" "handler class defines an in port"
+            ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the in port \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Handler classes cannot define in ports.")
+    describe (EIfElseIfCondNotBool ts) =
+        diagnostic "SE-034" "if-else-if condition not boolean"
+            ("The condition in the statement is expected to be of type \x1b[31mbool\x1b[0m but it is of type \x1b[31m" <> showText ts <> "\x1b[0m.")
+    describe (EFunctionCallExtraArgs (funcId, params, funcPos) argNumber) =
+        relatedTo funcPos ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") $
+        diagnostic "SE-035" "extra arguments in function call"
+            ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.\n")
+    describe (EFunctionCallMissingArgs (funcId, params, funcPos) argNumber) =
+        relatedTo funcPos ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") $
+        diagnostic "SE-036" "missing arguments in function call"
+            ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.\n")
+    describe (EFunctionCallArgTypeMismatch (funcId, Parameter _ expectedTy, funcPos) argNumber actualTy) =
+        relatedTo funcPos ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") $
+        diagnostic "SE-037" "argument type mismatch in function call"
+            ("Argument \x1b[31m#" <> T.pack (show argNumber) <> "\x1b[0m of function \x1b[31m" <> T.pack funcId <> "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")
+    describe (EMemberAccessNotFunction ident) =
+        diagnostic "SE-038" "access to a member that is not a function"
+            ("The identifier \x1b[31m" <> T.pack ident <> "\x1b[0m is not a valid member function.")
+    describe EMutableReferenceToImmutable =
+        diagnostic "SE-039" "mutable reference to immutable object"
+            ("You are trying to create a mutable reference to an immutable object.")
+    describe EMutableReferenceToPrivate =
+        diagnostic "SE-040" "mutable reference to private object"
+            ("You are trying to create a mutable reference to a private object.")
+    describe (EBinOpExpectedTypeLeft op expectedTy actualTy) =
+        diagnostic "SE-041" "binary operation expected type on the left"
+            ("The result of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but the left operand you are providing is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe (EBinOpExpectedTypeRight op expectedTy actualTy) =
+        diagnostic "SE-042" "binary operation expected type on the right"
+            ("The result of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but the right operand you are providing is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe (EBinOpTypeMismatch op ty_le ty_re) =
+        diagnostic "SE-043" "binary operation type mismatch"
+            ("Binary operation \x1b[31m" <> showText op <> "\x1b[0m expects operands of the same type but the left one is of type \x1b[31m" <> showText ty_le <> "\x1b[0m and the right one is of type \x1b[31m" <> showText ty_re <> "\x1b[0m.")
+    describe (EBinOpExpectedTypeNotBool op ty) =
+        diagnostic "SE-044" "binary operation expected result type not boolean"
+            ("The binary operation \x1b[31m" <> showText op <> "\x1b[0m will result in a value of type \x1b[31m" <> showText (TBool :: TerminaType a) <> "\x1b[0m but it is expected to be of type \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe (EBinOpLeftTypeNotBool op ty) =
+        diagnostic "SE-045" "binary operation expected boolean type on the left"
+            ("The left operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of type \x1b[31m" <> showText (TBool :: TerminaType a) <> "\x1b[0m.")
+    describe (EBinOpRightTypeNotBool op ty) =
+        diagnostic "SE-046" "binary operation expected boolean type on the right"
+            ("The right operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of type \x1b[31m" <> showText (TBool :: TerminaType a) <> "\x1b[0m.")
+    describe (EBinOpExpectedTypeNotArith op ty) =
+        diagnostic "SE-047" "binary operation expected result type not arithmetic"
+            ("The binary operation \x1b[31m" <> showText op <> "\x1b[0m will result in an arithmetic value but the expected type is \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe (EBinOpLeftTypeNotArith op ty) =
+        diagnostic "SE-048" "binary operation expected arithmetic type on the left"
+            ("The left operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of arithmetic type (integer or float).")
+    describe (EBinOpRightTypeNotArith op ty) =
+        diagnostic "SE-049" "binary operation expected arithmetic type on the right"
+            ("The right operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of arithmetic type (integer or float).")
+    describe (EBinOpExpectedTypeNotInt op ty) =
+        diagnostic "SE-214" "binary operation expected result type not integer"
+            ("The binary operation \x1b[31m" <> showText op <> "\x1b[0m will result in an integer value but the expected type is \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe (EBinOpLeftTypeNotInt op ty) =
+        diagnostic "SE-215" "binary operation expected integer type on the left"
+            ("The left operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of integer type.")
+    describe (EBinOpRightTypeNotInt op ty) =
+        diagnostic "SE-216" "binary operation expected integer type on the right"
+            ("The right operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of integer type.")
+    describe (EBinOpRightTypeNotPos op ty) =
+        diagnostic "SE-050" "binary operation expected positive numeric type on the right"
+            ("The right operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of positive numeric type.")
+    describe (EBinOpLeftTypeNotEq op ty) =
+        diagnostic "SE-051" "binary operation expected equatable type on the left"
+            ("The left operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of equatable type.")
+    describe (EBinOpRightTypeNotEq op ty) =
+        diagnostic "SE-052" "binary operation expected equatable type on the right"
+            ("The right operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of equatable type.")
+    describe (EAtomicAccessInvalidType ty) =
+        diagnostic "SE-053" "invalid type for the atomic access interface"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic access, only numeric types are allowed.")
+    describe (EAtomicArrayAccessInvalidType ty) =
+        diagnostic "SE-054" "invalid type for the atomic array access interface"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic array access, only numeric types are allowed.")
+    describe (EAtomicInvalidType ty) =
+        diagnostic "SE-055" "invalid atomic type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic.")
+    describe (EAtomicArrayInvalidType ty) =
+        diagnostic "SE-056" "invalid atomic array type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic array.")
+    describe (EAtomicConnectionTypeMismatch expectedTy actualTy) =
+        diagnostic "SE-057" "atomic connection type mismatch"
+            ("The type of the connected atomic resource is expected to be \x1b[31m" <> showText expectedTy <> "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe (EAtomicArrayConnectionTypeMismatch expectedTy actualTy) =
+        diagnostic "SE-058" "atomic array connection type mismatch"
+            ("The type of the elements of the connected atomic array is expected to be \x1b[31m" <> showText expectedTy <> "\x1b[0m but the array is of elements of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe EInvalidDefaultCase =
+        diagnostic "SE-059" "unnecessary default case"
+            ("The cases are already exhaustive, the default case is not needed.")
+    describe (EConstantWithoutKnownType c) =
+        diagnostic "SE-060" "constant without known type"
+            ("The type of the constant \x1b[31m" <> showText c <> "\x1b[0m cannot be inferred from the environment and must be explicitly defined.")
+    describe EStructInitializerInvalidUse =
+        diagnostic "SE-061" "invalid use of struct initializer"
+            ("You are trying to use a struct initializer in an invalid context.\n" <> "Struct initializers can only be used to initialize struct objects.")
+    describe (EStructInitializerTypeMismatch expectedTy actualTy) =
+        diagnostic "SE-062" "struct initializer type mismatch"
+            ("The struct initializer is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe (EEnumInitializerExpectedTypeMismatch expectedTy actualTy) =
+        diagnostic "SE-063" "enum initializer expected type mismatch"
+            ("The enum initializer is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe ESliceInvalidUse =
+        diagnostic "SE-064" "invalid use of slice"
+            ("You are trying to use a slice in an invalid context.\n" <> "Slices can only be used to create references to a part of an array.")
+    describe EArrayInitializerInvalidUse =
+        diagnostic "SE-065" "invalid use of an array initializer"
+            ("You are trying to use an array initializer in an invalid context.\n" <> "Array initializers can only be used to initialize array objects.")
+    describe (EArrayInitializerNotArray ty) =
+        diagnostic "SE-066" "assignment of an array initializer to a non-array type"
+            ("Invalid use of an array initializer.\n" <> "You are trying to assign an array initializer to an object of type \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe EArrayExprListInitializerInvalidUse =
+        diagnostic "SE-067" "invalid use of an expression list array initializer"
+            ("You are trying to use an array expression list initializer in an invalid context.\n" <> "TArray expression list initializers can only be used to initialize array objects.")
+    describe (EArrayExprListInitializerNotArray ty) =
+        diagnostic "SE-068" "assignment of an array expression list initializer to a non-array type"
+            ("Invalid use of an array expression list initializer.\n" <> "You are trying to assign an array expression list initializer to an object of type \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe EMonadicVariantInitializerInvalidUse =
+        diagnostic "SE-069" "invalid use of an builtin variant initializer"
+            ("You are trying to use an variant initializer for a builtin type in an invalid context.\n" <> "Variant initializers can only be used to initialize objects.")
+    describe (EForLoopLowerBoundTypeMismatch expectedTy actualTy) =
+        diagnostic "SE-070" "for loop lower bound type mismatch"
+            ("The lower bound of the for loop is expected to be of the type of the iterator \x1b[31m" <> showText expectedTy <> "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe (EForLoopUpperBoundTypeMismatch expectedTy actualTy) =
+        diagnostic "SE-071" "for loop upper bound type mismatch"
+            ("The upper bound of the for loop is expected to be of the type of the iterator \x1b[31m" <> showText expectedTy <> "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe (EArrayExprListInitializerExprTypeMismatch expectedTy actualTy) =
+        diagnostic "SE-072" "list of initializing expressions type mismatch"
+            ("The expression in the array expression list initializer is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe (EReturnValueExpected ty) =
+        diagnostic "SE-073" "expected return value"
+            ("The function is expected to return a value of type \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe EReturnValueNotUnit =
+        diagnostic "SE-074" "return value not expected"
+            ("The function is not expected to return a value.")
+    describe (EInvalidArrayType ty) =
+        diagnostic "SE-075" "invalid array type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid array type.")
+    describe (EInvalidBoxType ty) =
+        diagnostic "SE-076" "invalid box type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid box type.")
+    describe (ENoTypeFound ident) =
+        diagnostic "SE-077" "no type found"
+            ("The type \x1b[31m" <> T.pack ident <> "\x1b[0m is not found.")
+    describe (EGlobalNotType (ident, globalPos)) =
+        relatedTo globalPos "the global object is defined here" $
+        diagnostic "SE-078" "global object but not a type"
+            ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a type.\n")
+    describe (EInvalidAccessToGlobal ident) =
+        diagnostic "SE-079" "invalid access to global object"
+            ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be accessed from within this context.")
+    describe (EConstantIsReadOnly ident) =
+        diagnostic "SE-080" "invalid write to a constant"
+            ("The constant \x1b[31m" <> T.pack ident <> "\x1b[0m is read-only and cannot be modified.")
+    describe (ESymbolAlreadyDefined (ident, symbolPos)) =
+        relatedTo symbolPos "the symbol was previoulsy defined here" $
+        diagnostic "SE-081" "symbol already defined"
+            ("The symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already defined.\n")
+    describe EContinueInvalidExpression =
+        diagnostic "SE-082" "invalid expression in continue statement"
+            ("The expression in a continue statement must be a call to a member action.")
+    describe (EContinueInvalidMethodOrViewerCall ident) =
+        diagnostic "SE-083" "invalid method or viewer call in continue statement"
+            ("This statement can only be used to call a continuation action.\n" <> "The member function call \x1b[31m" <> T.pack ident <> "\x1b[0m in a continue statement is invalid.")
+    describe (EContinueInvalidMemberCall ts) =
+        diagnostic "SE-084" "invalid member call in continue statement"
+            ("This statement can only be used to call a continuation action.\n" <> "Calling a procedure of an object of type \x1b[31m" <> showText ts <> "\x1b[0m in a continue statement is invalid.")
+    describe (EContinueActionExtraArgs (ident, params, actionPos) argNumber) =
+        relatedTo actionPos "the action is defined here" $
+        diagnostic "SE-085" "extra arguments in continuation action"
+            ("Action \x1b[31m" <> T.pack ident <> "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.\n")
+    describe (EContinueActionMissingArgs (ident, actionPos)) =
+        relatedTo actionPos "the action is defined here" $
+        diagnostic "SE-086" "missing arguments in continuation action"
+            ("Action \x1b[31m" <> T.pack ident <> "\x1b[0m requires \x1b[31mone\x1b[0m parameter but you are providing \x1b[31mnone\x1b[0m.\n")
+    describe EEnumVariantInitializerInvalidUse =
+        diagnostic "SE-087" "invalid use of an enum variant initializer"
+            ("You are trying to use an enum variant initializer in an invalid context.\n" <> "Enum variant initializers can only be used to initialize enum objects.")
+    describe (EEnumVariantNotFound enumId variant) =
+        diagnostic "SE-088" "enum variant not found"
+            ("Enum \x1b[31m" <> T.pack enumId <> "\x1b[0m does not have a variant named \x1b[31m" <> T.pack variant <> "\x1b[0m.")
+    describe (EEnumVariantExtraParams (enumId, enumPos) (variant, params) paramNumber) =
+        relatedTo enumPos "the enum is defined here" $
+        diagnostic "SE-089" "extra parameters in enum variant"
+            ("Enum variant \x1b[31m" <> T.pack variant <> "\x1b[0m of enum \x1b[31m" <> T.pack enumId <> "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.\n")
+    describe (EEnumVariantMissingParams (enumId, enumPos) (variant, params) paramNumber) =
+        relatedTo enumPos "the enum is defined here" $
+        diagnostic "SE-090" "missing parameters in enum variant"
+            ("Enum variant \x1b[31m" <> T.pack variant <> "\x1b[0m of enum \x1b[31m" <> T.pack enumId <> "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.\n")
+    describe (EEnumVariantParamTypeMismatch (enumId, enumPos) (variant, paramNumber, expectedTy) actualTy) =
+        relatedTo enumPos "the enum is defined here" $
+        diagnostic "SE-091" "enum variant parameter type mismatch"
+            ("Parameter \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m of enum variant \x1b[31m" <> T.pack variant <> "\x1b[0m of enum \x1b[31m" <> T.pack enumId <> "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")
+    describe (EFunctionNotFound ident) =
+        diagnostic "SE-092" "function not found"
+            ("Function \x1b[31m" <> T.pack ident <> "\x1b[0m not found.")
+    describe (EGlobalNotFunction (ident, globalPos)) =
+        relatedTo globalPos "the global object is defined here" $
+        diagnostic "SE-093" "global object but not a function"
+            ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a function.\n")
+    describe (EUnexpectedNumericConstant ty) =
+        diagnostic "SE-094" "unexpected numeric constant"
+            ("Expected a value of type \x1b[31m" <> showText ty <> "\x1b[0m but found a numeric constant.")
+    describe (EInvalidAssignmentExprType ty) =
+        diagnostic "SE-095" "invalid assignment expression type"
+            ("Objects of type \x1b[31m" <> showText ty <> "\x1b[0m cannot be copied.")
+    describe (EInvalidMessageType ty) =
+        diagnostic "SE-096" "invalid message type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid message type.")
+    describe (EInvalidOptionType ty) =
+        diagnostic "SE-097" "invalid option type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid option type.")
+    describe (EInvalidReferenceType ty) =
+        diagnostic "SE-098" "invalid reference type"
+            ("References to objects of type \x1b[31m" <> showText ty <> "\x1b[0m cannot be created.")
+    describe (EInvalidFixedLocationType ty) =
+        diagnostic "SE-099" "invalid fixed-location type"
+            ("Fixed-location fields of type \x1b[31m" <> showText ty <> "\x1b[0m cannot be defined.")
+    describe (EInvalidAllocatorType ty) =
+        diagnostic "SE-100" "invalid allocator type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid allocator type.")
+    describe (EInvalidClassFieldType ty) =
+        diagnostic "SE-101" "invalid class field type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid class field type.")
+    describe (EInvalidStructFieldType ty) =
+        diagnostic "SE-102" "invalid struct field type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid struct field type.")
+    describe (EInvalidEnumParameterType ty) =
+        diagnostic "SE-103" "invalid enum parameter type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid parameter type for an enum variant.")
+    describe (EInvalidAccessPortType ty) =
+        diagnostic "SE-104" "invalid access port type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid access port type.")
+    describe (EInvalidDeclarationType ty) =
+        diagnostic "SE-105" "invalid declaration type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid object declaration type.")
+    describe (EInvalidTypeSpecifier ts) =
+        diagnostic "SE-106" "invalid type specifier"
+            ("The type specifier \x1b[31m" <> showText ts <> "\x1b[0m is not valid.")
+    describe (EInvalidNumericConstantType ty) =
+        diagnostic "SE-107" "invalid numeric constant type"
+            ("The expected type of this expression is \x1b[31m" <> showText ty <> "\x1b[0m but it is a numeric constant.")
+    describe (EInvalidActionParameterType ty) =
+        diagnostic "SE-108" "invalid action parameter type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid parameter type for an action.")
+    describe (EInvalidProcedureParameterType ty) =
+        diagnostic "SE-109" "invalid procedure parameter type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid parameter type for a procedure.")
+    describe (EMemberFunctionCallExtraArgs (funcId, params, funcPos) argNumber) =
+        relatedTo funcPos ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") $
+        diagnostic "SE-110" "extra arguments in member function call"
+            ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.\n")
+    describe (EMemberFunctionCallMissingArgs (funcId, params, funcPos) argNumber) =
+        relatedTo funcPos ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") $
+        diagnostic "SE-111" "missing arguments in member function call"
+            ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.")
+    describe (EMemberFunctionCallArgTypeMismatch (funcId, Parameter _ expectedTy, funcPos) argNumber actualTy) =
+        relatedTo funcPos ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") $
+        diagnostic "SE-112" "member function call argument type mismatch"
+            ("Argument \x1b[31m#" <> T.pack (show argNumber) <> "\x1b[0m of member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")
+    describe (EArrayIndexNotUSize ty) =
+        diagnostic "SE-113" "invalid array index type"
+            ("The type of the array index is \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of type \x1b[31m" <> showText (TUSize :: TerminaType a) <> "\x1b[0m.")
+    describe (EArraySliceLowerBoundNotUSize ty) =
+        diagnostic "SE-114" "invalid array slice lower bound type"
+            ("The type of the lower bound of the array slice is \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of type \x1b[31m" <> showText (TUSize :: TerminaType a) <> "\x1b[0m.")
+    describe (EArraySliceUpperBoundNotUSize ty) =
+        diagnostic "SE-115" "invalid array slice upper bound type"
+            ("The type of the upper bound of the array slice is \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of type \x1b[31m" <> showText (TUSize :: TerminaType a) <> "\x1b[0m.")
+    describe (EOutboundPortSendInvalidNumArgs argNumber) =
+        diagnostic "SE-116" "invalid number of arguments in outbound port send"
+            ("The send procedure of an outbound port expects \x1b[31mone\x1b[0m argument but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.")
+    describe (EOutboundPortArgTypeMismatch expectedTy actualTy) =
+        diagnostic "SE-117" "output port argument type mismatch"
+            ("The output data is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but you are sending data of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe (EAssignmentExprMismatch expectedTy actualTy) =
+        diagnostic "SE-118" "assignment expression type mismatch"
+            ("The expected type of the assignment is \x1b[31m" <> showText expectedTy <> "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe (EFieldValueAssignmentMissingFields (record, recordPos) [field]) =
+        relatedTo recordPos ("\nThe type \x1b[31m" <> showText record <> "\x1b[0m is defined here:") $
+        diagnostic "SE-119" "missing field/s in field assignment expression"
+            ("Field \x1b[31m" <> T.pack field <> "\x1b[0m is not being assigned a value in the field assignment expression.")
+    describe (EFieldValueAssignmentMissingFields (record, recordPos) fields) =
+        relatedTo recordPos ("\nThe type \x1b[31m" <> showText record <> "\x1b[0m is defined here:") $
+        diagnostic "SE-119" "missing field/s in field assignment expression"
+            ("Fields \x1b[31m" <> T.intercalate ", " (map T.pack fields) <> "\x1b[0m are not being assigned a value in the field assignment expression.")
+    describe (EFieldValueAssignmentUnknownFields (record, recordPos) [field]) =
+        relatedTo recordPos ("\nThe type \x1b[31m" <> showText record <> "\x1b[0m is defined here:") $
+        diagnostic "SE-120" "unknown field/s in field assignment expression"
+            ("Field \x1b[31m" <> T.pack field <> "\x1b[0m is not a field of the type \x1b[31m" <> showText record <> "\x1b[0m.")
+    describe (EFieldValueAssignmentUnknownFields (record, recordPos) fields) =
+        relatedTo recordPos ("\nThe type \x1b[31m" <> showText record <> "\x1b[0m is defined here:") $
+        diagnostic "SE-120" "unknown field/s in field assignment expression"
+            ("Fields \x1b[31m" <> T.intercalate ", " (map T.pack fields) <> "\x1b[0m are not fields of the type \x1b[31m" <> showText record <> "\x1b[0m.")
+    describe (EFieldNotFixedLocation fieldName ty) =
+        diagnostic "SE-121" "field is not a fixed-location field"
+            ("Field \x1b[31m" <> T.pack fieldName <> "\x1b[0m of type \x1b[31m" <> showText ty <> "\x1b[0m is not a fixed-location field.")
+    describe (EFieldNotAccessPort fieldName ty) =
+        diagnostic "SE-122" "field is not an access port field"
+            ("Field \x1b[31m" <> T.pack fieldName <> "\x1b[0m of type \x1b[31m" <> showText ty <> "\x1b[0m is not an access port field.")
+    describe (EFieldNotSinkOrInboundPort fieldName ty) =
+        diagnostic "SE-123" "field is not a sink or inbound port field"
+            ("Field \x1b[31m" <> T.pack fieldName <> "\x1b[0m of type \x1b[31m" <> showText ty <> "\x1b[0m is not a sink or inbound port field.")
+    describe (EFieldNotOutboundPort fieldName ty) =
+        diagnostic "SE-124" "field is not an outbound port field"
+            ("Field \x1b[31m" <> T.pack fieldName <> "\x1b[0m of type \x1b[31m" <> showText ty <> "\x1b[0m is not an outbound port field.")
+    describe (EMemberAccessInvalidType ty) =
+        diagnostic "SE-125" "invalid member access type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for member access.")
+    describe (EMemberFunctionCallInvalidType ty) =
+        diagnostic "SE-126" "invalid member function call type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for member function call.")
+    describe (EMemberAccessUnknownField (recordId, recordPos) field) =
+        relatedTo recordPos ("The type \x1b[31m" <> T.pack recordId <> "\x1b[0m is defined here:") $
+        diagnostic "SE-127" "unknown field in member access"
+            ("Field \x1b[31m" <> T.pack field <> "\x1b[0m is not a field of the type \x1b[31m" <> T.pack recordId <> "\x1b[0m.\n")
+    describe EInvalidProcedureCallInsideMemberFunction =
+        diagnostic "SE-128" "invalid procedure call inside member function"
+            ("Procedure calls are not allowed inside member functions.")
+    describe (EConstantOutRange ty) =
+        diagnostic "SE-129" "constant out of range"
+            ("The constant value \x1b[31m" <> showText ty <> "\x1b[0m is out of range for its type.")
+    describe (EForIteratorInvalidType ty) =
+        diagnostic "SE-130" "invalid type for for-loop iterator"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a for-loop iterator.")
+    describe (EUsedTypeName ident prevPos) =
+        relatedTo prevPos "the symbol is previously used here" $
+        diagnostic "SE-131" "type name already used"
+            ("The type cannot be defined because the symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already in use.\n")
+    describe (EUsedGlobalName ident prevPos) =
+        relatedTo prevPos "the symbol is previously used here" $
+        diagnostic "SE-132" "global name already used"
+            ("The global object cannot be declared because the symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already in use.\n")
+    describe (EUsedFunName ident prevPos) =
+        relatedTo prevPos "the symbol is previously used here" $
+        diagnostic "SE-133" "function name already used"
+            ("The function cannot be declared because the symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already in use.\n")
+    describe (EAccessPortConnectionInvalidGlobal ident) =
+        diagnostic "SE-134" "invalid global object in access port connection"
+            ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be used in an access port connection.")
+    describe (EAccessPortConnectionInterfaceNotProvided ident iface) =
+        diagnostic "SE-135" "resource does not provide the interface"
+            ("Resource \x1b[31m" <> T.pack ident <> "\x1b[0m does not provide the interface \x1b[31m" <> T.pack iface <> "\x1b[0m.")
+    describe (ESinkPortConnectionInvalidGlobal ident) =
+        diagnostic "SE-136" "invalid sink port connection"
+            ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to a sink port.")
+    describe (EInboundPortConnectionInvalidObject ident) =
+        diagnostic "SE-137" "invalid inbound port connection"
+            ("The object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to an inbound port.")
+    describe (EOutboundPortConnectionInvalidGlobal ident) =
+        diagnostic "SE-138" "invalid outbound port connection"
+            ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to an outbound port.")
+    describe (EAllocatorPortConnectionInvalidGlobal ident) =
+        diagnostic "SE-139" "invalid allocator port connection"
+            ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to an allocator port.")
+    describe (EAtomicAccessPortConnectionInvalidGlobal ident) =
+        diagnostic "SE-140" "invalid atomic access port connection"
+            ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to an atomic access port.")
+    describe (EAtomicArrayAccessPortConnectionInvalidGlobal ident) =
+        diagnostic "SE-141" "invalid atomic array access port connection"
+            ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to an atomic array access port.")
+    describe (EStructDefNotUniqueField [fieldName]) =
+        diagnostic "SE-142" "duplicate field in struct definition"
+            ("Field \x1b[31m" <> T.pack fieldName <> "\x1b[0m is duplicated in the struct definition.")
+    describe (EStructDefNotUniqueField fieldNames) =
+        diagnostic "SE-142" "duplicate field in struct definition"
+            ("Fields \x1b[31m" <> T.intercalate ", " (map T.pack fieldNames) <> "\x1b[0m are duplicated in the struct definition.")
+    describe (EEnumDefNotUniqueVariant [variantName]) =
+        diagnostic "SE-143" "duplicate variant in enum definition"
+            ("Variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is duplicated in the enum definition.")
+    describe (EEnumDefNotUniqueVariant variantNames) =
+        diagnostic "SE-143" "duplicate variant in enum definition"
+            ("Variants \x1b[31m" <> T.intercalate ", " (map T.pack variantNames) <> "\x1b[0m are duplicated in the enum definition.")
+    describe (EInterfaceNotUniqueProcedure [procName]) =
+        diagnostic "SE-144" "duplicate procedure in interface definition"
+            ("Procedure \x1b[31m" <> T.pack procName <> "\x1b[0m is duplicated in the interface definition.")
+    describe (EInterfaceNotUniqueProcedure procNames) =
+        diagnostic "SE-144" "duplicate procedure in interface definition"
+            ("Procedures \x1b[31m" <> T.intercalate ", " (map T.pack procNames) <> "\x1b[0m are duplicated in the interface definition.")
+    describe (EClassLoop ((currentCall, _) : xs)) =
+        diagnostic "SE-145" "loop between member function calls in class definition"
+            ("A recursive calling loop has been detected in the class definition.")
+    describe (EDereferenceInvalidType ty) =
+        diagnostic "SE-146" "invalid type for dereference"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m cannot be dereferenced.")
+    describe (EMatchInvalidType ty) =
+        diagnostic "SE-147" "invalid type for match statement"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for match statement.")
+    describe (EMatchCaseDuplicate variantName prevCase) =
+        relatedTo prevCase "the variant is previously used here" $
+        diagnostic "SE-148" "duplicate case in match statement"
+            ("Variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is duplicated in the match statement.\n")
+    describe (EMatchCaseUnknownVariant variantName) =
+        diagnostic "SE-149" "unknown variant in match case"
+            ("Variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant of the enum or option.")
+    describe (EMatchMissingCases [caseIdent]) =
+        diagnostic "SE-150" "missing case/s in match statement"
+            ("Case \x1b[31m" <> T.pack caseIdent <> "\x1b[0m is missing in the match statement.")
+    describe (EMatchMissingCases caseIdents) =
+        diagnostic "SE-150" "missing case/s in match statement"
+            ("Cases \x1b[31m" <> T.intercalate ", " (map T.pack caseIdents) <> "\x1b[0m are missing in the match statement.")
+    describe (EIsVariantInvalidType ty) =
+        diagnostic "SE-151" "invalid type for is-variant expression"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for is-variant expression.")
+    describe (EIsOptionVariantInvalidType ty) =
+        diagnostic "SE-152" "invalid type for is-option-variant expression"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not an option type.")
+    describe (EIsVariantEnumTypeMismatch expectedEnum actualEnum) =
+        diagnostic "SE-153" "type mismatch in is-variant expression"
+            ("The expected enum type is \x1b[31m" <> T.pack expectedEnum <> "\x1b[0m but the actual type is \x1b[31m" <> T.pack actualEnum <> "\x1b[0m.")
+    describe (EOutboundPortInvalidProcedure ident) =
+        diagnostic "SE-154" "invalid procedure in outbound port"
+            ("The procedure \x1b[31m" <> T.pack ident <> "\x1b[0m is not a valid procedure for an outbound port.")
+    describe EInvalidPoolInitialization =
+        diagnostic "SE-155" "invalid pool initialization"
+            ("A pool object cannot be initialized with a value.")
+    describe EInvalidMsgQueueInitialization =
+        diagnostic "SE-156" "invalid message queue initialization"
+            ("A message queue object cannot be initialized with a value.")
+    describe (EUnknownGlobal ident) =
+        diagnostic "SE-157" "unknown global object"
+            ("Global object \x1b[31m" <> T.pack ident <> "\x1b[0m is not defined.")
+    describe (EInvalidInterruptEmitterType ty) =
+        diagnostic "SE-158" "invalid interrupt emitter type"
+            ("Interrupts emit data of type \x1b[31m" <> showText (TUInt32 :: TerminaType a) <> "\x1b[0m but you are expecting data of type \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe (EInvalidPeriodicTimerEmitterType ty) =
+        diagnostic "SE-159" "invalid periodic timer emitter type"
+            ("Periodic timers emit data of type \x1b[31m" <> showText (TStruct "TimeVal" :: TerminaType a) <> "\x1b[0m but you are expecting data of type \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe (EInvalidSystemInitEmitterType ty) =
+        diagnostic "SE-160" "invalid system init emitter type"
+            ("System init emitters emit data of type \x1b[31m" <> showText (TStruct "TimeVal" :: TerminaType a) <> "\x1b[0m but you are expecting data of type \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe (EInboundPortConnectionMsgQueueTypeMismatch msgQueueId expectedTy actualTy) =
+        diagnostic "SE-161" "message queue type mismatch"
+            ("The message queue \x1b[31m" <> T.pack msgQueueId <> "\x1b[0m exchanges data messages of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but you are expecting data of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe (EOutboundPortConnectionMsgQueueTypeMismatch msgQueueId expectedTy actualTy) =
+        diagnostic "SE-162" "message queue type mismatch"
+            ("The message queue \x1b[31m" <> T.pack msgQueueId <> "\x1b[0m exchanges data messages of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but you are sending data of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe (EAllocatorPortConnectionPoolTypeMismatch poolId expectedTy actualTy) =
+        diagnostic "SE-163" "pool type mismatch"
+            ("The pool \x1b[31m" <> T.pack poolId <> "\x1b[0m serves data of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but you are expecting data of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe (EInvalidTaskType ty) =
+        diagnostic "SE-164" "invalid task type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid task type.")
+    describe (EInvalidHandlerType ty) =
+        diagnostic "SE-165" "invalid handler type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid handler type.")
+    describe (EInvalidResourceType ty) =
+        diagnostic "SE-166" "invalid resource type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid resource type.")
+    describe (EInvalidEmitterType ty) =
+        diagnostic "SE-167" "invalid emitter type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid emitter type.")
+    describe (EInvalidChannelType ty) =
+        diagnostic "SE-168" "invalid channel type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid channel type.")
+    describe (EEmitterClassNotInstantiable ident) =
+        diagnostic "SE-169" "emitter class is not instantiable"
+            ("Applications cannot instantiate event emitters of class \x1b[31m" <> T.pack ident <> "\x1b[0m.")
+    describe (ESingleExpressionTypeNotUnit ty) =
+        diagnostic "SE-170" "single expression type is not unit"
+            ("Expressions used in single-expression statements must have type \x1b[31m" <> showText (TUnit :: TerminaType a) <> "\x1b[0m but the expression has type \x1b[31m" <> showText ty <> "\x1b[0m. Return values of functions cannot be ignored.")
+    describe (EInterfaceDuplicatedExtendedIface ifaceName) =
+        diagnostic "SE-171" "interface extends the same interface multiple times"
+            ("Interface \x1b[31m" <> T.pack ifaceName <> "\x1b[0m is extended more than once.")
+    describe (EInterfaceDuplicatedExtendedProcedure iface1 iface2 procName) =
+        diagnostic "SE-172" "procedure duplicated in extended interfaces"
+            ("Procedure \x1b[31m" <> T.pack procName <> "\x1b[0m is defined in extended interfaces \x1b[31m" <> T.pack iface1 <> "\x1b[0m and \x1b[31m" <> T.pack iface2 <> "\x1b[0m.")
+    describe (EInterfaceProcedurePreviouslyExtended procName ifaceName) =
+        diagnostic "SE-173" "interface procedure previously defined by an extended interface"
+            ("Procedure \x1b[31m" <> T.pack procName <> "\x1b[0m is previously defined in interface \x1b[31m" <> T.pack ifaceName <> "\x1b[0m.")
+    describe (EInterfacePreviouslyExtended iface1 iface2) =
+        diagnostic "SE-174" "interface previously extended by another interface"
+            ("Interface \x1b[31m" <> T.pack iface1 <> "\x1b[0m is already extended by interface \x1b[31m" <> T.pack iface2 <> "\x1b[0m.")
+    describe (EResourceDuplicatedProvidedIface ifaceName) =
+        diagnostic "SE-175" "resource provides the same interface multiple times"
+            ("Resource provides interface \x1b[31m" <> T.pack ifaceName <> "\x1b[0m more than once.")
+    describe (EResourceDuplicatedProvidedProcedure iface1 iface2 procName) =
+        diagnostic "SE-176" "procedure duplicated in provided interfaces"
+            ("Procedure \x1b[31m" <> T.pack procName <> "\x1b[0m is provided in interfaces \x1b[31m" <> T.pack iface1 <> "\x1b[0m and \x1b[31m" <> T.pack iface2 <> "\x1b[0m.")
+    describe (EResourceInterfacePreviouslyExtended iface1 iface2) =
+        diagnostic "SE-177" "interface previously extended by another interface"
+            ("Interface \x1b[31m" <> T.pack iface1 <> "\x1b[0m is previously extended by interface \x1b[31m" <> T.pack iface2 <> "\x1b[0m.")
+    describe EStringInitializerInvalidUse =
+        diagnostic "SE-178" "invalid use of a string initializer"
+            ("You are trying to use a string initializer in an invalid context.\n" <> "String initializers can only be used to initialize arrays of characters.")
+    describe (EStringInitializerNotArrayOfChars ty) =
+        diagnostic "SE-180" "assignment of a string array initializer to an invalid type"
+            ("Invalid use of a string initializer.\n" <> "You are trying to assign a string initializer to an object of type \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe (EInvalidConstType ty) =
+        diagnostic "SE-181" "invalid type for constant"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a constant.\n" <> "Only numeric types, boolean and character types are valid for constants.")
+    describe (EInvalidAccessToConstExpr ident) =
+        diagnostic "SE-182" "invalid access to a constant expression"
+            ("Constant expression \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be accessed in this context.\n")
+    describe (EInvalidResultType ty) =
+        diagnostic "SE-183" "invalid type for result"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a result.")
+    describe (EInvalidStatusType ty) =
+        diagnostic "SE-184" "invalid type for status"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a status.")
+    describe (EInvalidVariantForOption variantName) =
+        diagnostic "SE-185" "invalid variant for option"
+            ("The variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant for an option.\n" <> "Only the variants \x1b[31mNone\x1b[0m and \x1b[31mSome\x1b[0m are valid.")
+    describe (EInvalidVariantForResult variantName) =
+        diagnostic "SE-186" "invalid variant for result"
+            ("The variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant for a result.\n" <> "Only the variants \x1b[31mOk\x1b[0m and \x1b[31mError\x1b[0m are valid.")
+    describe (EInvalidVariantForStatus variantName) =
+        diagnostic "SE-187" "invalid variant for status"
+            ("The variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant for a status.\n" <> "Only the variants \x1b[31mSuccess\x1b[0m, \x1b[31mFailure\x1b[0m are valid.")
+    describe (EInvalidResultTypeSpecifier typeSpec) =
+        diagnostic "SE-188" "invalid type specifier for result"
+            ("The type specifier \x1b[31m" <> showText typeSpec <> "\x1b[0m is not a valid type specifier for a result.\n" <> "Result types must be of the form \x1b[31mResult<R; L>\x1b[0m, where \x1b[31mR\x1b[0m is the valid result type and \x1b[31mL\x1b[0m is the error type.")
+    describe (EMonadicVariantParameterTypeMismatch expectedTy actualTy) =
+        diagnostic "SE-189" "monadic variant parameter type mismatch"
+            ("The parameter of the variant is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe (EObjectPreviouslyMoved prevPos) =
+        relatedTo prevPos "the object was previously moved here" $
+        diagnostic "SE-190" "object previously moved"
+            ("You are trying to access an object that has been moved.\n")
+    describe (EIsStatusVariantInvalidType ty) =
+        diagnostic "SE-191" "invalid type for is-status-variant expression"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for is-status-variant expression.")
+    describe (EIsResultVariantInvalidType ty) =
+        diagnostic "SE-192" "invalid type for is-result-variant expression"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for is-result-variant expression.")
+    describe (EInvalidSystemExceptEmitterType ty) =
+        diagnostic "SE-193" "invalid system exception emitter type"
+            ("System exception emitters emit data of type \x1b[31m" <> showText (TEnum "Exception" :: TerminaType a) <> "\x1b[0m but you are expecting data of type \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe (EInvalidInterruptActionReturnType ident ty) =
+        diagnostic "SE-194" "invalid interrupt action return type"
+            ("The return type of actions attached to the interrupt event is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <> "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe (EInvalidPeriodicTimerActionReturnType ident ty) =
+        diagnostic "SE-195" "invalid periodic timer action return type"
+            ("The return type of actions attached to the periodic timer event is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <> "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe (EInvalidSystemInitActionReturnType ident ty) =
+        diagnostic "SE-196" "invalid system init action return type"
+            ("The return type of actions attached to the system init event is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <> "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe (EInvalidSystemExceptActionReturnType ident ty) =
+        diagnostic "SE-197" "invalid system exception action return type"
+            ("Actions that handle system exceptions shall not return a value.\n" <> "However, the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe (EInvalidMsgQueueActionReturnType ident ty) =
+        diagnostic "SE-198" "invalid message queue action return type"
+            ("The return type of the actions attached to the reception of messages from a message queue is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <> "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe (ETypeNotInScope ident qualifiedName) =
+        let importString = T.replace "\\" "." $ T.pack qualifiedName
+            importString' = T.replace "/" "." importString
+        in
+            diagnostic "SE-199" "type not in scope"
+                ("The type \x1b[31m" <> T.pack ident <> "\x1b[0m is not in scope.\n" <> "The type is defined in the module \x1b[31m" <> importString' <> "\x1b[0m. You need to import it.")
+    describe (EFunctionNotInScope ident qualifiedName) =
+        let importString = T.replace "\\" "." $ T.pack qualifiedName
+            importString' = T.replace "/" "." importString
+        in
+            diagnostic "SE-200" "function not in scope"
+                ("The function \x1b[31m" <> T.pack ident <> "\x1b[0m is not in scope.\n" <> "The function is defined in the module \x1b[31m" <> importString' <> "\x1b[0m. You need to import it.")
+    describe (EUnknownAction ident) =
+        diagnostic "SE-201" "unknown action"
+            ("The action \x1b[31m" <> T.pack ident <> "\x1b[0m is not defined.")
+    describe (EInvalidViewerParameterType ty) =
+        diagnostic "SE-204" "invalid viewer parameter type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a viewer parameter.")
+    describe EInvalidAccessToProcedureFromImmutableSelfReference =
+        diagnostic "SE-205" "invalid access to procedure from immutable self reference"
+            ("You are trying to access a non-immutable procedure from an immutable self reference. " <> "Immutable self references can only access immutable procedures.")
+    describe EInvalidAccessToOutPortFromImmutableSelfReference =
+        diagnostic "SE-206" "invalid access to out port from immutable self reference"
+            ("You are trying to access an outbound port from an immutable self reference. " <> "Immutable self references cannot access outbound ports.")
+    describe (EProcedureSelfAccessKindMismatch (ifaceId, procId, expectedAccessKind, prevPos) accessKind) =
+        relatedTo prevPos "the interface procedure is defined here" $
+        diagnostic "SE-207" "self reference access kind mismatch in procedure"
+            ("Procedure \x1b[31m" <> T.pack procId <> "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> "\x1b[0m is expected to have a self reference of access kind \x1b[31m" <> showText expectedAccessKind <> "\x1b[0m but the access kind of the self reference of the implementated procedure is \x1b[31m" <> showText accessKind <> "\x1b[0m.\n")
+    describe (ETaskClassMethod (classId, clsPos) ident) =
+        relatedTo clsPos "the class is defined here" $
+        diagnostic "SE-208" "task class defines a method"
+            ("Task class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the method \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Task classes cannot define methods.")
+    describe (EHandlerClassMethod (classId, clsPos) ident) =
+        relatedTo clsPos "the class is defined here" $
+        diagnostic "SE-209" "handler class defines a method"
+            ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the method \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Handler classes cannot define methods.")
+    describe (EResourceClassViewer (classId, clsPos) ident) =
+        relatedTo clsPos "the class is defined here" $
+        diagnostic "SE-210" "resource class defines a viewer"
+            ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the viewer \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Resource classes cannot define viewers.")
+    describe (EUnprotectedResourceWithRegularFields (clsId, prevPos)) =
+        relatedTo prevPos "the resource class is defined here" $
+        diagnostic "SE-211" "unprotected resource with regular fields"
+            ("Resource class \x1b[31m" <> T.pack clsId <> "\x1b[0m defines regular fields but the resource is defined as unprotected.\n" <> "Unprotected resources cannot define regular fields.\n")
+    describe (EMemberFunctionWithMutableSelfInTaskClass ident) =
+        diagnostic "SE-212" "mutable member function in task class"
+            ("Member function \x1b[31m" <> T.pack ident <> "\x1b[0m defines a mutable self reference. " <> "Member functions in task classes cannot define mutable self references\n" <> "Only immutable or private self references are allowed.")
+    describe (EMemberFunctionWithMutableSelfInHandlerClass ident) =
+        diagnostic "SE-213" "mutable member function in handler class"
+            ("Member function \x1b[31m" <> T.pack ident <> "\x1b[0m defines a mutable self reference. " <> "Member functions in handler classes cannot define mutable self references\n" <> "Only immutable or private self references are allowed.")
+    describe (ECharLiteralOutOfRange cp) =
+        diagnostic "SE-217" "character literal out of range"
+            ("The character literal has code point \x1b[31m" <> T.pack (show (fromEnum cp)) <> "\x1b[0m, which is outside the 7-bit ASCII range (0 to 127).")
+    describe (EReferenceToPackedMember ident) =
+        diagnostic "SE-218" "reference to a packed struct member"
+            ("This reference reaches into the packed struct \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Taking a reference to a member of a packed struct yields an under-aligned pointer, whose\n" <> "packed provenance is lost at the call boundary; on a strict-alignment target the callee then\n" <> "performs a misaligned access (undefined behavior). Read or write the member by value instead.")
+
+    -- | The two clauses below pick their detail with a case, which the script
+    -- that moved the rest of this table does not read, so they were moved by
+    -- hand.
+    describe (EInPortActionParamTypeMismatch (ident, prevPos) expectedTy actualTy) =
+        relatedTo prevPos "the action is defined here" $
+        diagnostic "SE-202" "in port action parameter type mismatch"
+            (case expectedTy of
+                TUnit ->
+                    "The action \x1b[31m" <> T.pack ident <> "\x1b[0m is expected to have no parameters but it defines a parameter of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n"
+                _ ->
+                    "The action \x1b[31m" <> T.pack ident <> "\x1b[0m is expected to have a parameter of type \x1b[31m" <> showText expectedTy <>
+                        "\x1b[0m but the actual type is \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")
+    describe (ESinkPortActionParamTypeMismatch (ident, prevPos) expectedTy actualTy) =
+        relatedTo prevPos "the action is defined here" $
+        diagnostic "SE-203" "sink port action parameter type mismatch"
+            (case expectedTy of
+                TUnit ->
+                    "The action \x1b[31m" <> T.pack ident <> "\x1b[0m is expected to have no parameters but it defines a parameter of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n"
+                _ ->
+                    "The action \x1b[31m" <> T.pack ident <> "\x1b[0m is expected to have a parameter of type \x1b[31m" <> showText expectedTy <>
+                        "\x1b[0m but the actual type is \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")
+
+    -- | Everything else is an error of the compiler, not of the program.
+    describe _ = diagnosticWithoutDetail "Internal" "internal error"
+
 instance ErrorMessage SemanticErrors where
 
-    errorIdent (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "SE-001"
-    errorIdent (AnnotatedError (ENotNamedObject _ident) _pos) = "SE-002"
-    errorIdent (AnnotatedError EExpressionNotConstant _pos) = "SE-003"
-    errorIdent (AnnotatedError EAssignmentToImmutable _pos) = "SE-004"
-    errorIdent (AnnotatedError EIfElseNoOtherwise _pos) = "SE-005"
-    errorIdent (AnnotatedError (ENotCasteable _ty1 _ty2) _pos) = "SE-006"
-    errorIdent (AnnotatedError (EInvalidParameterType _param) _pos) = "SE-007"
-    errorIdent (AnnotatedError (EInvalidReturnType _ty) _pos) = "SE-008"
-    errorIdent (AnnotatedError (EProcedureCallExtraArgs _def _numArgs) _pos) = "SE-009"
-    errorIdent (AnnotatedError (EProcedureCallMissingArgs _def _numArgs) _pos) = "SE-010"
-    errorIdent (AnnotatedError (EProcedureCallArgTypeMismatch _def _num _actualTy) _pos) = "SE-011"
-    errorIdent (AnnotatedError (EUnknownProcedure _ident) _pos) = "SE-012"
-    errorIdent (AnnotatedError (EResourceClassNoProvides _ident) _pos) = "SE-013"
-    errorIdent (AnnotatedError (EResourceClassAction _def _ident) _pos) = "SE-014"
-    errorIdent (AnnotatedError (EResourceClassInPort _def _ident) _pos) = "SE-015"
-    errorIdent (AnnotatedError (EResourceClassOutPort _def _port) _pos) = "SE-016"
-    errorIdent (AnnotatedError (EInterfaceNotFound _ident) _pos) = "SE-017"
-    errorIdent (AnnotatedError (EGlobalNotInterface _ident) _pos) = "SE-018"
-    errorIdent (AnnotatedError (EProcedureNotFromProvidedInterfaces _def _ident) _pos) = "SE-019"
-    errorIdent (AnnotatedError (EMissingProcedure _ifaceId _procId) _pos) = "SE-020"
-    errorIdent (AnnotatedError (EProcedureExtraParams _def _paramNumber) _pos) = "SE-021"
-    errorIdent (AnnotatedError (EProcedureMissingParams _def _paramNumber) _pos) = "SE-022"
-    errorIdent (AnnotatedError (EProcedureParamTypeMismatch _def _ty) _pos) = "SE-023"
-    errorIdent (AnnotatedError (ETaskClassProvides _ident) _pos) = "SE-024"
-    errorIdent (AnnotatedError (ETaskClassProcedure _def _ident) _pos) = "SE-025"
-    errorIdent (AnnotatedError (ETaskClassNoActions _ident) _pos) = "SE-026"
-    errorIdent (AnnotatedError (EHandlerClassProvides _ident) _pos) = "SE-027"
-    errorIdent (AnnotatedError (EHandlerClassProcedure _def _ident) _pos) = "SE-028"
-    errorIdent (AnnotatedError (EHandlerClassNoAction _ident) _pos) = "SE-029"
-    errorIdent (AnnotatedError (EHandlerClassMultipleActions _ident _loc) _pos) = "SE-030"
-    errorIdent (AnnotatedError (EHandlerClassNoSinkPort _ident) _pos) = "SE-031"
-    errorIdent (AnnotatedError (EHandlerClassMultipleSinkPorts _ident _loc) _pos) = "SE-032"
-    errorIdent (AnnotatedError (EHandlerClassInPort _def _ident) _pos) = "SE-033"
-    errorIdent (AnnotatedError (EIfElseIfCondNotBool _ty) _pos) = "SE-034"
-    errorIdent (AnnotatedError (EFunctionCallExtraArgs _def _paramNumber) _pos) = "SE-035"
-    errorIdent (AnnotatedError (EFunctionCallMissingArgs _def _paramNumber) _pos) = "SE-036"
-    errorIdent (AnnotatedError (EFunctionCallArgTypeMismatch _def _paramNumber _ty) _pos) = "SE-037"
-    errorIdent (AnnotatedError (EMemberAccessNotFunction _ident) _pos) = "SE-038"
-    errorIdent (AnnotatedError EMutableReferenceToImmutable _pos) = "SE-039"
-    errorIdent (AnnotatedError EMutableReferenceToPrivate _pos) = "SE-040"
-    errorIdent (AnnotatedError (EBinOpExpectedTypeLeft _op _expectedTy _actualTy) _pos) = "SE-041"
-    errorIdent (AnnotatedError (EBinOpExpectedTypeRight _op _expectedTy _actualTy) _pos) = "SE-042"
-    errorIdent (AnnotatedError (EBinOpTypeMismatch _op _ty_le _ty_re) _pos) = "SE-043"
-    errorIdent (AnnotatedError (EBinOpExpectedTypeNotBool _op _ty) _pos) = "SE-044"
-    errorIdent (AnnotatedError (EBinOpLeftTypeNotBool _op _ty) _pos) = "SE-045"
-    errorIdent (AnnotatedError (EBinOpRightTypeNotBool _op _ty) _pos) = "SE-046"
-    errorIdent (AnnotatedError (EBinOpExpectedTypeNotArith _op _ty) _pos) = "SE-047"
-    errorIdent (AnnotatedError (EBinOpLeftTypeNotArith _op _ty) _pos) = "SE-048"
-    errorIdent (AnnotatedError (EBinOpRightTypeNotArith _op _ty) _pos) = "SE-049"
-    errorIdent (AnnotatedError (EBinOpExpectedTypeNotInt _op _ty) _pos) = "SE-214"
-    errorIdent (AnnotatedError (EBinOpLeftTypeNotInt _op _ty) _pos) = "SE-215"
-    errorIdent (AnnotatedError (EBinOpRightTypeNotInt _op _ty) _pos) = "SE-216"
-    errorIdent (AnnotatedError (ECharLiteralOutOfRange _cp) _pos) = "SE-217"
-    errorIdent (AnnotatedError (EReferenceToPackedMember _ident) _pos) = "SE-218"
-    errorIdent (AnnotatedError (EBinOpRightTypeNotPos _op _ty) _pos) = "SE-050"
-    errorIdent (AnnotatedError (EBinOpLeftTypeNotEq _op _ty) _pos) = "SE-051"
-    errorIdent (AnnotatedError (EBinOpRightTypeNotEq _op _ty) _pos) = "SE-052"
-    errorIdent (AnnotatedError (EAtomicAccessInvalidType _ty) _pos) = "SE-053"
-    errorIdent (AnnotatedError (EAtomicArrayAccessInvalidType _ty) _pos) = "SE-054"
-    errorIdent (AnnotatedError (EAtomicInvalidType _ty) _pos) = "SE-055"
-    errorIdent (AnnotatedError (EAtomicArrayInvalidType _ty) _pos) = "SE-056"
-    errorIdent (AnnotatedError (EAtomicConnectionTypeMismatch _expectedTy _actualTy) _pos) = "SE-057"
-    errorIdent (AnnotatedError (EAtomicArrayConnectionTypeMismatch _expectedTy _actualTy) _pos) = "SE-058"
-    errorIdent (AnnotatedError EInvalidDefaultCase _pos) = "SE-059"
-    errorIdent (AnnotatedError (EConstantWithoutKnownType _c) _pos) = "SE-060"
-    errorIdent (AnnotatedError EStructInitializerInvalidUse _pos) = "SE-061"
-    errorIdent (AnnotatedError (EStructInitializerTypeMismatch _expectedTy _actualTy) _pos) = "SE-062"
-    errorIdent (AnnotatedError (EEnumInitializerExpectedTypeMismatch _expectedTy _actualTy) _pos) = "SE-063"
-    errorIdent (AnnotatedError ESliceInvalidUse _pos) = "SE-064"
-    errorIdent (AnnotatedError EArrayInitializerInvalidUse _pos) = "SE-065"
-    errorIdent (AnnotatedError (EArrayInitializerNotArray _ty) _pos) = "SE-066"
-    errorIdent (AnnotatedError EArrayExprListInitializerInvalidUse _pos) = "SE-067"
-    errorIdent (AnnotatedError (EArrayExprListInitializerNotArray _ty) _pos) = "SE-068"
-    errorIdent (AnnotatedError EMonadicVariantInitializerInvalidUse _pos) = "SE-069"
-    errorIdent (AnnotatedError (EForLoopLowerBoundTypeMismatch _expectedTy _actualTy) _pos) = "SE-070"
-    errorIdent (AnnotatedError (EForLoopUpperBoundTypeMismatch _expectedTy _actualTy) _pos) = "SE-071"
-    errorIdent (AnnotatedError (EArrayExprListInitializerExprTypeMismatch _expectedTy _actualTy) _pos) = "SE-072"
-    errorIdent (AnnotatedError (EReturnValueExpected _ty) _pos) = "SE-073"
-    errorIdent (AnnotatedError EReturnValueNotUnit _pos) = "SE-074"
-    errorIdent (AnnotatedError (EInvalidArrayType _ty) _pos) = "SE-075"
-    errorIdent (AnnotatedError (EInvalidBoxType _ty) _pos) = "SE-076"
-    errorIdent (AnnotatedError (ENoTypeFound _ident) _pos) = "SE-077"
-    errorIdent (AnnotatedError (EGlobalNotType _def) _pos) = "SE-078"
-    errorIdent (AnnotatedError (EInvalidAccessToGlobal _ident) _pos) = "SE-079"
-    errorIdent (AnnotatedError (EConstantIsReadOnly _ident) _pos) = "SE-080"
-    errorIdent (AnnotatedError (ESymbolAlreadyDefined _def) _pos) = "SE-081"
-    errorIdent (AnnotatedError EContinueInvalidExpression _pos) = "SE-082"
-    errorIdent (AnnotatedError (EContinueInvalidMethodOrViewerCall _ident) _pos) = "SE-083"
-    errorIdent (AnnotatedError (EContinueInvalidMemberCall _ty) _pos) = "SE-084"
-    errorIdent (AnnotatedError (EContinueActionExtraArgs _def _argNumber) _pos) = "SE-085"
-    errorIdent (AnnotatedError (EContinueActionMissingArgs _def) _pos) = "SE-086"
-    errorIdent (AnnotatedError EEnumVariantInitializerInvalidUse _pos) = "SE-087"
-    errorIdent (AnnotatedError (EEnumVariantNotFound _enumId _variant) _pos) = "SE-088"
-    errorIdent (AnnotatedError (EEnumVariantExtraParams _def _params _paramNumber) _pos) = "SE-089"
-    errorIdent (AnnotatedError (EEnumVariantMissingParams _def _params _paramNumber) _pos) = "SE-090"
-    errorIdent (AnnotatedError (EEnumVariantParamTypeMismatch _def _param _actualTy) _pos) = "SE-091"
-    errorIdent (AnnotatedError (EFunctionNotFound _ident) _pos) = "SE-092"
-    errorIdent (AnnotatedError (EGlobalNotFunction _def) _pos) = "SE-093"
-    errorIdent (AnnotatedError (EUnexpectedNumericConstant _ty) _pos) = "SE-094"
-    errorIdent (AnnotatedError (EInvalidAssignmentExprType _ty) _pos) = "SE-095"
-    errorIdent (AnnotatedError (EInvalidMessageType _ty) _pos) = "SE-096"
-    errorIdent (AnnotatedError (EInvalidOptionType _ty) _pos) = "SE-097"
-    errorIdent (AnnotatedError (EInvalidReferenceType _ty) _pos) = "SE-098"
-    errorIdent (AnnotatedError (EInvalidFixedLocationType _ty) _pos) = "SE-099"
-    errorIdent (AnnotatedError (EInvalidAllocatorType _ty) _pos) = "SE-100"
-    errorIdent (AnnotatedError (EInvalidClassFieldType _ty) _pos) = "SE-101"
-    errorIdent (AnnotatedError (EInvalidStructFieldType _ty) _pos) = "SE-102"
-    errorIdent (AnnotatedError (EInvalidEnumParameterType _ty) _pos) = "SE-103"
-    errorIdent (AnnotatedError (EInvalidAccessPortType _ty) _pos) = "SE-104"
-    errorIdent (AnnotatedError (EInvalidDeclarationType _ty) _pos) = "SE-105"
-    errorIdent (AnnotatedError (EInvalidTypeSpecifier _ty) _pos) = "SE-106"
-    errorIdent (AnnotatedError (EInvalidNumericConstantType _ty) _pos) = "SE-107"
-    errorIdent (AnnotatedError (EInvalidActionParameterType _ty) _pos) = "SE-108"
-    errorIdent (AnnotatedError (EInvalidProcedureParameterType _ty) _pos) = "SE-109"
-    errorIdent (AnnotatedError (EMemberFunctionCallExtraArgs _def _argNumber) _pos) = "SE-110"
-    errorIdent (AnnotatedError (EMemberFunctionCallMissingArgs _def _argNumber) _pos) = "SE-111"
-    errorIdent (AnnotatedError (EMemberFunctionCallArgTypeMismatch _def _argNumber _actualTy) _pos) = "SE-112"
-    errorIdent (AnnotatedError (EArrayIndexNotUSize _ty) _pos) = "SE-113"
-    errorIdent (AnnotatedError (EArraySliceLowerBoundNotUSize _ty) _pos) = "SE-114"
-    errorIdent (AnnotatedError (EArraySliceUpperBoundNotUSize _ty) _pos) = "SE-115"
-    errorIdent (AnnotatedError (EOutboundPortSendInvalidNumArgs _argNumber) _pos) = "SE-116"
-    errorIdent (AnnotatedError (EOutboundPortArgTypeMismatch _expectedTy _actualTy) _pos) = "SE-117"
-    errorIdent (AnnotatedError (EAssignmentExprMismatch _expectedTy _actualTy) _pos) = "SE-118"
-    errorIdent (AnnotatedError (EFieldValueAssignmentMissingFields _def _fields) _pos) = "SE-119"
-    errorIdent (AnnotatedError (EFieldValueAssignmentUnknownFields _def _fields) _pos) = "SE-120"
-    errorIdent (AnnotatedError (EFieldNotFixedLocation _fieldName _ty) _pos) = "SE-121"
-    errorIdent (AnnotatedError (EFieldNotAccessPort _fieldName _ty) _pos) = "SE-122"
-    errorIdent (AnnotatedError (EFieldNotSinkOrInboundPort _fieldName _ty) _pos) = "SE-123"
-    errorIdent (AnnotatedError (EFieldNotOutboundPort _fieldName _ty) _pos) = "SE-124"
-    errorIdent (AnnotatedError (EMemberAccessInvalidType _ty) _pos) = "SE-125"
-    errorIdent (AnnotatedError (EMemberFunctionCallInvalidType _ty) _pos) = "SE-126"
-    errorIdent (AnnotatedError (EMemberAccessUnknownField _def _field) _pos) = "SE-127"
-    errorIdent (AnnotatedError EInvalidProcedureCallInsideMemberFunction _pos) = "SE-128"
-    errorIdent (AnnotatedError (EConstantOutRange _const) _pos) = "SE-129"
-    errorIdent (AnnotatedError (EForIteratorInvalidType _ty) _pos) = "SE-130"
-    errorIdent (AnnotatedError (EUsedTypeName _ident _loc) _pos) = "SE-131"
-    errorIdent (AnnotatedError (EUsedGlobalName _ident _loc) _pos) = "SE-132"
-    errorIdent (AnnotatedError (EUsedFunName _ident _loc) _pos) = "SE-133"
-    errorIdent (AnnotatedError (EAccessPortConnectionInvalidGlobal _ident) _pos) = "SE-134"
-    errorIdent (AnnotatedError (EAccessPortConnectionInterfaceNotProvided _ident _iface) _pos) = "SE-135"
-    errorIdent (AnnotatedError (ESinkPortConnectionInvalidGlobal _ident) _pos) = "SE-136"
-    errorIdent (AnnotatedError (EInboundPortConnectionInvalidObject _ident) _pos) = "SE-137"
-    errorIdent (AnnotatedError (EOutboundPortConnectionInvalidGlobal _ident) _pos) = "SE-138"
-    errorIdent (AnnotatedError (EAllocatorPortConnectionInvalidGlobal _ident) _pos) = "SE-139"
-    errorIdent (AnnotatedError (EAtomicAccessPortConnectionInvalidGlobal _ident) _pos) = "SE-140"
-    errorIdent (AnnotatedError (EAtomicArrayAccessPortConnectionInvalidGlobal _ident) _pos) = "SE-141"
-    errorIdent (AnnotatedError (EStructDefNotUniqueField _fields) _pos) = "SE-142"
-    errorIdent (AnnotatedError (EEnumDefNotUniqueVariant _variants) _pos) = "SE-143"
-    errorIdent (AnnotatedError (EInterfaceNotUniqueProcedure _procedures) _pos) = "SE-144"
-    errorIdent (AnnotatedError (EClassLoop _members) _pos) = "SE-145"
-    errorIdent (AnnotatedError (EDereferenceInvalidType _ty) _pos) = "SE-146"
-    errorIdent (AnnotatedError (EMatchInvalidType _ty) _pos) = "SE-147"
-    errorIdent (AnnotatedError (EMatchCaseDuplicate _ident _loc) _pos) = "SE-148"
-    errorIdent (AnnotatedError (EMatchCaseUnknownVariant _variant) _pos) = "SE-149"
-    errorIdent (AnnotatedError (EMatchMissingCases _variants) _pos) = "SE-150"
-    errorIdent (AnnotatedError (EIsVariantInvalidType _ty) _pos) = "SE-151"
-    errorIdent (AnnotatedError (EIsOptionVariantInvalidType _ty) _pos) = "SE-152"
-    errorIdent (AnnotatedError (EIsVariantEnumTypeMismatch _enum _variant) _pos) = "SE-153"
-    errorIdent (AnnotatedError (EOutboundPortInvalidProcedure _ident) _pos) = "SE-154"
-    errorIdent (AnnotatedError EInvalidPoolInitialization _pos) = "SE-155"
-    errorIdent (AnnotatedError EInvalidMsgQueueInitialization _pos) = "SE-156"
-    errorIdent (AnnotatedError (EUnknownGlobal _ident) _pos) = "SE-157"
-    errorIdent (AnnotatedError (EInvalidInterruptEmitterType _ty) _pos) = "SE-158"
-    errorIdent (AnnotatedError (EInvalidPeriodicTimerEmitterType _ty) _pos) = "SE-159"
-    errorIdent (AnnotatedError (EInvalidSystemInitEmitterType _ty) _pos) = "SE-160"
-    errorIdent (AnnotatedError (EInboundPortConnectionMsgQueueTypeMismatch _msgQueueId _expectedTy _actualTy) _pos) = "SE-161"
-    errorIdent (AnnotatedError (EOutboundPortConnectionMsgQueueTypeMismatch _msgQueueId _expectedTy _actualTy) _pos) = "SE-162"
-    errorIdent (AnnotatedError (EAllocatorPortConnectionPoolTypeMismatch _poolId _expectedTy _actualTy) _pos) = "SE-163"
-    errorIdent (AnnotatedError (EInvalidTaskType _ty) _pos) = "SE-164"
-    errorIdent (AnnotatedError (EInvalidHandlerType _ty) _pos) = "SE-165"
-    errorIdent (AnnotatedError (EInvalidResourceType _ty) _pos) = "SE-166"
-    errorIdent (AnnotatedError (EInvalidEmitterType _ty) _pos) = "SE-167"
-    errorIdent (AnnotatedError (EInvalidChannelType _ty) _pos) = "SE-168"
-    errorIdent (AnnotatedError (EEmitterClassNotInstantiable _ident) _pos) = "SE-169"
-    errorIdent (AnnotatedError (ESingleExpressionTypeNotUnit _ty) _pos) = "SE-170"
-    errorIdent (AnnotatedError (EInterfaceDuplicatedExtendedIface _iface) _pos) = "SE-171"
-    errorIdent (AnnotatedError (EInterfaceDuplicatedExtendedProcedure _iface1 _iface2 _procId) _pos) = "SE-172"
-    errorIdent (AnnotatedError (EInterfaceProcedurePreviouslyExtended _procId _iface) _pos) = "SE-173"
-    errorIdent (AnnotatedError (EInterfacePreviouslyExtended _iface1 _iface2) _pos) = "SE-174"
-    errorIdent (AnnotatedError (EResourceDuplicatedProvidedIface _iface) _pos) = "SE-175"
-    errorIdent (AnnotatedError (EResourceDuplicatedProvidedProcedure _iface1 _iface2 _procId) _pos) = "SE-176"
-    errorIdent (AnnotatedError (EResourceInterfacePreviouslyExtended _iface1 _iface2) _pos) = "SE-177"
-    errorIdent (AnnotatedError EStringInitializerInvalidUse _pos) = "SE-178"
-    errorIdent (AnnotatedError (EStringInitializerNotArrayOfChars _ty) _pos) = "SE-180"
-    errorIdent (AnnotatedError (EInvalidConstType _ty) _pos) = "SE-181"
-    errorIdent (AnnotatedError (EInvalidAccessToConstExpr _ident) _pos) = "SE-182"
-    errorIdent (AnnotatedError (EInvalidResultType _ty) _pos) = "SE-183"
-    errorIdent (AnnotatedError (EInvalidStatusType _ty) _pos) = "SE-184"
-    errorIdent (AnnotatedError (EInvalidVariantForOption _ident) _pos) = "SE-185"
-    errorIdent (AnnotatedError (EInvalidVariantForResult _ident) _pos) = "SE-186"
-    errorIdent (AnnotatedError (EInvalidVariantForStatus _ident) _pos) = "SE-187"
-    errorIdent (AnnotatedError (EInvalidResultTypeSpecifier _ts) _pos) = "SE-188"
-    errorIdent (AnnotatedError (EMonadicVariantParameterTypeMismatch _expectedTy _actualTy) _pos) = "SE-189"
-    errorIdent (AnnotatedError (EObjectPreviouslyMoved _loc) _pos) = "SE-190"
-    errorIdent (AnnotatedError (EIsStatusVariantInvalidType _ty) _pos) = "SE-191"
-    errorIdent (AnnotatedError (EIsResultVariantInvalidType _ty) _pos) = "SE-192"
-    errorIdent (AnnotatedError (EInvalidSystemExceptEmitterType _ty) _pos) = "SE-193"
-    errorIdent (AnnotatedError (EInvalidInterruptActionReturnType _ident _ty) _pos) = "SE-194"
-    errorIdent (AnnotatedError (EInvalidPeriodicTimerActionReturnType _ident _ty) _pos) = "SE-195"
-    errorIdent (AnnotatedError (EInvalidSystemInitActionReturnType _ident _ty) _pos) = "SE-196"
-    errorIdent (AnnotatedError (EInvalidSystemExceptActionReturnType _ident _ty) _pos) = "SE-197"
-    errorIdent (AnnotatedError (EInvalidMsgQueueActionReturnType _ident _ty) _pos) = "SE-198"
-    errorIdent (AnnotatedError (ETypeNotInScope _ident _qualifiedName) _pos) = "SE-199"
-    errorIdent (AnnotatedError (EFunctionNotInScope _ident _qualifiedName) _pos) = "SE-200"
-    errorIdent (AnnotatedError (EUnknownAction _ident) _pos) = "SE-201"
-    errorIdent (AnnotatedError (EInPortActionParamTypeMismatch _def _expectedTy _actualTy) _pos) = "SE-202"
-    errorIdent (AnnotatedError (ESinkPortActionParamTypeMismatch _def _expectedTy _actualTy) _pos) = "SE-203"
-    errorIdent (AnnotatedError (EInvalidViewerParameterType _ty) _pos) = "SE-204"
-    errorIdent (AnnotatedError EInvalidAccessToProcedureFromImmutableSelfReference _pos) = "SE-205"
-    errorIdent (AnnotatedError EInvalidAccessToOutPortFromImmutableSelfReference _pos) = "SE-206"
-    errorIdent (AnnotatedError (EProcedureSelfAccessKindMismatch (_ifaceId, _procId, _expectedAccessKind, _loc) _accessKind) _pos) = "SE-207"
-    errorIdent (AnnotatedError (ETaskClassMethod (_ident, _loc) _methodName) _pos) = "SE-208"
-    errorIdent (AnnotatedError (EHandlerClassMethod (_ident, _loc) _methodName) _pos) = "SE-209"
-    errorIdent (AnnotatedError (EResourceClassViewer (_ident, _loc) _viewerName) _pos) = "SE-210"
-    errorIdent (AnnotatedError (EUnprotectedResourceWithRegularFields (_ident, _loc)) _pos) = "SE-211"
-    errorIdent (AnnotatedError (EMemberFunctionWithMutableSelfInTaskClass _ident) _pos) = "SE-212"
-    errorIdent (AnnotatedError (EMemberFunctionWithMutableSelfInHandlerClass _ident) _pos) = "SE-213"
-    errorIdent _ = "Internal"
+    errorIdent = diagCode . describe . getError
+    errorTitle = diagTitle . describe . getError
 
-    errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
-    errorTitle (AnnotatedError (ENotNamedObject _ident) _pos) = "object not found"
-    errorTitle (AnnotatedError EExpressionNotConstant _pos) = "expected constant expression"
-    errorTitle (AnnotatedError EAssignmentToImmutable _pos) = "assignment to immutable variable"
-    errorTitle (AnnotatedError EIfElseNoOtherwise _pos) = "missing else clause"
-    errorTitle (AnnotatedError (ENotCasteable _ty1 _ty2) _pos) = "invalid cast"
-    errorTitle (AnnotatedError (EInvalidParameterType _param) _pos) = "invalid parameter type"
-    errorTitle (AnnotatedError (EInvalidReturnType _ty) _pos) = "invalid return type"
-    errorTitle (AnnotatedError (EProcedureCallExtraArgs _def _numArgsm) _pos) = "extra arguments in procedure call"
-    errorTitle (AnnotatedError (EProcedureCallMissingArgs _def _numArgsm) _pos) = "missing arguments in procedure call"
-    errorTitle (AnnotatedError (EProcedureCallArgTypeMismatch _def _num _actualTy) _pos) = "argument type mismatch in procedure call"
-    errorTitle (AnnotatedError (EUnknownProcedure _ident) _pos) = "unknown procedure"
-    errorTitle (AnnotatedError (EResourceClassNoProvides _ident) _pos) = "resource class does not provide any interface"
-    errorTitle (AnnotatedError (EResourceClassAction _def _ident) _pos) = "resource class defines an action"
-    errorTitle (AnnotatedError (EResourceClassInPort _def _ident) _pos) = "resource class defines an in port"
-    errorTitle (AnnotatedError (EResourceClassOutPort _def _ident) _pos) = "resource class defines an out port"
-    errorTitle (AnnotatedError (EInterfaceNotFound _ident) _pos) = "interface not found"
-    errorTitle (AnnotatedError (EGlobalNotInterface _ident) _pos) = "identifier not an interface"
-    errorTitle (AnnotatedError (EProcedureNotFromProvidedInterfaces _def _ident) _pos) = "procedure not from provided interfaces"
-    errorTitle (AnnotatedError (EMissingProcedure _ifaceId _procId) _pos) = "missing procedure"
-    errorTitle (AnnotatedError (EProcedureExtraParams _def _paramNumber) _pos) = "extra parameters in procedure definition"
-    errorTitle (AnnotatedError (EProcedureMissingParams _def _paramNumber) _pos) = "missing parameters in procedure definition"
-    errorTitle (AnnotatedError (EProcedureParamTypeMismatch _def _ty) _pos) = "parameter type mismatch in procedure definition"
-    errorTitle (AnnotatedError (ETaskClassProvides _ident) _pos) = "task class provides an interface"
-    errorTitle (AnnotatedError (ETaskClassProcedure _def _ident) _pos) = "task class defines a procedure"
-    errorTitle (AnnotatedError (ETaskClassNoActions _ident) _pos) = "task class does not define any actions"
-    errorTitle (AnnotatedError (EHandlerClassProvides _ident) _pos) = "handler class provides an interface"
-    errorTitle (AnnotatedError (EHandlerClassProcedure _def _ident) _pos) = "handler class defines a procedure"
-    errorTitle (AnnotatedError (EHandlerClassNoAction _ident) _pos) = "handler class does not define any actions"
-    errorTitle (AnnotatedError (EHandlerClassMultipleActions _ident _loc) _pos) = "handler class defines multiple actions"
-    errorTitle (AnnotatedError (EHandlerClassNoSinkPort _ident) _pos) = "handler class does not define any sink port"
-    errorTitle (AnnotatedError (EHandlerClassMultipleSinkPorts _ident _loc) _pos) = "handler class defines multiple sink ports"
-    errorTitle (AnnotatedError (EHandlerClassInPort _def _ident) _pos) = "handler class defines an in port"
-    errorTitle (AnnotatedError (EIfElseIfCondNotBool _ty) _pos) = "if-else-if condition not boolean"
-    errorTitle (AnnotatedError (EFunctionCallExtraArgs _def _argNumber) _pos) = "extra arguments in function call"
-    errorTitle (AnnotatedError (EFunctionCallMissingArgs _def _argNumber) _pos) = "missing arguments in function call"
-    errorTitle (AnnotatedError (EFunctionCallArgTypeMismatch _def _argNumber _ty) _pos) = "argument type mismatch in function call"
-    errorTitle (AnnotatedError (EMemberAccessNotFunction _ident) _pos) = "access to a member that is not a function"
-    errorTitle (AnnotatedError EMutableReferenceToImmutable _pos) = "mutable reference to immutable object"
-    errorTitle (AnnotatedError EMutableReferenceToPrivate _pos) = "mutable reference to private object"
-    errorTitle (AnnotatedError (EBinOpExpectedTypeLeft _op _expectedTy _actualTy) _pos) = "binary operation expected type on the left"
-    errorTitle (AnnotatedError (EBinOpExpectedTypeRight _op _expectedTy _actualTy) _pos) = "binary operation expected type on the right"
-    errorTitle (AnnotatedError (EBinOpTypeMismatch _op _ty_le _ty_re) _pos) = "binary operation type mismatch"
-    errorTitle (AnnotatedError (EBinOpExpectedTypeNotBool _op _ty) _pos) = "binary operation expected result type not boolean"
-    errorTitle (AnnotatedError (EBinOpLeftTypeNotBool _op _ty) _pos) = "binary operation expected boolean type on the left"
-    errorTitle (AnnotatedError (EBinOpRightTypeNotBool _op _ty) _pos) = "binary operation expected boolean type on the right"
-    errorTitle (AnnotatedError (EBinOpExpectedTypeNotArith _op _ty) _pos) = "binary operation expected result type not arithmetic"
-    errorTitle (AnnotatedError (EBinOpLeftTypeNotArith _op _ty) _pos) = "binary operation expected arithmetic type on the left"
-    errorTitle (AnnotatedError (EBinOpRightTypeNotArith _op _ty) _pos) = "binary operation expected arithmetic type on the right"
-    errorTitle (AnnotatedError (EBinOpExpectedTypeNotInt _op _ty) _pos) = "binary operation expected result type not integer"
-    errorTitle (AnnotatedError (EBinOpLeftTypeNotInt _op _ty) _pos) = "binary operation expected integer type on the left"
-    errorTitle (AnnotatedError (EBinOpRightTypeNotInt _op _ty) _pos) = "binary operation expected integer type on the right"
-    errorTitle (AnnotatedError (ECharLiteralOutOfRange _cp) _pos) = "character literal out of range"
-    errorTitle (AnnotatedError (EReferenceToPackedMember _ident) _pos) = "reference to a packed struct member"
-    errorTitle (AnnotatedError (EBinOpRightTypeNotPos _op _ty) _pos) = "binary operation expected positive numeric type on the right"
-    errorTitle (AnnotatedError (EBinOpLeftTypeNotEq _op _ty) _pos) = "binary operation expected equatable type on the left"
-    errorTitle (AnnotatedError (EBinOpRightTypeNotEq _op _ty) _pos) = "binary operation expected equatable type on the right"
-    errorTitle (AnnotatedError (EAtomicAccessInvalidType _ty) _pos) = "invalid type for the atomic access interface"
-    errorTitle (AnnotatedError (EAtomicArrayAccessInvalidType _ty) _pos) = "invalid type for the atomic array access interface"
-    errorTitle (AnnotatedError (EAtomicInvalidType _ty) _pos) = "invalid atomic type"
-    errorTitle (AnnotatedError (EAtomicArrayInvalidType _ty) _pos) = "invalid atomic array type"
-    errorTitle (AnnotatedError (EAtomicConnectionTypeMismatch _expectedTy _actualTy) _pos) = "atomic connection type mismatch"
-    errorTitle (AnnotatedError (EAtomicArrayConnectionTypeMismatch _expectedTy _actualTy) _pos) = "atomic array connection type mismatch"
-    errorTitle (AnnotatedError EInvalidDefaultCase _pos) = "unnecessary default case"
-    errorTitle (AnnotatedError (EConstantWithoutKnownType _c) _pos) = "constant without known type"
-    errorTitle (AnnotatedError EStructInitializerInvalidUse _pos) = "invalid use of struct initializer"
-    errorTitle (AnnotatedError (EStructInitializerTypeMismatch _expectedTy _actualTy) _pos) = "struct initializer type mismatch"
-    errorTitle (AnnotatedError (EEnumInitializerExpectedTypeMismatch _expectedTy _actualTy) _pos) = "enum initializer expected type mismatch"
-    errorTitle (AnnotatedError ESliceInvalidUse _pos) = "invalid use of slice"
-    errorTitle (AnnotatedError EArrayInitializerInvalidUse _pos) = "invalid use of an array initializer"
-    errorTitle (AnnotatedError (EArrayInitializerNotArray _ty) _pos) = "assignment of an array initializer to a non-array type"
-    errorTitle (AnnotatedError EArrayExprListInitializerInvalidUse _pos) = "invalid use of an expression list array initializer"
-    errorTitle (AnnotatedError (EArrayExprListInitializerNotArray _ty) _pos) = "assignment of an array expression list initializer to a non-array type"
-    errorTitle (AnnotatedError EMonadicVariantInitializerInvalidUse _pos) = "invalid use of an builtin variant initializer"
-    errorTitle (AnnotatedError (EForLoopLowerBoundTypeMismatch _expectedTy _actualTy) _pos) = "for loop lower bound type mismatch"
-    errorTitle (AnnotatedError (EForLoopUpperBoundTypeMismatch _exppectedTy _actualTy) _pos) = "for loop upper bound type mismatch"
-    errorTitle (AnnotatedError (EArrayExprListInitializerExprTypeMismatch _expectedTy _actualTy) _pos) = "list of initializing expressions type mismatch"
-    errorTitle (AnnotatedError (EReturnValueExpected _ty) _pos) = "expected return value"
-    errorTitle (AnnotatedError EReturnValueNotUnit _pos) = "return value not expected"
-    errorTitle (AnnotatedError (EInvalidArrayType _ty) _pos) = "invalid array type"
-    errorTitle (AnnotatedError (EInvalidBoxType _ty) _pos) = "invalid box type"
-    errorTitle (AnnotatedError (ENoTypeFound _ident) _pos) = "no type found"
-    errorTitle (AnnotatedError (EGlobalNotType _def) _pos) = "global object but not a type"
-    errorTitle (AnnotatedError (EInvalidAccessToGlobal _ident) _pos) = "invalid access to global object"
-    errorTitle (AnnotatedError (EConstantIsReadOnly _ident) _pos) = "invalid write to a constant"
-    errorTitle (AnnotatedError (ESymbolAlreadyDefined _def) _pos) = "symbol already defined"
-    errorTitle (AnnotatedError EContinueInvalidExpression _pos) = "invalid expression in continue statement"
-    errorTitle (AnnotatedError (EContinueInvalidMethodOrViewerCall _ident) _pos) = "invalid method or viewer call in continue statement"
-    errorTitle (AnnotatedError (EContinueInvalidMemberCall _ty) _pos) = "invalid member call in continue statement"
-    errorTitle (AnnotatedError (EContinueActionExtraArgs _def _argNumber) _pos) = "extra arguments in continuation action"
-    errorTitle (AnnotatedError (EContinueActionMissingArgs _def) _pos) = "missing arguments in continuation action"
-    errorTitle (AnnotatedError EEnumVariantInitializerInvalidUse _pos) = "invalid use of an enum variant initializer"
-    errorTitle (AnnotatedError (EEnumVariantNotFound _enumId _variant) _pos) = "enum variant not found"
-    errorTitle (AnnotatedError (EEnumVariantExtraParams _def _params _paramNumber) _pos) = "extra parameters in enum variant"
-    errorTitle (AnnotatedError (EEnumVariantMissingParams _def _params _paramNumber) _pos) = "missing parameters in enum variant"
-    errorTitle (AnnotatedError (EEnumVariantParamTypeMismatch _def _param _actualTy) _pos) = "enum variant parameter type mismatch"
-    errorTitle (AnnotatedError (EFunctionNotFound _ident) _pos) = "function not found"
-    errorTitle (AnnotatedError (EGlobalNotFunction _def) _pos) = "global object but not a function"
-    errorTitle (AnnotatedError (EUnexpectedNumericConstant _ty) _pos) = "unexpected numeric constant"
-    errorTitle (AnnotatedError (EInvalidAssignmentExprType _ty) _pos) = "invalid assignment expression type"
-    errorTitle (AnnotatedError (EInvalidMessageType _ty) _pos) = "invalid message type"
-    errorTitle (AnnotatedError (EInvalidOptionType _ty) _pos) = "invalid option type"
-    errorTitle (AnnotatedError (EInvalidReferenceType _ty) _pos) = "invalid reference type"
-    errorTitle (AnnotatedError (EInvalidFixedLocationType _ty) _pos) = "invalid fixed-location type"
-    errorTitle (AnnotatedError (EInvalidAllocatorType _ty) _pos) = "invalid allocator type"
-    errorTitle (AnnotatedError (EInvalidClassFieldType _ty) _pos) = "invalid class field type"
-    errorTitle (AnnotatedError (EInvalidStructFieldType _ty) _pos) = "invalid struct field type"
-    errorTitle (AnnotatedError (EInvalidEnumParameterType _ty) _pos) = "invalid enum parameter type"
-    errorTitle (AnnotatedError (EInvalidAccessPortType _ty) _pos) = "invalid access port type"
-    errorTitle (AnnotatedError (EInvalidDeclarationType _ty) _pos) = "invalid declaration type"
-    errorTitle (AnnotatedError (EInvalidTypeSpecifier _ty) _pos) = "invalid type specifier"
-    errorTitle (AnnotatedError (EInvalidNumericConstantType _ty) _pos) = "invalid numeric constant type"
-    errorTitle (AnnotatedError (EInvalidActionParameterType _ty) _pos) = "invalid action parameter type"
-    errorTitle (AnnotatedError (EInvalidProcedureParameterType _ty) _pos) = "invalid procedure parameter type"
-    errorTitle (AnnotatedError (EMemberFunctionCallExtraArgs _def _argNumber) _pos) = "extra arguments in member function call"
-    errorTitle (AnnotatedError (EMemberFunctionCallMissingArgs _def _argNumber) _pos) = "missing arguments in member function call"
-    errorTitle (AnnotatedError (EMemberFunctionCallArgTypeMismatch _def _argNumber _actualTy) _pos) = "member function call argument type mismatch"
-    errorTitle (AnnotatedError (EArrayIndexNotUSize _ty) _pos) = "invalid array index type"
-    errorTitle (AnnotatedError (EArraySliceLowerBoundNotUSize _ty) _pos) = "invalid array slice lower bound type"
-    errorTitle (AnnotatedError (EArraySliceUpperBoundNotUSize _ty) _pos) = "invalid array slice upper bound type"
-    errorTitle (AnnotatedError (EOutboundPortSendInvalidNumArgs _argNumber) _pos) = "invalid number of arguments in outbound port send"
-    errorTitle (AnnotatedError (EOutboundPortArgTypeMismatch _expectedTy _actualTy) _pos) = "output port argument type mismatch"
-    errorTitle (AnnotatedError (EAssignmentExprMismatch _expectedTy _actualTy) _pos) = "assignment expression type mismatch"
-    errorTitle (AnnotatedError (EFieldValueAssignmentMissingFields _def _fields) _pos) = "missing field/s in field assignment expression"
-    errorTitle (AnnotatedError (EFieldValueAssignmentUnknownFields _def _fields) _pos) = "unknown field/s in field assignment expression"
-    errorTitle (AnnotatedError (EFieldNotFixedLocation _fieldName _ty) _pos) = "field is not a fixed-location field"
-    errorTitle (AnnotatedError (EFieldNotAccessPort _fieldName _ty) _pos) = "field is not an access port field"
-    errorTitle (AnnotatedError (EFieldNotSinkOrInboundPort _fieldName _ty) _pos) = "field is not a sink or inbound port field"
-    errorTitle (AnnotatedError (EFieldNotOutboundPort _fieldName _ty) _pos) = "field is not an outbound port field"
-    errorTitle (AnnotatedError (EMemberAccessInvalidType _ty) _pos) = "invalid member access type"
-    errorTitle (AnnotatedError (EMemberFunctionCallInvalidType _ty) _pos) = "invalid member function call type"
-    errorTitle (AnnotatedError (EMemberAccessUnknownField _def _field) _pos) = "unknown field in member access"
-    errorTitle (AnnotatedError EInvalidProcedureCallInsideMemberFunction _pos) = "invalid procedure call inside member function"
-    errorTitle (AnnotatedError (EConstantOutRange _const) _pos) = "constant out of range"
-    errorTitle (AnnotatedError (EForIteratorInvalidType _ty) _pos) = "invalid type for for-loop iterator"
-    errorTitle (AnnotatedError (EUsedTypeName _ident _loc) _pos) = "type name already used"
-    errorTitle (AnnotatedError (EUsedGlobalName _ident _loc) _pos) = "global name already used"
-    errorTitle (AnnotatedError (EUsedFunName _ident _loc) _pos) = "function name already used"
-    errorTitle (AnnotatedError (EAccessPortConnectionInvalidGlobal _ident) _pos) = "invalid global object in access port connection"
-    errorTitle (AnnotatedError (EAccessPortConnectionInterfaceNotProvided _ident _iface) _pos) = "resource does not provide the interface"
-    errorTitle (AnnotatedError (ESinkPortConnectionInvalidGlobal _ident) _pos) = "invalid sink port connection"
-    errorTitle (AnnotatedError (EInboundPortConnectionInvalidObject _ident) _pos) = "invalid inbound port connection"
-    errorTitle (AnnotatedError (EOutboundPortConnectionInvalidGlobal _ident) _pos) = "invalid outbound port connection"
-    errorTitle (AnnotatedError (EAllocatorPortConnectionInvalidGlobal _ident) _pos) = "invalid allocator port connection"
-    errorTitle (AnnotatedError (EAtomicAccessPortConnectionInvalidGlobal _ident) _pos) = "invalid atomic access port connection"
-    errorTitle (AnnotatedError (EAtomicArrayAccessPortConnectionInvalidGlobal _ident) _pos) = "invalid atomic array access port connection"
-    errorTitle (AnnotatedError (EStructDefNotUniqueField _fields) _pos) = "duplicate field in struct definition"
-    errorTitle (AnnotatedError (EEnumDefNotUniqueVariant _variants) _pos) = "duplicate variant in enum definition"
-    errorTitle (AnnotatedError (EInterfaceNotUniqueProcedure _procedures) _pos) = "duplicate procedure in interface definition"
-    errorTitle (AnnotatedError (EClassLoop _members) _pos) = "loop between member function calls in class definition"
-    errorTitle (AnnotatedError (EDereferenceInvalidType _ty) _pos) = "invalid type for dereference"
-    errorTitle (AnnotatedError (EMatchInvalidType _ty) _pos) = "invalid type for match statement"
-    errorTitle (AnnotatedError (EMatchCaseDuplicate _ident _loc) _pos) = "duplicate case in match statement"
-    errorTitle (AnnotatedError (EMatchCaseUnknownVariant _variant) _pos) = "unknown variant in match case"
-    errorTitle (AnnotatedError (EMatchMissingCases _variants) _pos) = "missing case/s in match statement"
-    errorTitle (AnnotatedError (EIsVariantInvalidType _ty) _pos) = "invalid type for is-variant expression"
-    errorTitle (AnnotatedError (EIsOptionVariantInvalidType _ty) _pos) = "invalid type for is-option-variant expression"
-    errorTitle (AnnotatedError (EIsVariantEnumTypeMismatch _enum _variant) _pos) = "type mismatch in is-variant expression"
-    errorTitle (AnnotatedError (EOutboundPortInvalidProcedure _ident) _pos) = "invalid procedure in outbound port"
-    errorTitle (AnnotatedError EInvalidPoolInitialization _pos) = "invalid pool initialization"
-    errorTitle (AnnotatedError EInvalidMsgQueueInitialization _pos) = "invalid message queue initialization"
-    errorTitle (AnnotatedError (EUnknownGlobal _ident) _pos) = "unknown global object"
-    errorTitle (AnnotatedError (EInvalidInterruptEmitterType _ty) _pos) = "invalid interrupt emitter type"
-    errorTitle (AnnotatedError (EInvalidPeriodicTimerEmitterType _ty) _pos) = "invalid periodic timer emitter type"
-    errorTitle (AnnotatedError (EInvalidSystemInitEmitterType _ty) _pos) = "invalid system init emitter type"
-    errorTitle (AnnotatedError (EInboundPortConnectionMsgQueueTypeMismatch _msgQueueId _expectedTy _actualTy) _pos) = "message queue type mismatch"
-    errorTitle (AnnotatedError (EOutboundPortConnectionMsgQueueTypeMismatch _msgQueueId _expectedTy _actualTy) _pos) = "message queue type mismatch"
-    errorTitle (AnnotatedError (EAllocatorPortConnectionPoolTypeMismatch _poolId _expectedTy _actualTy) _pos) = "pool type mismatch"
-    errorTitle (AnnotatedError (EInvalidTaskType _ty) _pos) = "invalid task type"
-    errorTitle (AnnotatedError (EInvalidHandlerType _ty) _pos) = "invalid handler type"
-    errorTitle (AnnotatedError (EInvalidResourceType _ty) _pos) = "invalid resource type"
-    errorTitle (AnnotatedError (EInvalidEmitterType _ty) _pos) = "invalid emitter type"
-    errorTitle (AnnotatedError (EInvalidChannelType _ty) _pos) = "invalid channel type"
-    errorTitle (AnnotatedError (EEmitterClassNotInstantiable _ident) _pos) = "emitter class is not instantiable"
-    errorTitle (AnnotatedError (ESingleExpressionTypeNotUnit _ty) _pos) = "single expression type is not unit"
-    errorTitle (AnnotatedError (EInterfaceDuplicatedExtendedIface _iface) _pos) = "interface extends the same interface multiple times"
-    errorTitle (AnnotatedError (EInterfaceDuplicatedExtendedProcedure _iface1 _iface2 _procId) _pos) = "procedure duplicated in extended interfaces"
-    errorTitle (AnnotatedError (EInterfaceProcedurePreviouslyExtended _iface _procId) _pos) = "interface procedure previously defined by an extended interface"
-    errorTitle (AnnotatedError (EInterfacePreviouslyExtended _iface1 _iface2) _pos) = "interface previously extended by another interface"
-    errorTitle (AnnotatedError (EResourceDuplicatedProvidedIface _iface) _pos) = "resource provides the same interface multiple times"
-    errorTitle (AnnotatedError (EResourceDuplicatedProvidedProcedure _iface1 _iface2 _procId) _pos) = "procedure duplicated in provided interfaces"
-    errorTitle (AnnotatedError (EResourceInterfacePreviouslyExtended _iface1 _iface2) _pos) = "interface previously extended by another interface"
-    errorTitle (AnnotatedError EStringInitializerInvalidUse _pos) = "invalid use of a string initializer"
-    errorTitle (AnnotatedError (EStringInitializerNotArrayOfChars _ty) _pos) = "assignment of a string array initializer to an invalid type"
-    errorTitle (AnnotatedError (EInvalidConstType _ty) _pos) = "invalid type for constant"
-    errorTitle (AnnotatedError (EInvalidAccessToConstExpr _ident) _pos) = "invalid access to a constant expression"
-    errorTitle (AnnotatedError (EInvalidResultType _ty) _pos) = "invalid type for result"
-    errorTitle (AnnotatedError (EInvalidStatusType _ty) _pos) = "invalid type for status"
-    errorTitle (AnnotatedError (EInvalidVariantForOption _ident) _pos) = "invalid variant for option"
-    errorTitle (AnnotatedError (EInvalidVariantForResult _ident) _pos) = "invalid variant for result"
-    errorTitle (AnnotatedError (EInvalidVariantForStatus _ident) _pos) = "invalid variant for status"
-    errorTitle (AnnotatedError (EInvalidResultTypeSpecifier _ts) _pos) = "invalid type specifier for result"
-    errorTitle (AnnotatedError (EMonadicVariantParameterTypeMismatch _expectedTy _actualTy) _pos) = "monadic variant parameter type mismatch"
-    errorTitle (AnnotatedError (EObjectPreviouslyMoved _loc) _pos) = "object previously moved"
-    errorTitle (AnnotatedError (EIsStatusVariantInvalidType _ty) _pos) = "invalid type for is-status-variant expression"
-    errorTitle (AnnotatedError (EIsResultVariantInvalidType _ty) _pos) = "invalid type for is-result-variant expression"
-    errorTitle (AnnotatedError (EInvalidSystemExceptEmitterType _ty) _pos) = "invalid system exception emitter type"
-    errorTitle (AnnotatedError (EInvalidInterruptActionReturnType _ident _ty) _pos) = "invalid interrupt action return type"
-    errorTitle (AnnotatedError (EInvalidPeriodicTimerActionReturnType _ident _ty) _pos) = "invalid periodic timer action return type"
-    errorTitle (AnnotatedError (EInvalidSystemInitActionReturnType _ident _ty) _pos) = "invalid system init action return type"
-    errorTitle (AnnotatedError (EInvalidSystemExceptActionReturnType _ident _ty) _pos) = "invalid system exception action return type"
-    errorTitle (AnnotatedError (EInvalidMsgQueueActionReturnType _ident _ty) _pos) = "invalid message queue action return type"
-    errorTitle (AnnotatedError (ETypeNotInScope _ident _qualifiedName) _pos) = "type not in scope"
-    errorTitle (AnnotatedError (EFunctionNotInScope _ident _qualifiedName) _pos) = "function not in scope"
-    errorTitle (AnnotatedError (EUnknownAction _ident) _pos) = "unknown action"
-    errorTitle (AnnotatedError (EInPortActionParamTypeMismatch _def _expectedTy _actualTy) _pos) = "in port action parameter type mismatch"
-    errorTitle (AnnotatedError (ESinkPortActionParamTypeMismatch _def _expectedTy _actualTy) _pos) = "sink port action parameter type mismatch"
-    errorTitle (AnnotatedError (EInvalidViewerParameterType _ty) _pos) = "invalid viewer parameter type"
-    errorTitle (AnnotatedError EInvalidAccessToProcedureFromImmutableSelfReference _pos) = "invalid access to procedure from immutable self reference"
-    errorTitle (AnnotatedError EInvalidAccessToOutPortFromImmutableSelfReference _pos) = "invalid access to out port from immutable self reference"
-    errorTitle (AnnotatedError (EProcedureSelfAccessKindMismatch (_ifaceId, _procId, _expectedAccessKind, _loc) _accessKind) _pos) =
-        "self reference access kind mismatch in procedure"
-    errorTitle (AnnotatedError (ETaskClassMethod (_ident, _loc) _methodName) _pos) = "task class defines a method"
-    errorTitle (AnnotatedError (EHandlerClassMethod (_ident, _loc) _methodName) _pos) = "handler class defines a method"
-    errorTitle (AnnotatedError (EResourceClassViewer (_ident, _loc) _viewerName) _pos) = "resource class defines a viewer"
-    errorTitle (AnnotatedError (EUnprotectedResourceWithRegularFields (_ident, _loc)) _pos) = "unprotected resource with regular fields"
-    errorTitle (AnnotatedError (EMemberFunctionWithMutableSelfInTaskClass _ident) _pos) = "mutable member function in task class"
-    errorTitle (AnnotatedError (EMemberFunctionWithMutableSelfInHandlerClass _ident) _pos) = "mutable member function in handler class"
-    errorTitle (AnnotatedError _err _pos) = "internal error"
+    -- | A calling loop names one position per member function it goes through,
+    -- each with a header of its own, which is a message that walks several
+    -- files and not an error with related positions. It therefore keeps the
+    -- printer it had.
+    toText e@(AnnotatedError (EClassLoop ((currentCall, _) : xs)) _pos) files =
+        errorToText e files <> printCallTrace currentCall xs
 
-    toText e@(AnnotatedError err pos@(Position _ start end)) files =
-        let fileName = sourceName start
-            sourceLines = files M.! fileName
-            title = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."
-        in
-            case err of 
-                EInvalidArrayIndexing ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("You are trying to index an object of type \x1b[31m" <> showText ty <> "\x1b[0m.")) 
-                ENotNamedObject ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The variable \x1b[31m" <> T.pack ident <> "\x1b[0m has not been declared")) 
-                EExpressionNotConstant ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "The expression is not constant.")
-                EAssignmentToImmutable ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "You are trying to assign a value to an immutable object.")
-                EIfElseNoOtherwise ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("You are missing the else clause in an if-else-if statement.\n" <>
-                            "You must provide an else clause if you are defining an else-if clause."))
-                ENotCasteable ty1 ty2 ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("You cannot cast a value of type \x1b[31m" <> showText ty1 <> "\x1b[0m to type \x1b[31m" <> showText ty2 <> "\x1b[0m."))
-                EInvalidParameterType (Parameter ident ts) ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Parameter \x1b[31m" <> T.pack ident <> "\x1b[0m has an invalid type \x1b[31m" <> showText ts <> "\x1b[0m."))
-                EInvalidReturnType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Invalid return type \x1b[31m" <> showText ty <> "\x1b[0m."))
-                EProcedureCallExtraArgs (procId, params, procPos) numArgs ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Procedure \x1b[31m" <> T.pack procId <>
-                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
-                    "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show numArgs) <> "\x1b[0m.")) <>
-                    case procPos of 
-                        Position _ procStart _procEnd -> 
-                            let procFileName = sourceName procStart
-                                procSourceLines = files M.! procFileName in
-                            pprintSimpleError
-                                procSourceLines "\nThe interface of the procedure is defined here:" procFileName
-                                procPos Nothing
-                        _ -> ""
-                EProcedureCallMissingArgs (ident, params, procPos) numArgs ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Procedure \x1b[31m" <> T.pack ident <>
-                            "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
-                            "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show numArgs) <> "\x1b[0m.")) <>
-                    case procPos of 
-                        Position _ procStart _procEnd -> 
-                            let procFileName = sourceName procStart
-                                procSourceLines = files M.! procFileName in
-                            pprintSimpleError
-                                procSourceLines ("Procedure \x1b[31m" <> T.pack ident <> "\x1b[0m is defined here:") procFileName
-                                procPos Nothing
-                        _ -> ""
-                EProcedureCallArgTypeMismatch (ident, Parameter _ expectedTy, procPos) numArgs actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Argument \x1b[31m#" <> T.pack (show numArgs) <> "\x1b[0m of procedure \x1b[31m" <> T.pack ident <>
-                            "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
-                            "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) <>
-                    case procPos of 
-                        Position _ procStart _procEnd -> 
-                            let procFileName = sourceName procStart
-                                procSourceLines = files M.! procFileName in
-                            pprintSimpleError
-                                procSourceLines
-                                ("Procedure \x1b[31m" <> T.pack ident <> "\x1b[0m is defined here:")
-                                procFileName procPos Nothing
-                        _ -> ""
-                EUnknownProcedure ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Unknown procedure \x1b[31m" <> T.pack ident <> "\x1b[0m."))
-                EResourceClassNoProvides ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Resource class \x1b[31m" <> T.pack ident <> "\x1b[0m does not provide any interface.\n" <>
-                            "A resource class must provide at least one interface."))
-                EResourceClassAction (classId, Position _ startPosClass endPosClass) ident ->
-                    let actionStartLine = sourceLine start
-                        actionEndLine = sourceLine end
-                        actionStartColumn = sourceColumn start
-                        actionEndColumn = 
-                            if actionStartLine == actionEndLine then 
-                                sourceColumn end 
-                            else 
-                                T.length (T.lines sourceLines !! (actionStartLine - 1)) + 1
-                        classStartLine = sourceLine startPosClass
-                        classEndLine = sourceLine endPosClass
-                        classStartColumn = sourceColumn startPosClass
-                        classEndColumn = 
-                            if classStartLine == classEndLine then 
-                                sourceColumn endPosClass 
-                            else 
-                                T.length (T.lines sourceLines !! (classStartLine - 1)) + 1
-
-                    in
-                        TL.toStrict $ prettyErrors
-                            sourceLines
-                            [
-                                Errata
-                                    (Just title)
-                                    [
-                                        Errata.Block
-                                            fancyRedStyle
-                                            (sourceName start, classStartLine, classStartColumn)
-                                            Nothing
-                                            [
-                                                Pointer classStartLine classStartColumn
-                                                        classEndColumn
-                                                        True Nothing fancyRedPointer,
-                                                Pointer actionStartLine actionStartColumn actionEndColumn
-                                                        True (Just " \x1b[31minvalid action definition\x1b[0m") fancyRedPointer
-                                            ]
-                                            Nothing
-                                    ]
-                                    (Just
-                                        ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the action \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
-                                        <> "Resource classes cannot define actions."))
-                            ] 
-                EResourceClassInPort (classId, Position _ startPosClass endPosClass) ident ->
-                    let portStartLine = sourceLine start
-                        portEndLine = sourceLine end
-                        portStartColumn = sourceColumn start
-                        portEndColumn = 
-                            if portStartLine == portEndLine then 
-                                sourceColumn end 
-                            else 
-                                T.length (T.lines sourceLines !! (portStartLine - 1)) + 1
-                        classStartLine = sourceLine startPosClass
-                        classEndLine = sourceLine endPosClass
-                        classStartColumn = sourceColumn startPosClass
-                        classEndColumn = 
-                            if classStartLine == classEndLine then 
-                                sourceColumn endPosClass 
-                            else 
-                                T.length (T.lines sourceLines !! (classStartLine - 1)) + 1
-
-                    in
-                        TL.toStrict $ prettyErrors
-                            sourceLines
-                            [
-                                Errata
-                                    (Just title)
-                                    [
-                                        Errata.Block
-                                            fancyRedStyle
-                                            (sourceName start, classStartLine, classStartColumn)
-                                            Nothing
-                                            [
-                                                Pointer classStartLine classStartColumn
-                                                        classEndColumn
-                                                        True Nothing fancyRedPointer,
-                                                Pointer portStartLine portStartColumn portEndColumn
-                                                        True (Just " \x1b[31minvalid port definition\x1b[0m") fancyRedPointer
-                                            ]
-                                            Nothing
-                                    ]
-                                    (Just
-                                        ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the in port \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
-                                        <> "Resource classes cannot define in ports."))
-                            ]
-                EResourceClassOutPort (classId, Position _ startPosClass endPosClass) ident ->
-                    let portStartLine = sourceLine start
-                        portEndLine = sourceLine end
-                        portStartColumn = sourceColumn start
-                        portEndColumn = 
-                            if portStartLine == portEndLine then 
-                                sourceColumn end 
-                            else 
-                                T.length (T.lines sourceLines !! (portStartLine - 1)) + 1
-                        classStartLine = sourceLine startPosClass
-                        classEndLine = sourceLine endPosClass
-                        classStartColumn = sourceColumn startPosClass
-                        classEndColumn = 
-                            if classStartLine == classEndLine then 
-                                sourceColumn endPosClass 
-                            else 
-                                T.length (T.lines sourceLines !! (classStartLine - 1)) + 1
-                    in
-                        TL.toStrict $ prettyErrors
-                            sourceLines
-                            [
-                                Errata
-                                    (Just title)
-                                    [
-                                        Errata.Block
-                                            fancyRedStyle
-                                            (sourceName start, classStartLine, classStartColumn)
-                                            Nothing
-                                            [
-                                                Pointer classStartLine classStartColumn
-                                                        classEndColumn
-                                                        True Nothing fancyRedPointer,
-                                                Pointer portStartLine portStartColumn portEndColumn
-                                                        True (Just " \x1b[31minvalid port definition\x1b[0m") fancyRedPointer
-                                            ]
-                                            Nothing
-                                    ]
-                                    (Just
-                                        ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the out port \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
-                                        <> "Resource classes cannot define out ports."))
-                            ]
-                EInterfaceNotFound ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Interface \x1b[31m" <> T.pack ident <> "\x1b[0m not found."))
-                EGlobalNotInterface ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Identifier \x1b[31m" <> T.pack ident <> "\x1b[0m is not an interface."))
-                EProcedureNotFromProvidedInterfaces (classId, Position _ startPosClass endPosClass) ident ->
-                    let portStartLine = sourceLine start
-                        portEndLine = sourceLine end
-                        portStartColumn = sourceColumn start
-                        portEndColumn = 
-                            if portStartLine == portEndLine then 
-                                sourceColumn end 
-                            else 
-                                T.length (T.lines sourceLines !! (portStartLine - 1)) + 1
-                        classStartLine = sourceLine startPosClass
-                        classEndLine = sourceLine endPosClass
-                        classStartColumn = sourceColumn startPosClass
-                        classEndColumn = 
-                            if classStartLine == classEndLine then 
-                                sourceColumn endPosClass 
-                            else 
-                                T.length (T.lines sourceLines !! (classStartLine - 1)) + 1
-                    in
-                        TL.toStrict $ prettyErrors
-                            sourceLines
-                            [
-                                Errata
-                                    (Just title)
-                                    [
-                                        Errata.Block
-                                            fancyRedStyle
-                                            (sourceName start, classStartLine, classStartColumn)
-                                            Nothing
-                                            [
-                                                Pointer classStartLine classStartColumn
-                                                        classEndColumn
-                                                        True Nothing fancyRedPointer,
-                                                Pointer portStartLine portStartColumn portEndColumn
-                                                        True (Just " \x1b[31munknown procedure\x1b[0m") fancyRedPointer
-                                            ]
-                                            Nothing
-                                    ]
-                                    (Just
-                                        ("The procedure \x1b[31m" <> T.pack ident
-                                            <> "\x1b[0m does not belong to any of the provided interfaces of resource class \x1b[31m"
-                                            <> T.pack classId <> "\x1b[0m."))
-                            ]
-                EMissingProcedure ifaceId procId ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Procedure \x1b[31m" <> T.pack procId <> "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> "\x1b[0m is not being provided."))
-                EProcedureExtraParams (ifaceId, procId, params, procPos@(Position _ procStart _procEnd)) paramNumber ->
-                    let procFileName = sourceName procStart
-                        procSourceLines = files M.! procFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Procedure \x1b[31m" <> T.pack procId <>
-                                "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <>
-                                "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            procSourceLines "The interface of the procedure is defined here:" procFileName
-                            procPos Nothing
-                EProcedureMissingParams (ifaceId, procId, params, procPos@(Position _ procStart _procEnd)) paramNumber ->
-                    let procFileName = sourceName procStart
-                        procSourceLines = files M.! procFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Procedure \x1b[31m" <> T.pack procId <>
-                                "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <>
-                                "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            procSourceLines "The interface of the procedure is defined here:" procFileName
-                            procPos Nothing
-                EProcedureParamTypeMismatch (ifaceId, procId, expectedTy, procPos@(Position _ procStart _procEnd)) actualTy ->
-                    let procFileName = sourceName procStart
-                        procSourceLines = files M.! procFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Parameter is expected to be of type \x1b[31m" <> showText expectedTy <>
-                                "\x1b[0m but you are defining it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            procSourceLines
-                                ("The procedure \x1b[31m" <> T.pack procId <>
-                                "\x1b[0m of the interface \x1b[31m" <> T.pack ifaceId <>
-                                "\x1b[0m is defined here:")
-                                procFileName procPos Nothing
-                ETaskClassProvides ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Task class \x1b[31m" <> T.pack ident <> "\x1b[0m provides an interface.\n" <>
-                            "Task classes must not provide any interface."))
-                ETaskClassProcedure (classId, Position _ startPosClass endPosClass) ident ->
-                    let procStartLine = sourceLine start
-                        procEndLine = sourceLine end
-                        procStartColumn = sourceColumn start
-                        procEndColumn = 
-                            if procStartLine == procEndLine then 
-                                sourceColumn end 
-                            else 
-                                T.length (T.lines sourceLines !! (procStartLine - 1)) + 1
-                        classStartLine = sourceLine startPosClass
-                        classEndLine = sourceLine endPosClass
-                        classStartColumn = sourceColumn startPosClass
-                        classEndColumn = 
-                            if classStartLine == classEndLine then 
-                                sourceColumn endPosClass 
-                            else 
-                                T.length (T.lines sourceLines !! (classStartLine - 1)) + 1
-
-                    in
-                        TL.toStrict $ prettyErrors
-                            sourceLines
-                            [
-                                Errata
-                                    (Just title)
-                                    [
-                                        Errata.Block
-                                            fancyRedStyle
-                                            (sourceName start, classStartLine, classStartColumn)
-                                            Nothing
-                                            [
-                                                Pointer classStartLine classStartColumn
-                                                        classEndColumn
-                                                        True Nothing fancyRedPointer,
-                                                Pointer procStartLine procStartColumn procEndColumn
-                                                        True (Just " \x1b[31minvalid procedure definition\x1b[0m") fancyRedPointer
-                                            ]
-                                            Nothing
-                                    ]
-                                    (Just
-                                        ("Task class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the procedure \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
-                                        <> "Task classes cannot define procedures."))
-                            ]
-                ETaskClassNoActions ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Task class \x1b[31m" <> T.pack ident <> "\x1b[0m does not define any actions.\n" <>
-                            "Task classes must define at least one action."))
-                EHandlerClassProvides ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Handler class \x1b[31m" <> T.pack ident <> "\x1b[0m provides an interface.\n" <>
-                            "Handler classes must not provide any interface."))
-                EHandlerClassProcedure (classId, Position _ startPosClass endPosClass) ident ->
-                    let procStartLine = sourceLine start
-                        procEndLine = sourceLine end
-                        procStartColumn = sourceColumn start
-                        procEndColumn = 
-                            if procStartLine == procEndLine then 
-                                sourceColumn end 
-                            else 
-                                T.length (T.lines sourceLines !! (procStartLine - 1)) + 1
-                        classStartLine = sourceLine startPosClass
-                        classEndLine = sourceLine endPosClass
-                        classStartColumn = sourceColumn startPosClass
-                        classEndColumn = 
-                            if classStartLine == classEndLine then 
-                                sourceColumn endPosClass 
-                            else 
-                                T.length (T.lines sourceLines !! (classStartLine - 1)) + 1
-
-                    in
-                        TL.toStrict $ prettyErrors
-                            sourceLines
-                            [
-                                Errata
-                                    (Just title)
-                                    [
-                                        Errata.Block
-                                            fancyRedStyle
-                                            (sourceName start, classStartLine, classStartColumn)
-                                            Nothing
-                                            [
-                                                Pointer classStartLine classStartColumn
-                                                        classEndColumn
-                                                        True Nothing fancyRedPointer,
-                                                Pointer procStartLine procStartColumn procEndColumn
-                                                        True (Just " \x1b[31minvalid procedure definition\x1b[0m") fancyRedPointer
-                                            ]
-                                            Nothing
-                                    ]
-                                    (Just
-                                        ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the procedure \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
-                                        <> "Handler classes cannot define procedures."))
-                            ]
-                EHandlerClassNoAction ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Handler class \x1b[31m" <> T.pack ident <> "\x1b[0m does not define any actions.\n" <>
-                            "Handler classes must define exactly one action."))
-                EHandlerClassMultipleActions classId prevActPos@(Position _ actStartPos _actEndPos) ->
-                    let actFileName = sourceName actStartPos
-                        actSourceLines = files M.! actFileName 
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines multiple actions.\n")) <>
-                        pprintSimpleError
-                            actSourceLines "Another action is defined here:" actFileName
-                            prevActPos Nothing
-                EHandlerClassNoSinkPort classId ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m does not define any sink port.\n" <>
-                            "Handler classes must define exactly one sink port."))
-                EHandlerClassMultipleSinkPorts classId prevPortPos@(Position _ portStartPos _portEndPos) ->
-                    let portFileName = sourceName portStartPos
-                        portSourceLines = files M.! portFileName 
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines multiple sink ports.\n")) <>
-                        pprintSimpleError
-                            portSourceLines "Another sink port is defined here:" portFileName
-                            prevPortPos Nothing
-                EHandlerClassInPort (classId, Position _ startPosClass endPosClass) ident ->
-                    let portStartLine = sourceLine start
-                        portEndLine = sourceLine end
-                        portStartColumn = sourceColumn start
-                        portEndColumn = 
-                            if portStartLine == portEndLine then 
-                                sourceColumn end 
-                            else 
-                                T.length (T.lines sourceLines !! (portStartLine - 1)) + 1
-                        classStartLine = sourceLine startPosClass
-                        classEndLine = sourceLine endPosClass
-                        classStartColumn = sourceColumn startPosClass
-                        classEndColumn = 
-                            if classStartLine == classEndLine then 
-                                sourceColumn endPosClass 
-                            else 
-                                T.length (T.lines sourceLines !! (classStartLine - 1)) + 1
-
-                    in
-                        TL.toStrict $ prettyErrors
-                            sourceLines
-                            [
-                                Errata
-                                    (Just title)
-                                    [
-                                        Errata.Block
-                                            fancyRedStyle
-                                            (sourceName start, classStartLine, classStartColumn)
-                                            Nothing
-                                            [
-                                                Pointer classStartLine classStartColumn
-                                                        classEndColumn
-                                                        True Nothing fancyRedPointer,
-                                                Pointer portStartLine portStartColumn portEndColumn
-                                                        True (Just " \x1b[31minvalid port definition\x1b[0m") fancyRedPointer
-                                            ]
-                                            Nothing
-                                    ]
-                                    (Just
-                                        ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the in port \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
-                                        <> "Handler classes cannot define in ports."))
-                            ]
-                EIfElseIfCondNotBool ts ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The condition in the statement is expected to be of type \x1b[31mbool\x1b[0m but it is of type \x1b[31m" <> showText ts <> "\x1b[0m."))
-                EFunctionCallExtraArgs (funcId, params, funcPos@(Position _ funcStart _procEnd)) argNumber ->
-                    let funcFileName = sourceName funcStart
-                        funcSourceLines = files M.! funcFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Function \x1b[31m" <> T.pack funcId <>
-                                "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            funcSourceLines ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
-                            funcPos Nothing
-                EFunctionCallMissingArgs (funcId, params, funcPos@(Position _ funcStart _procEnd)) argNumber ->
-                    let funcFileName = sourceName funcStart
-                        funcSourceLines = files M.! funcFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Function \x1b[31m" <> T.pack funcId <>
-                                "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            funcSourceLines ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
-                            funcPos Nothing
-                EFunctionCallArgTypeMismatch (funcId, Parameter _ expectedTy, funcPos@(Position _ funcStart _procEnd)) argNumber actualTy ->
-                    let funcFileName = sourceName funcStart
-                        funcSourceLines = files M.! funcFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Argument \x1b[31m#" <> T.pack (show argNumber) <> "\x1b[0m of function \x1b[31m" <> T.pack funcId <>
-                                "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
-                                "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            funcSourceLines ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
-                            funcPos Nothing
-                EMemberAccessNotFunction ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The identifier \x1b[31m" <> T.pack ident <> "\x1b[0m is not a valid member function."))
-                EMutableReferenceToImmutable ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "You are trying to create a mutable reference to an immutable object.")
-                EMutableReferenceToPrivate ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "You are trying to create a mutable reference to a private object.")
-                EBinOpExpectedTypeLeft op expectedTy actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The result of the binary operation \x1b[31m" <> showText op <>
-                            "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
-                            "\x1b[0m but the left operand you are providing is of type \x1b[31m" <>
-                            showText actualTy <> "\x1b[0m."))
-                EBinOpExpectedTypeRight op expectedTy actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The result of the binary operation \x1b[31m" <> showText op <>
-                            "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
-                            "\x1b[0m but the right operand you are providing is of type \x1b[31m" <>
-                            showText actualTy <> "\x1b[0m."))
-                EBinOpTypeMismatch op ty_le ty_re ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Binary operation \x1b[31m" <> showText op <>
-                            "\x1b[0m expects operands of the same type but the left one is of type \x1b[31m" <>
-                            showText ty_le <> "\x1b[0m and the right one is of type \x1b[31m" <> showText ty_re <> "\x1b[0m."))
-                EBinOpExpectedTypeNotBool op ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The binary operation \x1b[31m" <> showText op <>
-                            "\x1b[0m will result in a value of type \x1b[31m" <> showText (TBool :: TerminaType a) <>
-                            "\x1b[0m but it is expected to be of type \x1b[31m" <> showText ty <> "\x1b[0m."))
-                EBinOpLeftTypeNotBool op ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The left operand of the binary operation \x1b[31m" <> showText op <>
-                            "\x1b[0m is of type \x1b[31m" <> showText ty <>
-                            "\x1b[0m but it is expected to be of type \x1b[31m" <> showText (TBool :: TerminaType a) <> "\x1b[0m."))
-                EBinOpRightTypeNotBool op ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The right operand of the binary operation \x1b[31m" <> showText op <>
-                            "\x1b[0m is of type \x1b[31m" <> showText ty <>
-                            "\x1b[0m but it is expected to be of type \x1b[31m" <> showText (TBool :: TerminaType a) <> "\x1b[0m."))
-                EBinOpExpectedTypeNotArith op ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The binary operation \x1b[31m" <> showText op <>
-                            "\x1b[0m will result in an arithmetic value but the expected type is \x1b[31m" <> showText ty <> "\x1b[0m."))
-                EBinOpLeftTypeNotArith op ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The left operand of the binary operation \x1b[31m" <> showText op <>
-                            "\x1b[0m is of type \x1b[31m" <> showText ty <>
-                            "\x1b[0m but it is expected to be of arithmetic type (integer or float)."))
-                EBinOpRightTypeNotArith op ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The right operand of the binary operation \x1b[31m" <> showText op <>
-                            "\x1b[0m is of type \x1b[31m" <> showText ty <>
-                            "\x1b[0m but it is expected to be of arithmetic type (integer or float)."))
-                EBinOpExpectedTypeNotInt op ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The binary operation \x1b[31m" <> showText op <>
-                            "\x1b[0m will result in an integer value but the expected type is \x1b[31m" <> showText ty <> "\x1b[0m."))
-                EBinOpLeftTypeNotInt op ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The left operand of the binary operation \x1b[31m" <> showText op <>
-                            "\x1b[0m is of type \x1b[31m" <> showText ty <>
-                            "\x1b[0m but it is expected to be of integer type."))
-                EBinOpRightTypeNotInt op ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The right operand of the binary operation \x1b[31m" <> showText op <>
-                            "\x1b[0m is of type \x1b[31m" <> showText ty <>
-                            "\x1b[0m but it is expected to be of integer type."))
-                EBinOpRightTypeNotPos op ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The right operand of the binary operation \x1b[31m" <> showText op <>
-                            "\x1b[0m is of type \x1b[31m" <> showText ty <>
-                            "\x1b[0m but it is expected to be of positive numeric type."))
-                EBinOpLeftTypeNotEq op ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The left operand of the binary operation \x1b[31m" <> showText op <>
-                            "\x1b[0m is of type \x1b[31m" <> showText ty <>
-                            "\x1b[0m but it is expected to be of equatable type."))
-                EBinOpRightTypeNotEq op ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The right operand of the binary operation \x1b[31m" <> showText op <>
-                            "\x1b[0m is of type \x1b[31m" <> showText ty <>
-                            "\x1b[0m but it is expected to be of equatable type."))
-                EAtomicAccessInvalidType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic access, only numeric types are allowed."))
-                EAtomicArrayAccessInvalidType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic array access, only numeric types are allowed."))
-                EAtomicInvalidType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic."))
-                EAtomicArrayInvalidType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic array."))
-                EAtomicConnectionTypeMismatch expectedTy actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type of the connected atomic resource is expected to be \x1b[31m" <> showText expectedTy <>
-                            "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-                EAtomicArrayConnectionTypeMismatch expectedTy actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type of the elements of the connected atomic array is expected to be \x1b[31m" <> showText expectedTy <>
-                            "\x1b[0m but the array is of elements of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-                EInvalidDefaultCase ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "The cases are already exhaustive, the default case is not needed.")
-                EConstantWithoutKnownType c ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type of the constant \x1b[31m" <> showText c <>
-                            "\x1b[0m cannot be inferred from the environment and must be explicitly defined."))
-                EStructInitializerInvalidUse ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just $ "You are trying to use a struct initializer in an invalid context.\n" <>
-                                "Struct initializers can only be used to initialize struct objects.")
-                EStructInitializerTypeMismatch expectedTy actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The struct initializer is expected to be of type \x1b[31m" <> showText expectedTy <>
-                            "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-                EEnumInitializerExpectedTypeMismatch expectedTy actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The enum initializer is expected to be of type \x1b[31m" <> showText expectedTy <>
-                            "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-                ESliceInvalidUse ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just $ "You are trying to use a slice in an invalid context.\n" <>
-                                "Slices can only be used to create references to a part of an array.")
-                EArrayInitializerInvalidUse ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just $ "You are trying to use an array initializer in an invalid context.\n" <>
-                                "Array initializers can only be used to initialize array objects.")
-                EArrayInitializerNotArray ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Invalid use of an array initializer.\n" <>
-                            "You are trying to assign an array initializer to an object of type \x1b[31m" <>
-                            showText ty <> "\x1b[0m."))
-                EArrayExprListInitializerInvalidUse ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just $ "You are trying to use an array expression list initializer in an invalid context.\n" <>
-                                "TArray expression list initializers can only be used to initialize array objects.")
-                EArrayExprListInitializerNotArray ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Invalid use of an array expression list initializer.\n" <>
-                            "You are trying to assign an array expression list initializer to an object of type \x1b[31m" <>
-                            showText ty <> "\x1b[0m."))
-                EMonadicVariantInitializerInvalidUse ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just $ "You are trying to use an variant initializer for a builtin type in an invalid context.\n" <>
-                                "Variant initializers can only be used to initialize objects.")
-                EForLoopLowerBoundTypeMismatch expectedTy actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The lower bound of the for loop is expected to be of the type of the iterator \x1b[31m" <> showText expectedTy <>
-                            "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-                EForLoopUpperBoundTypeMismatch expectedTy actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The upper bound of the for loop is expected to be of the type of the iterator \x1b[31m" <> showText expectedTy <>
-                            "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-                EArrayExprListInitializerExprTypeMismatch expectedTy actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The expression in the array expression list initializer is expected to be of type \x1b[31m" <> showText expectedTy <>
-                            "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-                EReturnValueExpected ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The function is expected to return a value of type \x1b[31m" <> showText ty <> "\x1b[0m."))
-                EReturnValueNotUnit ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "The function is not expected to return a value.")
-                EInvalidArrayType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid array type."))
-                EInvalidBoxType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid box type."))
-                ENoTypeFound ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> T.pack ident <> "\x1b[0m is not found."))
-                EGlobalNotType (ident, globalPos@(Position _ globalStart _)) ->
-                    let globalFileName = sourceName globalStart
-                        globalSourceLines = files M.! globalFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a type.\n")) <>
-                        pprintSimpleError
-                            globalSourceLines "The global object is defined here:" globalFileName
-                            globalPos Nothing
-                EInvalidAccessToGlobal ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be accessed from within this context."))
-                EConstantIsReadOnly ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The constant \x1b[31m" <> T.pack ident <> "\x1b[0m is read-only and cannot be modified."))
-                ESymbolAlreadyDefined (ident, symbolPos@(Position _ symbolStart _symbolEnd)) ->
-                    let symbolFileName = sourceName symbolStart
-                        symbolSourceLines = files M.! symbolFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("The symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already defined.\n")) <>
-                        pprintSimpleError
-                            symbolSourceLines "The symbol was previoulsy defined here:" symbolFileName
-                            symbolPos Nothing
-                EContinueInvalidExpression -> 
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "The expression in a continue statement must be a call to a member action.")
-                EContinueInvalidMethodOrViewerCall ident -> 
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("This statement can only be used to call a continuation action.\n" <>
-                            "The member function call \x1b[31m" <> T.pack ident <> "\x1b[0m in a continue statement is invalid."))
-                EContinueInvalidMemberCall ts ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("This statement can only be used to call a continuation action.\n" <>
-                            "Calling a procedure of an object of type \x1b[31m" <> showText ts <> "\x1b[0m in a continue statement is invalid."))
-                EContinueActionExtraArgs (ident, params, actionPos@(Position _ actStartPos _endPos)) argNumber ->
-                    let actFileName = sourceName actStartPos
-                        actSourceLines = files M.! actFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Action \x1b[31m" <> T.pack ident <>
-                                "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            actSourceLines "The action is defined here:" actFileName
-                            actionPos Nothing
-                EContinueActionMissingArgs (ident, actionPos@(Position _ actStartPos _endPos)) ->
-                    let actFileName = sourceName actStartPos
-                        actSourceLines = files M.! actFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Action \x1b[31m" <> T.pack ident <>
-                                "\x1b[0m requires \x1b[31mone\x1b[0m parameter but you are providing \x1b[31mnone\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            actSourceLines "The action is defined here:" actFileName
-                            actionPos Nothing
-                EEnumVariantInitializerInvalidUse ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just $ "You are trying to use an enum variant initializer in an invalid context.\n" <>
-                                "Enum variant initializers can only be used to initialize enum objects.")
-                EEnumVariantNotFound enumId variant ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Enum \x1b[31m" <> T.pack enumId <> "\x1b[0m does not have a variant named \x1b[31m" <> T.pack variant <> "\x1b[0m."))
-                EEnumVariantExtraParams (enumId, enumPos) (variant, params) paramNumber ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Enum variant \x1b[31m" <> T.pack variant <>
-                            "\x1b[0m of enum \x1b[31m" <> T.pack enumId <>
-                            "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
-                            "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.\n")) <>
-                    case enumPos of
-                        Position _ enumStart _end ->
-                            let enumFileName = sourceName enumStart
-                                enumSourceLines = files M.! enumFileName
-                            in
-                                pprintSimpleError
-                                    enumSourceLines "The enum is defined here:" enumFileName
-                                    enumPos Nothing
-                        _ -> mempty
-                EEnumVariantMissingParams (enumId, enumPos) (variant, params) paramNumber ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Enum variant \x1b[31m" <> T.pack variant <>
-                            "\x1b[0m of enum \x1b[31m" <> T.pack enumId <>
-                            "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
-                            "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.\n")) <>
-                    case enumPos of 
-                        Position _ enumStart _end ->
-                            let enumFileName = sourceName enumStart
-                                enumSourceLines = files M.! enumFileName
-                            in
-                                pprintSimpleError
-                                    enumSourceLines "The enum is defined here:" enumFileName
-                                    enumPos Nothing
-                        _ -> mempty
-                EEnumVariantParamTypeMismatch (enumId, enumPos) (variant, paramNumber, expectedTy) actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Parameter \x1b[31m" <> T.pack (show paramNumber) <>
-                            "\x1b[0m of enum variant \x1b[31m" <> T.pack variant <>
-                            "\x1b[0m of enum \x1b[31m" <> T.pack enumId <>
-                            "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
-                            "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")) <>
-                    case enumPos of
-                        Position _ enumStart _end ->
-                            let enumFileName = sourceName enumStart
-                                enumSourceLines = files M.! enumFileName
-                            in
-                                pprintSimpleError
-                                    enumSourceLines "The enum is defined here:" enumFileName
-                                    enumPos Nothing
-                        _ -> mempty
-                EFunctionNotFound ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Function \x1b[31m" <> T.pack ident <> "\x1b[0m not found."))
-                EGlobalNotFunction (ident, globalPos@(Position _ globalStart _)) ->
-                    let globalFileName = sourceName globalStart
-                        globalSourceLines = files M.! globalFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a function.\n")) <>
-                        pprintSimpleError
-                            globalSourceLines "The global object is defined here:" globalFileName
-                            globalPos Nothing
-                EUnexpectedNumericConstant ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Expected a value of type \x1b[31m" <> showText ty <> "\x1b[0m but found a numeric constant."))
-                EInvalidAssignmentExprType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Objects of type \x1b[31m" <> showText ty <> "\x1b[0m cannot be copied."))
-                EInvalidMessageType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid message type."))
-                EInvalidOptionType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid option type."))
-                EInvalidReferenceType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("References to objects of type \x1b[31m" <> showText ty <> "\x1b[0m cannot be created."))
-                EInvalidFixedLocationType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Fixed-location fields of type \x1b[31m" <> showText ty <> "\x1b[0m cannot be defined."))
-                EInvalidAllocatorType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid allocator type."))
-                EInvalidClassFieldType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid class field type."))
-                EInvalidStructFieldType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid struct field type."))
-                EInvalidEnumParameterType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid parameter type for an enum variant."))
-                EInvalidAccessPortType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid access port type."))
-                EInvalidDeclarationType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid object declaration type."))
-                EInvalidTypeSpecifier ts ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type specifier \x1b[31m" <> showText ts <> "\x1b[0m is not valid."))
-                EInvalidNumericConstantType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The expected type of this expression is \x1b[31m" <> showText ty <> "\x1b[0m but it is a numeric constant."))
-                EInvalidActionParameterType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid parameter type for an action."))
-                EInvalidProcedureParameterType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid parameter type for a procedure."))
-                EMemberFunctionCallExtraArgs (funcId, params, funcPos@(Position _ funcStart _procEnd)) argNumber ->
-                    let funcFileName = sourceName funcStart
-                        funcSourceLines = files M.! funcFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Member function \x1b[31m" <> T.pack funcId <>
-                                "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            funcSourceLines ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
-                            funcPos Nothing
-                EMemberFunctionCallMissingArgs (funcId, params, funcPos@(Position _ funcStart _procEnd)) argNumber ->
-                    let funcFileName = sourceName funcStart
-                        funcSourceLines = files M.! funcFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Member function \x1b[31m" <> T.pack funcId <>
-                                "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.")) <>
-                        pprintSimpleError
-                            funcSourceLines ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
-                            funcPos Nothing
-                EMemberFunctionCallArgTypeMismatch (funcId, Parameter _ expectedTy, funcPos@(Position _ funcStart _procEnd)) argNumber actualTy ->
-                    let funcFileName = sourceName funcStart
-                        funcSourceLines = files M.! funcFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Argument \x1b[31m#" <> T.pack (show argNumber) <>
-                                "\x1b[0m of member function \x1b[31m" <> T.pack funcId <>
-                                "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
-                                "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            funcSourceLines ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
-                            funcPos Nothing
-                EArrayIndexNotUSize ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type of the array index is \x1b[31m" <> showText ty <>
-                        "\x1b[0m but it is expected to be of type \x1b[31m" <> showText (TUSize :: TerminaType a) <> "\x1b[0m."))
-                EArraySliceLowerBoundNotUSize ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type of the lower bound of the array slice is \x1b[31m" <> showText ty <>
-                        "\x1b[0m but it is expected to be of type \x1b[31m" <> showText (TUSize :: TerminaType a) <> "\x1b[0m."))
-                EArraySliceUpperBoundNotUSize ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type of the upper bound of the array slice is \x1b[31m" <> showText ty <>
-                        "\x1b[0m but it is expected to be of type \x1b[31m" <> showText (TUSize :: TerminaType a) <> "\x1b[0m."))
-                EOutboundPortSendInvalidNumArgs argNumber ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The send procedure of an outbound port expects \x1b[31mone\x1b[0m argument but you are providing \x1b[31m" <>
-                            T.pack (show argNumber) <> "\x1b[0m."))
-                EOutboundPortArgTypeMismatch expectedTy actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The output data is expected to be of type \x1b[31m" <> showText expectedTy <>
-                            "\x1b[0m but you are sending data of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-                EAssignmentExprMismatch expectedTy actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The expected type of the assignment is \x1b[31m" <> showText expectedTy <>
-                            "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-                EFieldValueAssignmentMissingFields (record, recordPos) [field] ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Field \x1b[31m" <> T.pack field <>
-                            "\x1b[0m is not being assigned a value in the field assignment expression.")) <>
-                    case recordPos of
-                        Position _ recordStart _end ->
-                            let recordFileName = sourceName recordStart
-                                recordSourceLines = files M.! recordFileName
-                            in
-                            pprintSimpleError
-                                recordSourceLines ("\nThe type \x1b[31m" <> showText record <> "\x1b[0m is defined here:") recordFileName
-                                recordPos Nothing
-                        _ -> ""
-                EFieldValueAssignmentMissingFields (record, recordPos) fields ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Fields \x1b[31m" <> T.intercalate ", " (map T.pack fields) <>
-                            "\x1b[0m are not being assigned a value in the field assignment expression.")) <>
-                    case recordPos of
-                        Position _ recordStart _end ->
-                            let recordFileName = sourceName recordStart
-                                recordSourceLines = files M.! recordFileName
-                            in
-                            pprintSimpleError
-                                recordSourceLines ("\nThe type \x1b[31m" <> showText record <> "\x1b[0m is defined here:") recordFileName
-                                recordPos Nothing
-                        _ -> ""
-                EFieldValueAssignmentUnknownFields (record, recordPos) [field] ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Field \x1b[31m" <> T.pack field <>
-                            "\x1b[0m is not a field of the type \x1b[31m" <> showText record <> "\x1b[0m.")) <>
-                    case recordPos of
-                        Position _ recordStart _end ->
-                            let recordFileName = sourceName recordStart
-                                recordSourceLines = files M.! recordFileName
-                            in
-                            pprintSimpleError
-                                recordSourceLines ("\nThe type \x1b[31m" <> showText record <> "\x1b[0m is defined here:") recordFileName
-                                recordPos Nothing
-                        _ -> ""
-                EFieldValueAssignmentUnknownFields (record, recordPos) fields ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Fields \x1b[31m" <> T.intercalate ", " (map T.pack fields) <>
-                            "\x1b[0m are not fields of the type \x1b[31m" <> showText record <> "\x1b[0m.")) <>
-                    case recordPos of
-                        Position _ recordStart _end ->
-                            let recordFileName = sourceName recordStart
-                                recordSourceLines = files M.! recordFileName
-                            in
-                            pprintSimpleError
-                                recordSourceLines ("\nThe type \x1b[31m" <> showText record <> "\x1b[0m is defined here:") recordFileName
-                                recordPos Nothing
-                        _ -> ""
-                EFieldNotFixedLocation fieldName ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Field \x1b[31m" <> T.pack fieldName <>
-                            "\x1b[0m of type \x1b[31m" <> showText ty <>
-                            "\x1b[0m is not a fixed-location field."))
-                EFieldNotAccessPort fieldName ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Field \x1b[31m" <> T.pack fieldName <>
-                            "\x1b[0m of type \x1b[31m" <> showText ty <>
-                            "\x1b[0m is not an access port field."))
-                EFieldNotSinkOrInboundPort fieldName ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Field \x1b[31m" <> T.pack fieldName <>
-                            "\x1b[0m of type \x1b[31m" <> showText ty <>
-                            "\x1b[0m is not a sink or inbound port field."))
-                EFieldNotOutboundPort fieldName ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Field \x1b[31m" <> T.pack fieldName <>
-                            "\x1b[0m of type \x1b[31m" <> showText ty <>
-                            "\x1b[0m is not an outbound port field."))
-                EMemberAccessInvalidType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for member access."))
-                EMemberFunctionCallInvalidType ty -> 
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for member function call."))
-                EMemberAccessUnknownField (recordId, recordPos@(Position _ recordStart _end)) field ->
-                    let recordFileName = sourceName recordStart
-                        recordSourceLines = files M.! recordFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Field \x1b[31m" <> T.pack field <>
-                                "\x1b[0m is not a field of the type \x1b[31m" <> T.pack recordId <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            recordSourceLines ("The type \x1b[31m" <> T.pack recordId <> "\x1b[0m is defined here:") recordFileName
-                            recordPos Nothing
-                EInvalidProcedureCallInsideMemberFunction -> 
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "Procedure calls are not allowed inside member functions.")
-                EConstantOutRange ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The constant value \x1b[31m" <> showText ty <> "\x1b[0m is out of range for its type."))
-                EForIteratorInvalidType ty -> 
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a for-loop iterator."))
-                EUsedTypeName ident prevPos@(Position _ prevStart _) ->
-                    let prevFileName = sourceName prevStart
-                        prevSourceLines = files M.! prevFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("The type cannot be defined because the symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already in use.\n")) <>
-                        pprintSimpleError
-                            prevSourceLines "The symbol is previously used here:" prevFileName
-                            prevPos Nothing
-                EUsedGlobalName ident prevPos@(Position _ prevStart _) ->
-                    let prevFileName = sourceName prevStart
-                        prevSourceLines = files M.! prevFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("The global object cannot be declared because the symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already in use.\n")) <>
-                        pprintSimpleError
-                            prevSourceLines "The symbol is previously used here:" prevFileName
-                            prevPos Nothing
-                EUsedFunName ident prevPos@(Position _ prevStart _) ->
-                    let prevFileName = sourceName prevStart
-                        prevSourceLines = files M.! prevFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("The function cannot be declared because the symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already in use.\n")) <>
-                        pprintSimpleError
-                            prevSourceLines "The symbol is previously used here:" prevFileName
-                            prevPos Nothing
-                EAccessPortConnectionInvalidGlobal ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be used in an access port connection."))
-                EAccessPortConnectionInterfaceNotProvided ident iface ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Resource \x1b[31m" <> T.pack ident <>
-                            "\x1b[0m does not provide the interface \x1b[31m" <> T.pack iface <> "\x1b[0m."))
-                ESinkPortConnectionInvalidGlobal ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to a sink port."))
-                EInboundPortConnectionInvalidObject ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to an inbound port."))
-                EOutboundPortConnectionInvalidGlobal ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to an outbound port."))
-                EAllocatorPortConnectionInvalidGlobal ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to an allocator port."))
-                EAtomicAccessPortConnectionInvalidGlobal ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to an atomic access port."))
-                EAtomicArrayAccessPortConnectionInvalidGlobal ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to an atomic array access port."))
-                EStructDefNotUniqueField [fieldName] ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Field \x1b[31m" <> T.pack fieldName <> "\x1b[0m is duplicated in the struct definition."))
-                EStructDefNotUniqueField fieldNames ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Fields \x1b[31m" <> T.intercalate ", " (map T.pack fieldNames) <>
-                            "\x1b[0m are duplicated in the struct definition."))
-                EEnumDefNotUniqueVariant [variantName] ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is duplicated in the enum definition."))
-                EEnumDefNotUniqueVariant variantNames ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Variants \x1b[31m" <> T.intercalate ", " (map T.pack variantNames) <>
-                            "\x1b[0m are duplicated in the enum definition."))
-                EInterfaceNotUniqueProcedure [procName] ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Procedure \x1b[31m" <> T.pack procName <> "\x1b[0m is duplicated in the interface definition."))
-                EInterfaceNotUniqueProcedure procNames ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Procedures \x1b[31m" <> T.intercalate ", " (map T.pack procNames) <>
-                            "\x1b[0m are duplicated in the interface definition."))
-                EClassLoop ((currentCall, _) : xs) ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "A recursive calling loop has been detected in the class definition.") <> 
-                        printCallTrace currentCall xs
-                EDereferenceInvalidType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m cannot be dereferenced."))
-                EMatchInvalidType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for match statement."))
-                EMatchCaseDuplicate variantName prevCase@(Position _ prevStart _) ->
-                    let prevFileName = sourceName prevStart
-                        prevSourceLines = files M.! prevFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is duplicated in the match statement.\n")) <>
-                        pprintSimpleError
-                            prevSourceLines "The variant is previously used here:" prevFileName
-                            prevCase Nothing
-                EMatchCaseUnknownVariant variantName ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant of the enum or option."))
-                EMatchMissingCases [caseIdent] -> 
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Case \x1b[31m" <> T.pack caseIdent <> "\x1b[0m is missing in the match statement."))
-                EMatchMissingCases caseIdents ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Cases \x1b[31m" <> T.intercalate ", " (map T.pack caseIdents) <>
-                            "\x1b[0m are missing in the match statement."))
-                EIsVariantInvalidType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for is-variant expression."))
-                EIsOptionVariantInvalidType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not an option type."))
-                EIsVariantEnumTypeMismatch expectedEnum actualEnum ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The expected enum type is \x1b[31m" <> T.pack expectedEnum <>
-                            "\x1b[0m but the actual type is \x1b[31m" <> T.pack actualEnum <> "\x1b[0m."))
-                EOutboundPortInvalidProcedure ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The procedure \x1b[31m" <> T.pack ident <> "\x1b[0m is not a valid procedure for an outbound port."))
-                EInvalidPoolInitialization -> 
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "A pool object cannot be initialized with a value.")
-                EInvalidMsgQueueInitialization -> 
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "A message queue object cannot be initialized with a value.")
-                EUnknownGlobal ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Global object \x1b[31m" <> T.pack ident <> "\x1b[0m is not defined."))
-                EInvalidInterruptEmitterType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Interrupts emit data of type \x1b[31m" <> showText (TUInt32 :: TerminaType a) <> 
-                            "\x1b[0m but you are expecting data of type \x1b[31m" <> showText ty <> "\x1b[0m."))
-                EInvalidPeriodicTimerEmitterType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Periodic timers emit data of type \x1b[31m" <> showText (TStruct "TimeVal" :: TerminaType a) <> 
-                            "\x1b[0m but you are expecting data of type \x1b[31m" <> showText ty <> "\x1b[0m."))
-                EInvalidSystemInitEmitterType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("System init emitters emit data of type \x1b[31m" <> showText (TStruct "TimeVal" :: TerminaType a) <> 
-                            "\x1b[0m but you are expecting data of type \x1b[31m" <> showText ty <> "\x1b[0m."))
-                EInboundPortConnectionMsgQueueTypeMismatch msgQueueId expectedTy actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The message queue \x1b[31m" <> T.pack msgQueueId <> 
-                            "\x1b[0m exchanges data messages of type \x1b[31m" <> showText expectedTy <> 
-                            "\x1b[0m but you are expecting data of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-                EOutboundPortConnectionMsgQueueTypeMismatch msgQueueId expectedTy actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The message queue \x1b[31m" <> T.pack msgQueueId <> 
-                            "\x1b[0m exchanges data messages of type \x1b[31m" <> showText expectedTy <> 
-                            "\x1b[0m but you are sending data of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-                EAllocatorPortConnectionPoolTypeMismatch poolId expectedTy actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The pool \x1b[31m" <> T.pack poolId <> 
-                            "\x1b[0m serves data of type \x1b[31m" <> showText expectedTy <> 
-                            "\x1b[0m but you are expecting data of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-                EInvalidTaskType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid task type."))
-                EInvalidHandlerType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid handler type."))
-                EInvalidResourceType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid resource type."))
-                EInvalidEmitterType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid emitter type."))
-                EInvalidChannelType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid channel type."))
-                EEmitterClassNotInstantiable ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Applications cannot instantiate event emitters of class \x1b[31m" <> T.pack ident <> "\x1b[0m."))
-                ESingleExpressionTypeNotUnit ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos 
-                        (Just ("Expressions used in single-expression statements must have type \x1b[31m" <> showText (TUnit :: TerminaType a) <> 
-                            "\x1b[0m but the expression has type \x1b[31m" <> showText ty <> "\x1b[0m. Return values of functions cannot be ignored."))
-                EInterfaceDuplicatedExtendedIface ifaceName ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Interface \x1b[31m" <> T.pack ifaceName <> "\x1b[0m is extended more than once."))
-                EInterfaceDuplicatedExtendedProcedure iface1 iface2 procName ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Procedure \x1b[31m" <> T.pack procName <> "\x1b[0m is defined in extended interfaces \x1b[31m" <> T.pack iface1 <> 
-                            "\x1b[0m and \x1b[31m" <> T.pack iface2 <> "\x1b[0m.")) 
-                EInterfaceProcedurePreviouslyExtended procName ifaceName ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Procedure \x1b[31m" <> T.pack procName <> "\x1b[0m is previously defined in interface \x1b[31m" <> T.pack ifaceName <> "\x1b[0m."))
-                EInterfacePreviouslyExtended iface1 iface2 -> 
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Interface \x1b[31m" <> T.pack iface1 <> "\x1b[0m is already extended by interface \x1b[31m" <> T.pack iface2 <> "\x1b[0m."))
-                EResourceDuplicatedProvidedIface ifaceName ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Resource provides interface \x1b[31m" <> T.pack ifaceName <> "\x1b[0m more than once."))
-                EResourceDuplicatedProvidedProcedure iface1 iface2 procName ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Procedure \x1b[31m" <> T.pack procName <> "\x1b[0m is provided in interfaces \x1b[31m" <> T.pack iface1 <> 
-                            "\x1b[0m and \x1b[31m" <> T.pack iface2 <> "\x1b[0m."))
-                EResourceInterfacePreviouslyExtended iface1 iface2 ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Interface \x1b[31m" <> T.pack iface1 <> "\x1b[0m is previously extended by interface \x1b[31m" <> T.pack iface2 <> "\x1b[0m."))
-                EStringInitializerInvalidUse ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just $ "You are trying to use a string initializer in an invalid context.\n" <>
-                                "String initializers can only be used to initialize arrays of characters.")
-                EStringInitializerNotArrayOfChars ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Invalid use of a string initializer.\n" <>
-                            "You are trying to assign a string initializer to an object of type \x1b[31m" <>
-                            showText ty <> "\x1b[0m."))
-                EInvalidConstType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a constant.\n" <>
-                               "Only numeric types, boolean and character types are valid for constants."))
-                EInvalidAccessToConstExpr ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Constant expression \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be accessed in this context.\n"))
-                EInvalidResultType ty -> 
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a result."))
-                EInvalidStatusType ty -> 
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a status."))
-                EInvalidVariantForOption variantName ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant for an option.\n" <>
-                               "Only the variants \x1b[31mNone\x1b[0m and \x1b[31mSome\x1b[0m are valid."))
-                EInvalidVariantForResult variantName ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant for a result.\n" <>
-                                    "Only the variants \x1b[31mOk\x1b[0m and \x1b[31mError\x1b[0m are valid."))
-                EInvalidVariantForStatus variantName ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant for a status.\n" <>
-                                "Only the variants \x1b[31mSuccess\x1b[0m, \x1b[31mFailure\x1b[0m are valid."))
-                EInvalidResultTypeSpecifier typeSpec ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type specifier \x1b[31m" <> showText typeSpec <> "\x1b[0m is not a valid type specifier for a result.\n" <>
-                               "Result types must be of the form \x1b[31mResult<R; L>\x1b[0m, where \x1b[31mR\x1b[0m is the valid result type and \x1b[31mL\x1b[0m is the error type."))
-                EMonadicVariantParameterTypeMismatch expectedTy actualTy ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The parameter of the variant is expected to be of type \x1b[31m" <> showText expectedTy <>
-                            "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-                EObjectPreviouslyMoved prevPos@(Position _ prevStart _) -> 
-                    let prevFileName = sourceName prevStart
-                        prevSourceLines = files M.! prevFileName
-                    in
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "You are trying to access an object that has been moved.\n") <>
-                    pprintSimpleError
-                        prevSourceLines "The object was previously moved here:" prevFileName
-                        prevPos Nothing
-                EIsStatusVariantInvalidType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for is-status-variant expression."))
-                EIsResultVariantInvalidType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for is-result-variant expression."))
-                EInvalidSystemExceptEmitterType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("System exception emitters emit data of type \x1b[31m" <> showText (TEnum "Exception" :: TerminaType a) <> 
-                            "\x1b[0m but you are expecting data of type \x1b[31m" <> showText ty <> "\x1b[0m."))
-                EInvalidInterruptActionReturnType ident ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The return type of actions attached to the interrupt event is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <> 
-                            "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m."))
-                EInvalidPeriodicTimerActionReturnType ident ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The return type of actions attached to the periodic timer event is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <> 
-                            "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m."))
-                EInvalidSystemInitActionReturnType ident ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The return type of actions attached to the system init event is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <> 
-                            "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m."))
-                EInvalidSystemExceptActionReturnType ident ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Actions that handle system exceptions shall not return a value.\n" <>
-                            "However, the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m."))
-                EInvalidMsgQueueActionReturnType ident ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The return type of the actions attached to the reception of messages from a message queue is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <>
-                            "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m."))
-                ETypeNotInScope ident qualifiedName ->
-                    -- | Change slashes to dots:
-                    let importString = T.replace "\\" "." $ T.pack qualifiedName
-                        importString' = T.replace "/" "." importString
-                    in
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> T.pack ident <> "\x1b[0m is not in scope.\n" <>
-                            "The type is defined in the module \x1b[31m" <> importString' <> "\x1b[0m. You need to import it."))
-                EFunctionNotInScope ident qualifiedName ->
-                    -- | Change slashes to dots:
-                    let importString = T.replace "\\" "." $ T.pack qualifiedName
-                        importString' = T.replace "/" "." importString
-                    in
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The function \x1b[31m" <> T.pack ident <> "\x1b[0m is not in scope.\n" <>
-                            "The function is defined in the module \x1b[31m" <> importString' <> "\x1b[0m. You need to import it."))
-                EUnknownAction ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The action \x1b[31m" <> T.pack ident <> "\x1b[0m is not defined."))
-                EInPortActionParamTypeMismatch (ident, prevPos@(Position _ prevStart _)) expectedTy actualTy ->
-                    let prevFileName = sourceName prevStart
-                        prevSourceLines = files M.! prevFileName
-                    in
-                        (case expectedTy of
-                            TUnit -> 
-                                pprintSimpleError
-                                    sourceLines title fileName pos
-                                    (Just ("The action \x1b[31m" <> T.pack ident <> "\x1b[0m is expected to have no parameters but it defines a parameter of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n"))
-                            _ ->  
-                                pprintSimpleError
-                                    sourceLines title fileName pos
-                                    (Just ("The action \x1b[31m" <> T.pack ident <> "\x1b[0m is expected to have a parameter of type \x1b[31m" <> showText expectedTy <>
-                                        "\x1b[0m but the actual type is \x1b[31m" <> showText actualTy <> "\x1b[0m.\n"))) <>
-                        pprintSimpleError
-                            prevSourceLines "The action is defined here:" prevFileName
-                            prevPos Nothing
-                ESinkPortActionParamTypeMismatch (ident, prevPos@(Position _ prevStart _)) expectedTy actualTy ->
-                    let prevFileName = sourceName prevStart
-                        prevSourceLines = files M.! prevFileName
-                    in
-                        (case expectedTy of
-                            TUnit -> 
-                                pprintSimpleError
-                                    sourceLines title fileName pos
-                                    (Just ("The action \x1b[31m" <> T.pack ident <> "\x1b[0m is expected to have no parameters but it defines a parameter of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n"))
-                            _ ->  
-                                pprintSimpleError
-                                    sourceLines title fileName pos
-                                    (Just ("The action \x1b[31m" <> T.pack ident <> "\x1b[0m is expected to have a parameter of type \x1b[31m" <> showText expectedTy <>
-                                        "\x1b[0m but the actual type is \x1b[31m" <> showText actualTy <> "\x1b[0m.\n"))) <>
-                        pprintSimpleError
-                            prevSourceLines "The action is defined here:" prevFileName
-                            prevPos Nothing
-                EInvalidViewerParameterType ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a viewer parameter."))
-                EInvalidAccessToProcedureFromImmutableSelfReference ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("You are trying to access a non-immutable procedure from an immutable self reference. " <>
-                               "Immutable self references can only access immutable procedures."))
-                EInvalidAccessToOutPortFromImmutableSelfReference ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("You are trying to access an outbound port from an immutable self reference. " <>
-                               "Immutable self references cannot access outbound ports."))
-                EProcedureSelfAccessKindMismatch (ifaceId, procId, expectedAccessKind, prevPos@(Position _ prevStart _)) accessKind ->
-                    let prevFileName = sourceName prevStart
-                        prevSourceLines = files M.! prevFileName
-                    in
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Procedure \x1b[31m" <> T.pack procId <> "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> "\x1b[0m is expected to have a self reference of access kind \x1b[31m" <>
-                            showText expectedAccessKind <> "\x1b[0m but the access kind of the self reference of the implementated procedure is \x1b[31m" <> showText accessKind <> "\x1b[0m.\n")) <>
-                    pprintSimpleError
-                        prevSourceLines "The interface procedure is defined here:" prevFileName
-                        prevPos Nothing
-                ETaskClassMethod (classId, Position _ startPosClass endPosClass) ident ->
-                    let procStartLine = sourceLine start
-                        procEndLine = sourceLine end
-                        procStartColumn = sourceColumn start
-                        procEndColumn = 
-                            if procStartLine == procEndLine then 
-                                sourceColumn end 
-                            else 
-                                T.length (T.lines sourceLines !! (procStartLine - 1)) + 1
-                        classStartLine = sourceLine startPosClass
-                        classEndLine = sourceLine endPosClass
-                        classStartColumn = sourceColumn startPosClass
-                        classEndColumn = 
-                            if classStartLine == classEndLine then 
-                                sourceColumn endPosClass 
-                            else 
-                                T.length (T.lines sourceLines !! (classStartLine - 1)) + 1
-
-                    in
-                        TL.toStrict $ prettyErrors
-                            sourceLines
-                            [
-                                Errata
-                                    (Just title)
-                                    [
-                                        Errata.Block
-                                            fancyRedStyle
-                                            (sourceName start, classStartLine, classStartColumn)
-                                            Nothing
-                                            [
-                                                Pointer classStartLine classStartColumn
-                                                        classEndColumn
-                                                        True Nothing fancyRedPointer,
-                                                Pointer procStartLine procStartColumn procEndColumn
-                                                        True (Just " \x1b[31minvalid method definition\x1b[0m") fancyRedPointer
-                                            ]
-                                            Nothing
-                                    ]
-                                    (Just
-                                        ("Task class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the method \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
-                                        <> "Task classes cannot define methods."))
-                            ]
-                EHandlerClassMethod (classId, Position _ startPosClass endPosClass) ident ->
-                    let procStartLine = sourceLine start
-                        procEndLine = sourceLine end
-                        procStartColumn = sourceColumn start
-                        procEndColumn = 
-                            if procStartLine == procEndLine then 
-                                sourceColumn end 
-                            else 
-                                T.length (T.lines sourceLines !! (procStartLine - 1)) + 1
-                        classStartLine = sourceLine startPosClass
-                        classEndLine = sourceLine endPosClass
-                        classStartColumn = sourceColumn startPosClass
-                        classEndColumn = 
-                            if classStartLine == classEndLine then 
-                                sourceColumn endPosClass 
-                            else 
-                                T.length (T.lines sourceLines !! (classStartLine - 1)) + 1
-
-                    in
-                        TL.toStrict $ prettyErrors
-                            sourceLines
-                            [
-                                Errata
-                                    (Just title)
-                                    [
-                                        Errata.Block
-                                            fancyRedStyle
-                                            (sourceName start, classStartLine, classStartColumn)
-                                            Nothing
-                                            [
-                                                Pointer classStartLine classStartColumn
-                                                        classEndColumn
-                                                        True Nothing fancyRedPointer,
-                                                Pointer procStartLine procStartColumn procEndColumn
-                                                        True (Just " \x1b[31minvalid procedure definition\x1b[0m") fancyRedPointer
-                                            ]
-                                            Nothing
-                                    ]
-                                    (Just
-                                        ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the method \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
-                                        <> "Handler classes cannot define methods."))
-                            ]
-                EResourceClassViewer (classId, Position _ startPosClass endPosClass) ident ->
-                    let procStartLine = sourceLine start
-                        procEndLine = sourceLine end
-                        procStartColumn = sourceColumn start
-                        procEndColumn = 
-                            if procStartLine == procEndLine then 
-                                sourceColumn end 
-                            else 
-                                T.length (T.lines sourceLines !! (procStartLine - 1)) + 1
-                        classStartLine = sourceLine startPosClass
-                        classEndLine = sourceLine endPosClass
-                        classStartColumn = sourceColumn startPosClass
-                        classEndColumn = 
-                            if classStartLine == classEndLine then 
-                                sourceColumn endPosClass 
-                            else 
-                                T.length (T.lines sourceLines !! (classStartLine - 1)) + 1
-
-                    in
-                        TL.toStrict $ prettyErrors
-                            sourceLines
-                            [
-                                Errata
-                                    (Just title)
-                                    [
-                                        Errata.Block
-                                            fancyRedStyle
-                                            (sourceName start, classStartLine, classStartColumn)
-                                            Nothing
-                                            [
-                                                Pointer classStartLine classStartColumn
-                                                        classEndColumn
-                                                        True Nothing fancyRedPointer,
-                                                Pointer procStartLine procStartColumn procEndColumn
-                                                        True (Just " \x1b[31minvalid viewer definition\x1b[0m") fancyRedPointer
-                                            ]
-                                            Nothing
-                                    ]
-                                    (Just
-                                        ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the viewer \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
-                                        <> "Resource classes cannot define viewers."))
-                            ]
-                EUnprotectedResourceWithRegularFields (clsId, prevPos@(Position _ prevStart _)) ->
-                    let prevFileName = sourceName prevStart
-                        prevSourceLines = files M.! prevFileName
-                    in
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Resource class \x1b[31m" <> T.pack clsId <> "\x1b[0m defines regular fields but the resource is defined as unprotected.\n" <>
-                               "Unprotected resources cannot define regular fields.\n")) <>
-                    pprintSimpleError
-                        prevSourceLines "The resource class is defined here:" prevFileName
-                        prevPos Nothing
-                EMemberFunctionWithMutableSelfInTaskClass ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Member function \x1b[31m" <> T.pack ident <> "\x1b[0m defines a mutable self reference. " <>
-                            "Member functions in task classes cannot define mutable self references\n" <>
-                            "Only immutable or private self references are allowed."))
-                EMemberFunctionWithMutableSelfInHandlerClass ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Member function \x1b[31m" <> T.pack ident <> "\x1b[0m defines a mutable self reference. " <>
-                            "Member functions in handler classes cannot define mutable self references\n" <>
-                            "Only immutable or private self references are allowed."))
-                ECharLiteralOutOfRange cp ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The character literal has code point \x1b[31m" <> T.pack (show (fromEnum cp)) <> "\x1b[0m, which is outside the 7-bit ASCII range (0 to 127)."))
-                EReferenceToPackedMember ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("This reference reaches into the packed struct \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <>
-                            "Taking a reference to a member of a packed struct yields an under-aligned pointer, whose\n" <>
-                            "packed provenance is lost at the call boundary; on a strict-alignment target the callee then\n" <>
-                            "performs a misaligned access (undefined behavior). Read or write the member by value instead."))
-                _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 
             -- | Prints a trace of member function calls
             printCallTrace :: Identifier -> [(Identifier, Location)] -> T.Text
             printCallTrace _ [] = ""
-            printCallTrace currentCall [(finalCall, tracePos@(Position _ traceStartPos _))] =
-                let title = "\nFinally, member function \x1b[31m" <> T.pack currentCall <> 
+            printCallTrace currentCall' [(finalCall, tracePos@(Position _ traceStartPos _))] =
+                let title = "\nFinally, member function \x1b[31m" <> T.pack currentCall' <>
                         "\x1b[0m calls \x1b[31m" <> T.pack finalCall <> "\x1b[0m again here:"
                     traceFileName = sourceName traceStartPos
                     traceSourceLines = files M.! traceFileName
                 in
-                    pprintSimpleError 
+                    pprintSimpleError
                         traceSourceLines title traceFileName tracePos Nothing
-            printCallTrace currentCall ((nextCall, tracePos@(Position _ traceStartPos _)) : xr) =
-                let title = "\nMember function \x1b[31m" <> T.pack currentCall <> 
+            printCallTrace currentCall' ((nextCall, tracePos@(Position _ traceStartPos _)) : xr) =
+                let title = "\nMember function \x1b[31m" <> T.pack currentCall' <>
                         "\x1b[0m calls \x1b[31m" <> T.pack nextCall <> "\x1b[0m here:"
                     traceFileName = sourceName traceStartPos
                     traceSourceLines = files M.! traceFileName
@@ -2446,13 +1049,6 @@ instance ErrorMessage SemanticErrors where
                         traceSourceLines title traceFileName tracePos Nothing <> printCallTrace nextCall xr
             printCallTrace _ _ = error "Internal error: invalid error position"
 
-    toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
-    
-    toDiagnostics e@(AnnotatedError _ pos) _files =
-        [LSP.Diagnostic (loc2Range pos)
-            (Just LSP.DiagnosticSeverity_Error)
-            Nothing Nothing Nothing
-            text (Just []) Nothing Nothing]
-        
-        where 
-            text = "error [" <> errorIdent e <> "]: " <> errorTitle e <> "."
+    toText e files = errorToText e files
+
+    toDiagnostics = errorToDiagnostics
