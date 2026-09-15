@@ -78,21 +78,20 @@ errorToText :: Diagnosable e
 -- generation of the scheduling model.
 errorToText (AnnotatedError err pos@(Position _ start _end)) files
     | M.member (sourceName start) files =
-    let diagnostic = describe err
-        title = "\x1b[31merror [" <> diagCode diagnostic <> "]\x1b[0m: "
-            <> diagTitle diagnostic <> "."
+    let diag = describe err
+        title = "\x1b[31merror [" <> diagCode diag <> "]\x1b[0m: "
+            <> diagTitle diag <> "."
     in
-        pprintError files title pos
-            (diagRelated diagnostic) (diagDetail diagnostic)
+        pprintError files title pos (diagRelated diag) (diagDetail diag)
 -- | An error with no position in the source has nothing to quote, so it prints
 -- its message alone. An internal error has no message either, and then the value
 -- that produced it is the only clue there is.
 errorToText (AnnotatedError err pos) _files =
-    let diagnostic = describe err
-        title = "\x1b[31merror [" <> diagCode diagnostic <> "]\x1b[0m: "
-            <> diagTitle diagnostic <> "."
+    let diag = describe err
+        title = "\x1b[31merror [" <> diagCode diag <> "]\x1b[0m: "
+            <> diagTitle diag <> "."
     in
-        case diagDetail diagnostic of
+        case diagDetail diag of
             Just detail -> title <> "\n" <> detail
             Nothing -> title <> "\n" <> T.pack (show pos ++ ": " ++ show err)
 

@@ -10,32 +10,51 @@
 -- - A value that nobody reads before it is overwritten is a dead store
 -- (VE-006).
 --
--- Accordingly, the state keeps one accumulator per body for the objects that
--- are declared and not assigned yet, one per top-level element for every
--- identifier that is read, and one per body for the assignments whose value is
--- still unread. The second one spans the whole class because a field is used
--- when /any/ of its members reads it.
+-- Accordingly the state is split the way 'ControlFlow.Dataflow' asks for it:
+-- what a branch has to give back when it ends (the objects not assigned yet and
+-- the assignments nobody has read) and what it may not (which identifiers are
+-- read anywhere, and which assignments turned out to be read). The identifiers
+-- read span the whole class, because a field is used when /any/ of its members
+-- reads it.
 module ControlFlow.VarUsage (runVarUsageCheck) where
 
 import Control.Monad (when, unless)
 import Control.Monad.Except
-import qualified Control.Monad.State as ST
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Data.Maybe (listToMaybe, mapMaybe)
 
 import ControlFlow.BasicBlocks.AST
 import ControlFlow.BasicBlocks.Traversal
+    (Child(..), ObjectVisitor(..), expressionChildren, simpleBlockChildren,
+     walkObject, rootIdent)
+import ControlFlow.Dataflow
 import ControlFlow.VarUsage.Errors
 import Semantic.Types (SemanticAnn, getObjectSAnns)
 import Utils.Annotations
 
-data VarUsageSt = VarUsageSt
+-- | What belongs to the path being walked.
+data VarUsagePath = VarUsagePath
   {
     -- | Objects declared without an initializer that are not assigned yet. An
     -- object is initialized when it is not in this set, so joining two paths is
     -- the union of their sets.
     pending :: S.Set Identifier,
+    -- | Assignments of a whole object that reach this point along the current
+    -- path without having been read, kept under the name assigned and located
+    -- by the assignment itself. Joining two paths is the union of their maps,
+    -- since a value is worth reporting as soon as one path leaves it unread.
+    unread :: M.Map Identifier (S.Set Location)
+  } deriving Eq
+
+instance Lattice VarUsagePath where
+  joinPath left right = VarUsagePath
+    (S.union (pending left) (pending right))
+    (M.unionWith S.union (unread left) (unread right))
+
+-- | What belongs to the program, and no branch takes back.
+data VarUsageGlobal = VarUsageGlobal
+  {
     -- | Identifiers read so far. Besides variables, it holds the names of the
     -- fields reached through @self->@ and, under the key of
     -- 'memberFunctionKey', the member functions called through @self@.
@@ -43,11 +62,6 @@ data VarUsageSt = VarUsageSt
     -- | Objects declared in the body being checked, with the location to blame
     -- if nobody reads them.
     declared :: [(Identifier, Location)],
-    -- | Assignments of a whole object that reach this point along the current
-    -- path without having been read, kept under the name assigned and located
-    -- by the assignment itself. Joining two paths is the union of their maps,
-    -- since a value is worth reporting as soon as one path leaves it unread.
-    unread :: M.Map Identifier (S.Set Location),
     -- | Assignments read at some point along some path. An assignment read
     -- anywhere is not dead, so this set is what rescues the candidates below.
     readDefs :: S.Set Location,
@@ -61,14 +75,10 @@ data VarUsageSt = VarUsageSt
     initializers :: S.Set Location
   }
 
--- | What a branch leaves behind: the objects it does not assign and the
--- assignments it does not read.
-type BranchOut = (S.Set Identifier, M.Map Identifier (S.Set Location))
+type VarUsageMonad = DataflowM VarUsagePath VarUsageGlobal VarUsageError
 
-type VarUsageMonad = ExceptT VarUsageError (ST.State VarUsageSt)
-
-emptySt :: VarUsageSt
-emptySt = VarUsageSt S.empty S.empty [] M.empty S.empty [] S.empty
+emptySt :: DFState VarUsagePath VarUsageGlobal
+emptySt = DFState (VarUsagePath S.empty M.empty) (VarUsageGlobal S.empty [] S.empty [] S.empty)
 
 -- | Key under which a call to a member function through self is recorded. It
 -- is not a valid identifier, so it cannot clash with the name of a variable.
@@ -101,49 +111,54 @@ objectKey (DereferenceMemberAccess obj ident _) = objectKey obj ++ "->" ++ ident
 objectKey (Unbox obj _) = objectKey obj
 
 markDeclared :: Identifier -> Location -> VarUsageMonad ()
-markDeclared ident loc = ST.modify (\st -> st {
-    pending = S.insert ident (pending st),
-    declared = (ident, loc) : declared st
-  })
+markDeclared ident loc = do
+  modifyPath (\p -> p { pending = S.insert ident (pending p) })
+  modifyGlobal (\g -> g { declared = (ident, loc) : declared g })
 
 -- | A declaration with an initializer: the object has a value from the start,
 -- but it still has to be read by somebody.
 markInitialized :: Identifier -> Location -> VarUsageMonad ()
-markInitialized ident loc = ST.modify (\st -> st {
-    pending = S.delete ident (pending st),
-    declared = (ident, loc) : declared st
-  })
+markInitialized ident loc = do
+  markAssigned ident
+  modifyGlobal (\g -> g { declared = (ident, loc) : declared g })
 
 markAssigned :: Identifier -> VarUsageMonad ()
-markAssigned ident = ST.modify (\st -> st { pending = S.delete ident (pending st) })
+markAssigned ident = modifyPath (\p -> p { pending = S.delete ident (pending p) })
 
 -- | Reading an identifier reads whatever assignments of it reach this point,
 -- which takes them out of the candidates for good.
 markRead :: Identifier -> VarUsageMonad ()
-markRead ident = ST.modify (\st -> st {
-    readIdents = S.insert ident (readIdents st),
-    readDefs = S.union (M.findWithDefault S.empty ident (unread st)) (readDefs st),
-    unread = M.delete ident (unread st)
-  })
+markRead ident = do
+  reaching <- unreadOf ident
+  modifyGlobal (\g -> g {
+      readIdents = S.insert ident (readIdents g),
+      readDefs = S.union reaching (readDefs g)
+    })
+  modifyPath (\p -> p { unread = M.delete ident (unread p) })
+
+-- | The assignments of an identifier that reach this point unread.
+unreadOf :: Identifier -> VarUsageMonad (S.Set Location)
+unreadOf ident = M.findWithDefault S.empty ident . unread <$> getPath
 
 -- | An assignment is killed when the whole object is assigned again and when
 -- the body ends. One killed unread is a candidate to be reported.
 killAssignments :: Identifier -> VarUsageMonad ()
-killAssignments ident = ST.modify (\st -> st {
-    unread = M.delete ident (unread st),
-    deadStores = deadStores st ++
-      [(ident, loc) | loc <- S.toList (M.findWithDefault S.empty ident (unread st))]
-  })
+killAssignments ident = do
+  killed <- unreadOf ident
+  modifyGlobal (\g -> g {
+      deadStores = deadStores g ++ [(ident, loc) | loc <- S.toList killed]
+    })
+  modifyPath (\p -> p { unread = M.delete ident (unread p) })
 
 -- | Assignment of a whole object: it kills whatever reached this point.
 markAssignment :: Identifier -> Location -> VarUsageMonad ()
 markAssignment ident loc = do
   killAssignments ident
-  ST.modify (\st -> st { unread = M.insert ident (S.singleton loc) (unread st) })
+  modifyPath (\p -> p { unread = M.insert ident (S.singleton loc) (unread p) })
 
 checkRead :: Identifier -> Location -> VarUsageMonad ()
 checkRead ident loc = do
-  notAssigned <- ST.gets pending
+  notAssigned <- pending <$> getPath
   when (S.member ident notAssigned)
     (throwError $ annotateError loc (EReadBeforeAssignment ident))
   markRead ident
@@ -153,7 +168,7 @@ checkRead ident loc = do
 checkPartialWrite :: Object SemanticAnn -> Location -> VarUsageMonad ()
 checkPartialWrite obj loc = do
   let ident = rootIdent obj
-  notAssigned <- ST.gets pending
+  notAssigned <- pending <$> getPath
   when (S.member ident notAssigned)
     (throwError $ annotateError loc (EPartialWriteBeforeAssignment ident))
 
@@ -272,8 +287,8 @@ checkStatement (Declaration ident _ _ (Just initExpr) ann) = do
   readExpression initExpr
   markInitialized ident (getLocation ann)
   markAssignment ident (getLocation ann)
-  ST.modify (\st -> st {
-      initializers = S.insert (getLocation ann) (initializers st)
+  modifyGlobal (\g -> g {
+      initializers = S.insert (getLocation ann) (initializers g)
     })
 checkStatement (AssignmentStmt obj e ann) = do
   readExpression e
@@ -284,97 +299,32 @@ checkStatement (AssignmentStmt obj e ann) = do
     _ -> checkPartialWrite obj (getLocation ann) >> markWrittenObject obj >> readIndices obj
 checkStatement (SingleExpStmt e _) = readExpression e
 
--- | Checks one branch from the current state and returns the objects it leaves
--- unassigned, restoring the entry state so that the next branch starts where
--- this one did. What the branch reads is kept, since reading does not depend
--- on the path.
-checkBranch :: Block SemanticAnn -> VarUsageMonad BranchOut
-checkBranch blk = do
-  entry <- currentOut
-  checkBlock blk
-  out <- currentOut
-  ST.modify (\st -> st { pending = fst entry, unread = snd entry })
-  return out
-
--- | What the path being walked has left behind so far.
-currentOut :: VarUsageMonad BranchOut
-currentOut = ST.gets (\st -> (pending st, unread st))
-
--- | Joins the paths that meet after a conditional: an object is initialized
--- when every path assigns it, and a value is left unread when any path leaves
--- it unread.
-joinBranches :: [BranchOut] -> VarUsageMonad ()
-joinBranches outs = ST.modify (\st -> st {
-    pending = S.unions (map fst outs),
-    unread = M.unionsWith S.union (map snd outs)
-  })
-
-checkBasicBlock :: BasicBlock SemanticAnn -> VarUsageMonad ()
-checkBasicBlock (RegularBlock stmts) = mapM_ checkStatement stmts
-checkBasicBlock (IfElseBlock condIf elseIfs mElse _) = do
-  readExpression (condIfCond condIf)
-  ifOut <- checkBranch (condIfBody condIf)
-  elseIfOuts <- mapM
-    (\elseIf -> readExpression (condElseIfCond elseIf) >> checkBranch (condElseIfBody elseIf))
-    elseIfs
-  entry <- currentOut
-  -- | Without an else branch there is a path that assigns nothing
-  elseOut <- maybe (return entry) (checkBranch . condElseBody) mElse
-  joinBranches (ifOut : elseOut : elseIfOuts)
-checkBasicBlock (MatchBlock e cases mDefaultCase _) = do
-  readExpression e
-  caseOuts <- mapM checkMatchCase cases
-  entry <- currentOut
-  case mDefaultCase of
-    Just (DefaultCase blk _) -> do
-      defaultOut <- checkBranch blk
-      joinBranches (defaultOut : caseOuts)
-    -- | Without a default case the listed cases are exhaustive
-    Nothing -> joinBranches (if null caseOuts then [entry] else caseOuts)
-checkBasicBlock (ForLoopBlock _ _ initE endE mBreak blk _) = do
-  readExpression initE
-  readExpression endE
-  mapM_ readExpression mBreak
-  entry <- ST.gets unread
-  bodyUnread <- loopUnread entry
-  -- | The body may not run, so what it assigns does not count afterwards,
-  -- while what it leaves unread may still be read after the loop
-  ST.modify (\st -> st { unread = M.unionWith S.union entry bodyUnread })
-
-  where
-
-    -- | The assignments the body leaves unread. A value assigned in one
-    -- iteration may be read in the next one, so the body is walked again with
-    -- what the previous walk left unread, until the set stops growing; the
-    -- reads of those extra walks are what rescue the candidates.
-    loopUnread :: M.Map Identifier (S.Set Location)
-      -> VarUsageMonad (M.Map Identifier (S.Set Location))
-    loopUnread known = do
-      ST.modify (\st -> st { unread = known })
-      (_, out) <- checkBranch blk
-      let known' = M.unionWith S.union known out
-      if known' == known then return out else loopUnread known'
--- | Every other block only evaluates the expressions it holds, in order.
--- 'simpleBlockChildren' is exhaustive, so a new kind of block breaks its
--- definition rather than this one; a new block that branches has to be given a
--- case above.
-checkBasicBlock block = mapM_ (mapM_ readChild) (simpleBlockChildren block)
-
--- | The variables a case binds are declared by the case itself.
-checkMatchCase :: MatchCase SemanticAnn -> VarUsageMonad BranchOut
-checkMatchCase (MatchCase _ bvars body ann) = do
-  mapM_ (`markInitialized` getLocation ann) bvars
-  checkBranch body
+-- | What each node means to this pass. The two refinements are empty because
+-- reading a condition teaches it nothing about the paths it guards.
+transfer :: Transfer VarUsagePath VarUsageGlobal VarUsageError
+transfer = Transfer
+  {
+    onStatement = checkStatement
+    -- | Every other block only evaluates the expressions it holds, in order.
+  , onSimpleBlock = \block -> mapM_ (mapM_ readChild) (simpleBlockChildren block)
+  , onExpression = readExpression
+  , onCondition = readExpression
+    -- | The variables a case binds are declared by the case itself.
+  , onCaseEntry = \(MatchCase _ bvars _ ann) ->
+      mapM_ (`markInitialized` getLocation ann) bvars
+  , refineTrue = const (return ())
+  , refineFalse = const (return ())
+  }
 
 checkBlock :: Block SemanticAnn -> VarUsageMonad ()
-checkBlock = mapM_ checkBasicBlock . blockBody
+checkBlock = walkForward transfer
 
 -- | An identifier that is declared and never read is dead, unless its name
 -- starts with an underscore, in which case it is the other way round.
 checkDeclaredAreRead :: VarUsageMonad ()
 checkDeclaredAreRead = do
-  st <- ST.get
-  mapM_ (check (readIdents st)) (declared st)
+  global <- getGlobal
+  mapM_ (check (readIdents global)) (declared global)
 
   where
 
@@ -392,11 +342,11 @@ checkDeclaredAreRead = do
 -- in another turn of a loop or along another branch.
 checkDeadStores :: VarUsageMonad ()
 checkDeadStores = do
-  idents <- ST.gets (M.keys . unread)
+  idents <- M.keys . unread <$> getPath
   mapM_ killAssignments idents
-  st <- ST.get
-  mapM_ (report (initializers st))
-    (filter (not . (`S.member` readDefs st) . snd) (deadStores st))
+  global <- getGlobal
+  mapM_ (report (initializers global))
+    (filter (not . (`S.member` readDefs global) . snd) (deadStores global))
 
   where
 
@@ -413,9 +363,9 @@ checkDeadStores = do
 -- identifiers read are not.
 checkBody :: [Parameter SemanticAnn] -> Location -> Block SemanticAnn -> VarUsageMonad ()
 checkBody ps loc body = do
-  ST.modify (\st -> st {
-      pending = S.empty, declared = [],
-      unread = M.empty, readDefs = S.empty, deadStores = [],
+  putPath (VarUsagePath S.empty M.empty)
+  modifyGlobal (\g -> g {
+      declared = [], readDefs = S.empty, deadStores = [],
       initializers = S.empty
     })
   mapM_ (\p -> markInitialized (paramIdentifier p) loc) (filter (not . isBoxParam) ps)
@@ -448,9 +398,9 @@ checkClassMember (ClassField {}) = return ()
 -- body and looked up again afterwards.
 checkSelfBody :: Error -> Location -> VarUsageMonad () -> VarUsageMonad ()
 checkSelfBody err loc body = do
-  ST.modify (\st -> st { readIdents = S.delete "self" (readIdents st) })
+  modifyGlobal (\g -> g { readIdents = S.delete "self" (readIdents g) })
   body
-  wasRead <- ST.gets (S.member "self" . readIdents)
+  wasRead <- S.member "self" . readIdents <$> getGlobal
   unless wasRead (throwError $ annotateError loc err)
 
 -- | A field is used when any member of the class reads it. Sink and in ports
@@ -459,7 +409,7 @@ checkFieldIsRead :: ClassMember SemanticAnn -> VarUsageMonad ()
 checkFieldIsRead (ClassField (FieldDefinition _ (TSinkPort {}) _)) = return ()
 checkFieldIsRead (ClassField (FieldDefinition _ (TInPort {}) _)) = return ()
 checkFieldIsRead (ClassField fdef) = do
-  wasRead <- ST.gets (S.member (selfFieldKey (fieldIdentifier fdef)) . readIdents)
+  wasRead <- S.member (selfFieldKey (fieldIdentifier fdef)) . readIdents <$> getGlobal
   unless wasRead
     (throwError $ annotateError (getLocation (fieldAnnotation fdef))
       (ENotUsed (fieldIdentifier fdef)))
@@ -476,7 +426,7 @@ checkMemberFunctionIsCalled _ = return ()
 
 checkCalled :: Identifier -> Location -> VarUsageMonad ()
 checkCalled ident loc = do
-  wasCalled <- ST.gets (S.member (memberFunctionKey ident) . readIdents)
+  wasCalled <- S.member (memberFunctionKey ident) . readIdents <$> getGlobal
   unless wasCalled (throwError $ annotateError loc (EMemberFunctionNotUsed ident))
 
 checkTypeDef :: TypeDef SemanticAnn -> VarUsageMonad ()
@@ -494,12 +444,7 @@ checkElement (GlobalDeclaration {}) = return ()
 -- | Run the check over a single top-level element.
 runVarUsageElement :: AnnASTElement SemanticAnn -> Maybe VarUsageError
 runVarUsageElement =
-  either Just (const Nothing) . run . checkElement
-
-  where
-
-    run :: VarUsageMonad a -> Either VarUsageError a
-    run c = fst $ ST.runState (runExceptT c) emptySt
+  either Just (const Nothing) . fst . runDataflow emptySt . checkElement
 
 -- | Run the check over a whole module, returning the first error.
 runVarUsageCheck :: AnnotatedProgram SemanticAnn -> Maybe VarUsageError
