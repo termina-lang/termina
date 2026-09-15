@@ -429,7 +429,9 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
         $ genBasicBlocks typedProject
     runBasicBlockChecks chatty plt rawBBProject
     when chatty (putStrLn . debugMessage $ "Performing constant folding")
-    bbProject <- constFolding plt rawBBProject
+    (bbProject, constEnvs) <- constFolding plt rawBBProject
+    when chatty (putStrLn . debugMessage $ "Propagating constants through project modules")
+    constPropagationCheck plt constEnvs bbProject
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
     programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram config plt) orderedDependencies

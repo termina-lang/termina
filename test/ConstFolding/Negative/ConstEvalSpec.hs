@@ -27,16 +27,6 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CFE-006")
 
-    it "CFE-007: condition folds to a constant" $ do
-      let src = "function f() -> u32 {\n" ++
-                "    var x : u32 = 0 : u32;\n" ++
-                "    if (1 : u32 == 1 : u32) {\n" ++
-                "        x = 1 : u32;\n" ++
-                "    }\n" ++
-                "    return x;\n" ++
-                "}"
-      compileErrorCode src `shouldBe` Just (pack "CFE-007")
-
     it "CFE-008: for loop with zero iterations" $ do
       let src = "function f() {\n" ++
                 "    for i : usize in 3 : usize .. 3 : usize {\n" ++

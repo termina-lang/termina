@@ -16,6 +16,7 @@ import Data.Text (Text, pack)
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
+import Data.Maybe (mapMaybe)
 import Data.Time (UTCTime(..), fromGregorian, secondsToDiffTime)
 
 import Parser.Parsing (terminaModuleParser)
@@ -50,6 +51,7 @@ import ControlFlow.Architecture.Types (TerminaProgArch)
 import ControlFlow.Architecture.Checks
 import ControlFlow.ConstFolding (runConstFolding, constFoldModule)
 import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
+import ControlFlow.ConstPropagation (runConstPropagationCheck)
 import Utils.Errors (ErrorMessage(errorIdent, toText))
 
 -- | Drives a set of in-memory modules through the *full* transpiler pipeline,
@@ -104,7 +106,10 @@ runProjectPipeline sources = do
   mapM_ (\check -> noCheckError files (runCheck check TestPlatform bbProject)) basicBlockChecks
   -- | Constant folding runs before architecture so the architecture pass and
   -- the code generator see every type (array sizes) already folded to literals.
-  foldedProject <- foldProject files bbProject ordered
+  (foldedProject, constEnvs) <- foldProject files bbProject ordered
+  -- | The constant propagation check follows the folding, which is what gives
+  -- it the constants of each module.
+  propagateConstants files foldedProject constEnvs
   progArch <- genProjectArchitecture files foldedProject ordered
   runChecks files progArch
   pure (foldedProject, ordered, progArch)
@@ -131,14 +136,31 @@ renderInitFile prjprogs =
 -- environment so a module resolves the constants defined by the modules it
 -- imports. Mirrors @Command.Common.constFolding@ but stays in 'Either'.
 foldProject :: M.Map FilePath Text -> BasicBlocksProject -> [QualifiedName]
-  -> Either Failure BasicBlocksProject
-foldProject files bbProject = go (ConstFoldEnv M.empty TestPlatform) M.empty
+  -> Either Failure (BasicBlocksProject, ProjectConstEnvs)
+foldProject files bbProject = go (ConstFoldEnv M.empty TestPlatform) M.empty M.empty
   where
-    go _ folded [] = Right folded
-    go env folded (m:ms) =
+    go _ folded constEnvs [] = Right (folded, constEnvs)
+    go env folded constEnvs (m:ms) =
       case runConstFolding env (constFoldModule (bbProject M.! m)) of
         Left err -> Left (failure files err)
-        Right (foldedModule, env') -> go env' (M.insert m foldedModule folded) ms
+        Right (foldedModule, env') ->
+          go env' (M.insert m foldedModule folded) (M.insert m (constEnv env') constEnvs) ms
+
+-- | Report a condition that always has the same value, which is what the
+-- constant propagation check looks for. Mirrors
+-- @Command.Common.constPropagationCheck@ but stays in 'Either'.
+propagateConstants :: M.Map FilePath Text -> BasicBlocksProject -> ProjectConstEnvs
+  -> Either Failure ()
+propagateConstants files bbProject constEnvs =
+  case mapMaybe checkModule (M.toList bbProject) of
+    [] -> Right ()
+    (err : _) -> Left (failure files err)
+
+  where
+
+    checkModule (m, bbModule) = runConstPropagationCheck TestPlatform
+      (M.findWithDefault M.empty m constEnvs)
+      (basicBlocksAST . metadata $ bbModule)
 
 -- | The error code (@errorIdent@: \"SE-042\", \"BE-001\", \"AE-007\",
 -- \"CF-…\") raised by the first failing pipeline stage for a single-module

@@ -64,6 +64,10 @@ families =
       , "test/ConstFolding/Negative/CastSpec.hs"
       , "test/ConstFolding/Negative/SizeSpec.hs" ] []
       []
+  , Family "ConstPropagation (CPE)" "CPE"
+      "src/ControlFlow/ConstPropagation/Errors.hs"
+      ["test/ConstPropagation/Negative/CodeSpec.hs"] []
+      []
     -- The five families of the scheduling analysis have no tests of their own
     -- yet, so their codes are allowlisted whole. What the meta-test buys here is
     -- that a code written with the prefix of another family leaves its own family

@@ -392,15 +392,6 @@ foldStatement (SingleExpStmt expr ann) = do
   expr' <- foldExpression expr
   return $ SingleExpStmt expr' ann'
 
-checkCondition :: Expression SemanticAnn -> ConstFoldMonad()
-checkCondition cond = do
-  condExprType <- getExprType cond
-  case condExprType of
-    (TConstSubtype _) -> do
-      value <- evalConstExpression cond
-      throwError $ annotateError (getLocation . getAnnotation $ cond) (EConstCondition value)
-    _ -> return ()
-
 -- | Checks that the result of a relational comparison between an integer
 -- expression and a constant depends on the value of the expression. It does
 -- not when the constant is at or beyond the limits of the range of the type of
@@ -478,7 +469,6 @@ foldBasicBlock (IfElseBlock ifCond elifs mElse ann) = do
       ann'' <- foldAnnotation ann'
       cond' <- foldExpression cond
       blk' <- foldBasicBlocks blk
-      checkCondition cond'
       return $ CondIf cond' blk' ann''
     
     foldElseIfBlock :: CondElseIf SemanticAnn -> ConstFoldMonad (CondElseIf SemanticAnn)
@@ -486,7 +476,6 @@ foldBasicBlock (IfElseBlock ifCond elifs mElse ann) = do
       ann'' <- foldAnnotation ann'
       blk' <- foldBasicBlocks blk
       elifCond' <- foldExpression elifCond
-      checkCondition elifCond'
       return $ CondElseIf elifCond' blk' ann''
     
     foldElseBlock :: CondElse SemanticAnn -> ConstFoldMonad (CondElse SemanticAnn)
@@ -509,10 +498,8 @@ foldBasicBlock (ForLoopBlock iter ty from_expr to_expr mWhile body_stmt ann) = d
     (I (TInteger lhs _) _, I (TInteger rhs _) _) -> do
       if lhs == rhs then
         throwError $ annotateError stmtLoc EForLoopStatementZeroIterations
-      else if lhs > rhs then
-        throwError $ annotateError stmtLoc (EForLoopStatementNegativeIterations lhs rhs)
-      else do
-        mapM_ checkCondition mWhile'
+      else when (lhs > rhs)
+        (throwError $ annotateError stmtLoc (EForLoopStatementNegativeIterations lhs rhs))
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
   return $ ForLoopBlock iter ty' from_expr' to_expr' mWhile' body_stmt' ann'
 foldBasicBlock (MatchBlock expr cases mDefaultCase ann) = do

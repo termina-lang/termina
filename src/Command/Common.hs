@@ -28,6 +28,8 @@ import Text.Parsec.Error
 import Semantic.Environment
 import ControlFlow.ConstFolding (runConstFolding, constFoldModule)
 import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
+import ControlFlow.ConstPropagation (runConstPropagationCheck)
+import Data.Maybe (listToMaybe, mapMaybe)
 import qualified Data.Set as S
 import qualified Data.ByteString as BS
 import qualified Data.Text.Encoding as TE
@@ -207,7 +209,7 @@ checkProjectBoxSources bbProject progArchitecture =
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
-constFolding :: Platform -> BasicBlocksProject -> IO BasicBlocksProject
+constFolding :: Platform -> BasicBlocksProject -> IO (BasicBlocksProject, ProjectConstEnvs)
 constFolding plt bbProject =
   -- | Fold the modules in dependency order, threading the constant environment
   -- from one module to the next so that a module can resolve the constants
@@ -217,13 +219,14 @@ constFolding plt bbProject =
     -- before reaching this point, so a cycle here would be an internal error.
     Left _ -> die . errorMessage $ "Dependency cycle detected during constant folding"
     Right orderedDependencies ->
-      foldModules (ConstFoldEnv M.empty plt) M.empty orderedDependencies
+      foldModules (ConstFoldEnv M.empty plt) M.empty M.empty orderedDependencies
 
   where
 
-    foldModules :: ConstFoldEnv -> BasicBlocksProject -> [QualifiedName] -> IO BasicBlocksProject
-    foldModules _ foldedProject [] = return foldedProject
-    foldModules env foldedProject (m:ms) =
+    foldModules :: ConstFoldEnv -> BasicBlocksProject -> ProjectConstEnvs -> [QualifiedName]
+      -> IO (BasicBlocksProject, ProjectConstEnvs)
+    foldModules _ foldedProject constEnvs [] = return (foldedProject, constEnvs)
+    foldModules env foldedProject constEnvs (m:ms) =
       case runConstFolding env (constFoldModule (bbProject M.! m)) of
         Left err ->
           let sourceFilesMap =
@@ -231,4 +234,23 @@ constFolding plt bbProject =
                     M.empty bbProject in
           TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
         Right (foldedModule, env') ->
-          foldModules env' (M.insert m foldedModule foldedProject) ms
+          foldModules env' (M.insert m foldedModule foldedProject)
+            (M.insert m (constEnv env') constEnvs) ms
+
+-- | Checks that no condition of the project has the same value every time it
+-- is evaluated (CPE-001). The check runs after the folding and not with the
+-- rest of the basic-block checks because it needs the constants of each
+-- module, which the folding is what builds.
+constPropagationCheck :: Platform -> ProjectConstEnvs -> BasicBlocksProject -> IO ()
+constPropagationCheck plt constEnvs bbProject =
+  case checkModules (M.toList bbProject) of
+    Nothing -> return ()
+    Just err -> TIO.putStrLn (toText err (projectSourceFiles bbProject)) >> exitFailure
+
+  where
+
+    checkModules mods = listToMaybe (mapMaybe checkModule mods)
+
+    checkModule (m, bbModule) = runConstPropagationCheck plt
+      (M.findWithDefault M.empty m constEnvs)
+      (basicBlocksAST . metadata $ bbModule)

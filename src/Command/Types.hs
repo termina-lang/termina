@@ -63,3 +63,9 @@ type WCEPProject = M.Map QualifiedName TransPathModule
 type WCETProject = M.Map QualifiedName WCETModule
 
 type ProjectDependencies = M.Map QualifiedName [ModuleDependency]
+
+-- | The scalar constants each module of a project sees once it has been
+-- folded, which is its own plus those of the modules folded before it. The
+-- constant folding is what builds them, and the constant propagation check is
+-- what reads them back.
+type ProjectConstEnvs = M.Map QualifiedName (M.Map SAST.Identifier (SAST.Const STYPES.SemanticAnn))

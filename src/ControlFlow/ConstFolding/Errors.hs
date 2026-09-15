@@ -38,7 +38,10 @@ data Error =
   | EConstIntegerOverflow Integer (TerminaType SemanticAnn) -- ^ Constant integer overflow
   | EConstIntegerUnderflow Integer (TerminaType SemanticAnn) -- ^ Constant integer overflow
   | EConstDivisionByZero -- ^ Constant division by zero
-  | EConstCondition (Const SemanticAnn) -- ^ Constant condition
+  -- | CFE-007 was the constant condition, which the constant propagation pass
+  -- now reports as CPE-001: it covers the whole of Rule 14.3, so a condition
+  -- that is always the same had to stop being two errors depending on where
+  -- its value came from.
   | EForLoopStatementZeroIterations -- ^ For loop statement with zero iterations
   | EForLoopStatementNegativeIterations Integer Integer -- ^ For loop statement with negative iterations
   | EArraySliceOutOfBounds Integer Integer -- ^ Array slice out of bounds
@@ -78,9 +81,6 @@ instance Diagnosable Error where
     describe EConstDivisionByZero =
         diagnostic "CFE-006" "constant division by zero"
             "Division by zero in constant expression."
-    describe (EConstCondition value) =
-        diagnostic "CFE-007" "constant condition"
-            ("The condition always evaluates to " <> emph (showText value) <> ".")
     describe EForLoopStatementZeroIterations =
         diagnostic "CFE-008" "for loop statement with zero iterations"
             "The for loop statement has zero iterations."
