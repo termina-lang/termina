@@ -42,6 +42,11 @@ import qualified Control.Monad.State as ST
 class Eq p => Lattice p where
   joinPath :: p -> p -> p
 
+-- | A pass that carries nothing from one node to the next has no state of its
+-- own along a path, and the walk of its branches costs nothing.
+instance Lattice () where
+  joinPath _ _ = ()
+
 -- | What is true of the path being walked and what is true of the program.
 data DFState p g = DFState
   {

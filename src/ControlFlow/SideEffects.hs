@@ -1,11 +1,12 @@
 module ControlFlow.SideEffects where
 
 import ControlFlow.SideEffects.Monad
-  (SideEffectsMonad, insertMutableReference, resetMutableReferences, runSideEffects,
-   setMutableSelfMethods, isMutableSelfMethod, getMutableSelfMethods)
+  (SideEffectsMonad, SideEffectsEnv, insertMutableReference, resetMutableReferences,
+   runSideEffects, setMutableSelfMethods, isMutableSelfMethod, getMutableSelfMethods)
 import ControlFlow.SideEffects.Errors (SideEffectsError, Error(..))
 import ControlFlow.BasicBlocks.AST
 import ControlFlow.BasicBlocks.Traversal (childExpressions, indexExpressions)
+import ControlFlow.Dataflow (Transfer(..), walkForward)
 import Semantic.Types
 import Semantic.Utils (objectPath, mayAlias, AccessPath)
 import Utils.Annotations (Location, getLocation, getAnnotation, annotateError)
@@ -256,26 +257,30 @@ checkStatement stmt = case stmt of
   AssignmentStmt _ rhs _       -> checkFullExpression rhs
   SingleExpStmt e _            -> checkFullExpression e
 
-checkBlock :: Block SemanticAnn -> SideEffectsMonad ()
-checkBlock = mapM_ checkBasicBlock . blockBody
+-- | What each node means to this pass. It learns nothing from a condition and
+-- carries nothing from one statement to the next, so the refinements are empty
+-- and the state of a path is the unit.
+transfer :: Transfer () SideEffectsEnv SideEffectsError
+transfer = Transfer
+  {
+    onStatement = checkStatement
+  , onSimpleBlock = checkSimpleBlock
+  , onExpression = checkFullExpression
+  , onCondition = checkFullExpression
+  , onCaseEntry = const (return ())
+  , refineTrue = const (return ())
+  , refineFalse = const (return ())
+  }
 
-checkBasicBlock :: BasicBlock SemanticAnn -> SideEffectsMonad ()
-checkBasicBlock bb = case bb of
-  RegularBlock stmts -> mapM_ checkStatement stmts
-  IfElseBlock condIf elseIfs mElse _ -> do
-    checkFullExpression (condIfCond condIf)
-    checkBlock (condIfBody condIf)
-    mapM_ (\ei -> checkFullExpression (condElseIfCond ei) >> checkBlock (condElseIfBody ei)) elseIfs
-    mapM_ (\(CondElse blk _) -> checkBlock blk) mElse
-  ForLoopBlock _ _ initV endV mBreak body _ -> do
-    checkFullExpression initV
-    checkFullExpression endV
-    mapM_ checkFullExpression mBreak
-    checkBlock body
-  MatchBlock subject cases mDefault _ -> do
-    checkFullExpression subject
-    mapM_ (checkBlock . matchBody) cases
-    mapM_ (\(DefaultCase blk _) -> checkBlock blk) mDefault
+checkBlock :: Block SemanticAnn -> SideEffectsMonad ()
+checkBlock = walkForward transfer
+
+-- | The blocks that only evaluate expressions. The arguments of a call are
+-- checked as a group, since the aliasing rule is about what happens between
+-- siblings of one expression, which is why this is not read off
+-- 'simpleBlockChildren'.
+checkSimpleBlock :: BasicBlock SemanticAnn -> SideEffectsMonad ()
+checkSimpleBlock bb = case bb of
   SendMessage _ payload _        -> checkFullExpression payload
   ProcedureInvoke _ _ args _     -> checkFullExpressions args
   SystemCall _ _ args _          -> checkFullExpressions args
@@ -288,6 +293,11 @@ checkBasicBlock bb = case bb of
   ReturnBlock mRet _             -> mapM_ checkFullExpression mRet
   ContinueBlock e _              -> checkFullExpression e
   RebootBlock _                  -> return ()
+  -- | The blocks that branch are walked by the shared skeleton.
+  RegularBlock {}                -> return ()
+  IfElseBlock {}                 -> return ()
+  ForLoopBlock {}                -> return ()
+  MatchBlock {}                  -> return ()
 
 checkClassMember :: ClassMember SemanticAnn -> SideEffectsMonad ()
 checkClassMember (ClassMethod _ak _ident _ps _tyret body _ann)  = checkBlock body
