@@ -6,7 +6,7 @@ import ControlFlow.SideEffects.Monad
 import ControlFlow.SideEffects.Errors (SideEffectsError, Error(..))
 import ControlFlow.BasicBlocks.AST
 import ControlFlow.BasicBlocks.Traversal (childExpressions, indexExpressions)
-import ControlFlow.Dataflow (Transfer(..), walkForward)
+import ControlFlow.Dataflow (Transfer(..), walkForward, fixpoint)
 import Semantic.Types
 import Semantic.Utils (objectPath, mayAlias, AccessPath)
 import Utils.Annotations (Location, getLocation, getAnnotation, annotateError)
@@ -270,6 +270,9 @@ transfer = Transfer
   , onCaseEntry = const (return ())
   , refineTrue = const (return ())
   , refineFalse = const (return ())
+    -- | Every finding is about one expression, so the turn it is found in does
+    -- not change it.
+  , onLoopBody = fixpoint
   }
 
 checkBlock :: Block SemanticAnn -> SideEffectsMonad ()

@@ -124,6 +124,13 @@ data Transfer p g e = Transfer
     -- @pure ()@.
   , refineTrue :: Expression SemanticAnn -> DataflowM p g e ()
   , refineFalse :: Expression SemanticAnn -> DataflowM p g e ()
+    -- | How the body of a loop is walked, which is 'fixpoint' for a pass whose
+    -- findings do not depend on the turn they are found in. A pass that reports
+    -- what holds at a point of the program cannot report while it iterates,
+    -- because a turn that is not the last one works with a state that is not
+    -- valid yet, so it wraps the iteration in whatever keeps it quiet until the
+    -- state settles.
+  , onLoopBody :: DataflowM p g e () -> DataflowM p g e ()
   }
 
 -- | Walks a block forwards.
@@ -160,11 +167,14 @@ walkForward transfer = walkBlock
         -- | Without a default case the listed cases are exhaustive.
         Nothing -> joinPaths (if null caseOuts then [entry] else caseOuts)
 
+    -- | The break condition is part of the head of the loop, which the
+    -- generated @for@ shows: it is evaluated before every turn, the first one
+    -- included, and what a turn assigns is what the next one tests. It is
+    -- therefore walked inside the loop and not before it.
     walkBasicBlock (ForLoopBlock _ _ initE endE mBreak blk _) = do
       onExpression transfer initE
       onExpression transfer endE
-      mapM_ (onCondition transfer) mBreak
-      fixpoint (walkBlock blk)
+      onLoopBody transfer (mapM_ (onCondition transfer) mBreak >> walkBlock blk)
 
     walkBasicBlock block = onSimpleBlock transfer block
 

@@ -314,6 +314,9 @@ transfer = Transfer
       mapM_ (`markInitialized` getLocation ann) bvars
   , refineTrue = const (return ())
   , refineFalse = const (return ())
+    -- | A candidate found in one turn is rescued by a later one, so the walk
+    -- of the body needs nothing around it.
+  , onLoopBody = fixpoint
   }
 
 checkBlock :: Block SemanticAnn -> VarUsageMonad ()
