@@ -398,18 +398,24 @@ foldStatement (SingleExpStmt expr ann) = do
 -- the expression, e.g., when an unsigned expression is checked to be less than
 -- zero.
 checkComparison :: Location -> Op -> Expression SemanticAnn -> Expression SemanticAnn -> ConstFoldMonad ()
-checkComparison loc op lhs rhs
-  | op `elem` [RelationalLT, RelationalLTE, RelationalGT, RelationalGTE] = do
-    lhsType <- getExprType lhs
-    rhsType <- getExprType rhs
-    case (lhsType, rhsType) of
-      (TConstSubtype _, TConstSubtype _) -> return ()
-      (_, TConstSubtype _) -> checkBounds op lhsType rhs
-      (TConstSubtype _, _) -> checkBounds (swapOperands op) rhsType lhs
-      _ -> return ()
-  | otherwise = return ()
+checkComparison loc op lhs rhs =
+  case op of
+    RelationalLT -> againstBounds
+    RelationalLTE -> againstBounds
+    RelationalGT -> againstBounds
+    RelationalGTE -> againstBounds
+    _ -> return ()
 
   where
+
+    againstBounds = do
+      lhsType <- getExprType lhs
+      rhsType <- getExprType rhs
+      case (lhsType, rhsType) of
+        (TConstSubtype _, TConstSubtype _) -> return ()
+        (_, TConstSubtype _) -> checkBounds op lhsType rhs
+        (TConstSubtype _, _) -> checkBounds (swapOperands op) rhsType lhs
+        _ -> return ()
 
     -- | Operator that yields the same result when the operands are swapped.
     swapOperands :: Op -> Op
@@ -437,19 +443,22 @@ checkComparison loc op lhs rhs
     -- | Result of (e op' c) for every value of e in [lo, hi], if it is the same
     -- for all of them.
     fixedResult :: Op -> Integer -> Integer -> Integer -> Maybe Bool
-    fixedResult RelationalLT lo hi c
-      | c <= lo = Just False
-      | c > hi = Just True
-    fixedResult RelationalLTE lo hi c
-      | c < lo = Just False
-      | c >= hi = Just True
-    fixedResult RelationalGT lo hi c
-      | c >= hi = Just False
-      | c < lo = Just True
-    fixedResult RelationalGTE lo hi c
-      | c > hi = Just False
-      | c <= lo = Just True
-    fixedResult _ _ _ _ = Nothing
+    fixedResult op' lo hi c =
+      case op' of
+        RelationalLT -> decide (c <= lo) (c > hi)
+        RelationalLTE -> decide (c < lo) (c >= hi)
+        RelationalGT -> decide (c >= hi) (c < lo)
+        RelationalGTE -> decide (c > hi) (c <= lo)
+        _ -> Nothing
+
+    -- | The two ways the comparison can turn out the same for every value of
+    -- the range, and the silence that is left when neither of them holds.
+    decide :: Bool -> Bool -> Maybe Bool
+    decide alwaysFalse alwaysTrue =
+      case (alwaysFalse, alwaysTrue) of
+        (True, _) -> Just False
+        (_, True) -> Just True
+        _ -> Nothing
 
 foldBasicBlock :: BasicBlock SemanticAnn -> ConstFoldMonad (BasicBlock SemanticAnn)
 foldBasicBlock (RegularBlock stmts) =

@@ -144,18 +144,18 @@ instance Lattice ValueAnalysisPath where
 -- an interval takes part and neither side contains the other; a variable whose
 -- type has no interval falls to unknown instead.
 joinValues :: Maybe (Integer, Integer) -> Values -> Values -> Maybe Values
-joinValues range (Discrete left) (Discrete right)
-  | S.size both <= valueLimit = Just (Discrete both)
-  | otherwise = wholeType range
+joinValues range (Discrete left) (Discrete right) =
+  if S.size both <= valueLimit then Just (Discrete both) else wholeType range
 
   where
 
     both = S.union left right
 
-joinValues range left right
-  | left `covers` right = Just left
-  | right `covers` left = Just right
-  | otherwise = wholeType range
+joinValues range left right =
+  case (left `covers` right, right `covers` left) of
+    (True, _) -> Just left
+    (_, True) -> Just right
+    _ -> wholeType range
 
 wholeType :: Maybe (Integer, Integer) -> Maybe Values
 wholeType = fmap (uncurry Interval)
@@ -307,25 +307,22 @@ satisfies (AtMost high) value = value <= high
 -- every value: a variable with no value left says the branch is never taken,
 -- a finding this pass does not make.
 narrow :: Bound -> Values -> Maybe Values
-narrow bound (Discrete values)
-  | S.null kept || kept == values = Nothing
-  | otherwise = Just (Discrete kept)
+narrow bound (Discrete values) =
+  if S.null kept || kept == values then Nothing else Just (Discrete kept)
 
   where
 
     kept = S.filter (maybe False (satisfies bound) . integerOf) values
 
-narrow (AtLeast low) (Interval lo hi)
-  | raised > hi || raised <= lo = Nothing
-  | otherwise = Just (Interval raised hi)
+narrow (AtLeast low) (Interval lo hi) =
+  if raised > hi || raised <= lo then Nothing else Just (Interval raised hi)
 
   where
 
     raised = max lo low
 
-narrow (AtMost high) (Interval lo hi)
-  | lowered < lo || lowered >= hi = Nothing
-  | otherwise = Just (Interval lo lowered)
+narrow (AtMost high) (Interval lo hi) =
+  if lowered < lo || lowered >= hi then Nothing else Just (Interval lo lowered)
 
   where
 
@@ -473,20 +470,25 @@ seedIterator ident ty initE endE = do
   mFrom <- (>>= integerOfConst) <$> valueOf initE
   mTo <- (>>= integerOfConst) <$> valueOf endE
   range <- rangeOfType ty
-  case (mFrom, mTo) of
-    (Just from, Just end) | from <= end - 1 ->
-      let loc = getLocation . getAnnotation $ initE
-          values
-            | end - from <= fromIntegral valueLimit =
-                Discrete (S.fromList (map value [from .. end - 1]))
-            | otherwise = Interval from (end - 1)
-      in modifyPath $ \p -> ValueAnalysisPath $
-           M.insert ident (Known range values (S.singleton (Iterated loc))) (known p)
+  case turns mFrom mTo of
     -- | Bounds the folding could not work out, and a loop of no turns at all,
     -- which the folding rejects before this pass runs (CFE-008, CFE-009).
-    _ -> forget ident
+    Nothing -> forget ident
+    Just (from, to) ->
+      let loc = getLocation . getAnnotation $ initE
+          values =
+            if to - from < fromIntegral valueLimit
+              then Discrete (S.fromList (map value [from .. to]))
+              else Interval from to
+      in modifyPath $ \p -> ValueAnalysisPath $
+           M.insert ident (Known range values (S.singleton (Iterated loc))) (known p)
 
   where
+
+    turns mFrom mTo = do
+      from <- mFrom
+      end <- mTo
+      if from <= end - 1 then Just (from, end - 1) else Nothing
 
     value v = Value (I (TInteger v DecRepr) Nothing)
 
@@ -608,13 +610,13 @@ compareValues op left right = do
 -- may take. Exact, and cheap because neither list outgrows 'valueLimit'.
 pairwise ::
   (Integer -> Integer -> Bool) -> S.Set Integer -> S.Set Integer -> Maybe Bool
-pairwise decide left right
-  -- | An operand with no values at all is not something the lattice builds,
-  -- and answering it would mean answering that every comparison holds.
-  | null outcomes = Nothing
-  | and outcomes = Just True
-  | all not outcomes = Just False
-  | otherwise = Nothing
+pairwise decide left right =
+  case nub outcomes of
+    -- | Every pair answered the same, so the comparison answers that
+    -- everywhere.
+    [verdict] -> Just verdict
+    -- | Either the pairs disagreed, or there were no pairs at all.
+    _ -> Nothing
 
   where
 
@@ -624,10 +626,11 @@ pairwise decide left right
 -- go on once an interval takes part. It loses the gaps of a list and never
 -- claims more than the ends allow.
 fromEnds :: Op -> Integers -> Integers -> Maybe Bool
-fromEnds op left right
-  | always = Just True
-  | never = Just False
-  | otherwise = Nothing
+fromEnds op left right =
+  case (always, never) of
+    (True, _) -> Just True
+    (_, True) -> Just False
+    _ -> Nothing
 
   where
 

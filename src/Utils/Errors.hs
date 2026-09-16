@@ -73,27 +73,29 @@ stripAnsi = T.concat . go
 -- | The message of an annotated error, from its description.
 errorToText :: Diagnosable e
     => AnnotatedError e Location -> M.Map FilePath T.Text -> T.Text
--- | The source of the file the error points at is quoted when it is at hand. It
--- is not when the error comes from a stage that is given no sources, such as the
--- generation of the scheduling model.
-errorToText (AnnotatedError err pos@(Position _ start _end)) files
-    | M.member (sourceName start) files =
-    let diag = describe err
+-- | The source of the file the error points at is quoted when it is at hand.
+-- It is not when the error comes from a stage that is given no sources, such
+-- as the generation of the scheduling model, and then the message prints
+-- alone. An internal error has no message either, and then the value that
+-- produced it is the only clue there is.
+errorToText (AnnotatedError err pos) files =
+    if quotable
+        then pprintError files title pos (diagRelated diag) (diagDetail diag)
+        else
+            case diagDetail diag of
+                Just detail -> title <> "\n" <> detail
+                Nothing -> title <> "\n" <> T.pack (show pos ++ ": " ++ show err)
+
+    where
+
+        diag = describe err
+
         title = "\x1b[31merror [" <> diagCode diag <> "]\x1b[0m: "
             <> diagTitle diag <> "."
-    in
-        pprintError files title pos (diagRelated diag) (diagDetail diag)
--- | An error with no position in the source has nothing to quote, so it prints
--- its message alone. An internal error has no message either, and then the value
--- that produced it is the only clue there is.
-errorToText (AnnotatedError err pos) _files =
-    let diag = describe err
-        title = "\x1b[31merror [" <> diagCode diag <> "]\x1b[0m: "
-            <> diagTitle diag <> "."
-    in
-        case diagDetail diag of
-            Just detail -> title <> "\n" <> detail
-            Nothing -> title <> "\n" <> T.pack (show pos ++ ": " ++ show err)
+
+        quotable = case pos of
+            Position _ start _end -> M.member (sourceName start) files
+            _ -> False
 
 -- | The LSP diagnostic of an annotated error, from its description. The fields
 -- are, in order, range, severity, code, code description, source, message, tags,

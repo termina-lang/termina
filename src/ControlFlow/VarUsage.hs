@@ -356,9 +356,11 @@ checkDeadStores = do
     -- the same way, but they are not removed in the same way, so each one is
     -- reported with the remedy that fits it.
     report :: S.Set Location -> (Identifier, Location) -> VarUsageMonad ()
-    report inits (ident, loc)
-      | S.member loc inits = throwError $ annotateError loc (EInitializerNotUsed ident)
-      | otherwise = throwError $ annotateError loc (EAssignedValueNotUsed ident)
+    report inits (ident, loc) =
+      throwError . annotateError loc $
+        if S.member loc inits
+          then EInitializerNotUsed ident
+          else EAssignedValueNotUsed ident
 
 -- | Runs the body of a member or of a function: the objects pending
 -- assignment, the declarations and the assignments are its own, the

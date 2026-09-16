@@ -447,19 +447,22 @@ writeMASTModels reduction config arch sitMap trPathMap = do
     _ -> putStrLn (errorMessage "Unexpected RT element when generating MAST models for transactional paths") >> exitFailure
 
 fmtSec :: Double -> String
-fmtSec s
-  | isInfinite s = "?"
-  | s < 60 = printf "%.0fs" s
-  | s < 3600 =
-      let m = floor (s/60) :: Int
-          r = s - fromIntegral (m*60)
-      in printf "%dm%.0fs" m r
-  | otherwise =
-      let h = floor (s/3600) :: Int
-          r1 = s - fromIntegral (h*3600)
-          m = floor (r1/60) :: Int
-          r2 = r1 - fromIntegral (m*60)
-      in printf "%dh%dm%.0fs" h m r2
+fmtSec s =
+  if isInfinite s
+    then "?"
+    else
+      case (s < 60, s < 3600) of
+        (True, _) -> printf "%.0fs" s
+        (_, True) ->
+          let m = floor (s/60) :: Int
+              r = s - fromIntegral (m*60)
+          in printf "%dm%.0fs" m r
+        _ ->
+          let h = floor (s/3600) :: Int
+              r1 = s - fromIntegral (h*3600)
+              m = floor (r1/60) :: Int
+              r2 = r1 - fromIntegral (m*60)
+          in printf "%dh%dm%.0fs" h m r2
 
 -- Total number of combinations of sequenceA pickedEvents, without enumerating.
 numCombos :: [[a]] -> Int

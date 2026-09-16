@@ -69,9 +69,9 @@ constructorsOf typeName content =
 
 splitOn :: Char -> String -> [String]
 splitOn sep = foldr step [[]]
-  where step c acc@(cur:rest) | c == sep  = [] : acc
-                              | otherwise = (c:cur) : rest
-        step _ []                         = [[]]
+  where step c acc@(cur:rest) =
+          if c == sep then [] : acc else (c:cur) : rest
+        step _ [] = [[]]
 
 -- | All identifier words mentioned across the positive parser specs.
 testedIdentifiers :: IO (S.Set String)

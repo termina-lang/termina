@@ -337,7 +337,8 @@ noCheckError files =
   where
 
     code :: CheckFailure -> Text
-    code checkFailure
-      | failureCode checkFailure == pack "Internal" =
-          failureCode checkFailure <> pack ": " <> pack (take 240 (failureShown checkFailure))
-      | otherwise = failureCode checkFailure
+    code checkFailure =
+      if failureCode checkFailure == pack "Internal"
+        then failureCode checkFailure <> pack ": "
+               <> pack (take 240 (failureShown checkFailure))
+        else failureCode checkFailure
