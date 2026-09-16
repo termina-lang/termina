@@ -171,6 +171,10 @@ covers (Interval lo hi) (Discrete vs) = all inside (S.toList vs)
 covers (Discrete left) (Discrete right) = right `S.isSubsetOf` left
 covers (Discrete _) (Interval _ _) = False
 
+-- | What each function and member gives back, for a call site to read. One
+-- with no entry here gives back whatever its type allows.
+type ReturnedValues = M.Map Identifier Values
+
 -- | What belongs to the program, and no branch takes back.
 data ValueAnalysisGlobal = ValueAnalysisGlobal
   {
@@ -183,7 +187,10 @@ data ValueAnalysisGlobal = ValueAnalysisGlobal
     -- condition once per turn and each turn overwrites the one before, so what
     -- is left is what the last turn saw, which is the turn that starts from
     -- the settled state of the head.
-    observed :: M.Map Location (Expression SemanticAnn, ValueAnalysisPath)
+    observed :: M.Map Location (Expression SemanticAnn, ValueAnalysisPath),
+    -- | What each function and member walked so far gives back, including
+    -- those of the modules this one imports.
+    returnedValues :: ReturnedValues
   }
 
 type ValueAnalysisMonad = DataflowM ValueAnalysisPath ValueAnalysisGlobal ValueAnalysisError
@@ -253,19 +260,32 @@ setValue ::
   -> Origin
   -> Maybe (Const SemanticAnn)
   -> ValueAnalysisMonad ()
-setValue ident range origin mValue = modifyPath $ \p -> ValueAnalysisPath $
-  case mValue >>= scalar of
-    Just value ->
-      M.insert ident
-        (Known range (Discrete (S.singleton value)) (S.singleton origin))
-        (known p)
+setValue ident range origin mValue =
+  setValues ident range origin
+    (Discrete . S.singleton <$> (mValue >>= scalar))
+
+-- | Records what a variable may hold from here on, which is what a call to a
+-- function the walk has summarised gives back as well as what an expression
+-- the folding evaluator works out does. An expression that says nothing leaves
+-- the variable unknown.
+setValues ::
+  Identifier
+  -> Maybe (Integer, Integer)
+  -> Origin
+  -> Maybe Values
+  -> ValueAnalysisMonad ()
+setValues ident range origin mValues = modifyPath $ \p -> ValueAnalysisPath $
+  case mValues of
+    Just values ->
+      M.insert ident (Known range values (S.singleton origin)) (known p)
     Nothing -> M.delete ident (known p)
 
-  where
-
-    scalar value@(B _) = Just (Value value)
-    scalar value@(I _ _) = Just (Value value)
-    scalar _ = Nothing
+-- | The values the lattice follows, which are the booleans and the integers.
+-- Every other value leaves the variable unknown.
+scalar :: Const SemanticAnn -> Maybe Value
+scalar value@(B _) = Just (Value value)
+scalar value@(I _ _) = Just (Value value)
+scalar _ = Nothing
 
 forget :: Identifier -> ValueAnalysisMonad ()
 forget ident = modifyPath (\p -> ValueAnalysisPath (M.delete ident (known p)))
@@ -500,19 +520,20 @@ checkStatement :: Statement SemanticAnn -> ValueAnalysisMonad ()
 checkStatement (Declaration ident _ ty mInitExpr ann) = do
   mapM_ noteEscapes mInitExpr
   range <- rangeOfType ty
-  value <- maybe (return Nothing) valueOf mInitExpr
-  setValue ident range (Assigned (getLocation ann)) value
+  values <- maybe (return Nothing) valuesOf mInitExpr
+  setValues ident range (Assigned (getLocation ann)) values
 checkStatement (AssignmentStmt obj expr ann) = do
   noteEscapes expr
   case obj of
-    -- | The whole variable takes the value of the expression.
+    -- | The whole variable takes the values of the expression.
     Variable ident _ -> do
       range <- rangeOfVariable obj
-      valueOf expr >>= setValue ident range (Assigned (getLocation ann))
+      valuesOf expr >>= setValues ident range (Assigned (getLocation ann))
     -- | A write into a field or an element of an object, which is not a scalar
     -- and is therefore outside the lattice.
     _ -> return ()
 checkStatement (SingleExpStmt expr _) = noteEscapes expr
+
 
 -- | What each node means to this pass. Only the expressions that decide a path
 -- are recorded, which is the condition of an @if@, of each of its @else if@ and
@@ -541,19 +562,82 @@ checkBody body = do
   putPath (ValueAnalysisPath M.empty)
   walkForward transfer body
 
-checkClassMember :: ClassMember SemanticAnn -> ValueAnalysisMonad ()
-checkClassMember (ClassMethod _ak _ident _ps _tyret body _ann) = checkBody body
-checkClassMember (ClassViewer _ident _ps _tyret body _ann) = checkBody body
-checkClassMember (ClassAction _ak _ident _mp _tyret body _ann) = checkBody body
-checkClassMember (ClassProcedure _ak _ident _ps body _ann) = checkBody body
-checkClassMember (ClassField {}) = return ()
+-- | The name a member is filed under, which carries its class as well, with a
+-- separator no identifier can hold so that it cannot clash with the name of a
+-- function.
+memberName :: Identifier -> Identifier -> Identifier
+memberName className member = className ++ "::" ++ member
+
+-- | The class a member call goes to, read from the type the receiver carries.
+--
+-- A method is reachable only through @self@, since what a class exposes is an
+-- interface and an interface holds procedures, so this always names the class
+-- the walk is inside of. It is read from the receiver rather than carried
+-- along because the diagnostic asks the same question once the walk is over,
+-- when there is no class it is inside of any more, while the annotation
+-- travels with the expression.
+--
+-- A receiver that is an access port names an interface instead of a class, and
+-- which class answers for it is decided by the wiring of the program, which
+-- this pass does not see: the architecture is built after it runs.
+classOfReceiver :: Object SemanticAnn -> Maybe Identifier
+classOfReceiver obj = snd <$> getObjectSAnns (getAnnotation obj) >>= named
+
+  where
+
+    named (TGlobal _ className) = Just className
+    named (TReference _ inner) = named inner
+    named _ = Nothing
+
+checkClassMember :: Identifier -> ClassMember SemanticAnn -> ValueAnalysisMonad ()
+checkClassMember className (ClassMethod _ak member _ps _mTy body _ann) =
+  checkReturning (memberName className member) body
+checkClassMember className (ClassViewer member _ps _mTy body _ann) =
+  checkReturning (memberName className member) body
+-- | An action answers its task or handler and a procedure answers a port, so
+-- neither is called by a name this pass can resolve. Their bodies are walked
+-- for the conditions in them, and whatever summary they leave nobody reads.
+checkClassMember className (ClassAction _ak member _mp _tyret body _ann) =
+  checkReturning (memberName className member) body
+checkClassMember className (ClassProcedure _ak member _ps body _ann) =
+  checkReturning (memberName className member) body
+checkClassMember _ (ClassField {}) = return ()
 
 checkTypeDef :: TypeDef SemanticAnn -> ValueAnalysisMonad ()
-checkTypeDef (Class _kind _ident members _provides _mods) = mapM_ checkClassMember members
+checkTypeDef (Class _kind className members _provides _mods) =
+  mapM_ (checkClassMember className) members
 checkTypeDef _ = return ()
 
+-- | The expression a body gives back. A body has at most one return and it is
+-- its last statement (EE-001), so it is the last block of the body and the
+-- state the walk leaves behind is the state at it. A language that allowed a
+-- return anywhere else would have to gather them all and join them, since a
+-- summary that missed one of the values a body gives back would have a call
+-- site claim more than the body does.
+returnExpression :: Block SemanticAnn -> Maybe (Expression SemanticAnn)
+returnExpression body =
+  case reverse (blockBody body) of
+    (ReturnBlock (Just expr) _ : _) -> Just expr
+    _ -> Nothing
+
+-- | Walks the body of a function or of a member and files what it gives back
+-- under the given name.
+checkReturning ::
+  Identifier -> Block SemanticAnn -> ValueAnalysisMonad ()
+checkReturning name body = do
+  checkBody body
+  case returnExpression body of
+    Nothing -> return ()
+    Just expr -> do
+      mValues <- valuesOf expr
+      case mValues of
+        Nothing -> return ()
+        Just values ->
+          modifyGlobal (\g ->
+            g { returnedValues = M.insert name values (returnedValues g) })
+
 checkElement :: AnnASTElement SemanticAnn -> ValueAnalysisMonad ()
-checkElement (Function _ident _ps _ty body _mods _ann) = checkBody body
+checkElement (Function ident _ps _mTy body _mods _ann) = checkReturning ident body
 checkElement (TypeDefinition tyDef _ann) = checkTypeDef tyDef
 checkElement (GlobalDeclaration {}) = return ()
 
@@ -584,13 +668,7 @@ operandOf ::
   -> ValueAnalysisPath
   -> Expression SemanticAnn
   -> Maybe Integers
-operandOf global locals expr =
-  case evaluate (platform global) (moduleConsts global) locals expr of
-    Just (I (TInteger value _) _) -> Just (Listed (S.singleton value))
-    _ -> case expr of
-      AccessObject (Variable ident _) ->
-        M.lookup ident (known locals) >>= integersOf . varValues
-      _ -> Nothing
+operandOf global locals expr = valuesIn global locals expr >>= integersOf
 
 -- | Whether a comparison holds for every pair of values its operands may take,
 -- for no pair at all, or neither, which is when the pass has nothing to say.
@@ -687,6 +765,39 @@ abstractValue global locals (BinOp op left right _) = do
   B <$> compareValues op leftValues rightValues
 abstractValue _ _ _ = Nothing
 
+-- | What the walk can say an expression may be: the value the folding
+-- evaluator works out, what the path holds for a plain variable, or what the
+-- walk of a function said it gives back. Every other shape says nothing.
+--
+-- It takes what it reads instead of getting it from the state, since the
+-- diagnostic asks the same question once the walk is over.
+valuesIn ::
+  ValueAnalysisGlobal -> ValueAnalysisPath -> Expression SemanticAnn -> Maybe Values
+valuesIn global locals expr =
+  case evaluate (platform global) (moduleConsts global) locals expr >>= scalar of
+    Just value -> Just (Discrete (S.singleton value))
+    Nothing ->
+      case expr of
+        AccessObject (Variable ident _) -> varValues <$> M.lookup ident (known locals)
+        -- | The body of the callee was walked knowing nothing of its
+        -- parameters, so what it gives back holds for any call.
+        FunctionCall ident _args _ -> M.lookup ident (returnedValues global)
+        MemberFunctionCall obj member _args _ -> memberSummary obj member
+        DerefMemberFunctionCall obj member _args _ -> memberSummary obj member
+        _ -> Nothing
+
+  where
+
+    memberSummary obj member = do
+      className <- classOfReceiver obj
+      M.lookup (memberName className member) (returnedValues global)
+
+valuesOf :: Expression SemanticAnn -> ValueAnalysisMonad (Maybe Values)
+valuesOf expr = do
+  global <- getGlobal
+  locals <- getPath
+  return (valuesIn global locals expr)
+
 -- | The plain variables an expression reads, in the order it reads them. A
 -- field or an element of an array is left out, since the pass follows neither
 -- and so has nothing to say about them.
@@ -749,18 +860,33 @@ invariantConditions global =
 
 -- | Runs the check over a whole module, with the constants it sees, returning
 -- the first error. Only the first, since a user resolves them one at a time.
+-- | Runs the check over a whole module, with the constants it sees and the
+-- returned of the modules it imports, returning the first error and the
+-- returned this module adds to them.
+--
+-- The elements are walked in the order the source has them, and the global
+-- state travels from one to the next so that a call reads the summary of the
+-- function it calls. No ordering work is needed for that: the language admits
+-- neither recursion nor a reference to something declared later (SE-092), so
+-- the order of the source is already a topological order of the call graph.
 runValueAnalysisCheck ::
   Platform
   -> M.Map Identifier (Const SemanticAnn)
+  -> ReturnedValues
   -> AnnotatedProgram SemanticAnn
-  -> Maybe ValueAnalysisError
-runValueAnalysisCheck plt consts = listToMaybe . mapMaybe checkOne
+  -> (Maybe ValueAnalysisError, ReturnedValues)
+runValueAnalysisCheck plt consts imported program =
+  (listToMaybe (invariantConditions final), returnedValues final)
 
   where
 
-    initialSt =
-      DFState (ValueAnalysisPath M.empty) (ValueAnalysisGlobal consts plt M.empty)
+    -- | The conditions the walk records are keyed by their position, so the
+    -- state left by the last element holds the whole module in source order
+    -- and the diagnostic reads it once.
+    final = foldl walk start program
 
-    checkOne =
-      listToMaybe . invariantConditions . globalState
-        . snd . runDataflow initialSt . checkElement
+    start = ValueAnalysisGlobal consts plt M.empty imported
+
+    walk global element =
+      globalState . snd $
+        runDataflow (DFState (ValueAnalysisPath M.empty) global) (checkElement element)

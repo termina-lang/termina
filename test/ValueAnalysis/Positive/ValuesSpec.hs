@@ -109,6 +109,42 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Nothing
 
+    -- | The body of the callee gives back a parameter, which the walk knows
+    -- nothing about, so the function is left without values and the call says
+    -- nothing. A summary that missed one of the values a function gives back
+    -- would have the call site claim more than the callee does.
+    it "accepts a condition on a call whose value the callee does not fix" $ do
+      let src = "function passthrough(n : u32) -> u32 {\n" ++
+                "    return n;\n" ++
+                "}\n" ++
+                "function f(n : u32) -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    if (passthrough(n) < 5 : u32) {\n" ++
+                "        y = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
+
+    -- | The two values the callee gives back decide the comparison in opposite
+    -- ways.
+    it "accepts a condition only some of the values a call gives back decide" $ do
+      let src = "function pick(b : bool) -> u32 {\n" ++
+                "    var r : u32 = 1 : u32;\n" ++
+                "    if (b) {\n" ++
+                "        r = 2 : u32;\n" ++
+                "    }\n" ++
+                "    return r;\n" ++
+                "}\n" ++
+                "function f(b : bool) -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    if (pick(b) < 2 : u32) {\n" ++
+                "        y = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
+
     -- | The walk of the pass never sees the increment of a loop, which lives
     -- only in the generated C, so an iterator seeded with the value it starts
     -- at would keep that value for ever and this condition would be reported.

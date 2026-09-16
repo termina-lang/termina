@@ -138,6 +138,54 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
+    -- | The values a function gives back are what the walk of its body found,
+    -- and a call site reads them: neither branch of the callee is a constant
+    -- the folding could reach.
+    it "VAE-001: condition the values a function gives back decide" $ do
+      let src = "function pick(b : bool) -> u32 {\n" ++
+                "    var r : u32 = 1 : u32;\n" ++
+                "    if (b) {\n" ++
+                "        r = 2 : u32;\n" ++
+                "    }\n" ++
+                "    return r;\n" ++
+                "}\n" ++
+                "function f(b : bool) -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    var v : u32 = pick(b);\n" ++
+                "    if (v < 5 : u32) {\n" ++
+                "        y = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
+
+    -- | A member is filed under its class as well as its name, so a call
+    -- through self reaches it.
+    it "VAE-001: condition the values a member gives back decide" $ do
+      let src = "interface Iface0 {\n" ++
+                "    procedure proc0(&mut self);\n" ++
+                "};\n" ++
+                "resource class Class0 provides Iface0 {\n" ++
+                "    base : u32;\n" ++
+                "    method pick(&self) -> u32 {\n" ++
+                "        var r : u32 = 1 : u32;\n" ++
+                "        if (self->base == 0 : u32) {\n" ++
+                "            r = 2 : u32;\n" ++
+                "        }\n" ++
+                "        return r;\n" ++
+                "    }\n" ++
+                "    procedure proc0(&mut self) {\n" ++
+                "        var y : u32 = 0 : u32;\n" ++
+                "        var v : u32 = self->pick();\n" ++
+                "        if (v < 5 : u32) {\n" ++
+                "            y = 1 : u32;\n" ++
+                "        }\n" ++
+                "        self->base = y;\n" ++
+                "        return;\n" ++
+                "    }\n" ++
+                "};"
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
+
     -- | The loop runs its iterator over four values and the condition holds
     -- for all four, which no assignment in the body says.
     it "VAE-001: condition the range of a loop iterator decides" $ do

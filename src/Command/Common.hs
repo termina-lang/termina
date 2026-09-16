@@ -241,16 +241,26 @@ constFolding plt bbProject =
 -- is evaluated (VAE-001). The check runs after the folding and not with the
 -- rest of the basic-block checks because it needs the constants of each
 -- module, which the folding is what builds.
+-- The modules are checked in dependency order, threading the returned of what
+-- each function gives back from one module to the next, so that a call resolves
+-- against the function it calls even when that one lives in a module this one
+-- imports.
 valueAnalysisCheck :: Platform -> ProjectConstEnvs -> BasicBlocksProject -> IO ()
 valueAnalysisCheck plt constEnvs bbProject =
-  case checkModules (M.toList bbProject) of
-    Nothing -> return ()
-    Just err -> TIO.putStrLn (toText err (projectSourceFiles bbProject)) >> exitFailure
+  case sortProjectDepsOrLoop (M.map importedModules bbProject) of
+    -- | The build pipeline orders the modules (and reports dependency cycles)
+    -- before reaching this point, so a cycle here would be an internal error.
+    Left _ -> die . errorMessage $ "Dependency cycle detected during the value analysis"
+    Right orderedDependencies -> checkModules M.empty orderedDependencies
 
   where
 
-    checkModules mods = listToMaybe (mapMaybe checkModule mods)
-
-    checkModule (m, bbModule) = runValueAnalysisCheck plt
-      (M.findWithDefault M.empty m constEnvs)
-      (basicBlocksAST . metadata $ bbModule)
+    checkModules _ [] = return ()
+    checkModules returned (m:ms) =
+      case runValueAnalysisCheck plt
+             (M.findWithDefault M.empty m constEnvs)
+             returned
+             (basicBlocksAST . metadata $ bbProject M.! m) of
+        (Just err, _) ->
+          TIO.putStrLn (toText err (projectSourceFiles bbProject)) >> exitFailure
+        (Nothing, returned') -> checkModules returned' ms

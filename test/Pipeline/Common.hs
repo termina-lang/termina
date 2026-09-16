@@ -109,7 +109,7 @@ runProjectPipeline sources = do
   (foldedProject, constEnvs) <- foldProject files bbProject ordered
   -- | The constant propagation check follows the folding, which is what gives
   -- it the constants of each module.
-  analyseValues files foldedProject constEnvs
+  analyseValues files foldedProject constEnvs ordered
   progArch <- genProjectArchitecture files foldedProject ordered
   runChecks files progArch
   pure (foldedProject, ordered, progArch)
@@ -150,17 +150,19 @@ foldProject files bbProject = go (ConstFoldEnv M.empty TestPlatform) M.empty M.e
 -- analysis check looks for. Mirrors @Command.Common.valueAnalysisCheck@ but
 -- stays in 'Either'.
 analyseValues :: M.Map FilePath Text -> BasicBlocksProject -> ProjectConstEnvs
-  -> Either Failure ()
-analyseValues files bbProject constEnvs =
-  case mapMaybe checkModule (M.toList bbProject) of
-    [] -> Right ()
-    (err : _) -> Left (failure files err)
+  -> [QualifiedName] -> Either Failure ()
+analyseValues files bbProject constEnvs = go M.empty
 
   where
 
-    checkModule (m, bbModule) = runValueAnalysisCheck TestPlatform
-      (M.findWithDefault M.empty m constEnvs)
-      (basicBlocksAST . metadata $ bbModule)
+    go _ [] = Right ()
+    go returned (m:ms) =
+      case runValueAnalysisCheck TestPlatform
+             (M.findWithDefault M.empty m constEnvs)
+             returned
+             (basicBlocksAST . metadata $ bbProject M.! m) of
+        (Just err, _) -> Left (failure files err)
+        (Nothing, returned') -> go returned' ms
 
 -- | The error code (@errorIdent@: \"SE-042\", \"BE-001\", \"AE-007\",
 -- \"CF-…\") raised by the first failing pipeline stage for a single-module
