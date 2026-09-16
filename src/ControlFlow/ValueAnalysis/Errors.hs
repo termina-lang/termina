@@ -23,6 +23,8 @@ data Origin =
     -- | The same, for a condition that bounds the variable instead of fixing
     -- it, which is what an order comparison does.
   | Bounded Location
+    -- | The loop that declares the variable and runs it over a range.
+  | Iterated Location
   deriving (Eq, Ord, Show)
 
 -- | What the pass knows a name holds, in the three shapes a message can say
@@ -107,6 +109,8 @@ instance Diagnosable Error where
             relatedTo loc (T.pack name <> " is fixed at that value by this condition") diag
         sends name diag (Bounded loc) =
             relatedTo loc (T.pack name <> " is bounded by this condition") diag
+        sends name diag (Iterated loc) =
+            relatedTo loc (T.pack name <> " takes its values from this loop") diag
 
 instance ErrorMessage ValueAnalysisError where
 

@@ -314,6 +314,8 @@ transfer = Transfer
       mapM_ (`markInitialized` getLocation ann) bvars
   , refineTrue = const (return ())
   , refineFalse = const (return ())
+    -- | The iterator is read by the loop itself, so it needs no marking.
+  , onLoopEntry = \_ _ _ _ -> return ()
   }
 
 checkBlock :: Block SemanticAnn -> VarUsageMonad ()

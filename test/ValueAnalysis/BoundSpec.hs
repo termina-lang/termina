@@ -2,11 +2,10 @@
 -- work it out.
 --
 -- Bounding is the only operation of the pass that makes it claim /more/ about
--- a variable, so a shifted end or an inverted side is a finding on correct
--- code, which is the one direction an error of the transpiler may not be wrong
--- in. The off-by-one lives in 'boundOf', where a strict comparison becomes an
--- end that is included, and the emptiness lives in 'narrow', which refuses to
--- leave a variable with no value at all.
+-- a variable, so a shifted end or an inverted side reports a condition of
+-- correct code. 'boundOf' is where a strict comparison turns into an end that
+-- is included, and 'narrow' is where a bound that would leave a variable with
+-- no value at all is refused.
 module ValueAnalysis.BoundSpec (spec) where
 
 import ControlFlow.ValueAnalysis (Bound(..), Value(..), Values(..), boundOf, narrow)

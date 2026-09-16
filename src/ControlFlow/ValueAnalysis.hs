@@ -111,9 +111,9 @@ data Known = Known
     typeRange :: Maybe (Integer, Integer)
   , varValues :: Values
     -- | The places that gave the variable what it holds, which the message
-    -- points at. They are carried along and never read by the walk, so the
-    -- equality below leaves them out: two states that agree on the values are
-    -- the same state, and letting the origins decide would spend turns of the
+    -- points at. The walk carries them along and never reads them, so the
+    -- equality below leaves them out and two states that agree on the values
+    -- count as the same state; comparing them as well would spend turns of the
     -- fixed point on information nobody iterates over.
   , valueOrigins :: S.Set Origin
   }
@@ -303,9 +303,9 @@ satisfies (AtLeast low) value = value >= low
 satisfies (AtMost high) value = value <= high
 
 -- | What is left of the values of a variable once a bound applies to them.
--- Nothing when the bound teaches nothing this can express, and also when it
--- would leave no value at all: an empty set is the branch being unreachable,
--- which is a different finding from the one this pass makes.
+-- Nothing when the bound rules out no value, and also when it would rule out
+-- every value: a variable with no value left says the branch is never taken,
+-- a finding this pass does not make.
 narrow :: Bound -> Values -> Maybe Values
 narrow bound (Discrete values)
   | S.null kept || kept == values = Nothing
@@ -360,10 +360,10 @@ mirrored op = op
 -- bounds it when the comparison is an order; and a conjunction that holds says
 -- both of its halves hold.
 --
--- The sides that are missing are missing on purpose. From a conjunction that
--- fails, and from a disjunction that holds, all that follows is that one of
--- the two halves does, and a state that keeps one value per variable has no
--- way to say "one of these two things".
+-- From a conjunction that fails, and from a disjunction that holds, all that
+-- follows is that one of the two halves does, and a state that keeps one value
+-- per variable has no way to say "one of these two things", so those two sides
+-- teach nothing.
 refine :: Bool -> Expression SemanticAnn -> ValueAnalysisMonad ()
 refine holds cond@(AccessObject obj@(Variable ident _)) = do
   range <- rangeOfVariable obj
@@ -405,16 +405,13 @@ refineOrder holds loc op left right =
 
     against (obj, ident) direction other = do
       mValue <- valueOf other
-      case mValue >>= integerValue >>= boundOf holds direction of
+      case mValue >>= integerOfConst >>= boundOf holds direction of
         Nothing -> return ()
         Just bound -> bindBound loc obj ident bound
 
-    integerValue (I (TInteger value _) _) = Just value
-    integerValue _ = Nothing
-
 -- | Applies a bound to what the path knows of a variable. A variable the path
--- says nothing about starts from the interval its declared type allows, which
--- is what lets a guard bound a parameter the body never assigns.
+-- says nothing about starts from the interval its declared type allows, so a
+-- guard also bounds a parameter the body never assigns.
 bindBound ::
   Location -> Object SemanticAnn -> Identifier -> Bound -> ValueAnalysisMonad ()
 bindBound loc obj ident bound = do
@@ -456,6 +453,47 @@ refineEquality loc left right = do
         >>= maybe (return ()) (setValue ident range (Refined loc) . Just)
     refineAgainst _ _ = return ()
 
+-- | What a loop gives its iterator. The generated @for (i = init; i < end;
+-- i = i + 1)@ runs it over every value between the two bounds, the second one
+-- excluded.
+--
+-- The increment lives only in the generated C, so the walk never meets it and
+-- the fixed point never grows the iterator past what it was seeded with.
+-- Seeding it with the value it starts at would therefore have the pass hold
+-- that the iterator keeps that value on every turn and report @if (i == 0)@,
+-- so the whole range goes in at once.
+--
+-- A range of few enough values goes in written out, which decides an equality
+-- that the ends alone cannot; a longer one goes in as an interval.
+seedIterator ::
+  Identifier -> TerminaType SemanticAnn
+  -> Expression SemanticAnn -> Expression SemanticAnn
+  -> ValueAnalysisMonad ()
+seedIterator ident ty initE endE = do
+  mFrom <- (>>= integerOfConst) <$> valueOf initE
+  mTo <- (>>= integerOfConst) <$> valueOf endE
+  range <- rangeOfType ty
+  case (mFrom, mTo) of
+    (Just from, Just end) | from <= end - 1 ->
+      let loc = getLocation . getAnnotation $ initE
+          values
+            | end - from <= fromIntegral valueLimit =
+                Discrete (S.fromList (map value [from .. end - 1]))
+            | otherwise = Interval from (end - 1)
+      in modifyPath $ \p -> ValueAnalysisPath $
+           M.insert ident (Known range values (S.singleton (Iterated loc))) (known p)
+    -- | Bounds the folding could not work out, and a loop of no turns at all,
+    -- which the folding rejects before this pass runs (CFE-008, CFE-009).
+    _ -> forget ident
+
+  where
+
+    value v = Value (I (TInteger v DecRepr) Nothing)
+
+integerOfConst :: Const SemanticAnn -> Maybe Integer
+integerOfConst (I (TInteger value _) _) = Just value
+integerOfConst _ = Nothing
+
 checkStatement :: Statement SemanticAnn -> ValueAnalysisMonad ()
 checkStatement (Declaration ident _ ty mInitExpr ann) = do
   mapM_ noteEscapes mInitExpr
@@ -491,6 +529,7 @@ transfer = Transfer
   , onCaseEntry = \(MatchCase _ bvars _ _) -> mapM_ forget bvars
   , refineTrue = refine True
   , refineFalse = refine False
+  , onLoopEntry = seedIterator
   }
 
 -- | Runs the body of a member or of a function, which knows nothing of its
@@ -619,9 +658,8 @@ fromEnds op left right
       _ -> False
 
 -- | How a pair of integers is compared, for the operators this evaluator
--- answers. An operator that is not a comparison gets no answer at all, which
--- is what keeps a verdict from being read out of an operator nobody meant to
--- compare with.
+-- answers. An operator that is not a comparison gets no answer at all, so no
+-- verdict comes out of one.
 comparison :: Op -> Maybe (Integer -> Integer -> Bool)
 comparison RelationalLT = Just (<)
 comparison RelationalLTE = Just (<=)

@@ -138,6 +138,35 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
+    -- | The loop runs its iterator over four values and the condition holds
+    -- for all four, which no assignment in the body says.
+    it "VAE-001: condition the range of a loop iterator decides" $ do
+      let src = "function f() -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    for i : usize in 0 : usize .. 4 : usize {\n" ++
+                "        if (i < 10 : usize) {\n" ++
+                "            y = y + 1 : u32;\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
+
+    -- | A loop of more turns than the limit gives its iterator an interval
+    -- instead of a set, which is the only way a source program reaches the
+    -- verdict that reads the ends of the two operands.
+    it "VAE-001: condition the range of a long loop decides" $ do
+      let src = "function f() -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    for i : usize in 0 : usize .. 1000 : usize {\n" ++
+                "        if (i < 2000 : usize) {\n" ++
+                "            y = y + 1 : u32;\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
+
     -- | Neither half of the guard pins the parameter to a value, but the two
     -- together bound it, and the bound decides the condition inside.
     it "VAE-001: condition the range its guard leaves already decides" $ do

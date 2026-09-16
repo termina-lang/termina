@@ -1,14 +1,13 @@
 -- | The verdict of a comparison, driven from the function itself.
 --
--- The two tables it holds, the one that answers from the ends and the one that
--- pairs the values up, decide whether a condition is reported, so an inverted
--- bound in either of them is a finding on correct code. No source program
--- reaches the ends table yet: an interval only appears when a set outgrows the
--- limit, which takes ten branches assigning ten values, and the interval it
--- lands on is the whole range of the type, whose comparisons the folding
--- rejects earlier as CFE-017. The seeds of the loop bounds and the return
--- ranges are what will turn it on, and this is the net that has to be in place
--- by then.
+-- The two tables it holds, the one that pairs the values up and the one that
+-- answers from the ends, decide whether a condition is reported, so an
+-- inverted bound in either of them reports a condition of correct code. A
+-- source program reaches the ends table through the iterator of a loop of more
+-- turns than the limit, and through little else: a set outgrows the limit only
+-- after ten branches assigning ten values, and the interval it lands on is the
+-- whole range of the type, whose comparisons the folding rejects earlier as
+-- CFE-017.
 module ValueAnalysis.CompareSpec (spec) where
 
 import ControlFlow.ValueAnalysis (Integers(..), compareValues)

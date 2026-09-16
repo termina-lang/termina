@@ -109,6 +109,35 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Nothing
 
+    -- | The walk of the pass never sees the increment of a loop, which lives
+    -- only in the generated C, so an iterator seeded with the value it starts
+    -- at would keep that value for ever and this condition would be reported.
+    -- It is seeded with the whole range instead, and this pins that.
+    it "accepts a condition on the value a loop iterator starts at" $ do
+      let src = "function f() -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    for i : usize in 0 : usize .. 4 : usize {\n" ++
+                "        if (i == 0 : usize) {\n" ++
+                "            y = y + 1 : u32;\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
+
+    -- | The condition holds on the first two turns and fails on the other two.
+    it "accepts a condition only some turns of a loop decide" $ do
+      let src = "function f() -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    for i : usize in 0 : usize .. 4 : usize {\n" ++
+                "        if (i < 2 : usize) {\n" ++
+                "            y = y + 1 : u32;\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
+
     -- | From a disjunction that holds, all that follows is that one of its two
     -- halves does, and which one is not known. Learning either of them would
     -- be a finding on correct code, so this pins the silence.

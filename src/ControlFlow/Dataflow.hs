@@ -119,6 +119,13 @@ data Transfer p g e = Transfer
   , onCondition :: Expression SemanticAnn -> DataflowM p g e ()
     -- | Entering a case of a @match@, which binds the variables of its variant.
   , onCaseEntry :: MatchCase SemanticAnn -> DataflowM p g e ()
+    -- | Entering a loop, which declares an iterator of the given type that
+    -- runs from the first of the two bounds up to but not including the
+    -- second, one value per turn.
+  , onLoopEntry ::
+      Identifier -> TerminaType SemanticAnn
+      -> Expression SemanticAnn -> Expression SemanticAnn
+      -> DataflowM p g e ()
     -- | What is known inside the branch a condition guards, and inside the ones
     -- it does not. A pass that learns nothing from a condition leaves both at
     -- @pure ()@.
@@ -164,9 +171,14 @@ walkForward transfer = walkBlock
     -- generated @for@ shows: it is evaluated before every turn, the first one
     -- included, and what a turn assigns is what the next one tests. It is
     -- therefore walked inside the loop and not before it.
-    walkBasicBlock (ForLoopBlock _ _ initE endE mBreak blk _) = do
+    walkBasicBlock (ForLoopBlock iterator iteratorTy initE endE mBreak blk _) = do
       onExpression transfer initE
       onExpression transfer endE
+      -- | What a pass records under the name of the iterator outlives the walk
+      -- of the loop. Nothing reads it afterwards, since the iterator goes out
+      -- of scope with the loop and a later declaration of the same name writes
+      -- over the record.
+      onLoopEntry transfer iterator iteratorTy initE endE
       fixpoint (mapM_ (onCondition transfer) mBreak >> walkBlock blk)
 
     walkBasicBlock block = onSimpleBlock transfer block
