@@ -852,6 +852,26 @@ comparison RelationalEqual = Just (==)
 comparison RelationalNotEqual = Just (/=)
 comparison _ = Nothing
 
+-- | The name of a variant of an option, a status or a result. They are a
+-- different shape in the AST from the variants of an enumeration, and the same
+-- thing for this pass: both hold one name out of a closed set, and both lower
+-- to the same tag in the generated C.
+monadicName :: MonadicVariant' Expression SemanticAnn -> Identifier
+monadicName None = "None"
+monadicName (Some _) = "Some"
+monadicName (Ok _) = "Ok"
+monadicName (Error _) = "Error"
+monadicName Success = "Success"
+monadicName (Failure _) = "Failure"
+
+labelName :: MonadicVariantLabel -> Identifier
+labelName NoneLabel = "None"
+labelName SomeLabel = "Some"
+labelName OkLabel = "Ok"
+labelName ErrorLabel = "Error"
+labelName SuccessLabel = "Success"
+labelName FailureLabel = "Failure"
+
 -- | Whether every value an object may hold is this variant, whether none of
 -- them is, or neither. An interval holds numbers, so it is never a variant.
 isVariant :: Identifier -> Values -> Maybe Bool
@@ -877,6 +897,9 @@ abstractValue global locals (BinOp op left right _) = do
 abstractValue global locals (IsEnumVariantExpression obj _enum variant _) = do
   values <- valuesIn global locals (AccessObject obj)
   B <$> isVariant variant values
+abstractValue global locals (IsMonadicVariantExpression obj label _) = do
+  values <- valuesIn global locals (AccessObject obj)
+  B <$> isVariant (labelName label) values
 abstractValue _ _ _ = Nothing
 
 -- | What the walk can say an expression may be: the value the folding
@@ -899,6 +922,8 @@ valuesIn global locals expr =
         -- variant it is.
         EnumVariantInitializer _enum variant _args _ ->
           Just (Discrete (S.singleton (Variant variant)))
+        MonadicVariantInitializer monadic _ ->
+          Just (Discrete (S.singleton (Variant (monadicName monadic))))
         FunctionCall ident _args _ -> M.lookup ident (returnedValues global)
         MemberFunctionCall obj member _args _ -> memberSummary obj member
         DerefMemberFunctionCall obj member _args _ -> memberSummary obj member

@@ -227,6 +227,27 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
+    -- | An option, a status and a result are a different shape in the AST
+    -- from an enumeration and the same thing here: one name out of a closed
+    -- set, and the same tag in the generated C.
+    it "VAE-001: variant test of an option no path can satisfy" $ do
+      let src = "function f(n : u32) -> u32 {\n" ++
+                "    var y : u32;\n" ++
+                "    var opt : Option<u32>;\n" ++
+                "    if (n == 1 : u32) {\n" ++
+                "        opt = Some(3 : u32);\n" ++
+                "    } else {\n" ++
+                "        opt = Some(4 : u32);\n" ++
+                "    }\n" ++
+                "    if (opt is None) {\n" ++
+                "        y = 7 : u32;\n" ++
+                "    } else {\n" ++
+                "        y = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
+
     -- | The walk of the callee found three of the four variants, so the
     -- fourth case of the match is a body that never runs. The match has to
     -- list it, since a match is exhaustive over the type, which is what says

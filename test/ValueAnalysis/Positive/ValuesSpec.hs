@@ -109,6 +109,26 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Nothing
 
+    -- | One branch leaves the option at Some and the other at None, so the
+    -- test of the variant goes both ways.
+    it "accepts a variant test of an option only some paths decide" $ do
+      let src = "function f(n : u32) -> u32 {\n" ++
+                "    var y : u32;\n" ++
+                "    var opt : Option<u32>;\n" ++
+                "    if (n == 1 : u32) {\n" ++
+                "        opt = Some(3 : u32);\n" ++
+                "    } else {\n" ++
+                "        opt = None;\n" ++
+                "    }\n" ++
+                "    if (opt is None) {\n" ++
+                "        y = 7 : u32;\n" ++
+                "    } else {\n" ++
+                "        y = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
+
     -- | Every case of the match is a variant the callee gives back, so the
     -- match says no more than the type does.
     it "accepts a match every case of which the discriminant may hold" $ do
