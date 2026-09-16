@@ -43,6 +43,7 @@ module ControlFlow.ValueAnalysis
   , Value(..)
   , boundOf
   , narrow
+  , without
   ) where
 
 import qualified Data.Map.Strict as M
@@ -69,27 +70,38 @@ import Utils.Annotations
 valueLimit :: Int
 valueLimit = 8
 
--- | One of the values a variable may hold, which 'setValue' keeps down to a
--- boolean or an integer. Two of them are compared by the value alone: two
--- paths that reach the same number agree whether or not it was written the
--- same way, and the type a constant carries is not part of what they agree on.
-newtype Value = Value { valueConst :: Const SemanticAnn }
+-- | One of the values a variable may hold: a boolean or an integer, which is
+-- what 'scalar' keeps, or one of the variants of an enumeration.
+--
+-- Two of them are compared by the value alone: two paths that reach the same
+-- number agree whether or not it was written the same way, and the type a
+-- constant carries is not part of what they agree on. A variant is held by its
+-- name alone, since the type of the variable already fixes which enumeration
+-- the name belongs to.
+data Value =
+    Scalar (Const SemanticAnn)
+  | Variant Identifier
   deriving Show
 
 instance Eq Value where
   left == right = compare left right == EQ
 
 instance Ord Value where
-  compare = comparing (rank . valueConst)
+  compare = comparing rank
 
     where
 
-      rank (B b) = (0 :: Int, if b then 1 else 0 :: Integer)
-      rank (I (TInteger v _) _) = (1, v)
-      rank _ = (2, 0)
+      rank (Scalar (B b)) = (0 :: Int, if b then 1 else 0 :: Integer, "")
+      rank (Scalar (I (TInteger v _) _)) = (1, v, "")
+      rank (Scalar _) = (2, 0, "")
+      rank (Variant name) = (3, 0, name)
+
+variantOf :: Value -> Maybe Identifier
+variantOf (Variant name) = Just name
+variantOf _ = Nothing
 
 integerOf :: Value -> Maybe Integer
-integerOf (Value (I (TInteger v _) _)) = Just v
+integerOf (Scalar (I (TInteger v _) _)) = Just v
 integerOf _ = Nothing
 
 -- | What is known of a variable at a point of a path: the values it may hold,
@@ -200,7 +212,7 @@ type ValueAnalysisMonad = DataflowM ValueAnalysisPath ValueAnalysisGlobal ValueA
 -- it would be with the variable unknown.
 singleValue :: Known -> Maybe (Const SemanticAnn)
 singleValue entry = case varValues entry of
-  Discrete values | [Value value] <- S.toList values -> Just value
+  Discrete values | [Scalar value] <- S.toList values -> Just value
   _ -> Nothing
 
 -- | The value of an expression, when the constants of the module and what a
@@ -283,8 +295,8 @@ setValues ident range origin mValues = modifyPath $ \p -> ValueAnalysisPath $
 -- | The values the lattice follows, which are the booleans and the integers.
 -- Every other value leaves the variable unknown.
 scalar :: Const SemanticAnn -> Maybe Value
-scalar value@(B _) = Just (Value value)
-scalar value@(I _ _) = Just (Value value)
+scalar value@(B _) = Just (Scalar value)
+scalar value@(I _ _) = Just (Scalar value)
 scalar _ = Nothing
 
 forget :: Identifier -> ValueAnalysisMonad ()
@@ -348,6 +360,17 @@ narrow (AtMost high) (Interval lo hi) =
 
     lowered = min hi high
 
+-- | What is left of the values of a variable once one of them is ruled out.
+-- Nothing when the value was not among them, and also when it was the only
+-- one: a variable with no value left says the branch is never taken, a finding
+-- this pass does not make.
+without :: Value -> Values -> Maybe Values
+without value (Discrete values) =
+  if S.notMember value values || S.size values == 1
+    then Nothing
+    else Just (Discrete (S.delete value values))
+without _ (Interval _ _) = Nothing
+
 -- | The bound a comparison of a variable against a value puts on the variable,
 -- on the side of the branch that takes it and on the side that does not. The
 -- variable is the left operand here; 'mirrored' puts it there.
@@ -371,6 +394,22 @@ mirrored RelationalGT = RelationalLT
 mirrored RelationalGTE = RelationalLTE
 mirrored op = op
 
+-- | What a case of a @match@ says inside its body: the object the match
+-- discriminates on holds the variant of the case, which is what lets a state
+-- machine be followed from one turn of its loop to the next.
+enterCase ::
+  Expression SemanticAnn -> MatchCase SemanticAnn -> ValueAnalysisMonad ()
+enterCase discriminant (MatchCase variant bvars _ ann) = do
+  -- | The variables a case binds are declared by the case, with a value that
+  -- comes from the variant it matched.
+  mapM_ forget bvars
+  case discriminant of
+    AccessObject obj@(Variable ident _) -> do
+      range <- rangeOfVariable obj
+      setValues ident range (Matched (getLocation ann))
+        (Just (Discrete (S.singleton (Variant variant))))
+    _ -> return ()
+
 -- | What a condition says about the variables in it inside the branch it
 -- guards. A boolean variable holds the value that took the path there; a
 -- comparison against a determined value fixes the variable at that value, or
@@ -389,15 +428,61 @@ refine True (BinOp RelationalEqual left right ann) =
   refineEquality (getLocation ann) left right
 refine False (BinOp RelationalNotEqual left right ann) =
   refineEquality (getLocation ann) left right
+refine holds cond@(IsEnumVariantExpression obj@(Variable ident _) _enum variant _) = do
+  range <- rangeOfVariable obj
+  let loc = getLocation . getAnnotation $ cond
+  if holds
+    then setValues ident range (Refined loc)
+           (Just (Discrete (S.singleton (Variant variant))))
+    else ruleOut loc obj ident (Variant variant)
 refine True (BinOp LogicalAnd left right _) = do
   refine True left
   refine True right
 refine False (BinOp LogicalOr left right _) = do
   refine False left
   refine False right
+refine False (BinOp RelationalEqual left right ann) =
+  refineExclusion (getLocation ann) left right
+refine True (BinOp RelationalNotEqual left right ann) =
+  refineExclusion (getLocation ann) left right
 refine holds (BinOp op left right ann) =
   refineOrder holds (getLocation ann) op left right
 refine _ _ = return ()
+
+-- | What a comparison that fails teaches about the variable in it: the value
+-- it was compared against is one the variable does not hold. Which operand is
+-- the variable is not fixed by the syntax, so both orders are tried.
+refineExclusion ::
+  Location -> Expression SemanticAnn -> Expression SemanticAnn
+  -> ValueAnalysisMonad ()
+refineExclusion loc left right = do
+  against left right
+  against right left
+
+  where
+
+    against (AccessObject obj@(Variable ident _)) other = do
+      mValue <- valueOf other
+      case mValue >>= scalar of
+        Nothing -> return ()
+        Just value -> ruleOut loc obj ident value
+    against _ _ = return ()
+
+-- | Takes a value out of what the path holds for a variable. A variable the
+-- path says nothing about stays that way: the values it does not hold are of
+-- no use without the ones it does.
+ruleOut ::
+  Location -> Object SemanticAnn -> Identifier -> Value -> ValueAnalysisMonad ()
+ruleOut loc obj ident value = do
+  current <- M.lookup ident . known <$> getPath
+  range <- rangeOfVariable obj
+  case current >>= excluded of
+    Nothing -> return ()
+    Just values -> setValues ident range (Refined loc) (Just values)
+
+  where
+
+    excluded entry = without value (varValues entry)
 
 -- | What an order comparison teaches about the variable in it, which is a
 -- bound and not a value. Unlike an equality, it teaches on both sides of the
@@ -510,7 +595,7 @@ seedIterator ident ty initE endE = do
       end <- mTo
       if from <= end - 1 then Just (from, end - 1) else Nothing
 
-    value v = Value (I (TInteger v DecRepr) Nothing)
+    value v = Scalar (I (TInteger v DecRepr) Nothing)
 
 integerOfConst :: Const SemanticAnn -> Maybe Integer
 integerOfConst (I (TInteger value _) _) = Just value
@@ -547,9 +632,7 @@ transfer = Transfer
   , onSimpleBlock = mapM_ (mapM_ escapesIn) . simpleBlockChildren
   , onExpression = noteEscapes
   , onCondition = observeCondition
-    -- | The variables a case binds are declared by the case, with a value that
-    -- comes from the variant it matched.
-  , onCaseEntry = \(MatchCase _ bvars _ _) -> mapM_ forget bvars
+  , onCaseEntry = enterCase
   , refineTrue = refine True
   , refineFalse = refine False
   , onLoopEntry = seedIterator
@@ -750,6 +833,15 @@ comparison RelationalEqual = Just (==)
 comparison RelationalNotEqual = Just (/=)
 comparison _ = Nothing
 
+-- | Whether every value an object may hold is this variant, whether none of
+-- them is, or neither. An interval holds numbers, so it is never a variant.
+isVariant :: Identifier -> Values -> Maybe Bool
+isVariant variant (Discrete values) =
+  case nub (map (== Variant variant) (S.toList values)) of
+    [verdict] -> Just verdict
+    _ -> Nothing
+isVariant _ (Interval _ _) = Nothing
+
 -- | What a condition is worth when the folding evaluator cannot pin it down,
 -- which is where a variable that holds several values or a range still decides
 -- a comparison. Only a comparison of two integer operands is answered; every
@@ -763,6 +855,9 @@ abstractValue global locals (BinOp op left right _) = do
   leftValues <- operandOf global locals left
   rightValues <- operandOf global locals right
   B <$> compareValues op leftValues rightValues
+abstractValue global locals (IsEnumVariantExpression obj _enum variant _) = do
+  values <- valuesIn global locals (AccessObject obj)
+  B <$> isVariant variant values
 abstractValue _ _ _ = Nothing
 
 -- | What the walk can say an expression may be: the value the folding
@@ -781,6 +876,10 @@ valuesIn global locals expr =
         AccessObject (Variable ident _) -> varValues <$> M.lookup ident (known locals)
         -- | The body of the callee was walked knowing nothing of its
         -- parameters, so what it gives back holds for any call.
+        -- | A variant written out, with or without data attached, says which
+        -- variant it is.
+        EnumVariantInitializer _enum variant _args _ ->
+          Just (Discrete (S.singleton (Variant variant)))
         FunctionCall ident _args _ -> M.lookup ident (returnedValues global)
         MemberFunctionCall obj member _args _ -> memberSummary obj member
         DerefMemberFunctionCall obj member _args _ -> memberSummary obj member
@@ -832,23 +931,30 @@ reasonsFor global locals cond =
           (\value -> Reason ident (OneValue value) [])
             <$> M.lookup ident (moduleConsts global)
 
-    holdsOf entry = case singleValue entry of
-      Just value -> OneValue value
-      Nothing -> case varValues entry of
-        Interval lo hi -> Between lo hi
-        Discrete values -> OneOf (mapMaybe integerOf (S.toList values))
+    holdsOf entry = case varValues entry of
+      Interval lo hi -> Between lo hi
+      Discrete values ->
+        case S.toList values of
+          [Scalar value] -> OneValue value
+          listedValues ->
+            case mapMaybe variantOf listedValues of
+              [] -> OneOf (mapMaybe integerOf listedValues)
+              names -> OneOfVariants names
 
 -- | The diagnostic: of the conditions the walk recorded, the ones whose value
 -- the state at them determines, in the order the source has them, which is the
 -- order of their positions.
 invariantConditions :: ValueAnalysisGlobal -> [ValueAnalysisError]
-invariantConditions global =
-  [ annotateError loc (EInvariantCondition value (reasonsFor global locals cond))
-  | (loc, (cond, locals)) <- M.toAscList (observed global)
-  , Just value@(B _) <- [verdict locals cond]
-  ]
+invariantConditions global = mapMaybe finding (M.toAscList (observed global))
 
   where
+
+    finding (loc, (cond, locals)) =
+      case verdict locals cond of
+        Just value@(B _) ->
+          Just (annotateError loc
+                  (EInvariantCondition value (reasonsFor global locals cond)))
+        _ -> Nothing
 
     -- | The folding evaluator answers first, which keeps the arithmetic of a
     -- condition it can work out whole, with its overflow and its division by
@@ -858,8 +964,6 @@ invariantConditions global =
         Just value -> Just value
         Nothing -> abstractValue global locals cond
 
--- | Runs the check over a whole module, with the constants it sees, returning
--- the first error. Only the first, since a user resolves them one at a time.
 -- | Runs the check over a whole module, with the constants it sees and the
 -- returned of the modules it imports, returning the first error and the
 -- returned this module adds to them.

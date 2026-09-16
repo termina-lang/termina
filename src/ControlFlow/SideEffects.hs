@@ -267,7 +267,7 @@ transfer = Transfer
   , onSimpleBlock = checkSimpleBlock
   , onExpression = checkFullExpression
   , onCondition = checkFullExpression
-  , onCaseEntry = const (return ())
+  , onCaseEntry = \_ _ -> return ()
   , refineTrue = const (return ())
   , refineFalse = const (return ())
     -- | The iterator holds a number, which has no effects to order.

@@ -109,6 +109,23 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Nothing
 
+    -- | One of the two branches leaves the enumeration at the variant the
+    -- condition asks about and the other does not.
+    it "accepts a variant test only some paths decide" $ do
+      let src = "enum State { Init, Running, Exit };\n" ++
+                "function f(n : u32) -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    var s : State = State::Init;\n" ++
+                "    if (n == 1 : u32) {\n" ++
+                "        s = State::Exit;\n" ++
+                "    }\n" ++
+                "    if (s is State::Exit) {\n" ++
+                "        y = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
+
     -- | The body of the callee gives back a parameter, which the walk knows
     -- nothing about, so the function is left without values and the call says
     -- nothing. A summary that missed one of the values a function gives back

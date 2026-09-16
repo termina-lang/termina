@@ -117,8 +117,10 @@ data Transfer p g e = Transfer
   , onExpression :: Expression SemanticAnn -> DataflowM p g e ()
     -- | An expression whose value decides which path is taken.
   , onCondition :: Expression SemanticAnn -> DataflowM p g e ()
-    -- | Entering a case of a @match@, which binds the variables of its variant.
-  , onCaseEntry :: MatchCase SemanticAnn -> DataflowM p g e ()
+    -- | Entering a case of a @match@, which binds the variables of its variant
+    -- and says which variant the object it discriminates on holds.
+  , onCaseEntry ::
+      Expression SemanticAnn -> MatchCase SemanticAnn -> DataflowM p g e ()
     -- | Entering a loop, which declares an iterator of the given type that
     -- runs from the first of the two bounds up to but not including the
     -- second, one value per turn.
@@ -158,7 +160,8 @@ walkForward transfer = walkBlock
 
     walkBasicBlock (MatchBlock expr cases mDefaultCase _) = do
       onExpression transfer expr
-      caseOuts <- mapM (\c -> branch (onCaseEntry transfer c >> walkBlock (matchBody c))) cases
+      caseOuts <-
+        mapM (\c -> branch (onCaseEntry transfer expr c >> walkBlock (matchBody c))) cases
       entry <- getPath
       case mDefaultCase of
         Just (DefaultCase blk _) -> do

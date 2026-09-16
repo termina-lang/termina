@@ -186,6 +186,47 @@ spec = do
                 "};"
       compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
+    -- | Neither branch leaves the enumeration at the variant the condition
+    -- asks about, and a variant is a value of the lattice like a number is.
+    it "VAE-001: variant test no assignment of the enumeration reaches" $ do
+      let src = "enum State { Init, Running, Exit };\n" ++
+                "function f(n : u32) -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    var s : State = State::Init;\n" ++
+                "    if (n == 1 : u32) {\n" ++
+                "        s = State::Running;\n" ++
+                "    }\n" ++
+                "    if (s is State::Exit) {\n" ++
+                "        y = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
+
+    -- | The case of a match says which variant its discriminant holds inside
+    -- the body, which is how a state machine is followed from one turn of its
+    -- loop to the next.
+    it "VAE-001: variant test the case it sits in has already decided" $ do
+      let src = "enum State { Init, Running, Exit };\n" ++
+                "function f(s : State) -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    match s {\n" ++
+                "        case Init => {\n" ++
+                "            if (s is State::Exit) {\n" ++
+                "                y = 1 : u32;\n" ++
+                "            }\n" ++
+                "        }\n" ++
+                "        case Running => {\n" ++
+                "            y = 2 : u32;\n" ++
+                "        }\n" ++
+                "        case Exit => {\n" ++
+                "            y = 3 : u32;\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
+
     -- | The loop runs its iterator over four values and the condition holds
     -- for all four, which no assignment in the body says.
     it "VAE-001: condition the range of a loop iterator decides" $ do

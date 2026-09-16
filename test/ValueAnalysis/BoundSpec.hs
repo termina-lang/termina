@@ -16,13 +16,13 @@ import Control.Monad (forM_)
 import Test.Hspec
 
 number :: Integer -> Value
-number value = Value (I (TInteger value DecRepr) Nothing)
+number value = Scalar (I (TInteger value DecRepr) Nothing)
 
 discrete :: [Integer] -> Values
 discrete = Discrete . S.fromList . map number
 
 boolean :: Bool -> Values
-boolean value = Discrete (S.singleton (Value (B value)))
+boolean value = Discrete (S.singleton (Scalar (B value)))
 
 -- | What a comparison against the value 10 says about the variable, on the
 -- side of the branch that takes it and on the side that does not.

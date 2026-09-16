@@ -310,7 +310,7 @@ transfer = Transfer
   , onExpression = readExpression
   , onCondition = readExpression
     -- | The variables a case binds are declared by the case itself.
-  , onCaseEntry = \(MatchCase _ bvars _ ann) ->
+  , onCaseEntry = \_ (MatchCase _ bvars _ ann) ->
       mapM_ (`markInitialized` getLocation ann) bvars
   , refineTrue = const (return ())
   , refineFalse = const (return ())
