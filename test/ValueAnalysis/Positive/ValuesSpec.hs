@@ -109,6 +109,39 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Nothing
 
+    -- | Every case of the match is a variant the callee gives back, so the
+    -- match says no more than the type does.
+    it "accepts a match every case of which the discriminant may hold" $ do
+      let src = "enum Status { Above, Below, Within };\n" ++
+                "function check(n : u32) -> Status {\n" ++
+                "    var s : Status;\n" ++
+                "    if (n == 1 : u32) {\n" ++
+                "        s = Status::Above;\n" ++
+                "    } else if (n == 2 : u32) {\n" ++
+                "        s = Status::Below;\n" ++
+                "    } else {\n" ++
+                "        s = Status::Within;\n" ++
+                "    }\n" ++
+                "    return s;\n" ++
+                "}\n" ++
+                "function f(n : u32) -> u32 {\n" ++
+                "    var y : u32;\n" ++
+                "    var s : Status = check(n);\n" ++
+                "    match s {\n" ++
+                "        case Above => {\n" ++
+                "            y = 1 : u32;\n" ++
+                "        }\n" ++
+                "        case Below => {\n" ++
+                "            y = 2 : u32;\n" ++
+                "        }\n" ++
+                "        case Within => {\n" ++
+                "            y = 3 : u32;\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
+
     -- | One of the two branches leaves the enumeration at the variant the
     -- condition asks about and the other does not.
     it "accepts a variant test only some paths decide" $ do

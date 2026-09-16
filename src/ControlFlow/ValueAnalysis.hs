@@ -183,6 +183,16 @@ covers (Interval lo hi) (Discrete vs) = all inside (S.toList vs)
 covers (Discrete left) (Discrete right) = right `S.isSubsetOf` left
 covers (Discrete _) (Interval _ _) = False
 
+-- | A place the walk meets that decides which path is taken, which is what
+-- the diagnostic reads once the walk is over.
+data Met =
+    -- | A condition, which is invariant when the state determines its value.
+    MetCondition (Expression SemanticAnn)
+    -- | A case of a match, with what the match discriminates on and the
+    -- variant of the case, which is never taken when the state rules the
+    -- variant out.
+  | MetCase (Expression SemanticAnn) Identifier
+
 -- | What each function and member gives back, for a call site to read. One
 -- with no entry here gives back whatever its type allows.
 type ReturnedValues = M.Map Identifier Values
@@ -194,12 +204,12 @@ data ValueAnalysisGlobal = ValueAnalysisGlobal
     -- makes this pass answer for the case a condition is constant outright.
     moduleConsts :: M.Map Identifier (Const SemanticAnn),
     platform :: Platform,
-    -- | Every condition the walk has met, with the state of the path where it
-    -- met it, under the position of the condition. A loop meets the same
-    -- condition once per turn and each turn overwrites the one before, so what
-    -- is left is what the last turn saw, which is the turn that starts from
-    -- the settled state of the head.
-    observed :: M.Map Location (Expression SemanticAnn, ValueAnalysisPath),
+    -- | Every place the walk has met that decides a path, with the state of
+    -- the path where it met it, under its position. A loop meets the same
+    -- place once per turn and each turn overwrites the one before, so what is
+    -- left is what the last turn saw, which is the turn that starts from the
+    -- settled state of the head.
+    observed :: M.Map Location (Met, ValueAnalysisPath),
     -- | What each function and member walked so far gives back, including
     -- those of the modules this one imports.
     returnedValues :: ReturnedValues
@@ -324,7 +334,8 @@ observeCondition cond = do
   noteEscapes cond
   locals <- getPath
   let loc = getLocation . getAnnotation $ cond
-  modifyGlobal (\g -> g { observed = M.insert loc (cond, locals) (observed g) })
+  modifyGlobal (\g ->
+    g { observed = M.insert loc (MetCondition cond, locals) (observed g) })
 
 -- | A bound a branch puts on a variable, both ends included.
 data Bound = AtLeast Integer | AtMost Integer
@@ -400,6 +411,14 @@ mirrored op = op
 enterCase ::
   Expression SemanticAnn -> MatchCase SemanticAnn -> ValueAnalysisMonad ()
 enterCase discriminant (MatchCase variant bvars _ ann) = do
+  -- | Taken down before the refinement below, since what says whether the case
+  -- is ever taken is what the match knows on the way in, not what the case
+  -- itself says.
+  locals <- getPath
+  modifyGlobal (\g ->
+    g { observed =
+          M.insert (getLocation ann) (MetCase discriminant variant, locals)
+            (observed g) })
   -- | The variables a case binds are declared by the case, with a value that
   -- comes from the variant it matched.
   mapM_ forget bvars
@@ -941,19 +960,25 @@ reasonsFor global locals cond =
               [] -> OneOf (mapMaybe integerOf listedValues)
               names -> OneOfVariants names
 
--- | The diagnostic: of the conditions the walk recorded, the ones whose value
--- the state at them determines, in the order the source has them, which is the
--- order of their positions.
-invariantConditions :: ValueAnalysisGlobal -> [ValueAnalysisError]
-invariantConditions global = mapMaybe finding (M.toAscList (observed global))
+-- | The diagnostic: of the places the walk recorded, the conditions whose
+-- value the state at them determines and the cases the state rules out, in the
+-- order the source has them, which is the order of their positions.
+findings :: ValueAnalysisGlobal -> [ValueAnalysisError]
+findings global = mapMaybe finding (M.toAscList (observed global))
 
   where
 
-    finding (loc, (cond, locals)) =
+    finding (loc, (MetCondition cond, locals)) =
       case verdict locals cond of
         Just value@(B _) ->
           Just (annotateError loc
                   (EInvariantCondition value (reasonsFor global locals cond)))
+        _ -> Nothing
+    finding (loc, (MetCase discriminant variant, locals)) =
+      case valuesIn global locals discriminant >>= isVariant variant of
+        Just False ->
+          Just (annotateError loc
+                  (EUnreachableCase variant (reasonsFor global locals discriminant)))
         _ -> Nothing
 
     -- | The folding evaluator answers first, which keeps the arithmetic of a
@@ -980,7 +1005,7 @@ runValueAnalysisCheck ::
   -> AnnotatedProgram SemanticAnn
   -> (Maybe ValueAnalysisError, ReturnedValues)
 runValueAnalysisCheck plt consts imported program =
-  (listToMaybe (invariantConditions final), returnedValues final)
+  (listToMaybe (findings final), returnedValues final)
 
   where
 

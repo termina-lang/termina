@@ -60,6 +60,9 @@ data Error =
     -- | Condition with the same value on every evaluation, with what the pass
     -- knows of each name it reads (VAE-001)
     EInvariantCondition (Const SemanticAnn) [Reason]
+    -- | Case of a match the object it discriminates on can never hold, with
+    -- the name of the variant and what the pass knows of that object (VAE-002)
+  | EUnreachableCase Identifier [Reason]
   deriving Show
 
 type ValueAnalysisError = AnnotatedError Error Location
@@ -126,6 +129,14 @@ instance Diagnosable Error where
                     <> emph (showText value)
                     <> " every time it is reached, so one of the paths it"
                     <> " guards is never taken.")
+
+    describe (EUnreachableCase variant reasons) =
+        unnecessary . withReasons reasons $
+            diagnostic "VAE-002" "case that is never taken"
+                (saysReasons reasons <> "The object this match discriminates on"
+                    <> " never holds " <> emph (T.pack variant)
+                    <> " where the match is reached, so the body of this case"
+                    <> " never runs.")
 
 instance ErrorMessage ValueAnalysisError where
 

@@ -227,6 +227,44 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
+    -- | The walk of the callee found three of the four variants, so the
+    -- fourth case of the match is a body that never runs. The match has to
+    -- list it, since a match is exhaustive over the type, which is what says
+    -- the type is wider than the values it ever takes.
+    it "VAE-002: case of a variant the discriminant never holds" $ do
+      let src = "enum Status { Above, Below, Within, Unchecked };\n" ++
+                "function check(n : u32) -> Status {\n" ++
+                "    var s : Status;\n" ++
+                "    if (n == 1 : u32) {\n" ++
+                "        s = Status::Above;\n" ++
+                "    } else if (n == 2 : u32) {\n" ++
+                "        s = Status::Below;\n" ++
+                "    } else {\n" ++
+                "        s = Status::Within;\n" ++
+                "    }\n" ++
+                "    return s;\n" ++
+                "}\n" ++
+                "function f(n : u32) -> u32 {\n" ++
+                "    var y : u32;\n" ++
+                "    var s : Status = check(n);\n" ++
+                "    match s {\n" ++
+                "        case Above => {\n" ++
+                "            y = 1 : u32;\n" ++
+                "        }\n" ++
+                "        case Below => {\n" ++
+                "            y = 2 : u32;\n" ++
+                "        }\n" ++
+                "        case Within => {\n" ++
+                "            y = 3 : u32;\n" ++
+                "        }\n" ++
+                "        case Unchecked => {\n" ++
+                "            y = 4 : u32;\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-002")
+
     -- | The loop runs its iterator over four values and the condition holds
     -- for all four, which no assignment in the body says.
     it "VAE-001: condition the range of a loop iterator decides" $ do
