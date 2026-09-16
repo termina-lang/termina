@@ -186,9 +186,9 @@ walkForward transfer = walkBlock
     -- | Each else-if is walked knowing that the conditions before it were false.
     walkElseIfs _ [] = return []
     walkElseIfs before (elseIf : rest) = do
-      onCondition transfer (condElseIfCond elseIf)
       out <- branch $ do
         mapM_ (refineFalse transfer) before
+        onCondition transfer (condElseIfCond elseIf)
         refineTrue transfer (condElseIfCond elseIf)
         walkBlock (condElseIfBody elseIf)
       outs <- walkElseIfs (before ++ [condElseIfCond elseIf]) rest
