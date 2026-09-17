@@ -31,6 +31,7 @@ import Parser.Errors
 import Control.Monad.IO.Class
 import Data.Functor ((<&>))
 import qualified Data.Map.Strict as M
+import Semantic.Environment (DeclaredEnv, declaredNames)
 import Utils.Graph (TopSortError(..), topSortFromDepList)
 import Utils.Errors (ErrorMessage(toText, errorIdent))
 import Modules.Utils
@@ -69,6 +70,13 @@ getVisibleModules prevModsMap importedMods =
           Just prevMods -> prevMods) moduleDependencies
   in
   moduleDependencies ++ moduleDependencies'
+
+-- | Identifiers that the whole project declares at its top level, each with the
+-- location of its declaration. The type checker needs them before it types the
+-- first module, so that a local object that reuses one of these names is
+-- rejected whatever the order in which the modules are typed.
+projectDeclaredNames :: ParsedProject -> DeclaredEnv
+projectDeclaredNames = M.unions . fmap (declaredNames . parsedAST . metadata) . M.elems
 
 changedDependendencies :: BasicBlocksProject -> UTCTime -> [QualifiedName] -> IO Bool
 changedDependendencies _ _ [] = return False

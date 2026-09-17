@@ -24,7 +24,7 @@ import Text.Parsec (runParser)
 import Core.AST (TerminaModule'(..), ModuleImport'(..))
 
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
-import Semantic.Environment (makeInitialGlobalEnv, Environment)
+import Semantic.Environment (makeInitialGlobalEnv, Environment, addDeclaredNames)
 import Semantic.Types (SemanticAnn)
 
 import Configuration.Configuration (defaultConfig, TerminaConfig)
@@ -40,7 +40,7 @@ import ControlFlow.BasicBlocks.AST (AnnotatedProgram)
 import Command.Types
 import Command.Utils
     (genBasicBlocks, basicBlockChecks, runCheck, CheckFailure(..),
-     getVisibleModules, sortProjectDepsOrLoop)
+     getVisibleModules, sortProjectDepsOrLoop, projectDeclaredNames)
 import Modules.Modules (TerminaModuleData(..), ModuleDependency(..))
 import Modules.Utils (buildModuleName)
 import Parser.Errors (Error(..), ParsingErrors)
@@ -236,7 +236,8 @@ orderModules parsedProject =
 
 typeProject :: M.Map FilePath Text -> ParsedProject -> [QualifiedName]
   -> Either Failure TypedProject
-typeProject files parsedProject = go M.empty initialEnv
+typeProject files parsedProject =
+  go M.empty (addDeclaredNames (projectDeclaredNames parsedProject) initialEnv)
 
   where
 

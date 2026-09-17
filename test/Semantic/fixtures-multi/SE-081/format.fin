@@ -1,0 +1,7 @@
+// The parameter takes the name that handler.fin gives to a constant. Both end
+// up as the same C identifier, one with external linkage, so the type checker
+// must reject the pair. This module is typed first, before the constant reaches
+// the global environment, which is the case that used to slip through.
+function build_df_header(destination_id : u8) -> u32 {
+    return destination_id as u32;
+}

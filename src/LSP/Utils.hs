@@ -176,8 +176,14 @@ loadVSFile filePath = do
     Just fileContents -> return $ Right fileContents
 
 typeModules :: FilePath -> M.Map QualifiedName [QualifiedName] -> Environment -> [QualifiedName] -> HandlerM Environment
-typeModules _srcPath _prevModsMap finalState [] = pure finalState
-typeModules srcPath prevModsMap prevState (m:ms) = do
+typeModules srcPath prevModsMap initialState ms = do
+  parsedProject <- gets project_modules
+  let names = M.unions [declaredNames (parsedAST parsingData) | Just parsingData <- parsing <$> M.elems parsedProject]
+  typeModules' srcPath prevModsMap (addDeclaredNames names initialState) ms
+
+typeModules' :: FilePath -> M.Map QualifiedName [QualifiedName] -> Environment -> [QualifiedName] -> HandlerM Environment
+typeModules' _srcPath _prevModsMap finalState [] = pure finalState
+typeModules' srcPath prevModsMap prevState (m:ms) = do
   parsedProject <- gets project_modules
   let parsedModule = parsedProject M.! m
   let moduleDependencies = S.fromList $ getVisibleModules prevModsMap (importedModules parsedModule)
@@ -213,7 +219,7 @@ typeModules srcPath prevModsMap prevState (m:ms) = do
                   parsedModule { semantic = Just semanticData }
                   (project_modules s) })          
           -- | We need to update the project store
-          typeModules srcPath newModsMap newState ms
+          typeModules' srcPath newModsMap newState ms
 
 getDocumentSymbols :: LSP.Uri -> SAST.AnnotatedProgram SemanticAnn -> [LSP.SymbolInformation]
 getDocumentSymbols fileURI = Prelude.concatMap toDocumentSymbol

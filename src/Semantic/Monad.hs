@@ -227,13 +227,14 @@ getGlobalVarTy loc ident =
 glbWhereIsDefined :: Identifier -> SemanticMonad (Maybe Location)
 glbWhereIsDefined i = fmap location . M.lookup i <$> gets global
 
+-- | Location where an identifier is already taken, if it is. The declared map
+-- covers every name of the top level, the ones of the modules that are still to
+-- be typed included, so the global environment adds nothing to this lookup.
 whereIsDefined :: Identifier -> SemanticMonad (Maybe Location)
 whereIsDefined ident = do
   st <- get
-  case M.lookup ident (global st) of
-    Nothing -> case M.lookup ident (local st) of
-      Nothing -> return Nothing
-      Just ob -> return . Just . location $ ob
+  case M.lookup ident (local st) of
+    Nothing -> return $ M.lookup ident (declared st)
     Just ob -> return . Just . location $ ob
 
 sameTyOrError :: Location -> TerminaType SemanticAnn -> TerminaType SemanticAnn -> SemanticMonad ()

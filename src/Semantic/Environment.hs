@@ -2,6 +2,7 @@ module Semantic.Environment where
 
 import qualified Data.Map.Strict as M
 import Semantic.AST
+import Core.Utils (getGlobalIdentifier, getTypeIdentifier)
 import Utils.Annotations
 import Semantic.Types
 import Configuration.Configuration
@@ -20,6 +21,9 @@ type LocalEnv = M.Map Identifier (LocatedElement (AccessKind, TerminaType Semant
 -- | Map with the moved variables
 type MovedEnv = M.Map Identifier Location
 
+-- | Map with the identifiers declared at the top level of the project
+type DeclaredEnv = M.Map Identifier Location
+
 -- | Environment required to type expression packed into just one type.
 data Environment
  = ExprST
@@ -29,6 +33,12 @@ data Environment
  -- | Set of all the modules that are imported in the current module together with the
  -- | current module.
  , visible :: S.Set QualifiedName
+ -- | Every identifier that is taken at the top level of the program: the ones
+ -- the language and the platform provide, and the ones declared by any module
+ -- of the project, typed or not. The modules are typed one after another, so
+ -- the global environment above only holds what the modules typed so far
+ -- declare, which is why a local object is checked against this map instead.
+ , declared :: DeclaredEnv
  -- | Target platform, for the static range checks (its @usize@ width; see
  -- 'Configuration.Platform').
  , targetPlatform :: Platform
@@ -36,6 +46,22 @@ data Environment
 
 getEntry :: LocatedElement (GEntry SemanticAnn) -> GEntry SemanticAnn
 getEntry = element
+
+-- | Identifiers that a program declares at the top level, each with the
+-- location of its declaration. The constexpr declarations are in, even though
+-- the transpiler folds them and they reach no C identifier: an object that took
+-- the name of a constexpr would lose every read of it, because the type checker
+-- substitutes the folded value before it looks the name up among the local
+-- objects.
+declaredNames :: [AnnASTElement' ty expr blk Location] -> DeclaredEnv
+declaredNames = foldr addName M.empty
+
+  where
+
+    addName :: AnnASTElement' ty expr blk Location -> DeclaredEnv -> DeclaredEnv
+    addName element'@(Function ident _ _ _ _ _) = M.insert ident (getAnnotation element')
+    addName element'@(GlobalDeclaration glb) = M.insert (getGlobalIdentifier glb) (getAnnotation element')
+    addName element'@(TypeDefinition tydef _) = M.insert (getTypeIdentifier tydef) (getAnnotation element')
 
 stdlibGlobalEnv :: Integer -> Integer -> [(Identifier, LocatedElement (GEntry SemanticAnn))]
 stdlibGlobalEnv outBufSize inBufSize =
@@ -174,8 +200,19 @@ makeInitialGlobalEnv (Just config) plt pltEnvironment =
         env | enableSystemExcept config, env <- sysExceptGlobalEnv
       ]]
   in
-  ExprST (M.fromList globalEnv) M.empty M.empty S.empty plt
+  makeEnvironment (M.fromList globalEnv) plt
 makeInitialGlobalEnv Nothing plt pltEnvironment =
   let globalEnv = mconcat [stdlibGlobalEnv defaultSysPrintOutputBufferSize defaultSysReadInputBufferSize, pltEnvironment]
   in
-  ExprST (M.fromList globalEnv) M.empty M.empty S.empty plt
+  makeEnvironment (M.fromList globalEnv) plt
+
+-- | The environment a project starts from, holding the entries that the
+-- language and the platform provide. Their names go into the declared map as
+-- well: they are as taken as the ones the project declares, and nothing else
+-- fills that map for them.
+makeEnvironment :: GlobalEnv -> Platform -> Environment
+makeEnvironment globalEnv = ExprST globalEnv M.empty M.empty S.empty (M.map location globalEnv)
+
+-- | Take note of the names that the project declares at its top level.
+addDeclaredNames :: DeclaredEnv -> Environment -> Environment
+addDeclaredNames names env = env { declared = M.union names (declared env) }

@@ -96,8 +96,8 @@ loadModules imported srcPath = do
         (fss ++ deps)
 
 typeModules :: ParsedProject -> Environment -> [QualifiedName] -> IO (TypedProject, Environment)
-typeModules parsedProject =
-  typeModules' M.empty
+typeModules parsedProject initialState =
+  typeModules' M.empty (addDeclaredNames (projectDeclaredNames parsedProject) initialState)
 
   where
 
