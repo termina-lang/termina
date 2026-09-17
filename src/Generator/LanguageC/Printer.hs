@@ -133,15 +133,17 @@ instance CPrint CType where
         pqual <- pprint qual
         pArraySizes <- pprintCTArray aTy
         return $ pATy <+> parens (pretty "*" <+> pqual) <> pArraySizes
-    pprint (CTPointer (CTFunction rTy params) (CQualifier False False False)) = do
+    pprint (CTFunctionPointer rTy params (CQualifier False False False)) = do
         prTy <- pprint rTy
-        pparams <- mapM pprint params
+        pparams <- mapM pprintCParameter params
         return $ prTy <+> parens (pretty "*") <> pprintParamList pparams
-    pprint (CTPointer (CTFunction rTy params) qual) = do
+    pprint (CTFunctionPointer rTy params qual) = do
         prTy <- pprint rTy
         pqual <- pprint qual
-        pparams <- mapM pprint params
+        pparams <- mapM pprintCParameter params
         return $ prTy <+> parens (pretty "*" <+> pqual) <> pprintParamList pparams
+    pprint ty@(CTPointer (CTFunction {}) _) =
+        error $ "A function pointer that is printed must carry the names of its parameters: " ++ show ty
     pprint (CTPointer ty (CQualifier False False False)) = do
         ptype <- pprint ty
         return $ ptype <+> pretty "*"
@@ -335,8 +337,14 @@ braces' b = braces (line <> b <> line)
 indentTab :: DocStyle -> DocStyle
 indentTab = indent 4
 
+-- | A parameter of a prototype prints as the declaration of an object of its
+-- type, which is what puts the name where C expects it when the type is an
+-- array or a pointer.
+pprintCParameter :: CParameter -> CPrinter
+pprintCParameter (CParameter ident ty) = pprintCTypeDecl ident ty
+
 pprintCTypeDecl :: Ident -> CType -> CPrinter
-pprintCTypeDecl ident ty = 
+pprintCTypeDecl ident ty =
     case ty of
         CTArray {} -> do
             pRootTy <- pprint (rootCType ty)
@@ -351,14 +359,14 @@ pprintCTypeDecl ident ty =
             pqual <- pprint qual
             pArraySizes <- pprintCTArray aTy
             return $ pATy <+> parens (pretty "*" <+> pqual <+> pretty ident) <> pArraySizes
-        CTPointer (CTFunction rTy params) (CQualifier False False False) -> do
+        CTFunctionPointer rTy params (CQualifier False False False) -> do
             prTy <- pprint rTy
-            pparams <- mapM pprint params
+            pparams <- mapM pprintCParameter params
             return $ prTy <+> parens (pretty "*" <+> pretty ident) <> pprintParamList pparams
-        CTPointer (CTFunction rTy params) qual -> do
+        CTFunctionPointer rTy params qual -> do
             prTy <- pprint rTy
             pqual <- pprint qual
-            pparams <- mapM pprint params
+            pparams <- mapM pprintCParameter params
             return $ prTy <+> parens (pretty "*" <+> pqual <+> pretty ident) <> pprintParamList pparams
         _ -> do
             pty <- pprint ty

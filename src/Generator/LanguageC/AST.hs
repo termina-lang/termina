@@ -123,6 +123,8 @@ data CType =
     | CTStruct CStructTag Ident CQualifier
     -- | Function type
     | CTFunction CType [CType]
+    -- | Pointer to function
+    | CTFunctionPointer CType [CParameter] CQualifier
     -- | Enumeration types
     | CTEnum Ident CQualifier
     -- | size_t type 
@@ -133,6 +135,11 @@ data CType =
     | CTFloat CFloatSize CQualifier
     -- | typedef name
     | CTTypeDef Ident CQualifier
+    deriving Show
+
+-- | A parameter of a function type that is declared, with the name that the
+-- prototype gives it.
+data CParameter = CParameter Ident CType
     deriving Show
 
 data CBinaryOp = 

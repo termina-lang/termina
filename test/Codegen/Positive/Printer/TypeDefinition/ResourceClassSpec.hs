@@ -183,7 +183,8 @@ spec = do
             "    uint32_t field0;\n" ++
             "    struct {\n" ++
             "        void * __that;\n" ++
-            "        void (* test0)(const __termina_event_t * const, void * const);\n" ++
+            "        void (* test0)(const __termina_event_t * const __ev,\n" ++
+            "                       void * const __this);\n" ++
             "    } field1;\n" ++
             "} Class0;\n" ++
             "\n" ++

@@ -52,10 +52,10 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface Regular
 
         genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
         genInterfaceProcedureField (InterfaceProcedure _ak procedure params _modifiers _) = do
-            cParamTypes <- mapM (genType noqual . paramType) params
-            let cEventParamType = _const . ptr $ _const __termina_event_t
-                cThisParamType = _const . ptr $ void
-                cFuncPointerType = CTPointer (CTFunction (CTVoid noqual) (cEventParamType : cThisParamType : cParamTypes)) noqual
+            cParams <- mapM genCParameter params
+            let cEventParam = CParameter eventParam (_const . ptr $ _const __termina_event_t)
+                cThisParam = CParameter thisParam (_const . ptr $ void)
+                cFuncPointerType = CTFunctionPointer (CTVoid noqual) (cEventParam : cThisParam : cParams) noqual
             return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
 genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface SystemInterface _)) (SemanticAnn (FTy (AccessPortField members)) _)) = do
     memberFields <- mapM genInterfaceProcedureField (M.elems members)
@@ -70,9 +70,9 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface SystemI
 
         genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
         genInterfaceProcedureField (InterfaceProcedure _ak procedure params _modifiers _) = do
-            let cEventParamType = _const . ptr $ _const __termina_event_t
-            cParamTypes <- mapM (genType noqual . paramType) params
-            let cFuncPointerType = CTPointer (CTFunction (CTVoid noqual) (cEventParamType : cParamTypes)) noqual
+            cParams <- mapM genCParameter params
+            let cEventParam = CParameter eventParam (_const . ptr $ _const __termina_event_t)
+                cFuncPointerType = CTFunctionPointer (CTVoid noqual) (cEventParam : cParams) noqual
             return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
 
 genFieldDeclaration (FieldDefinition _ (TAccessPort (TInterface _ _)) ann) = error $ "Invalid access port annotation" ++ show ann
