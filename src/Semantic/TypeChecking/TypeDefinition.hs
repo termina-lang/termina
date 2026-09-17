@@ -134,8 +134,8 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
     typeInterfaceProcedure (InterfaceProcedure ak procId ps_ts mds_ts' annIP) = do
       ps_ty <- localScope $ do
           forM ps_ts (\param@(Parameter paramId _) -> do
-            typedParam <- typeProcedureParameter ann param
-            insertLocalImmutObj ann paramId (paramType typedParam)
+            typedParam <- typeProcedureParameter annIP param
+            insertLocalImmutObj annIP paramId (paramType typedParam)
             return typedParam)
       mds_ty' <- mapM (typeModifier ann typeGlobalObject) mds_ts'
       return $ InterfaceProcedure ak procId ps_ty mds_ty' (buildExpAnn annIP TUnit)
@@ -496,7 +496,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts, _methods, viewers) prov
       localScope $ zipWithM_ (\p@(Parameter _ ty) (Parameter pId ts) -> do
           ty' <- typeTypeSpecifier loc typeRHSObject ts
           unless (sameTy ty ty') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, paramType p, loc) ty'))
-          insertLocalImmutObj anns pId ty'
+          insertLocalImmutObj ann pId ty'
         ) ps ps'
       checkSortedProcedures ds as
     checkSortedProcedures _ _ = throwError (annotateError Internal EMalformedClassTyping)
