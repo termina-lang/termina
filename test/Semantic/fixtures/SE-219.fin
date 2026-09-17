@@ -1,0 +1,9 @@
+// malloc names a function of the standard library of C, so the generated code
+// would declare an object over a name that belongs to the implementation.
+function allocate_one() -> u32 {
+
+    var malloc : u32 = 0;
+
+    return malloc;
+
+}

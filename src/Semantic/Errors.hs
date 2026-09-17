@@ -6,6 +6,7 @@ module Semantic.Errors where
 
 -- Termina AST
 import Semantic.AST
+import Semantic.Reserved (ReservedBy(..))
 import Utils.Annotations
 import Utils.Errors
 import qualified Data.Map.Strict as M
@@ -269,6 +270,7 @@ data Error
   | EMemberFunctionWithMutableSelfInHandlerClass Identifier -- ^ Member function with mutable self reference in handler class
   | ECharLiteralOutOfRange Char -- ^ Character literal whose code point is outside the 7-bit ASCII range (SE-217)
   | EReferenceToPackedMember Identifier -- ^ Reference to a member reached through a packed struct, on a strict-alignment target (SE-218)
+  | EReservedIdentifier Identifier ReservedBy -- ^ Identifier that C keeps for itself (SE-219)
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -985,6 +987,17 @@ instance Diagnosable Error where
     describe (ECharLiteralOutOfRange cp) =
         diagnostic "SE-217" "character literal out of range"
             ("The character literal has code point \x1b[31m" <> T.pack (show (fromEnum cp)) <> "\x1b[0m, which is outside the 7-bit ASCII range (0 to 127).")
+    describe (EReservedIdentifier ident reservedBy) =
+        diagnostic "SE-219" "reserved identifier"
+            ("The name \x1b[31m" <> T.pack ident <> "\x1b[0m is reserved: " <> heldBy <> ".\n" <>
+             "The transpiler does not rename, so a Termina name reaches the generated code as it is\n" <>
+             "written and lands in the same name space as the names of C.")
+      where
+        heldBy = case reservedBy of
+            CKeyword -> "it is a keyword of C"
+            CStandardLibrary -> "it names something in the standard library of C"
+            CImplementation -> "an underscore and an uppercase letter are kept for the implementation (ISO/IEC 9899 7.1.3)"
+            CPlatform -> "the target platform declares it in the headers that a generated module includes"
     describe (EReferenceToPackedMember ident) =
         diagnostic "SE-218" "reference to a packed struct member"
             ("This reference reaches into the packed struct \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Taking a reference to a member of a packed struct yields an under-aligned pointer, whose\n" <> "packed provenance is lost at the call boundary; on a strict-alignment target the callee then\n" <> "performs a misaligned access (undefined behavior). Read or write the member by value instead.")

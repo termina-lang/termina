@@ -14,6 +14,7 @@ import Core.AST as CAST
 import Semantic.AST
 
 import Semantic.Errors
+import Semantic.Reserved
 import Semantic.Types
 import Semantic.Environment
 import Core.Utils
@@ -95,7 +96,9 @@ insertLocalMutObj :: Location -> Identifier -> TerminaType SemanticAnn -> Semant
 insertLocalMutObj loc ident ty = do
   prev <- whereIsDefined ident
   case prev of
-    Nothing -> modify (\s -> s{local = M.insert ident (LocatedElement (Mutable, ty) loc) (local s)})
+    Nothing -> do
+      checkReservedName loc ident
+      modify (\s -> s{local = M.insert ident (LocatedElement (Mutable, ty) loc) (local s)})
     Just prevloc -> throwError $ annotateError loc $ ESymbolAlreadyDefined (ident, prevloc)
 
 -- | Insert immutable object (variable) in local scope.
@@ -103,8 +106,18 @@ insertLocalImmutObj :: Location -> Identifier -> TerminaType SemanticAnn -> Sema
 insertLocalImmutObj loc ident ty = do
   prev <- whereIsDefined ident
   case prev of
-    Nothing -> modify (\s -> s{local = M.insert ident (LocatedElement (Immutable, ty) loc) (local s)})
+    Nothing -> do
+      checkReservedName loc ident
+      modify (\s -> s{local = M.insert ident (LocatedElement (Immutable, ty) loc) (local s)})
     Just prevloc -> throwError $ annotateError loc $ ESymbolAlreadyDefined (ident, prevloc)
+
+-- | Reject a name that C keeps for itself.
+checkReservedName :: Location -> Identifier -> SemanticMonad ()
+checkReservedName loc ident = do
+  plt <- gets targetPlatform
+  case reservedName plt ident of
+    Nothing -> return ()
+    Just reservedBy -> throwError $ annotateError loc $ EReservedIdentifier ident reservedBy
 
 moveObject :: Location -> Object a -> SemanticMonad ()
 moveObject loc obj = 
@@ -129,7 +142,9 @@ insertGlobal ident entry err =
   glbWhereIsDefined ident >>=
   \case
     { Just l -> throwError (annotateError (location entry) (err l)) ;
-      Nothing -> modify (\s -> s{global = M.insert ident entry (global s)}) ;
+      Nothing -> do
+        checkReservedName (location entry) ident
+        modify (\s -> s{global = M.insert ident entry (global s)}) ;
     }
   -- if b then throwError (annotateError (location entry) getError)
   -- else

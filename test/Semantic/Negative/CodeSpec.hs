@@ -253,6 +253,7 @@ titles =
   , ("SE-216", "binary operation expected integer type on the right")
   , ("SE-217", "character literal out of range")
   , ("SE-218", "reference to a packed struct member")
+  , ("SE-219", "reserved identifier")
   ]
 
 spec :: Spec
