@@ -78,7 +78,7 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_lock_type_t __lock_type;\n" ++
+              "    __termina_resource_lock_type_t _lock_type;\n" ++
               "} id0;\n" ++
               "\n" ++
               "void id0__assignment_test1(const __termina_event_t * const __ev,\n" ++
@@ -96,14 +96,14 @@ spec = do
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
               "    __termina_lock_t __lock = __termina_resource__lock(&__ev->owner,\n" ++
-              "                                                       &self->__lock_type);\n" ++
+              "                                                       &self->_lock_type);\n" ++
               "\n" ++
-              "    __option_box_t opt = { .__variant = None };\n" ++
+              "    __option_box_t opt = { ._variant = None };\n" ++
               "\n" ++
-              "    opt.__variant = Some;\n" ++
-              "    opt.Some.__0 = box_var0;\n" ++
+              "    opt._variant = Some;\n" ++
+              "    opt.Some._0 = box_var0;\n" ++
               "\n" ++
-              "    __termina_resource__unlock(&__ev->owner, &self->__lock_type, __lock);\n" ++
+              "    __termina_resource__unlock(&__ev->owner, &self->_lock_type, __lock);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -116,7 +116,7 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_lock_type_t __lock_type;\n" ++
+              "    __termina_resource_lock_type_t _lock_type;\n" ++
               "} id0;\n" ++
               "\n" ++
               "void id0__assignment_test2(const __termina_event_t * const __ev,\n" ++
@@ -136,7 +136,7 @@ spec = do
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
               "    __termina_lock_t __lock = __termina_resource__lock(&__ev->owner,\n" ++
-              "                                                       &self->__lock_type);\n" ++
+              "                                                       &self->_lock_type);\n" ++
               "\n" ++
               "    uint32_t foo = 0U;\n" ++
               "\n" ++
@@ -146,7 +146,7 @@ spec = do
               "\n" ++
               "    *(uint32_t *)box_var1.data = *(uint32_t *)box_var0.data;\n" ++
               "\n" ++
-              "    __termina_resource__unlock(&__ev->owner, &self->__lock_type, __lock);\n" ++
+              "    __termina_resource__unlock(&__ev->owner, &self->_lock_type, __lock);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

@@ -146,10 +146,10 @@ spec = do
               "\n" ++
               "void test_option(void) {\n" ++
               "    \n" ++
-              "    __option_float32_t o = { .__variant = None };\n" ++
+              "    __option_float32_t o = { ._variant = None };\n" ++
               "\n" ++
-              "    o.__variant = Some;\n" ++
-              "    o.Some.__0 = 1.5f;\n" ++
+              "    o._variant = Some;\n" ++
+              "    o.Some._0 = 1.5f;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

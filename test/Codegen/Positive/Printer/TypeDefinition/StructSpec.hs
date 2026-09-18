@@ -66,21 +66,21 @@ spec = do
             "} id0;\n" ++
             "\n" ++
             "typedef struct {\n" ++
-            "    id0 __0;\n" ++
+            "    id0 _0;\n" ++
             "} __option_id0__Some_params_t;\n" ++
             "\n" ++     
             "typedef struct {\n" ++
             "    __option_id0__Some_params_t Some;\n" ++
-            "    __enum_option_t __variant;\n" ++
+            "    __enum_option_t _variant;\n" ++
             "} __option_id0_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
-            "    id0 __0;\n" ++
+            "    id0 _0;\n" ++
             "} __status_id0__Failure_params_t;\n" ++
             "\n" ++     
             "typedef struct {\n" ++
             "    __status_id0__Failure_params_t Failure;\n" ++
-            "    __enum_status_t __variant;\n" ++
+            "    __enum_status_t _variant;\n" ++
             "} __status_id0_t;")
     it "Prints a struct with two fields" $ do
       renderTypeDefinitionDecl (MonadicTypes S.empty (S.fromList [TStruct "id0"]) M.empty M.empty) structWithTwoFields `shouldBe`
@@ -91,12 +91,12 @@ spec = do
             "} id0;\n" ++
             "\n" ++
             "typedef struct {\n" ++
-            "    id0 __0;\n" ++
+            "    id0 _0;\n" ++
             "} __status_id0__Failure_params_t;\n" ++
             "\n" ++     
             "typedef struct {\n" ++
             "    __status_id0__Failure_params_t Failure;\n" ++
-            "    __enum_status_t __variant;\n" ++
+            "    __enum_status_t _variant;\n" ++
             "} __status_id0_t;")
     it "Prints a packed struct" $ do
       renderTypeDefinitionDecl emptyMonadicTypes packedStruct `shouldBe`

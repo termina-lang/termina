@@ -83,14 +83,14 @@ genFieldDeclaration (FieldDefinition identifier ts _) = do
 genOptionSomeParameterStruct :: TerminaType SemanticAnn ->  CGenerator CFileItem
 genOptionSomeParameterStruct ts = do
     cTs <- genType noqual ts
-    let fld = field (namefy "0") cTs
+    let fld = field (variantParamField 0) cTs
     identifier <- genOptionParameterStructName ts
     return $ pre_cr $ struct identifier [fld] []
 
 genStatusFailureParameterStruct :: TerminaType SemanticAnn ->  CGenerator CFileItem
 genStatusFailureParameterStruct ts = do
     cTs <- genType noqual ts
-    let fld = field (namefy "0") cTs
+    let fld = field (variantParamField 0) cTs
     identifier <- genStatusParameterStructName ts
     return $ pre_cr $ struct identifier [fld] []
 
@@ -112,14 +112,14 @@ genStatusStruct ts = do
 genResultOkParameterStruct :: TerminaType SemanticAnn -> TerminaType SemanticAnn ->  CGenerator CFileItem
 genResultOkParameterStruct okTy errorTy = do
     cTs <- genType noqual okTy
-    let fld = field (namefy "0") cTs
+    let fld = field (variantParamField 0) cTs
     identifier <- genResultParameterStructName okTy errorTy resultOkVariant
     return $ pre_cr $ struct identifier [fld] []
 
 genResultErrorParameterStruct :: TerminaType SemanticAnn -> TerminaType SemanticAnn ->  CGenerator CFileItem
 genResultErrorParameterStruct okTy errorTy = do
     cTs <- genType noqual errorTy
-    let fld = field (namefy "0") cTs
+    let fld = field (variantParamField 0) cTs
     identifier <- genResultParameterStructName okTy errorTy resultErrorVariant
     return $ pre_cr $ struct identifier [fld] []
 
@@ -232,7 +232,7 @@ genEnumVariantParameterStruct ann identifier (EnumVariant this_variant params) =
         genEnumVariantParameter :: TerminaType SemanticAnn -> Integer -> CGenerator CDeclaration
         genEnumVariantParameter ts index = do
             cParamType <- genType noqual ts
-            return $ CDecl (CTypeSpec cParamType) (Just (namefy $ show index)) Nothing
+            return $ CDecl (CTypeSpec cParamType) (Just (variantParamField index)) Nothing
 
 classifyClassMembers :: (MonadError CGeneratorError m) => TypeDef SemanticAnn -> m ([ClassMember SemanticAnn], [ClassMember SemanticAnn])
 classifyClassMembers (Class clsKind _identifier members _provides _modifiers) =
@@ -281,7 +281,7 @@ genConstSelfCastStmt ann identifier = do
     return $ pre_cr (var selfParam (ptr selfCType) @:= cExpr) |>> getLocation ann
 
 -- | __termina_lock_t __lock = __termina_resource__lock(
---        &__ev->owner, &self->__lock_type);
+--        &__ev->owner, &self->_lock_type);
 genResourceLockStmt :: SemanticAnn -> Identifier -> CGenerator CCompoundBlockItem
 genResourceLockStmt ann identifier = do
     selfCType <- genType noqual (TStruct identifier)
@@ -530,22 +530,22 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                         (classFunctionName @: classFunctionType) @@ [
                             addrOf ("event" @: __termina_event_t),
                             "self" @: classStructType],
-                    -- if (result.__variant != Status__Success)
+                    -- if (result._variant != Status__Success)
                     indent . pre_cr $ _if (
                             (("result" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
                         $ trail_cr $ block [
                             -- ExceptSource source;
                             pre_cr $ var "source" (typeDef "ExceptSource"),
-                            -- source.__variant = ExceptSource__Task;
+                            -- source._variant = ExceptSource__Task;
                             no_cr $ "source" @: typeDef "ExceptSource" @. variant @: enumFieldType @= "ExceptSource__Task" @: enumFieldType,
-                            -- source.Task.__0 = self->__task_id;
-                            no_cr $ "source" @: typeDef "ExceptSource" @. "Task" @: enumFieldType @. namefy "0" @: __termina_id_t @= ("self" @: ptr classStructType) @. taskIDField @: __termina_id_t,
+                            -- source.Task._0 = self->_task_id;
+                            no_cr $ "source" @: typeDef "ExceptSource" @. "Task" @: enumFieldType @. variantParamField 0 @: __termina_id_t @= ("self" @: ptr classStructType) @. taskIDField @: __termina_id_t,
 
-                            -- __termina_except__action_failure(source, , status.Failure.__0);
+                            -- __termina_except__action_failure(source, , status.Failure._0);
                             pre_cr $ __termina_except__action_failure @@ [
                                 "source" @: typeDef "ExceptSource",
                                 this_variant @: size_t,
-                                ("result" @: __status_int32_t) @. statusFailureVariant @: enumFieldType @. namefy "0" @: int32_t
+                                ("result" @: __status_int32_t) @. statusFailureVariant @: enumFieldType @. variantParamField 0 @: int32_t
                             ]
                         ],
                     indent . pre_cr $ _break
@@ -568,7 +568,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                                 cast void_ptr (addrOf ((action <::> "msg_data") @: cDataType)),
                                 addrOf ("status" @: int32_t)
                             ],
-                    -- if (status.__variant != Status__Success)
+                    -- if (status._variant != Status__Success)
                     indent . pre_cr $ _if (
                            "status" @: int32_t @!= dec 0 @: int32_t)
                         $ block [
@@ -583,22 +583,22 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                         (classFunctionName @: classFunctionType) @@ [
                             addrOf ("event" @: __termina_event_t),
                             "self" @: classStructType, (action <::> "msg_data") @: cDataType],
-                    -- if (result.__variant != Status__Success)
+                    -- if (result._variant != Status__Success)
                     indent . pre_cr $ _if (
                             (("result" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
                         $ trail_cr $ block [
                             -- ExceptSource source;
                             pre_cr $ var "source" (typeDef "ExceptSource"),
-                            -- source.__variant = ExceptSource__Task;
+                            -- source._variant = ExceptSource__Task;
                             no_cr $ "source" @: typeDef "ExceptSource" @. variant @: enumFieldType @= "ExceptSource__Task" @: enumFieldType,
-                            -- source.Task.__0 = self->__task_id;
-                            no_cr $ "source" @: typeDef "ExceptSource" @. "Task" @: enumFieldType @. namefy "0" @: __termina_id_t @= ("self" @: ptr classStructType) @. taskIDField @: __termina_id_t,
+                            -- source.Task._0 = self->_task_id;
+                            no_cr $ "source" @: typeDef "ExceptSource" @. "Task" @: enumFieldType @. variantParamField 0 @: __termina_id_t @= ("self" @: ptr classStructType) @. taskIDField @: __termina_id_t,
 
-                            -- __termina_except__action_failure(source, , status.Failure.__0);
+                            -- __termina_except__action_failure(source, , status.Failure._0);
                             pre_cr $ __termina_except__action_failure @@ [
                                 "source" @: typeDef "ExceptSource",
                                 this_variant @: size_t,
-                                ("result" @: __status_int32_t) @. statusFailureVariant @: enumFieldType @. namefy "0" @: int32_t
+                                ("result" @: __status_int32_t) @. statusFailureVariant @: enumFieldType @. variantParamField 0 @: int32_t
                             ]
                         ],
                     indent . pre_cr $ _break

@@ -46,7 +46,7 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_lock_type_t __lock_type;\n" ++
+              "    __termina_resource_lock_type_t _lock_type;\n" ++
               "    uint32_t tm_sent_packets;\n" ++
               "} TMChannel;\n" ++
               "\n" ++
@@ -67,11 +67,11 @@ spec = do
               "    TMChannel * self = (TMChannel *)__this;\n" ++
               "\n" ++
               "    __termina_lock_t __lock = __termina_resource__lock(&__ev->owner,\n" ++
-              "                                                       &self->__lock_type);\n" ++
+              "                                                       &self->_lock_type);\n" ++
               "\n" ++
               "    *packets = self->tm_sent_packets;\n" ++
               "\n" ++
-              "    __termina_resource__unlock(&__ev->owner, &self->__lock_type, __lock);\n" ++
+              "    __termina_resource__unlock(&__ev->owner, &self->_lock_type, __lock);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -84,7 +84,7 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_lock_type_t __lock_type;\n" ++
+              "    __termina_resource_lock_type_t _lock_type;\n" ++
               "    volatile uint32_t * status;\n" ++
               "} UARTDriver;\n" ++
               "\n" ++
@@ -103,11 +103,11 @@ spec = do
               "    UARTDriver * self = (UARTDriver *)__this;\n" ++
               "\n" ++
               "    __termina_lock_t __lock = __termina_resource__lock(&__ev->owner,\n" ++
-              "                                                       &self->__lock_type);\n" ++
+              "                                                       &self->_lock_type);\n" ++
               "\n" ++
               "    *ret = *self->status;\n" ++
               "\n" ++
-              "    __termina_resource__unlock(&__ev->owner, &self->__lock_type, __lock);\n" ++
+              "    __termina_resource__unlock(&__ev->owner, &self->_lock_type, __lock);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

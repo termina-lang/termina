@@ -95,7 +95,7 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_lock_type_t __lock_type;\n" ++
+              "    __termina_resource_lock_type_t _lock_type;\n" ++
               "} id0;\n" ++
               "\n" ++
               "void id0__test1(const __termina_event_t * const __ev, void * const __this,\n" ++
@@ -113,7 +113,7 @@ spec = do
              "    id0 * self = (id0 *)__this;\n" ++
              "\n" ++
              "    __termina_lock_t __lock = __termina_resource__lock(&__ev->owner,\n" ++
-             "                                                       &self->__lock_type);\n" ++
+             "                                                       &self->_lock_type);\n" ++
              "\n" ++
              "    *(uint16_t *)foo.data = *(uint16_t *)foo.data + 1024U;\n" ++
              "\n" ++
@@ -135,7 +135,7 @@ spec = do
              "\n" ++
              "    *(uint16_t *)foo.data = 1024U % *(uint16_t *)foo.data;\n" ++
              "\n" ++
-             "    __termina_resource__unlock(&__ev->owner, &self->__lock_type, __lock);\n" ++
+             "    __termina_resource__unlock(&__ev->owner, &self->_lock_type, __lock);\n" ++
              "\n" ++
              "    return;\n" ++
              "\n" ++

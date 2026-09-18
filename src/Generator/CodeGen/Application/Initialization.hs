@@ -31,7 +31,7 @@ genInitializeObj loc before (Resource identifier ty@(TAtomicArray {}) (Just expr
 genInitializeObj loc before (Resource identifier _ mexpr _ _) = do
     let cObj = identifier @: typeDef identifier
     let cLockNone = 
-            cObj @. "__lock_type" @: __termina_resource_lock_type_t @. "type" @: enumFieldType
+            cObj @. resourceLockTypeField @: __termina_resource_lock_type_t @. "type" @: enumFieldType
                 @= "__termina_resource_lock_type__none" @: enumFieldType
     case mexpr of
         Just expr -> do

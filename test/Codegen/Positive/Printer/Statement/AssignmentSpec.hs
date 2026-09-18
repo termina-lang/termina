@@ -134,21 +134,21 @@ spec = do
     it "Assigns Some to an option-box" $ do
       renderStatement option0Assign `shouldBe`
         pack (
-          "\noption0.__variant = Some;\n" ++
-          "option0.Some.__0 = box_var0;")
+          "\noption0._variant = Some;\n" ++
+          "option0.Some._0 = box_var0;")
     it "Assigns None to an option-box" $ do
       renderStatement option1Assign `shouldBe`
-        pack "\noption1.__variant = None;"
+        pack "\noption1._variant = None;"
   describe "Pretty printing enum assignments" $ do
     it "Assigns a parameterless enum variant" $ do
       renderStatement enum0Assign `shouldBe`
-        pack "\nenum0.__variant = Message__Reset;"
+        pack "\nenum0._variant = Message__Reset;"
     it "Assigns an enum variant with parameters" $ do
       renderStatement enum1Assign `shouldBe`
         pack (
-          "\nenum1.__variant = Message__In;\n" ++
-          "enum1.In.__0 = 0U;\n" ++
-          "enum1.In.__1 = 0U;")
+          "\nenum1._variant = Message__In;\n" ++
+          "enum1.In._0 = 0U;\n" ++
+          "enum1.In._1 = 0U;")
   describe "Pretty printing struct assignments" $ do
     it "Assigns a nested struct initializer" $ do
       renderStatement struct0Assign `shouldBe`

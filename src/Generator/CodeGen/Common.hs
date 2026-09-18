@@ -134,20 +134,28 @@ poolMemoryArea identifier = namefy $ "pool" <:> identifier <:> "memory"
 msgQueueSendMethodName :: Identifier
 msgQueueSendMethodName = namefy "termina_out_port" <::> "send"
 
+-- | Name of a field that the generator adds to a struct.
+fieldify :: Identifier -> Identifier
+fieldify = ("_" <>)
+
+-- | Name of the field that holds the parameter of a variant at the given
+-- position.
+variantParamField :: Integer -> Identifier
+variantParamField = fieldify . show
+
 thatField, thisParam, eventParam, selfParam, lockVar :: Identifier
-thatField = namefy "that"
+thatField = fieldify "that"
 thisParam = namefy "this"
 eventParam = namefy "ev"
 selfParam = "self"
 lockVar = namefy "lock"
 
 resourceLockTypeField, taskMsgQueueIDField,
-    timerField, taskIDField, handlerIDField :: Identifier
-resourceLockTypeField = namefy $ "lock" <:> "type"
-taskMsgQueueIDField = namefy $ "task" <:> "msg_queue" <:> "id"
-timerField = namefy $ "timer" <:> "id"
-taskIDField = namefy $ "task" <:> "id"
-handlerIDField = namefy $ "handler" <:> "id"
+    taskIDField, handlerIDField :: Identifier
+resourceLockTypeField = fieldify $ "lock" <:> "type"
+taskMsgQueueIDField = fieldify $ "task" <:> "msg_queue" <:> "id"
+taskIDField = fieldify $ "task" <:> "id"
+handlerIDField = fieldify $ "handler" <:> "id"
 
 genEnumStructName :: (MonadError CGeneratorError m) => Identifier -> m Identifier
 genEnumStructName identifier = return $ namefy $ "enum" <:> identifier <:> "t"
@@ -203,7 +211,7 @@ genResultParameterStructName okTy errorTy this_variant = do
     return $ namefy "result" <:> okTyName <:> errorTyName <::> this_variant <:> "params" <:> "t"
 
 variant :: Identifier
-variant = namefy "variant"
+variant = fieldify "variant"
 
 optionSomeVariant, optionNoneVariant :: Identifier
 optionSomeVariant = "Some"

@@ -91,17 +91,17 @@ spec = do
   describe "Pretty printing option variable declarations" $ do
     it "Initializes an option-box with Some" $ do
       renderStatement option0 `shouldBe`
-        pack "\n__option_box_t option0 = { .__variant = Some, .Some = { .__0 = box_var0 } };"
+        pack "\n__option_box_t option0 = { ._variant = Some, .Some = { ._0 = box_var0 } };"
     it "Initializes an option-box with None" $ do
       renderStatement option1 `shouldBe`
-        pack "\n__option_box_t option1 = { .__variant = None };"
+        pack "\n__option_box_t option1 = { ._variant = None };"
   describe "Pretty printing enum variable declarations" $ do
     it "Initializes an enum variable with a parameterless variant" $ do
       renderStatement enum0 `shouldBe`
-        pack "\nMessage enum0 = { .__variant = Message__Reset };"
+        pack "\nMessage enum0 = { ._variant = Message__Reset };"
     it "Initializes an enum variable with a parameterized variant" $ do
       renderStatement enum1 `shouldBe`
-        pack "\nMessage enum1 = { .__variant = Message__In, .In = { .__0 = 0U, .__1 = 0U } };"
+        pack "\nMessage enum1 = { ._variant = Message__In, .In = { ._0 = 0U, ._1 = 0U } };"
   describe "Pretty printing struct variable declarations" $ do
     it "Initializes a struct variable with a nested initializer" $ do
       renderStatement struct0 `shouldBe`

@@ -7,9 +7,9 @@ static void __termina_app__init_tasks(int32_t * const status) {
     
     *status = 0L;
 
-    t.__task_id = __t__task_id;
+    t._task_id = __t__task_id;
 
-    t.__task_msg_queue_id = __t__task_msg_queue_id;
+    t._task_msg_queue_id = __t__task_msg_queue_id;
 
     __termina_task__init(__t__task_id, 10, 4096U, &__UserTask__termina_task, &t,
                          status);

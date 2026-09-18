@@ -464,7 +464,7 @@ genInitializerExpr e@(MonadicVariantInitializer mv ann) = do
         variantTag name = name @: enumFieldType |>> getLocation ann
         singlePayload tagName v = do
             cv <- genInitializerExpr v
-            let inner = CExprDesignatedInitializer [(namefy "0", cv)] cType cAnn
+            let inner = CExprDesignatedInitializer [(variantParamField 0, cv)] cType cAnn
             return $ CExprDesignatedInitializer [(variant, variantTag tagName), (tagName, inner)] cType cAnn
         noPayload tagName =
             return $ CExprDesignatedInitializer [(variant, variantTag tagName)] cType cAnn
@@ -481,7 +481,7 @@ genInitializerExpr e@(EnumVariantInitializer ts this_variant params ann) = do
         tagExpr = CExprValOf (CVar (ts <::> this_variant) enumFieldType) enumFieldType cAnn
     cParams <- zipWithM (\p i -> do
         cp <- genInitializerExpr p
-        return (namefy (show (i :: Integer)), cp)) params [0..]
+        return (variantParamField (i :: Integer), cp)) params [0..]
     let designators = (variant, tagExpr) :
             [(this_variant, CExprDesignatedInitializer cParams cType cAnn) | not (null cParams)]
     return $ CExprDesignatedInitializer designators cType cAnn

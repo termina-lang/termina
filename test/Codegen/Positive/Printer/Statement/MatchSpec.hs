@@ -78,9 +78,9 @@ spec = do
     it "Prints a match option statement" $ do
       renderStatement matchOption0 `shouldBe`
         pack (
-          "\nif (option_var.__variant == Some) {\n" ++
+          "\nif (option_var._variant == Some) {\n" ++
           "    \n" ++
-          "    __termina_box_t param0 = option_var.Some.__0;\n" ++
+          "    __termina_box_t param0 = option_var.Some._0;\n" ++
           "\n" ++
           "    foo1 = *(uint32_t *)param0.data;\n" ++
           "\n" ++
@@ -92,13 +92,13 @@ spec = do
     it "Prints a match option array statement" $ do
       renderStatement matchOption1 `shouldBe`
         pack (
-          "\nif (option_var.__variant == None) {\n" ++
+          "\nif (option_var._variant == None) {\n" ++
           "    \n" ++
           "    foo1 = 0U;\n" ++
           "\n" ++
           "} else {\n" ++
           "    \n" ++
-          "    __termina_box_t param1 = option_var.Some.__0;\n" ++
+          "    __termina_box_t param1 = option_var.Some._0;\n" ++
           "\n" ++
           "    foo1 = ((uint32_t *)param1.data)[8U];\n" ++
           "\n" ++
@@ -110,9 +110,9 @@ spec = do
           "    \n" ++
           "    __option_box_t __match = get_integer();\n" ++
           "\n" ++
-          "    if (__match.__variant == Some) {\n" ++
+          "    if (__match._variant == Some) {\n" ++
           "        \n" ++
-          "        __termina_box_t param0 = __match.Some.__0;\n" ++
+          "        __termina_box_t param0 = __match.Some._0;\n" ++
           "\n" ++
           "        foo1 = *(uint32_t *)param0.data;\n" ++
           "\n" ++

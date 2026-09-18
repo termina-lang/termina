@@ -53,8 +53,8 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_id_t __task_id;\n" ++
-              "    __termina_id_t __task_msg_queue_id;\n" ++
+              "    __termina_id_t _task_id;\n" ++
+              "    __termina_id_t _task_msg_queue_id;\n" ++
               "    __termina_id_t data_in;\n" ++
               "} CHousekeeping;\n" ++
               "\n" ++   
@@ -72,12 +72,12 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    uint32_t __0;\n" ++
+              "    uint32_t _0;\n" ++
               "} __option_uint32__Some_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    __option_uint32__Some_params_t Some;\n" ++
-              "    __enum_option_t __variant;\n" ++
+              "    __enum_option_t _variant;\n" ++
               "} __option_uint32_t;\n" ++
               "\n" ++
               "#endif\n")

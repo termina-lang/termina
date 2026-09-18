@@ -102,7 +102,7 @@ genEnumAssign loc before level cObj expr = do
             cParams <- zipWithM (\e index -> do
                 cType <- getExprType e >>= genType noqual
                 let cFieldObj = cObj @. this_variant @: cType
-                genFieldAssign loc False level cFieldObj (namefy (show (index :: Integer))) e) params [0..]
+                genFieldAssign loc False level cFieldObj (variantParamField (index :: Integer)) e) params [0..]
             let variantsFieldsObj = cObj @. variant @: enumFieldType
             let variantExpr = CExprValOf (CVar (ts <::> this_variant) enumFieldType) enumFieldType exprCAnn
             if before then
@@ -196,7 +196,7 @@ genMonadicVariantAssign loc before level cObj expr =
     case expr of
         (MonadicVariantInitializer (Some e) ann) -> do
             let cSomeVariantFieldObj = cObj @. optionSomeVariant @: enumFieldType
-            fieldInitalization <- genFieldAssign loc False level cSomeVariantFieldObj (namefy "0") e
+            fieldInitalization <- genFieldAssign loc False level cSomeVariantFieldObj (variantParamField 0) e
             let variantsFieldsObj = cObj @. variant @: enumFieldType
             let someVariantExpr = optionSomeVariant @: enumFieldType |>> getLocation ann
             if before then
@@ -219,7 +219,7 @@ genMonadicVariantAssign loc before level cObj expr =
                 return [no_cr (variantsFieldsObj @= successVariantExpr |>> getLocation ann) |>> getLocation ann]
         (MonadicVariantInitializer (Failure e) ann) -> do
             let cFailureVariantFieldObj = cObj @. statusFailureVariant @: enumFieldType
-            fieldInitalization <- genFieldAssign loc False level cFailureVariantFieldObj (namefy "0") e
+            fieldInitalization <- genFieldAssign loc False level cFailureVariantFieldObj (variantParamField 0) e
             let variantsFieldsObj = cObj @. variant @: enumFieldType
             let failureVariantExpr = statusFailureVariant @: enumFieldType |>> getLocation ann
             if before then
@@ -228,7 +228,7 @@ genMonadicVariantAssign loc before level cObj expr =
                 return $ no_cr (variantsFieldsObj @= failureVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
         (MonadicVariantInitializer (Ok e) ann) -> do
             let cOkVariantFieldObj = cObj @. resultOkVariant @: enumFieldType
-            fieldInitalization <- genFieldAssign loc False level cOkVariantFieldObj (namefy "0") e
+            fieldInitalization <- genFieldAssign loc False level cOkVariantFieldObj (variantParamField 0) e
             let variantsFieldsObj = cObj @. variant @: enumFieldType
             let failureVariantExpr = resultOkVariant @: enumFieldType |>> getLocation ann
             if before then
@@ -237,7 +237,7 @@ genMonadicVariantAssign loc before level cObj expr =
                 return $ no_cr (variantsFieldsObj @= failureVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
         (MonadicVariantInitializer (Error e) ann) -> do
             let cErrorVariantFieldObj = cObj @. resultErrorVariant @: enumFieldType
-            fieldInitalization <- genFieldAssign loc False level cErrorVariantFieldObj (namefy "0") e
+            fieldInitalization <- genFieldAssign loc False level cErrorVariantFieldObj (variantParamField 0) e
             let variantsFieldsObj = cObj @. variant @: enumFieldType
             let failureVariantExpr = resultErrorVariant @: enumFieldType |>> getLocation ann
             if before then
@@ -824,22 +824,22 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                 [param] ->
                     case head cParamTypes of
                         CTPointer {} ->
-                            return [pre_cr (var param (head cParamTypes) @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes)) |>> loc']
+                            return [pre_cr (var param (head cParamTypes) @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. variantParamField 0 @: head cParamTypes)) |>> loc']
                         _ ->
-                            return [pre_cr (var param (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes) |>> loc']
+                            return [pre_cr (var param (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. variantParamField 0 @: head cParamTypes) |>> loc']
                 (p : xp) -> do
                     let rest = zipWith3
                             (\sym index cParamType ->
                                 case cParamType of
                                     CTPointer {} ->
-                                        no_cr (var sym cParamType @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. namefy (show (index :: Integer)) @: cParamType)) |>> loc'
+                                        no_cr (var sym cParamType @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. variantParamField (index :: Integer) @: cParamType)) |>> loc'
                                     _ ->
-                                        no_cr (var sym cParamType @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (index :: Integer)) @: cParamType) |>> loc') xp [1..] (tail cParamTypes)
+                                        no_cr (var sym cParamType @:= (cObj @. this_variant @: cParamsStructType) @. variantParamField (index :: Integer) @: cParamType) |>> loc') xp [1..] (tail cParamTypes)
                     case head cParamTypes of
                         CTPointer {} ->
-                            return $ pre_cr (var p (head cParamTypes) @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes)) |>> loc' : rest
+                            return $ pre_cr (var p (head cParamTypes) @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. variantParamField 0 @: head cParamTypes)) |>> loc' : rest
                         _ ->
-                            return $ pre_cr (var p (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes) |>> loc' : rest
+                            return $ pre_cr (var p (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. variantParamField 0 @: head cParamTypes) |>> loc' : rest
 
 
 genBlocks (ReturnBlock mExpr ann) =

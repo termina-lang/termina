@@ -52,8 +52,8 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_id_t __task_id;\n" ++
-              "    __termina_id_t __task_msg_queue_id;\n" ++
+              "    __termina_id_t _task_id;\n" ++
+              "    __termina_id_t _task_msg_queue_id;\n" ++
               "    __termina_id_t timer;\n" ++
               "    _Atomic uint32_t * interval;\n" ++
               "} CHousekeeping;\n" ++
@@ -76,7 +76,7 @@ spec = do
               "\n" ++
               "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
               "\n" ++
-              "    __status_int32_t ret = { .__variant = Success };\n" ++
+              "    __status_int32_t ret = { ._variant = Success };\n" ++
               "\n" ++
               "    uint32_t local = 0U;\n" ++
               "\n" ++
@@ -102,7 +102,7 @@ spec = do
               "\n" ++ 
               "    for (;;) {\n" ++
               "        \n" ++  
-              "        __termina_msg_queue__recv(self->__task_msg_queue_id, &event, &status);\n" ++
+              "        __termina_msg_queue__recv(self->_task_msg_queue_id, &event, &status);\n" ++
               "\n" ++  
               "        if (status != 0L) {\n" ++
               "            break;\n" ++
@@ -122,15 +122,15 @@ spec = do
               "                result = CHousekeeping__timeout(&event, self,\n" ++
               "                                                timeout__msg_data);\n" ++
               "\n" ++
-              "                if (result.__variant != Success) {\n" ++
+              "                if (result._variant != Success) {\n" ++
               "                    \n" ++ 
               "                    ExceptSource source;\n" ++
-              "                    source.__variant = ExceptSource__Task;\n" ++
-              "                    source.Task.__0 = self->__task_id;\n" ++
+              "                    source._variant = ExceptSource__Task;\n" ++
+              "                    source.Task._0 = self->_task_id;\n" ++
               "\n" ++
               "                    __termina_except__action_failure(source,\n" ++
               "                                                     __CHousekeeping__timer,\n" ++
-              "                                                     result.Failure.__0);\n" ++
+              "                                                     result.Failure._0);\n" ++
               "\n" ++
               "                }\n" ++
               "\n" ++   
@@ -157,8 +157,8 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_id_t __task_id;\n" ++
-              "    __termina_id_t __task_msg_queue_id;\n" ++
+              "    __termina_id_t _task_id;\n" ++
+              "    __termina_id_t _task_msg_queue_id;\n" ++
               "    __termina_id_t timer;\n" ++
               "    _Atomic uint32_t * interval;\n" ++
               "} CHousekeeping;\n" ++
@@ -181,7 +181,7 @@ spec = do
               "\n" ++
               "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
               "\n" ++
-              "    __status_int32_t ret = { .__variant = Success };\n" ++
+              "    __status_int32_t ret = { ._variant = Success };\n" ++
               "\n" ++
               "    uint32_t local = 0U;\n" ++
               "\n" ++
@@ -207,7 +207,7 @@ spec = do
               "\n" ++ 
               "    for (;;) {\n" ++
               "        \n" ++  
-              "        __termina_msg_queue__recv(self->__task_msg_queue_id, &event, &status);\n" ++
+              "        __termina_msg_queue__recv(self->_task_msg_queue_id, &event, &status);\n" ++
               "\n" ++  
               "        if (status != 0L) {\n" ++
               "            break;\n" ++
@@ -227,15 +227,15 @@ spec = do
               "                result = CHousekeeping__timeout(&event, self,\n" ++
               "                                                timeout__msg_data);\n" ++
               "\n" ++
-              "                if (result.__variant != Success) {\n" ++
+              "                if (result._variant != Success) {\n" ++
               "                    \n" ++ 
               "                    ExceptSource source;\n" ++
-              "                    source.__variant = ExceptSource__Task;\n" ++
-              "                    source.Task.__0 = self->__task_id;\n" ++
+              "                    source._variant = ExceptSource__Task;\n" ++
+              "                    source.Task._0 = self->_task_id;\n" ++
               "\n" ++
               "                    __termina_except__action_failure(source,\n" ++
               "                                                     __CHousekeeping__timer,\n" ++
-              "                                                     result.Failure.__0);\n" ++
+              "                                                     result.Failure._0);\n" ++
               "\n" ++
               "                }\n" ++
               "\n" ++   

@@ -69,8 +69,8 @@ spec = do
               "} Message;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_id_t __task_id;\n" ++
-              "    __termina_id_t __task_msg_queue_id;\n" ++
+              "    __termina_id_t _task_id;\n" ++
+              "    __termina_id_t _task_msg_queue_id;\n" ++
               "    __termina_id_t timer;\n" ++
               "    __termina_allocator_t message_pool;\n" ++
               "    uint32_t interval;\n" ++
@@ -114,19 +114,19 @@ spec = do
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
               "\n" ++
-              "    __status_int32_t ret = { .__variant = Success };\n" ++
+              "    __status_int32_t ret = { ._variant = Success };\n" ++
               "\n" ++
               "    self->interval = self->interval + 1U;\n" ++
               "\n" ++
-              "    __option_box_t alloc_msg = { .__variant = None };\n" ++
+              "    __option_box_t alloc_msg = { ._variant = None };\n" ++
               "\n" ++
-              "    self->message_pool.alloc(__ev, self->message_pool.__that, &alloc_msg);\n"  ++
+              "    self->message_pool.alloc(__ev, self->message_pool._that, &alloc_msg);\n"  ++
               "\n"  ++
-              "    if (alloc_msg.__variant == Some) {\n"  ++
+              "    if (alloc_msg._variant == Some) {\n"  ++
               "        \n" ++
-              "        __termina_box_t msg = alloc_msg.Some.__0;\n" ++
+              "        __termina_box_t msg = alloc_msg.Some._0;\n" ++
               "\n" ++
-              "        self->message_pool.free(__ev, self->message_pool.__that, msg);\n" ++
+              "        self->message_pool.free(__ev, self->message_pool._that, msg);\n" ++
               "\n" ++
               "    } else {\n" ++
               "        \n"  ++
@@ -137,8 +137,8 @@ spec = do
               "\n" ++
               "    if (check == false) {\n" ++
               "        \n" ++
-              "        ret.__variant = Failure;\n" ++
-              "        ret.Failure.__0 = -(1L);\n" ++
+              "        ret._variant = Failure;\n" ++
+              "        ret.Failure._0 = -(1L);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -160,7 +160,7 @@ spec = do
               "\n" ++ 
               "    for (;;) {\n" ++
               "        \n" ++  
-              "        __termina_msg_queue__recv(self->__task_msg_queue_id, &event, &status);\n" ++
+              "        __termina_msg_queue__recv(self->_task_msg_queue_id, &event, &status);\n" ++
               "\n" ++  
               "        if (status != 0L) {\n" ++
               "            break;\n" ++
@@ -180,15 +180,15 @@ spec = do
               "                result = CHousekeeping__timeout(&event, self,\n" ++
               "                                                timeout__msg_data);\n" ++
               "\n" ++
-              "                if (result.__variant != Success) {\n" ++
+              "                if (result._variant != Success) {\n" ++
               "                    \n" ++ 
               "                    ExceptSource source;\n" ++
-              "                    source.__variant = ExceptSource__Task;\n" ++
-              "                    source.Task.__0 = self->__task_id;\n" ++
+              "                    source._variant = ExceptSource__Task;\n" ++
+              "                    source.Task._0 = self->_task_id;\n" ++
               "\n" ++
               "                    __termina_except__action_failure(source,\n" ++
               "                                                     __CHousekeeping__timer,\n" ++
-              "                                                     result.Failure.__0);\n" ++
+              "                                                     result.Failure._0);\n" ++
               "\n" ++
               "                }\n" ++
               "\n" ++   

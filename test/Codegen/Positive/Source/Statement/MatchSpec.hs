@@ -83,7 +83,7 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_lock_type_t __lock_type;\n" ++
+              "    __termina_resource_lock_type_t _lock_type;\n" ++
               "} id0;\n" ++
               "\n" ++
               "void id0__match_test0(const __termina_event_t * const __ev, void * const __this,\n" ++
@@ -101,13 +101,13 @@ spec = do
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
               "    __termina_lock_t __lock = __termina_resource__lock(&__ev->owner,\n" ++
-              "                                                       &self->__lock_type);\n" ++
+              "                                                       &self->_lock_type);\n" ++
               "\n" ++
               "    uint32_t foo = 0U;\n" ++
               "\n" ++
-              "    if (option0.__variant == Some) {\n" ++
+              "    if (option0._variant == Some) {\n" ++
               "        \n" ++
-              "        __termina_box_t value = option0.Some.__0;\n" ++
+              "        __termina_box_t value = option0.Some._0;\n" ++
               "\n" ++
               "        foo = *(uint32_t *)value.data;\n" ++
               "\n" ++
@@ -117,7 +117,7 @@ spec = do
               "\n" ++
               "    }\n" ++
               "\n" ++
-              "    __termina_resource__unlock(&__ev->owner, &self->__lock_type, __lock);\n" ++
+              "    __termina_resource__unlock(&__ev->owner, &self->_lock_type, __lock);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -130,7 +130,7 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_lock_type_t __lock_type;\n" ++
+              "    __termina_resource_lock_type_t _lock_type;\n" ++
               "} id0;\n" ++
               "\n" ++
               "void id0__match_test1(const __termina_event_t * const __ev, void * const __this,\n" ++
@@ -148,22 +148,22 @@ spec = do
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
               "    __termina_lock_t __lock = __termina_resource__lock(&__ev->owner,\n" ++
-              "                                                       &self->__lock_type);\n" ++
+              "                                                       &self->_lock_type);\n" ++
               "\n" ++
               "    uint32_t foo = 0U;\n" ++
               "\n" ++
-              "    if (option0.__variant == None) {\n" ++
+              "    if (option0._variant == None) {\n" ++
               "        \n" ++
               "\n" ++
               "    } else {\n" ++
               "        \n" ++
-              "        __termina_box_t value = option0.Some.__0;\n" ++
+              "        __termina_box_t value = option0.Some._0;\n" ++
               "\n" ++
               "        foo = *(uint32_t *)value.data;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
-              "    __termina_resource__unlock(&__ev->owner, &self->__lock_type, __lock);\n" ++
+              "    __termina_resource__unlock(&__ev->owner, &self->_lock_type, __lock);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -183,16 +183,16 @@ spec = do
               "} __enum_Message_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    uint32_t __0;\n" ++
-              "    uint32_t __1;\n" ++
+              "    uint32_t _0;\n" ++
+              "    uint32_t _1;\n" ++
               "} __enum_Message__In_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    uint32_t __0;\n" ++
+              "    uint32_t _0;\n" ++
               "} __enum_Message__Out_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __enum_Message_t __variant;\n" ++
+              "    __enum_Message_t _variant;\n" ++
               "    union {\n" ++
               "        __enum_Message__In_params_t In;\n" ++
               "        __enum_Message__Out_params_t Out;\n" ++
@@ -211,23 +211,22 @@ spec = do
               "    \n" ++
               "    uint32_t ret = 0U;\n" ++
               "\n" ++
-              "    Message msg = { .__variant = Message__In, .In = { .__0 = 10U,\n" ++
-              "                                                      .__1 = 10U } };\n" ++
+              "    Message msg = { ._variant = Message__In, .In = { ._0 = 10U, ._1 = 10U } };\n" ++
               "\n" ++
-              "    if (msg.__variant == Message__In) {\n" ++
+              "    if (msg._variant == Message__In) {\n" ++
               "        \n" ++
-              "        uint32_t param0 = msg.In.__0;\n" ++
-              "        uint32_t param1 = msg.In.__1;\n" ++
+              "        uint32_t param0 = msg.In._0;\n" ++
+              "        uint32_t param1 = msg.In._1;\n" ++
               "\n" ++
               "        ret = param0 + param1;\n" ++
               "\n" ++
-              "    } else if (msg.__variant == Message__Out) {\n" ++
+              "    } else if (msg._variant == Message__Out) {\n" ++
               "        \n" ++
-              "        uint32_t result = msg.Out.__0;\n" ++
+              "        uint32_t result = msg.Out._0;\n" ++
               "\n" ++
               "        ret = result;\n" ++
               "\n" ++
-              "    } else if (msg.__variant == Message__Stop) {\n" ++
+              "    } else if (msg._variant == Message__Stop) {\n" ++
               "        \n" ++
               "        ret = 0U;\n" ++
               "\n" ++

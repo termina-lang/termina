@@ -98,7 +98,7 @@ spec = do
       renderTypeDefinitionDecl emptyMonadicTypes classWithOneProcedureAndZeroFields `shouldBe`
         pack (
           "\ntypedef struct {\n" ++
-          "    __termina_resource_lock_type_t __lock_type;\n" ++
+          "    __termina_resource_lock_type_t _lock_type;\n" ++
           "} Class0;\n" ++
           "\n" ++
           "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
@@ -109,7 +109,7 @@ spec = do
       renderTypeDefinitionDecl emptyMonadicTypes classWithTwoProceduresAndZeroFields `shouldBe`
         pack (
           "\ntypedef struct {\n" ++
-          "    __termina_resource_lock_type_t __lock_type;\n" ++
+          "    __termina_resource_lock_type_t _lock_type;\n" ++
           "} Class0;\n" ++
           "\n" ++
           "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
@@ -123,7 +123,7 @@ spec = do
       renderTypeDefinitionDecl emptyMonadicTypes noHandlerClassWithoutOneProcedureAndZeroFields `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_resource_lock_type_t __lock_type;\n" ++
+            "    __termina_resource_lock_type_t _lock_type;\n" ++
             "} Class0;\n" ++
             "\n" ++
             "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
@@ -132,7 +132,7 @@ spec = do
       renderTypeDefinitionDecl emptyMonadicTypes noHandlerClassWithOneEmptyProcedure `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_resource_lock_type_t __lock_type;\n" ++
+            "    __termina_resource_lock_type_t _lock_type;\n" ++
             "    uint8_t field0;\n" ++
             "    uint64_t field1[24U];\n" ++
             "} Class0;\n" ++
@@ -143,7 +143,7 @@ spec = do
       renderTypeDefinitionDecl emptyMonadicTypes classWithOneProcedureAndTwoFields `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_resource_lock_type_t __lock_type;\n" ++
+            "    __termina_resource_lock_type_t _lock_type;\n" ++
             "    uint8_t field0;\n" ++
             "    uint64_t field1[24U];\n" ++
             "} Class0;\n" ++
@@ -154,7 +154,7 @@ spec = do
       renderTypeDefinitionDecl emptyMonadicTypes packedClass `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_resource_lock_type_t __lock_type;\n" ++
+            "    __termina_resource_lock_type_t _lock_type;\n" ++
             "    uint64_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    TMDescriptor field2[32U];\n" ++
@@ -166,7 +166,7 @@ spec = do
       renderTypeDefinitionDecl emptyMonadicTypes classWithFixedLocationField `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_resource_lock_type_t __lock_type;\n" ++
+            "    __termina_resource_lock_type_t _lock_type;\n" ++
             "    uint32_t field0;\n" ++
             "    volatile uint32_t * field1;\n" ++
             "    volatile uint32_t (* field2);\n" ++
@@ -179,10 +179,10 @@ spec = do
       renderTypeDefinitionDecl emptyMonadicTypes classWithAccessPortField `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_resource_lock_type_t __lock_type;\n" ++
+            "    __termina_resource_lock_type_t _lock_type;\n" ++
             "    uint32_t field0;\n" ++
             "    struct {\n" ++
-            "        void * __that;\n" ++
+            "        void * _that;\n" ++
             "        void (* test0)(const __termina_event_t * const __ev,\n" ++
             "                       void * const __this);\n" ++
             "    } field1;\n" ++

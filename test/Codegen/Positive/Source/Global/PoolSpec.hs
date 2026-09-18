@@ -33,16 +33,16 @@ spec = do
               "} __enum_Message_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    uint32_t __0;\n" ++
-              "    uint32_t __1;\n" ++
+              "    uint32_t _0;\n" ++
+              "    uint32_t _1;\n" ++
               "} __enum_Message__In_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    uint32_t __0;\n" ++
+              "    uint32_t _0;\n" ++
               "} __enum_Message__Out_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __enum_Message_t __variant;\n" ++
+              "    __enum_Message_t _variant;\n" ++
               "    union {\n" ++
               "        __enum_Message__In_params_t In;\n" ++
               "        __enum_Message__Out_params_t Out;\n" ++
