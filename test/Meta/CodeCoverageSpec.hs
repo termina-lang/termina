@@ -45,6 +45,10 @@ families =
       "src/ControlFlow/VarUsage/Errors.hs"
       ["test/VarUsage/Negative/CodeSpec.hs"] []
       []
+  , Family "VarScope (VSE)" "VSE"
+      "src/ControlFlow/VarScope/Errors.hs"
+      ["test/VarScope/Negative/CodeSpec.hs"] []
+      []
   , Family "BoxUsage (BE)" "BE"
       "src/ControlFlow/BoxUsage/Errors.hs"
       ["test/VarUsage/Negative/CodeSpec.hs"] []
