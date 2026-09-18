@@ -16,7 +16,6 @@ import Data.Text (Text, pack)
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
-import Data.Maybe (mapMaybe)
 import Data.Time (UTCTime(..), fromGregorian, secondsToDiffTime)
 
 import Parser.Parsing (terminaModuleParser)

@@ -29,7 +29,6 @@ import Semantic.Environment
 import ControlFlow.ConstFolding (runConstFolding, constFoldModule)
 import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
 import ControlFlow.ValueAnalysis (runValueAnalysisCheck)
-import Data.Maybe (listToMaybe, mapMaybe)
 import qualified Data.Set as S
 import qualified Data.ByteString as BS
 import qualified Data.Text.Encoding as TE

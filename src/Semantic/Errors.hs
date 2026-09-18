@@ -11,11 +11,7 @@ import Utils.Annotations
 import Utils.Errors
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
-import qualified Language.LSP.Protocol.Types as LSP
 import Text.Parsec
-import Errata 
-import qualified Data.Text.Lazy as TL
-import Errata.Styles
 import Semantic.Types
 import qualified Parser.AST as PAST
 import Parser.Types
@@ -770,7 +766,7 @@ instance Diagnosable Error where
     describe (EInterfaceNotUniqueProcedure procNames) =
         diagnostic "SE-144" "duplicate procedure in interface definition"
             ("Procedures \x1b[31m" <> T.intercalate ", " (map T.pack procNames) <> "\x1b[0m are duplicated in the interface definition.")
-    describe (EClassLoop ((currentCall, _) : xs)) =
+    describe (EClassLoop _) =
         diagnostic "SE-145" "loop between member function calls in class definition"
             ("A recursive calling loop has been detected in the class definition.")
     describe (EDereferenceInvalidType ty) =
