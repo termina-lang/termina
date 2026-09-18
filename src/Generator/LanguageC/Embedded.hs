@@ -195,6 +195,8 @@ instance ConstType CType where
     _const (CTPointer cType qual) = CTPointer cType qual{qual_const = True}
     _const (CTStruct tag ident qual) = CTStruct tag ident qual{qual_const = True}
     _const func@(CTFunction {}) = func
+    _const (CTFunctionPointer retTy params qual) =
+        CTFunctionPointer retTy params qual{qual_const = True}
     _const (CTEnum ident qual) = CTEnum ident qual{qual_const = True}
     _const (CTSizeT qual) = CTSizeT qual{qual_const = True}
     _const (CTBool qual) = CTBool qual{qual_const = True}
