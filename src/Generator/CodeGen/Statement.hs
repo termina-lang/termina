@@ -819,27 +819,19 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
             cParamTypes <- case getMatchCaseTypes semann of
                 Just ts -> traverse (genType noqual) ts
                 Nothing -> throwError $ InternalError "Match case without types"
-            case [used | used@(x : _) <- params, x /= '_' ] of
+            -- The parameters are numbered before the ignored ones are dropped,
+            -- so that each one reads the field of its own position.
+            let paramDecl param index cParamType =
+                    let cField = (cObj @. this_variant @: cParamsStructType) @. variantParamField index in
+                    case cParamType of
+                        CTPointer {} -> var param cParamType @:= addrOf (cField @: cParamType)
+                        _ -> var param cParamType @:= cField @: cParamType
+                decls = [paramDecl param index cParamType
+                            | (param, index, cParamType) <- zip3 params [0..] cParamTypes
+                            , not (isIgnoredParameter param)]
+            case decls of
                 [] -> return []
-                [param] ->
-                    case head cParamTypes of
-                        CTPointer {} ->
-                            return [pre_cr (var param (head cParamTypes) @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. variantParamField 0 @: head cParamTypes)) |>> loc']
-                        _ ->
-                            return [pre_cr (var param (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. variantParamField 0 @: head cParamTypes) |>> loc']
-                (p : xp) -> do
-                    let rest = zipWith3
-                            (\sym index cParamType ->
-                                case cParamType of
-                                    CTPointer {} ->
-                                        no_cr (var sym cParamType @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. variantParamField (index :: Integer) @: cParamType)) |>> loc'
-                                    _ ->
-                                        no_cr (var sym cParamType @:= (cObj @. this_variant @: cParamsStructType) @. variantParamField (index :: Integer) @: cParamType) |>> loc') xp [1..] (tail cParamTypes)
-                    case head cParamTypes of
-                        CTPointer {} ->
-                            return $ pre_cr (var p (head cParamTypes) @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. variantParamField 0 @: head cParamTypes)) |>> loc' : rest
-                        _ ->
-                            return $ pre_cr (var p (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. variantParamField 0 @: head cParamTypes) |>> loc' : rest
+                (d : ds) -> return $ (pre_cr d |>> loc') : map (\d' -> no_cr d' |>> loc') ds
 
 
 genBlocks (ReturnBlock mExpr ann) =

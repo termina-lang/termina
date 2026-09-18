@@ -72,6 +72,25 @@ test2 = "enum Message {\n" ++
         "    return ret;\n" ++
         "}"
 
+test3 :: String
+test3 = "enum Sample {\n" ++
+        "    Pair (u8, u32),\n" ++
+        "    Empty\n" ++
+        "};\n" ++
+        "\n" ++
+        "function match_test3(s : Sample) -> u32 {\n" ++
+        "    var ret : u32;\n" ++
+        "    match s {\n" ++
+        "        case Pair(_a, b) => {\n" ++
+        "            ret = b;\n" ++
+        "        }\n" ++
+        "        case Empty => {\n" ++
+        "            ret = 0 : u32;\n" ++
+        "        }\n" ++
+        "    }\n" ++
+        "    return ret;\n" ++
+        "}"
+
 spec :: Spec
 spec = do
   describe "Code generation for match statements" $ do
@@ -233,6 +252,30 @@ spec = do
               "    } else {\n" ++
               "        \n" ++
               "        ret = 1U;\n" ++
+              "\n" ++
+              "    }\n" ++
+              "\n" ++
+              "    return ret;\n" ++
+              "\n" ++
+              "}\n")
+    it "Reads each case parameter from its own position when an earlier one is ignored" $ do
+      renderSource test3 `shouldBe`
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++
+              "uint32_t match_test3(Sample s) {\n" ++
+              "    \n" ++
+              "    uint32_t ret;\n" ++
+              "\n" ++
+              "    if (s._variant == Sample__Pair) {\n" ++
+              "        \n" ++
+              "        uint32_t b = s.Pair._1;\n" ++
+              "\n" ++
+              "        ret = b;\n" ++
+              "\n" ++
+              "    } else {\n" ++
+              "        \n" ++
+              "        ret = 0U;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
