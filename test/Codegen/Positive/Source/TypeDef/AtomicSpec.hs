@@ -97,7 +97,6 @@ spec = do
               "    __termina_event_t event;\n" ++
               "\n" ++   
               "    __status_int32_t result;\n" ++
-              "    result.__variant = Success;\n" ++
               "\n" ++ 
               "    TimeVal timeout__msg_data;\n" ++
               "\n" ++ 
@@ -203,7 +202,6 @@ spec = do
               "    __termina_event_t event;\n" ++
               "\n" ++   
               "    __status_int32_t result;\n" ++
-              "    result.__variant = Success;\n" ++
               "\n" ++ 
               "    TimeVal timeout__msg_data;\n" ++
               "\n" ++ 

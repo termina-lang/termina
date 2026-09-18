@@ -647,9 +647,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                     -- __termina_event_t ev;
                     pre_cr $ var "event" __termina_event_t,
                     -- __status_int32_t result;
-                    pre_cr $ var "result" __status_int32_t,
-                    -- result.__variant = Success;
-                    no_cr $ ("result" @: __status_int32_t) @. variant @: enumFieldType @= "Success" @: enumFieldType
+                    pre_cr $ var "result" __status_int32_t
                 ] ++ msgDataVars ++
                 [
                     pre_cr $ _for Nothing Nothing Nothing loop
