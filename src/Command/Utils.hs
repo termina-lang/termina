@@ -15,6 +15,7 @@ import Modules.Modules
 
 import ControlFlow.BoxUsage (runBoxUsageCheck)
 import ControlFlow.VarUsage (runVarUsageCheck)
+import ControlFlow.VarScope (runVarScopeCheck)
 import ControlFlow.SideEffects (runSideEffectCheck)
 import ControlFlow.SideEffects.Errors (SideEffectsError)
 import Configuration.Platform (Platform)
@@ -26,6 +27,7 @@ import Utils.Annotations
 import ControlFlow.BasicBlocks.Checks.ExitPaths.Errors (PathsCheckError)
 import ControlFlow.BoxUsage.Errors (BoxUsageError)
 import ControlFlow.VarUsage.Errors (VarUsageError)
+import ControlFlow.VarScope.Errors (VarScopeError)
 import ControlFlow.BasicBlocks.Errors (BBGeneratorError)
 import Parser.Errors
 import Control.Monad.IO.Class
@@ -37,6 +39,7 @@ import Utils.Errors (ErrorMessage(toText, errorIdent))
 import Modules.Utils
 import Data.Time (UTCTime)
 import Control.Monad (when)
+import Data.Maybe (listToMaybe, mapMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import System.Exit (exitFailure)
@@ -163,6 +166,13 @@ varUsageCheckModule :: BasicBlocksModule -> Maybe VarUsageError
 varUsageCheckModule =
     runVarUsageCheck . basicBlocksAST . metadata
 
+varScopeCheckModules :: BasicBlocksProject -> Maybe VarScopeError
+varScopeCheckModules = listToMaybe . mapMaybe varScopeCheckModule . M.elems
+
+varScopeCheckModule :: BasicBlocksModule -> Maybe VarScopeError
+varScopeCheckModule =
+    runVarScopeCheck . basicBlocksAST . metadata
+
 genBasicBlocks :: TypedProject -> Either BBGeneratorError BasicBlocksProject
 genBasicBlocks = mapM genBasicBlocksModule
 
@@ -238,6 +248,11 @@ basicBlockChecks =
       (const (fmap checkFailure . boxUsageCheckModules))
   , Check "Side-effect checking project modules"
       (\plt -> fmap checkFailure . sideEffectCheckModules plt)
+    -- | The scope check relies on definite assignment having passed, and a
+    -- declaration in too wide a block is the least of the mistakes, so it goes
+    -- last.
+  , Check "Scope checking project modules"
+      (const (fmap checkFailure . varScopeCheckModules))
   ]
 
 -- | The source of each module of a project, which is what the error printer
