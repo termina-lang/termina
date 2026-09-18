@@ -47,7 +47,8 @@ module ControlFlow.ValueAnalysis
   ) where
 
 import qualified Data.Map.Strict as M
-import Data.List (nub)
+import Control.Monad (unless)
+import Data.List (isPrefixOf, nub)
 import Data.Maybe (listToMaybe, mapMaybe)
 import Data.Ord (comparing)
 import qualified Data.Set as S
@@ -134,10 +135,40 @@ instance Eq Known where
   left == right =
     typeRange left == typeRange right && varValues left == varValues right
 
--- | What belongs to the path being walked: the local variables whose value the
--- path constrains. A variable that is not here is unknown, so joining two paths
--- keeps the entries they both constrain and drops the rest.
-newtype ValueAnalysisPath = ValueAnalysisPath { known :: M.Map Identifier Known }
+-- | The names that lead from an object to a field of it, one name per step
+-- down. The object itself is the empty path.
+type FieldPath = [Identifier]
+
+-- | What the pass follows: a local variable, or a field of one reached by the
+-- names that lead to it. A field is a cell of its own because a struct that a
+-- body builds, or that a call gives back, carries in its fields the values a
+-- condition then reads.
+--
+-- Nothing else is a cell. An element of an array is left out because its index
+-- need not be known, and anything behind a dereference because what it names
+-- belongs to another body.
+data Cell = Cell Identifier FieldPath
+  deriving (Eq, Ord, Show)
+
+baseOf :: Cell -> Identifier
+baseOf (Cell ident _) = ident
+
+-- | The cell an object names, if it names one.
+cellOf :: Object a -> Maybe Cell
+cellOf (Variable ident _) = Just (Cell ident [])
+cellOf (MemberAccess obj fieldName _) = do
+  Cell ident path <- cellOf obj
+  return (Cell ident (path ++ [fieldName]))
+cellOf _ = Nothing
+
+-- | How a message names a cell, which is how the source writes it.
+cellName :: Cell -> Identifier
+cellName (Cell ident path) = foldl (\acc fieldName -> acc ++ "." ++ fieldName) ident path
+
+-- | What belongs to the path being walked: the cells whose value the path
+-- constrains. A cell that is not here is unknown, so joining two paths keeps
+-- the entries they both constrain and drops the rest.
+newtype ValueAnalysisPath = ValueAnalysisPath { known :: M.Map Cell Known }
   deriving Eq
 
 instance Lattice ValueAnalysisPath where
@@ -193,9 +224,14 @@ data Met =
     -- variant out.
   | MetCase (Expression SemanticAnn) Identifier
 
--- | What each function and member gives back, for a call site to read. One
+-- | What one function or member gives back, cell by cell: the values of what
+-- it returns under the empty path, and those of each field of it under the
+-- path that leads to the field.
+type Returned = M.Map FieldPath Values
+
+-- | What every function and member gives back, for a call site to read. One
 -- with no entry here gives back whatever its type allows.
-type ReturnedValues = M.Map Identifier Values
+type ReturnedValues = M.Map Identifier Returned
 
 -- | What belongs to the program, and no branch takes back.
 data ValueAnalysisGlobal = ValueAnalysisGlobal
@@ -249,9 +285,15 @@ evaluate plt consts locals expr =
 
   where
 
+    -- | The folding evaluator reads plain names, so only what the path knows
+    -- of a whole variable reaches it; a field answers through 'valuesIn'.
     env = ConstFoldEnv
-      (M.union (M.mapMaybe singleValue (known locals)) consts)
+      (M.union (M.mapMaybe singleValue (variables locals)) consts)
       plt
+
+    variables path =
+      M.fromList [ (ident, entry)
+                 | (Cell ident [], entry) <- M.toList (known path) ]
 
 valueOf :: Expression SemanticAnn -> ValueAnalysisMonad (Maybe (Const SemanticAnn))
 valueOf expr = do
@@ -277,30 +319,37 @@ rangeOfVariable obj =
 -- is followed; every other value, and every expression the evaluation could
 -- not determine, leaves the variable unknown.
 setValue ::
-  Identifier
+  Cell
   -> Maybe (Integer, Integer)
   -> Origin
   -> Maybe (Const SemanticAnn)
   -> ValueAnalysisMonad ()
-setValue ident range origin mValue =
-  setValues ident range origin
+setValue cell range origin mValue =
+  setValues cell range origin
     (Discrete . S.singleton <$> (mValue >>= scalar))
 
 -- | Records what a variable may hold from here on, which is what a call to a
 -- function the walk has summarised gives back as well as what an expression
 -- the folding evaluator works out does. An expression that says nothing leaves
 -- the variable unknown.
+-- | Writing a cell takes down what was known of the cells under it, since the
+-- fields of a struct that is written as a whole are written with it.
 setValues ::
-  Identifier
+  Cell
   -> Maybe (Integer, Integer)
   -> Origin
   -> Maybe Values
   -> ValueAnalysisMonad ()
-setValues ident range origin mValues = modifyPath $ \p -> ValueAnalysisPath $
+setValues cell range origin mValues = modifyPath $ \p -> ValueAnalysisPath $
+  let rest = M.filterWithKey (\other _ -> not (cell `holds` other)) (known p) in
   case mValues of
-    Just values ->
-      M.insert ident (Known range values (S.singleton origin)) (known p)
-    Nothing -> M.delete ident (known p)
+    Just values -> M.insert cell (Known range values (S.singleton origin)) rest
+    Nothing -> rest
+
+  where
+
+    Cell ident path `holds` Cell ident' path' =
+      ident == ident' && path `isPrefixOf` path'
 
 -- | The values the lattice follows, which are the booleans and the integers.
 -- Every other value leaves the variable unknown.
@@ -309,8 +358,10 @@ scalar value@(B _) = Just (Scalar value)
 scalar value@(I _ _) = Just (Scalar value)
 scalar _ = Nothing
 
+-- | Drops what the path knows of a variable, fields included.
 forget :: Identifier -> ValueAnalysisMonad ()
-forget ident = modifyPath (\p -> ValueAnalysisPath (M.delete ident (known p)))
+forget ident = modifyPath $ \p ->
+  ValueAnalysisPath (M.filterWithKey (\cell _ -> baseOf cell /= ident) (known p))
 
 -- | A variable whose address is handed out mutably is written behind the back
 -- of this pass, so what was known of it no longer holds. An immutable
@@ -423,9 +474,9 @@ enterCase discriminant (MatchCase variant bvars _ ann) = do
   -- comes from the variant it matched.
   mapM_ forget bvars
   case discriminant of
-    AccessObject obj@(Variable ident _) -> do
+    AccessObject obj | Just cell <- cellOf obj -> do
       range <- rangeOfVariable obj
-      setValues ident range (Matched (getLocation ann))
+      setValues cell range (Matched (getLocation ann))
         (Just (Discrete (S.singleton (Variant variant))))
     _ -> return ()
 
@@ -440,20 +491,20 @@ enterCase discriminant (MatchCase variant bvars _ ann) = do
 -- per variable has no way to say "one of these two things", so those two sides
 -- teach nothing.
 refine :: Bool -> Expression SemanticAnn -> ValueAnalysisMonad ()
-refine holds cond@(AccessObject obj@(Variable ident _)) = do
+refine holds cond@(AccessObject obj) | Just cell <- cellOf obj = do
   range <- rangeOfVariable obj
-  setValue ident range (Refined (getLocation . getAnnotation $ cond)) (Just (B holds))
+  setValue cell range (Refined (getLocation . getAnnotation $ cond)) (Just (B holds))
 refine True (BinOp RelationalEqual left right ann) =
   refineEquality (getLocation ann) left right
 refine False (BinOp RelationalNotEqual left right ann) =
   refineEquality (getLocation ann) left right
-refine holds cond@(IsEnumVariantExpression obj@(Variable ident _) _enum variant _) = do
+refine holds cond@(IsEnumVariantExpression obj _enum variant _) | Just cell <- cellOf obj = do
   range <- rangeOfVariable obj
   let loc = getLocation . getAnnotation $ cond
   if holds
-    then setValues ident range (Refined loc)
+    then setValues cell range (Refined loc)
            (Just (Discrete (S.singleton (Variant variant))))
-    else ruleOut loc obj ident (Variant variant)
+    else ruleOut loc obj cell (Variant variant)
 refine True (BinOp LogicalAnd left right _) = do
   refine True left
   refine True right
@@ -480,24 +531,24 @@ refineExclusion loc left right = do
 
   where
 
-    against (AccessObject obj@(Variable ident _)) other = do
+    against (AccessObject obj) other | Just cell <- cellOf obj = do
       mValue <- valueOf other
       case mValue >>= scalar of
         Nothing -> return ()
-        Just value -> ruleOut loc obj ident value
+        Just value -> ruleOut loc obj cell value
     against _ _ = return ()
 
 -- | Takes a value out of what the path holds for a variable. A variable the
 -- path says nothing about stays that way: the values it does not hold are of
 -- no use without the ones it does.
 ruleOut ::
-  Location -> Object SemanticAnn -> Identifier -> Value -> ValueAnalysisMonad ()
-ruleOut loc obj ident value = do
-  current <- M.lookup ident . known <$> getPath
+  Location -> Object SemanticAnn -> Cell -> Value -> ValueAnalysisMonad ()
+ruleOut loc obj cell value = do
+  current <- M.lookup cell . known <$> getPath
   range <- rangeOfVariable obj
   case current >>= excluded of
     Nothing -> return ()
-    Just values -> setValues ident range (Refined loc) (Just values)
+    Just values -> setValues cell range (Refined loc) (Just values)
 
   where
 
@@ -521,22 +572,22 @@ refineOrder holds loc op left right =
 
   where
 
-    asVariable (AccessObject obj@(Variable ident _)) = Just (obj, ident)
+    asVariable (AccessObject obj) = (,) obj <$> cellOf obj
     asVariable _ = Nothing
 
-    against (obj, ident) direction other = do
+    against (obj, cell) direction other = do
       mValue <- valueOf other
       case mValue >>= integerOfConst >>= boundOf holds direction of
         Nothing -> return ()
-        Just bound -> bindBound loc obj ident bound
+        Just bound -> bindBound loc obj cell bound
 
 -- | Applies a bound to what the path knows of a variable. A variable the path
 -- says nothing about starts from the interval its declared type allows, so a
 -- guard also bounds a parameter the body never assigns.
 bindBound ::
-  Location -> Object SemanticAnn -> Identifier -> Bound -> ValueAnalysisMonad ()
-bindBound loc obj ident bound = do
-  current <- M.lookup ident . known <$> getPath
+  Location -> Object SemanticAnn -> Cell -> Bound -> ValueAnalysisMonad ()
+bindBound loc obj cell bound = do
+  current <- M.lookup cell . known <$> getPath
   range <- rangeOfVariable obj
   let start = case current of
         Just entry -> Just entry
@@ -544,7 +595,7 @@ bindBound loc obj ident bound = do
   case start >>= bounded of
     Nothing -> return ()
     Just entry ->
-      modifyPath (\p -> ValueAnalysisPath (M.insert ident entry (known p)))
+      modifyPath (\p -> ValueAnalysisPath (M.insert cell entry (known p)))
 
   where
 
@@ -568,10 +619,10 @@ refineEquality loc left right = do
 
   where
 
-    refineAgainst (AccessObject obj@(Variable ident _)) other = do
+    refineAgainst (AccessObject obj) other | Just cell <- cellOf obj = do
       range <- rangeOfVariable obj
       valueOf other
-        >>= maybe (return ()) (setValue ident range (Refined loc) . Just)
+        >>= maybe (return ()) (setValue cell range (Refined loc) . Just)
     refineAgainst _ _ = return ()
 
 -- | What a loop gives its iterator. The generated @for (i = init; i < end;
@@ -605,7 +656,8 @@ seedIterator ident ty initE endE = do
               then Discrete (S.fromList (map value [from .. to]))
               else Interval from to
       in modifyPath $ \p -> ValueAnalysisPath $
-           M.insert ident (Known range values (S.singleton (Iterated loc))) (known p)
+           M.insert (Cell ident [])
+             (Known range values (S.singleton (Iterated loc))) (known p)
 
   where
 
@@ -620,22 +672,49 @@ integerOfConst :: Const SemanticAnn -> Maybe Integer
 integerOfConst (I (TInteger value _) _) = Just value
 integerOfConst _ = Nothing
 
+-- | Records what a cell takes from an expression: the values of the cell
+-- itself, and those of each field below it when the expression says something
+-- about them.
+bindCell ::
+  Cell -> Maybe (Integer, Integer) -> Origin -> Expression SemanticAnn
+  -> ValueAnalysisMonad ()
+bindCell cell range origin expr = do
+  global <- getGlobal
+  locals <- getPath
+  setValues cell range origin (valuesIn global locals expr)
+  mapM_ bindField (M.toList (fieldsIn global locals expr))
+
+  where
+
+    Cell ident path `under` fields = Cell ident (path ++ fields)
+
+    -- | The interval of the type of a field is not carried along: what the
+    -- summary says is what the field holds, and a cell with no interval to
+    -- fall back on falls to unknown, which is the direction this pass errs in.
+    bindField (fields, values) =
+      setValues (cell `under` fields) Nothing origin (Just values)
+
 checkStatement :: Statement SemanticAnn -> ValueAnalysisMonad ()
 checkStatement (Declaration ident _ ty mInitExpr ann) = do
   mapM_ noteEscapes mInitExpr
   range <- rangeOfType ty
-  values <- maybe (return Nothing) valuesOf mInitExpr
-  setValues ident range (Assigned (getLocation ann)) values
+  let cell = Cell ident []
+      origin = Assigned (getLocation ann)
+  case mInitExpr of
+    Nothing -> setValues cell range origin Nothing
+    Just initExpr -> bindCell cell range origin initExpr
 checkStatement (AssignmentStmt obj expr ann) = do
   noteEscapes expr
-  case obj of
-    -- | The whole variable takes the values of the expression.
-    Variable ident _ -> do
+  case cellOf obj of
+    -- | The cell takes the values of the expression, and so do the fields
+    -- below it.
+    Just cell -> do
       range <- rangeOfVariable obj
-      valuesOf expr >>= setValues ident range (Assigned (getLocation ann))
-    -- | A write into a field or an element of an object, which is not a scalar
-    -- and is therefore outside the lattice.
-    _ -> return ()
+      bindCell cell range (Assigned (getLocation ann)) expr
+    -- | A write this pass cannot place, which is one through a dereference or
+    -- into an element of an array. What it reaches is not known, so what was
+    -- known of the object it starts from no longer holds.
+    Nothing -> forget (rootIdent obj)
 checkStatement (SingleExpStmt expr _) = noteEscapes expr
 
 
@@ -731,12 +810,13 @@ checkReturning name body = do
   case returnExpression body of
     Nothing -> return ()
     Just expr -> do
-      mValues <- valuesOf expr
-      case mValues of
-        Nothing -> return ()
-        Just values ->
-          modifyGlobal (\g ->
-            g { returnedValues = M.insert name values (returnedValues g) })
+      global <- getGlobal
+      locals <- getPath
+      let whole = maybe M.empty (M.singleton []) (valuesIn global locals expr)
+          returned = M.union whole (fieldsIn global locals expr)
+      unless (M.null returned) $
+        modifyGlobal (\g ->
+          g { returnedValues = M.insert name returned (returnedValues g) })
 
 checkElement :: AnnASTElement SemanticAnn -> ValueAnalysisMonad ()
 checkElement (Function ident _ps _mTy body _mods _ann) = checkReturning ident body
@@ -915,7 +995,9 @@ valuesIn global locals expr =
     Just value -> Just (Discrete (S.singleton value))
     Nothing ->
       case expr of
-        AccessObject (Variable ident _) -> varValues <$> M.lookup ident (known locals)
+        AccessObject obj -> do
+          cell <- cellOf obj
+          varValues <$> M.lookup cell (known locals)
         -- | The body of the callee was walked knowing nothing of its
         -- parameters, so what it gives back holds for any call.
         -- | A variant written out, with or without data attached, says which
@@ -924,10 +1006,58 @@ valuesIn global locals expr =
           Just (Discrete (S.singleton (Variant variant)))
         MonadicVariantInitializer monadic _ ->
           Just (Discrete (S.singleton (Variant (monadicName monadic))))
-        FunctionCall ident _args _ -> M.lookup ident (returnedValues global)
-        MemberFunctionCall obj member _args _ -> memberSummary obj member
-        DerefMemberFunctionCall obj member _args _ -> memberSummary obj member
+        FunctionCall {} -> returnedBy global locals expr >>= wholeOf
+        MemberFunctionCall {} -> returnedBy global locals expr >>= wholeOf
+        DerefMemberFunctionCall {} -> returnedBy global locals expr >>= wholeOf
         _ -> Nothing
+
+  where
+
+    wholeOf = M.lookup []
+
+-- | What an expression says about the cells under the object it gives: the
+-- fields of the summary of a call, the fields a struct written out assigns,
+-- and the cells of a struct that is copied from another one. Every other shape
+-- says nothing, which leaves the fields of the object unknown.
+fieldsIn ::
+  ValueAnalysisGlobal -> ValueAnalysisPath -> Expression SemanticAnn -> Returned
+fieldsIn global locals expr =
+  case expr of
+    FunctionCall {} -> fields (returnedBy global locals expr)
+    MemberFunctionCall {} -> fields (returnedBy global locals expr)
+    DerefMemberFunctionCall {} -> fields (returnedBy global locals expr)
+    StructInitializer assignments _ ->
+      M.fromList (mapMaybe assigned assignments)
+    AccessObject obj -> maybe M.empty copied (cellOf obj)
+    _ -> M.empty
+
+  where
+
+    fields = maybe M.empty (M.filterWithKey (\path _ -> not (null path)))
+
+    assigned (FieldValueAssignment fieldName value _) = do
+      values <- valuesIn global locals value
+      return ([fieldName], values)
+    assigned _ = Nothing
+
+    -- | The cells of the source, filed under the path that hangs below it.
+    copied (Cell ident path) =
+      M.fromList
+        [ (drop (length path) path', varValues entry)
+        | (Cell ident' path', entry) <- M.toList (known locals)
+        , ident' == ident, path `isPrefixOf` path', length path' > length path ]
+
+-- | The summary of what a call gives back, whether it goes to a function or to
+-- a member.
+returnedBy ::
+  ValueAnalysisGlobal -> ValueAnalysisPath -> Expression SemanticAnn
+  -> Maybe Returned
+returnedBy global _locals expr =
+  case expr of
+    FunctionCall ident _args _ -> M.lookup ident (returnedValues global)
+    MemberFunctionCall obj member _args _ -> memberSummary obj member
+    DerefMemberFunctionCall obj member _args _ -> memberSummary obj member
+    _ -> Nothing
 
   where
 
@@ -935,25 +1065,18 @@ valuesIn global locals expr =
       className <- classOfReceiver obj
       M.lookup (memberName className member) (returnedValues global)
 
-valuesOf :: Expression SemanticAnn -> ValueAnalysisMonad (Maybe Values)
-valuesOf expr = do
-  global <- getGlobal
-  locals <- getPath
-  return (valuesIn global locals expr)
-
--- | The plain variables an expression reads, in the order it reads them. A
--- field or an element of an array is left out, since the pass follows neither
--- and so has nothing to say about them.
-variablesIn :: Expression SemanticAnn -> [Identifier]
-variablesIn = concatMap inChild . expressionChildren
+-- | The cells an expression reads, in the order it reads them. An element of
+-- an array is left out, since the pass does not follow it and so has nothing
+-- to say about it.
+cellsIn :: Expression SemanticAnn -> [Cell]
+cellsIn = concatMap inChild . expressionChildren
 
   where
 
-    inChild (ChildObject (Variable ident _)) = [ident]
-    inChild (ChildObject _) = []
+    inChild (ChildObject obj) = maybe [] (: []) (cellOf obj)
     inChild (ChildReference _ _) = []
-    inChild (ChildExpr expr) = variablesIn expr
-    inChild (ChildArg expr) = variablesIn expr
+    inChild (ChildExpr expr) = cellsIn expr
+    inChild (ChildArg expr) = cellsIn expr
     inChild (ChildConstExpr _) = []
 
 -- | What the message says about each name of a condition: the value it holds
@@ -963,17 +1086,20 @@ variablesIn = concatMap inChild . expressionChildren
 reasonsFor ::
   ValueAnalysisGlobal -> ValueAnalysisPath -> Expression SemanticAnn -> [Reason]
 reasonsFor global locals cond =
-  mapMaybe reasonOf (nub (variablesIn cond))
+  mapMaybe reasonOf (nub (cellsIn cond))
 
   where
 
-    reasonOf ident =
-      case M.lookup ident (known locals) of
+    reasonOf cell =
+      case M.lookup cell (known locals) of
         Just entry ->
-          Just (Reason ident (holdsOf entry) (S.toList (valueOrigins entry)))
+          Just (Reason (cellName cell) (holdsOf entry) (S.toList (valueOrigins entry)))
         Nothing ->
-          (\value -> Reason ident (OneValue value) [])
-            <$> M.lookup ident (moduleConsts global)
+          case cell of
+            Cell ident [] ->
+              (\value -> Reason ident (OneValue value) [])
+                <$> M.lookup ident (moduleConsts global)
+            _ -> Nothing
 
     holdsOf entry = case varValues entry of
       Interval lo hi -> Between lo hi
@@ -1041,6 +1167,6 @@ runValueAnalysisCheck plt consts imported program =
 
     start = ValueAnalysisGlobal consts plt M.empty imported
 
-    walk global element =
+    walk global astElement =
       globalState . snd $
-        runDataflow (DFState (ValueAnalysisPath M.empty) global) (checkElement element)
+        runDataflow (DFState (ValueAnalysisPath M.empty) global) (checkElement astElement)
