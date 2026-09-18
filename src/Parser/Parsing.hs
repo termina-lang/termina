@@ -14,6 +14,8 @@ import           Text.Parsec hiding (Error, Ok)
 import qualified Text.Parsec.Expr     as Ex
 import qualified Text.Parsec.Language as Lang
 import qualified Text.Parsec.Token    as Tok
+import qualified Text.Parsec.Prim     as P
+import qualified Text.Parsec.Error    as PE
 
 import Data.Functor
 import Text.Parsec.Expr
@@ -178,7 +180,21 @@ reservedOp :: String -> TerminaParser ()
 reservedOp = Tok.reservedOp lexer
 
 identifierParser :: TerminaParser String
-identifierParser = Tok.identifier lexer
+identifierParser = do
+  startPos <- getPosition
+  Tok.identifier lexer >>= checkUnderscores startPos
+
+-- | Checks that an identifier does not contain two consecutive underscores.
+checkUnderscores :: SourcePos -> Identifier -> TerminaParser Identifier
+checkUnderscores startPos ident = do
+  when ("__" `L.isInfixOf` ident) $
+    failAt (incSourceColumn startPos (length ident)) ("Identifiers cannot contain two consecutive underscores: " ++ ident ++ ".")
+  return ident
+
+-- | Fails at the given position with the given message.
+failAt :: SourcePos -> String -> TerminaParser a
+failAt pos msg = P.mkPT $ \_ ->
+  return (P.Consumed (return (P.Error (PE.newErrorMessage (PE.Message msg) pos))))
 
 tails :: [a] -> [[a]]
 tails = L.tails
@@ -278,7 +294,10 @@ typeSpecifierParser =
   <|> (reserved "unit" >> return TSUnit)
 
 objectIdentifierParser :: TerminaParser Identifier
-objectIdentifierParser = try ((char '_' >> identifierParser) <&> ('_' :)) <|> identifierParser
+objectIdentifierParser = do
+  startPos <- getPosition
+  ident <- try ((char '_' >> Tok.identifier lexer) <&> ('_' :)) <|> Tok.identifier lexer
+  checkUnderscores startPos ident
 
 parameterParser :: TerminaParser (Parameter ParserAnn)
 parameterParser = do
@@ -1333,9 +1352,14 @@ topLevel = many $
 moduleIdentifierParser :: TerminaParser [ String ]
 moduleIdentifierParser = sepBy1 firstCapital dot
   where
-    firstCapital = (:)
-      <$> (lower <?> "Module paths begin with a lowercase letter.")
-      <*> (many (lower <|> char '_' <|> digit) <?> "Module names only accept lowercase letters or underscores.")
+    firstCapital = do
+      startPos <- getPosition
+      name <- (:)
+        <$> (lower <?> "Module paths begin with a lowercase letter.")
+        <*> (many (lower <|> char '_' <|> digit) <?> "Module names only accept lowercase letters or underscores.")
+      when ("__" `L.isInfixOf` name) $
+        failAt (incSourceColumn startPos (length name)) ("Module names cannot contain two consecutive underscores: " ++ name ++ ".")
+      return name
 
 moduleImportParser :: TerminaParser (ModuleImport ParserAnn)
 moduleImportParser = do

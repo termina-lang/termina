@@ -25,6 +25,7 @@ spec = describe "Parser: top-level declarations" $ do
       , ("one param, with return",   "function f(x : u32) -> u32 { return x; }")
       , ("many params, with return", "function f(x : u32, y : u32) -> u32 { return x; }")
       , ("many params, no return",   "function f(x : u32, y : u32) { return; }")
+      , ("single underscores and an ignored param", "function f_a(_x : u32, y_z : u32) -> u32 { return y_z; }")
       ]
 
   -- NB: each row stores the already-parsed constructor name (a String), not the
