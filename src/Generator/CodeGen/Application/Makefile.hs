@@ -84,7 +84,7 @@ genMakefile params bbProject =
             MInclude False "$(DEPS)"
         ],
         MakeBlock [
-            MInclude True $ "$(TERMINA_OSAL_DIR)" </> "shared" </> "shared" <.> "mk"
+            MInclude True $ "$(TERMINA_OSAL_DIR)" </> "platform" </> "common" <.> "mk"
         ]
 
     ]
