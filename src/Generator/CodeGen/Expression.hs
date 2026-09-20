@@ -377,12 +377,12 @@ genExpression (IsMonadicVariantExpression obj this_variant ann) = do
     cObj <- genObject obj
     let leftExpr = cObj @. variant @: enumFieldType |>> getLocation ann
     let rightExpr = case this_variant of 
-            NoneLabel -> optionNoneVariant @: enumFieldType |>> getLocation ann
-            SomeLabel -> optionSomeVariant @: enumFieldType |>> getLocation ann
-            SuccessLabel -> statusSuccessVariant @: enumFieldType |>> getLocation ann
-            FailureLabel -> statusFailureVariant @: enumFieldType |>> getLocation ann
-            OkLabel -> resultOkVariant @: enumFieldType |>> getLocation ann
-            ErrorLabel -> resultErrorVariant @: enumFieldType |>> getLocation ann
+            NoneLabel -> optionNoneTag @: enumFieldType |>> getLocation ann
+            SomeLabel -> optionSomeTag @: enumFieldType |>> getLocation ann
+            SuccessLabel -> statusSuccessTag @: enumFieldType |>> getLocation ann
+            FailureLabel -> statusFailureTag @: enumFieldType |>> getLocation ann
+            OkLabel -> resultOkTag @: enumFieldType |>> getLocation ann
+            ErrorLabel -> resultErrorTag @: enumFieldType |>> getLocation ann
     return $ leftExpr @== rightExpr |>> getLocation ann
 genExpression expr@(ArraySliceExpression _ak obj lower upper ann) = do
     objType <- getObjType obj
@@ -462,19 +462,19 @@ genInitializerExpr e@(MonadicVariantInitializer mv ann) = do
     cType <- getExprType e >>= genType noqual
     let cAnn = buildGenericAnn ann
         variantTag name = name @: enumFieldType |>> getLocation ann
-        singlePayload tagName v = do
+        singlePayload tag fieldName v = do
             cv <- genInitializerExpr v
             let inner = CExprDesignatedInitializer [(variantParamField 0, cv)] cType cAnn
-            return $ CExprDesignatedInitializer [(variant, variantTag tagName), (tagName, inner)] cType cAnn
-        noPayload tagName =
-            return $ CExprDesignatedInitializer [(variant, variantTag tagName)] cType cAnn
+            return $ CExprDesignatedInitializer [(variant, variantTag tag), (fieldName, inner)] cType cAnn
+        noPayload tag =
+            return $ CExprDesignatedInitializer [(variant, variantTag tag)] cType cAnn
     case mv of
-        Some v -> singlePayload optionSomeVariant v
-        None -> noPayload optionNoneVariant
-        Success -> noPayload statusSuccessVariant
-        Failure v -> singlePayload statusFailureVariant v
-        Ok v -> singlePayload resultOkVariant v
-        Error v -> singlePayload resultErrorVariant v
+        Some v -> singlePayload optionSomeTag optionSomeVariant v
+        None -> noPayload optionNoneTag
+        Success -> noPayload statusSuccessTag
+        Failure v -> singlePayload statusFailureTag statusFailureVariant v
+        Ok v -> singlePayload resultOkTag resultOkVariant v
+        Error v -> singlePayload resultErrorTag resultErrorVariant v
 genInitializerExpr e@(EnumVariantInitializer ts this_variant params ann) = do
     cType <- getExprType e >>= genType noqual
     let cAnn = buildGenericAnn ann

@@ -64,7 +64,7 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t sender_id;\n" ++
-              "    __option_uint32_t destination_id;\n" ++
+              "    Option__u32 destination_id;\n" ++
               "    _Bool urgent;\n" ++
               "} Message;\n" ++
               "\n" ++
@@ -78,9 +78,8 @@ spec = do
               "\n" ++
               "void __CHousekeeping__termina_task(void * const arg);\n" ++
               "\n" ++
-              "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const termina__ev,\n" ++
-              "                                        void * const termina__this,\n" ++
-              "                                        TimeVal current);\n" ++
+              "Status__i32 CHousekeeping__timeout(const __termina_event_t * const termina__ev,\n" ++
+              "                                   void * const termina__this, TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of task class CHousekeeping" $ do
@@ -110,21 +109,21 @@ spec = do
               "\n" ++
               "}\n" ++
               "\n" ++
-              "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const termina__ev,\n" ++
-              "                                        void * const termina__this,\n" ++
-              "                                        TimeVal current) {\n" ++
+              "Status__i32 CHousekeeping__timeout(const __termina_event_t * const termina__ev,\n" ++
+              "                                   void * const termina__this,\n" ++
+              "                                   TimeVal current) {\n" ++
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)termina__this;\n" ++
               "\n" ++
-              "    __status_int32_t ret = { ._variant = Success };\n" ++
+              "    Status__i32 ret = { ._variant = Status__Success };\n" ++
               "\n" ++
               "    self->interval = self->interval + 1U;\n" ++
               "\n" ++
-              "    __option_box_t alloc_msg = { ._variant = None };\n" ++
+              "    Option__box alloc_msg = { ._variant = Option__None };\n" ++
               "\n" ++
               "    self->message_pool.alloc(termina__ev, self->message_pool._that, &alloc_msg);\n" ++
               "\n" ++
-              "    if (alloc_msg._variant == Some) {\n" ++
+              "    if (alloc_msg._variant == Option__Some) {\n" ++
               "        \n" ++
               "        __termina_box_t msg = alloc_msg.Some._0;\n" ++
               "\n" ++
@@ -139,7 +138,7 @@ spec = do
               "\n" ++
               "    if (check == false) {\n" ++
               "        \n" ++
-              "        ret._variant = Failure;\n" ++
+              "        ret._variant = Status__Failure;\n" ++
               "        ret.Failure._0 = -(1L);\n" ++
               "\n" ++
               "    }\n" ++
@@ -156,7 +155,7 @@ spec = do
               "\n" ++
               "    __termina_event_t event;\n" ++
               "\n" ++
-              "    __status_int32_t result;\n" ++
+              "    Status__i32 result;\n" ++
               "\n" ++
               "    TimeVal timeout__msg_data;\n" ++
               "\n" ++
@@ -182,7 +181,7 @@ spec = do
               "                result = CHousekeeping__timeout(&event, self,\n" ++
               "                                                timeout__msg_data);\n" ++
               "\n" ++
-              "                if (result._variant != Success) {\n" ++
+              "                if (result._variant != Status__Success) {\n" ++
               "                    \n" ++
               "                    ExceptSource source;\n" ++
               "                    source._variant = ExceptSource__Task;\n" ++

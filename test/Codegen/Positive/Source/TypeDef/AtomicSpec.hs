@@ -60,9 +60,8 @@ spec = do
               "\n" ++
               "void __CHousekeeping__termina_task(void * const arg);\n" ++
               "\n" ++
-              "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const termina__ev,\n" ++
-              "                                        void * const termina__this,\n" ++
-              "                                        TimeVal current);\n" ++
+              "Status__i32 CHousekeeping__timeout(const __termina_event_t * const termina__ev,\n" ++
+              "                                   void * const termina__this, TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of class with atomic access port" $ do
@@ -70,15 +69,15 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const termina__ev,\n" ++
-              "                                        void * const termina__this,\n" ++
-              "                                        TimeVal current) {\n" ++
+              "Status__i32 CHousekeeping__timeout(const __termina_event_t * const termina__ev,\n" ++
+              "                                   void * const termina__this,\n" ++
+              "                                   TimeVal current) {\n" ++
               "    \n" ++
               "    (void)termina__ev;\n" ++
               "\n" ++
               "    CHousekeeping * self = (CHousekeeping *)termina__this;\n" ++
               "\n" ++
-              "    __status_int32_t ret = { ._variant = Success };\n" ++
+              "    Status__i32 ret = { ._variant = Status__Success };\n" ++
               "\n" ++
               "    uint32_t local = 0U;\n" ++
               "\n" ++
@@ -98,7 +97,7 @@ spec = do
               "\n" ++
               "    __termina_event_t event;\n" ++
               "\n" ++
-              "    __status_int32_t result;\n" ++
+              "    Status__i32 result;\n" ++
               "\n" ++
               "    TimeVal timeout__msg_data;\n" ++
               "\n" ++
@@ -124,7 +123,7 @@ spec = do
               "                result = CHousekeeping__timeout(&event, self,\n" ++
               "                                                timeout__msg_data);\n" ++
               "\n" ++
-              "                if (result._variant != Success) {\n" ++
+              "                if (result._variant != Status__Success) {\n" ++
               "                    \n" ++
               "                    ExceptSource source;\n" ++
               "                    source._variant = ExceptSource__Task;\n" ++
@@ -167,9 +166,8 @@ spec = do
               "\n" ++
               "void __CHousekeeping__termina_task(void * const arg);\n" ++
               "\n" ++
-              "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const termina__ev,\n" ++
-              "                                        void * const termina__this,\n" ++
-              "                                        TimeVal current);\n" ++
+              "Status__i32 CHousekeeping__timeout(const __termina_event_t * const termina__ev,\n" ++
+              "                                   void * const termina__this, TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of class with atomic access port" $ do
@@ -177,15 +175,15 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const termina__ev,\n" ++
-              "                                        void * const termina__this,\n" ++
-              "                                        TimeVal current) {\n" ++
+              "Status__i32 CHousekeeping__timeout(const __termina_event_t * const termina__ev,\n" ++
+              "                                   void * const termina__this,\n" ++
+              "                                   TimeVal current) {\n" ++
               "    \n" ++
               "    (void)termina__ev;\n" ++
               "\n" ++
               "    CHousekeeping * self = (CHousekeeping *)termina__this;\n" ++
               "\n" ++
-              "    __status_int32_t ret = { ._variant = Success };\n" ++
+              "    Status__i32 ret = { ._variant = Status__Success };\n" ++
               "\n" ++
               "    uint32_t local = 0U;\n" ++
               "\n" ++
@@ -205,7 +203,7 @@ spec = do
               "\n" ++
               "    __termina_event_t event;\n" ++
               "\n" ++
-              "    __status_int32_t result;\n" ++
+              "    Status__i32 result;\n" ++
               "\n" ++
               "    TimeVal timeout__msg_data;\n" ++
               "\n" ++
@@ -231,7 +229,7 @@ spec = do
               "                result = CHousekeeping__timeout(&event, self,\n" ++
               "                                                timeout__msg_data);\n" ++
               "\n" ++
-              "                if (result._variant != Success) {\n" ++
+              "                if (result._variant != Status__Success) {\n" ++
               "                    \n" ++
               "                    ExceptSource source;\n" ++
               "                    source._variant = ExceptSource__Task;\n" ++

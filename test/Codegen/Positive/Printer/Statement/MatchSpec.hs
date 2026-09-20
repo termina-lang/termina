@@ -77,49 +77,49 @@ spec = do
   describe "Pretty printing match statements" $ do
     it "Prints a match option statement" $ do
       renderStatement matchOption0 `shouldBe`
-        pack (
-          "\nif (option_var._variant == Some) {\n" ++
-          "    \n" ++
-          "    __termina_box_t param0 = option_var.Some._0;\n" ++
-          "\n" ++
-          "    foo1 = *(uint32_t *)param0.data;\n" ++
-          "\n" ++
-          "} else {\n" ++
-          "    \n" ++
-          "    foo1 = 0U;\n" ++
-          "\n" ++
-          "}")
+        pack ("\n" ++
+              "if (option_var._variant == Option__Some) {\n" ++
+              "    \n" ++
+              "    __termina_box_t param0 = option_var.Some._0;\n" ++
+              "\n" ++
+              "    foo1 = *(uint32_t *)param0.data;\n" ++
+              "\n" ++
+              "} else {\n" ++
+              "    \n" ++
+              "    foo1 = 0U;\n" ++
+              "\n" ++
+              "}")
     it "Prints a match option array statement" $ do
       renderStatement matchOption1 `shouldBe`
-        pack (
-          "\nif (option_var._variant == None) {\n" ++
-          "    \n" ++
-          "    foo1 = 0U;\n" ++
-          "\n" ++
-          "} else {\n" ++
-          "    \n" ++
-          "    __termina_box_t param1 = option_var.Some._0;\n" ++
-          "\n" ++
-          "    foo1 = ((uint32_t *)param1.data)[8U];\n" ++
-          "\n" ++
-          "}")
+        pack ("\n" ++
+              "if (option_var._variant == Option__None) {\n" ++
+              "    \n" ++
+              "    foo1 = 0U;\n" ++
+              "\n" ++
+              "} else {\n" ++
+              "    \n" ++
+              "    __termina_box_t param1 = option_var.Some._0;\n" ++
+              "\n" ++
+              "    foo1 = ((uint32_t *)param1.data)[8U];\n" ++
+              "\n" ++
+              "}")
     it "Prints a match option statement with a complex expression" $ do
       renderStatement matchOption2 `shouldBe`
-        pack (
-          "\n{\n" ++
-          "    \n" ++
-          "    __option_box_t termina__match = get_integer();\n" ++
-          "\n" ++
-          "    if (termina__match._variant == Some) {\n" ++
-          "        \n" ++
-          "        __termina_box_t param0 = termina__match.Some._0;\n" ++
-          "\n" ++
-          "        foo1 = *(uint32_t *)param0.data;\n" ++
-          "\n" ++
-          "    } else {\n" ++
-          "        \n" ++
-          "        foo1 = 0U;\n" ++
-          "\n" ++
-          "    }\n" ++
-          "\n" ++
-          "}")
+        pack ("\n" ++
+              "{\n" ++
+              "    \n" ++
+              "    Option__box termina__match = get_integer();\n" ++
+              "\n" ++
+              "    if (termina__match._variant == Option__Some) {\n" ++
+              "        \n" ++
+              "        __termina_box_t param0 = termina__match.Some._0;\n" ++
+              "\n" ++
+              "        foo1 = *(uint32_t *)param0.data;\n" ++
+              "\n" ++
+              "    } else {\n" ++
+              "        \n" ++
+              "        foo1 = 0U;\n" ++
+              "\n" ++
+              "    }\n" ++
+              "\n" ++
+              "}")

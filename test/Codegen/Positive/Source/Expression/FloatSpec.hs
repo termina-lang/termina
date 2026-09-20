@@ -146,9 +146,9 @@ spec = do
               "\n" ++
               "void test_option(void) {\n" ++
               "    \n" ++
-              "    __option_float32_t o = { ._variant = None };\n" ++
+              "    Option__f32 o = { ._variant = Option__None };\n" ++
               "\n" ++
-              "    o._variant = Some;\n" ++
+              "    o._variant = Option__Some;\n" ++
               "    o.Some._0 = 1.5f;\n" ++
               "\n" ++
               "    return;\n" ++

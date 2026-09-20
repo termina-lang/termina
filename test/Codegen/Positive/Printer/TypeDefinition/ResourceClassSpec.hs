@@ -115,7 +115,7 @@ spec = do
           "\n" ++
           "void Class0__procedure0(const __termina_event_t * const termina__ev,\n" ++
           "                        void * const termina__this, uint8_t param0,\n" ++
-          "                        __option_box_t param1);\n" ++
+          "                        Option__box param1);\n" ++
           "\n" ++
           "void Class0__procedure1(const __termina_event_t * const termina__ev,\n" ++
           "                        void * const termina__this, uint8_t param0,\n" ++

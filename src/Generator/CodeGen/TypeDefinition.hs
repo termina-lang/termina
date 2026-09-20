@@ -97,7 +97,7 @@ genStatusFailureParameterStruct ts = do
 genStatusStruct :: TerminaType SemanticAnn -> CGenerator [CFileItem]
 genStatusStruct ts = do
     paramsStructName <- genStatusParameterStructName ts
-    enumStructName <- genEnumStructName "status"
+    enumStructName <- genEnumStructName statusType
     paramsStructType <- genType noqual (TStruct paramsStructName)
     enumStructType <- genType noqual (TStruct enumStructName)
     let failure = field statusFailureVariant paramsStructType
@@ -129,7 +129,7 @@ genResultStruct okTy errorTy = do
     okParamsStructType <- genType noqual (TStruct okParamStructName)
     errorParamStructName <- genResultParameterStructName okTy errorTy resultErrorVariant
     errorParamsStructType <- genType noqual (TStruct errorParamStructName)
-    enumStructName <- genEnumStructName "result"
+    enumStructName <- genEnumStructName resultType
     enumStructType <- genType noqual (TStruct enumStructName)
     let ok = field resultOkVariant okParamsStructType
         err = field resultErrorVariant errorParamsStructType
@@ -203,7 +203,7 @@ genResultStructFromTypeDef _ _ = throwError $ InternalError "Invalid result enum
 genOptionStruct :: TerminaType SemanticAnn -> CGenerator [CFileItem]
 genOptionStruct ts = do
     paramsStructName <- genOptionParameterStructName ts
-    enumStructName <- genEnumStructName "option"
+    enumStructName <- genEnumStructName optionType
     paramsStructType <- genType noqual (TStruct paramsStructName)
     enumStructType <- genType noqual (TStruct enumStructName)
     let some = field optionSomeVariant paramsStructType
@@ -519,20 +519,20 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
             classFunctionName <- genClassFunctionName classId action
             classStructType <- genType noqual (TStruct classId)
 
-            let classFunctionType = CTFunction __status_int32_t
+            let classFunctionType = CTFunction _Status__i32
                     [_const . ptr $ classStructType]
             return
                 [
                     -- case variant:
                     pre_cr $ _case (this_variant @: enumFieldType) $
                     -- status = classFunctionName(self, action_msg_data);
-                    indent . pre_cr $ "result" @: __status_int32_t @=
+                    indent . pre_cr $ "result" @: _Status__i32 @=
                         (classFunctionName @: classFunctionType) @@ [
                             addrOf ("event" @: __termina_event_t),
                             "self" @: classStructType],
                     -- if (result._variant != Status__Success)
                     indent . pre_cr $ _if (
-                            (("result" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
+                            (("result" @: _Status__i32) @. variant) @: enumFieldType @!= statusSuccessTag @: enumFieldType)
                         $ trail_cr $ block [
                             -- ExceptSource source;
                             pre_cr $ var "source" (typeDef "ExceptSource"),
@@ -545,7 +545,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                             pre_cr $ __termina_except__action_failure @@ [
                                 "source" @: typeDef "ExceptSource",
                                 this_variant @: size_t,
-                                ("result" @: __status_int32_t) @. statusFailureVariant @: enumFieldType @. variantParamField 0 @: int32_t
+                                ("result" @: _Status__i32) @. statusFailureVariant @: enumFieldType @. variantParamField 0 @: int32_t
                             ]
                         ],
                     indent . pre_cr $ _break
@@ -556,7 +556,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
             classStructType <- genType noqual (TStruct classId)
             cDataType <- genType noqual dts
 
-            let classFunctionType = CTFunction __status_int32_t
+            let classFunctionType = CTFunction _Status__i32
                     [_const . ptr $ classStructType, cDataType]
             return
                 [
@@ -579,13 +579,13 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                             ]
                         ],
                     -- status = classFunctionName(self, action_msg_data);
-                    indent . pre_cr $ "result" @: __status_int32_t @=
+                    indent . pre_cr $ "result" @: _Status__i32 @=
                         (classFunctionName @: classFunctionType) @@ [
                             addrOf ("event" @: __termina_event_t),
                             "self" @: classStructType, (action <::> "msg_data") @: cDataType],
                     -- if (result._variant != Status__Success)
                     indent . pre_cr $ _if (
-                            (("result" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
+                            (("result" @: _Status__i32) @. variant) @: enumFieldType @!= statusSuccessTag @: enumFieldType)
                         $ trail_cr $ block [
                             -- ExceptSource source;
                             pre_cr $ var "source" (typeDef "ExceptSource"),
@@ -598,7 +598,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                             pre_cr $ __termina_except__action_failure @@ [
                                 "source" @: typeDef "ExceptSource",
                                 this_variant @: size_t,
-                                ("result" @: __status_int32_t) @. statusFailureVariant @: enumFieldType @. variantParamField 0 @: int32_t
+                                ("result" @: _Status__i32) @. statusFailureVariant @: enumFieldType @. variantParamField 0 @: int32_t
                             ]
                         ],
                     indent . pre_cr $ _break
@@ -646,8 +646,8 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                     pre_cr $ var "status" int32_t @:= dec 0 @: int32_t,
                     -- __termina_event_t ev;
                     pre_cr $ var "event" __termina_event_t,
-                    -- __status_int32_t result;
-                    pre_cr $ var "result" __status_int32_t
+                    -- _Status__i32 result;
+                    pre_cr $ var "result" _Status__i32
                 ] ++ msgDataVars ++
                 [
                     pre_cr $ _for Nothing Nothing Nothing loop

@@ -101,15 +101,15 @@ spec = do
         pack "\n#include \"test.h\"\n\nvoid tb(void) {\n    \n    Point p = { .x = 1U, .y = 2U };\n\n    Box b = { .v = { 1U, 2U } };\n\n    Point arr[2U] = { { .x = 1U, .y = 2U }, { .x = 3U, .y = 4U } };\n\n    return;\n\n}\n"
     it "Option (Some/None) and enum variants (with/without parameters)" $
       renderSource declVariants `shouldBe`
-        pack "\n#include \"test.h\"\n\nvoid tc(void) {\n    \n    __option_uint32_t o = { ._variant = Some, .Some = { ._0 = 5U } };\n\n    __option_uint32_t n = { ._variant = None };\n\n    Color c = { ._variant = Color__Pair, .Pair = { ._0 = 1U, ._1 = 2U } };\n\n    Color r = { ._variant = Color__Red };\n\n    return;\n\n}\n"
+        pack "\n#include \"test.h\"\n\nvoid tc(void) {\n    \n    Option__u32 o = { ._variant = Option__Some, .Some = { ._0 = 5U } };\n\n    Option__u32 n = { ._variant = Option__None };\n\n    Color c = { ._variant = Color__Pair, .Pair = { ._0 = 1U, ._1 = 2U } };\n\n    Color r = { ._variant = Color__Red };\n\n    return;\n\n}\n"
   describe "Assignment to an already-declared variable (element-wise)" $ do
     it "Arrays: list, fill and string assignment" $
       renderSource assignArrays `shouldBe`
         pack "\n#include \"test.h\"\n\nvoid td(void) {\n    \n    uint8_t a[3U] = { 0U, 0U, 0U };\n\n    a[0U] = 1U;\n    a[1U] = 2U;\n    a[2U] = 3U;\n\n    for (size_t termina__i0 = 0U;\n         termina__i0 < 3U;\n         termina__i0 = termina__i0 + 1U) {\n        a[termina__i0] = 9U;\n    }\n\n    char s[6U] = { 'a', 'a', 'a', 'a', 'a' };\n\n    s[0U] = 'h';\n    s[1U] = 'e';\n    s[2U] = 'l';\n    s[3U] = 'l';\n    s[4U] = 'o';\n    s[5U] = '\\0';\n\n    return;\n\n}\n"
     it "Struct field-wise assignment, struct copy and Option assignment" $
       renderSource assignAggregates `shouldBe`
-        pack "\n#include \"test.h\"\n\nvoid te(void) {\n    \n    Point p = { .x = 0U, .y = 0U };\n\n    p.x = 1U;\n    p.y = 2U;\n\n    Point p2 = { .x = 0U, .y = 0U };\n\n    p2 = p;\n\n    __option_uint32_t o = { ._variant = None };\n\n    o._variant = Some;\n    o.Some._0 = 7U;\n\n    return;\n\n}\n"
+        pack "\n#include \"test.h\"\n\nvoid te(void) {\n    \n    Point p = { .x = 0U, .y = 0U };\n\n    p.x = 1U;\n    p.y = 2U;\n\n    Point p2 = { .x = 0U, .y = 0U };\n\n    p2 = p;\n\n    Option__u32 o = { ._variant = Option__None };\n\n    o._variant = Option__Some;\n    o.Some._0 = 7U;\n\n    return;\n\n}\n"
   describe "Status declaration and assignment" $
     it "Success/Failure declaration ({ ... }) and assignment (element-wise)" $
       renderSource statusInitAssign `shouldBe`
-        pack "\n#include \"test.h\"\n\nvoid ts(void) {\n    \n    __status_int32_t su = { ._variant = Success };\n\n    __status_int32_t fa = { ._variant = Failure, .Failure = { ._0 = 3L } };\n\n    fa._variant = Success;\n\n    su._variant = Failure;\n    su.Failure._0 = 2L;\n\n    return;\n\n}\n"
+        pack "\n#include \"test.h\"\n\nvoid ts(void) {\n    \n    Status__i32 su = { ._variant = Status__Success };\n\n    Status__i32 fa = { ._variant = Status__Failure, .Failure = { ._0 = 3L } };\n\n    fa._variant = Status__Success;\n\n    su._variant = Status__Failure;\n    su.Failure._0 = 2L;\n\n    return;\n\n}\n"

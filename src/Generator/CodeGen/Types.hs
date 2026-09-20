@@ -8,9 +8,9 @@ import Generator.LanguageC.Embedded
 import Generator.CodeGen.Common
 
 -- | Generic types
-_TimeVal, __status_int32_t :: CType
+_TimeVal, _Status__i32 :: CType
 _TimeVal = typeDef "TimeVal"
-__status_int32_t = typeDef "__status_int32_t"
+_Status__i32 = typeDef "Status__i32"
 
 __termina_id_t, __termina_pool_t, 
     __termina_allocator_t,
@@ -22,18 +22,18 @@ __termina_msg_queue_t = typeDef msgQueue
 __termina_periodic_timer_t = typeDef periodicTimer
 
 __termina_event_t, __termina_active_entity_t,
-    __enum_termina_active_entity__handler_params_t,
-    __enum_termina_active_entity__task_params_t :: CType
+    termina__enum__termina_active_entity__handler_params_t,
+    termina__enum__termina_active_entity__task_params_t :: CType
 __termina_event_t = typeDef "__termina_event_t"
 __termina_active_entity_t = typeDef "__termina_active_entity_t"
-__enum_termina_active_entity__handler_params_t = typeDef "__enum_termina_active_entity__handler_params_t"
-__enum_termina_active_entity__task_params_t = typeDef "__enum_termina_active_entity__task_params_t"
+termina__enum__termina_active_entity__handler_params_t = typeDef "termina__enum__termina_active_entity__handler_params_t"
+termina__enum__termina_active_entity__task_params_t = typeDef "termina__enum__termina_active_entity__task_params_t"
 
 __termina_lock_t, __termina_resource_lock_type_t,
-    __enum_termina_resource_lock_type__mutex_params_t :: CType
+    termina__enum__termina_resource_lock_type__mutex_params_t :: CType
 __termina_lock_t = typeDef "__termina_lock_t"
 __termina_resource_lock_type_t = typeDef "__termina_resource_lock_type_t"
-__enum_termina_resource_lock_type__mutex_params_t = typeDef "__enum_termina_resource_lock_type__mutex_params_t"
+termina__enum__termina_resource_lock_type__mutex_params_t = typeDef "termina__enum__termina_resource_lock_type__mutex_params_t"
 
 __termina_resource__lock :: CExpression
 __termina_resource__lock = "__termina_resource__lock" @:
@@ -57,9 +57,9 @@ __termina_resource__unlock = "__termina_resource__unlock" @:
             __termina_lock_t
         ]
 
-__termina_box_t, __option_box_t :: CType
+__termina_box_t, _Option__box :: CType
 __termina_box_t = typeDef boxStruct
-__option_box_t = typeDef optionBox
+_Option__box = typeDef optionBox
 
 __termina_emitter_task_connection_t :: CType
 __termina_emitter_task_connection_t = typeDef "__termina_emitter_task_connection_t"
@@ -90,7 +90,7 @@ timer_handler classId handler = (classId <::> handler) @:
 
 system_init_handler :: Ident -> Ident -> CExpression
 system_init_handler classId handler = (classId <::> handler) @:
-    CTFunction __status_int32_t
+    CTFunction _Status__i32
         [
             _const . ptr $ classId,
             -- | TimeVal current
@@ -254,8 +254,8 @@ __termina_pool__alloc = "__termina_pool__alloc" @:
     CTFunction void
         [
             _const __termina_id_t,
-            -- | __option_box_t * const opt
-            _const . ptr $ __option_box_t
+            -- | _Option__box * const opt
+            _const . ptr $ _Option__box
         ]
 
 __termina_pool__free :: CExpression

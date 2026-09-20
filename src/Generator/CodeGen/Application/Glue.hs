@@ -395,7 +395,7 @@ genEnableProtection progArchitecture = do
                     return [
                         pre_cr $ resourceId @: typeDef classId @. resourceLockTypeField @: __termina_resource_lock_type_t @. "type" @: enumFieldType @= 
                             "__termina_resource_lock_type__mutex" @: enumFieldType,
-                        no_cr $ resourceId @: typeDef classId @. resourceLockTypeField @: __termina_resource_lock_type_t @. "mutex" @: __enum_termina_resource_lock_type__mutex_params_t @. "mutex_id" @: __termina_id_t
+                        no_cr $ resourceId @: typeDef classId @. resourceLockTypeField @: __termina_resource_lock_type_t @. "mutex" @: termina__enum__termina_resource_lock_type__mutex_params_t @. "mutex_id" @: __termina_id_t
                             @= mutexId @: __termina_id_t
                         ]
                 Nothing -> throwError $ InternalError $ "Resource " ++ show resourceId
@@ -414,7 +414,7 @@ genEnableProtection progArchitecture = do
                     return [
                         pre_cr $ poolId @: __termina_pool_t @. resourceLockTypeField @: __termina_resource_lock_type_t @. "type" @: enumFieldType @= 
                             "__termina_resource_lock_type__mutex" @: enumFieldType,
-                        no_cr $ poolId @: __termina_pool_t @. resourceLockTypeField @: __termina_resource_lock_type_t @. "mutex" @: __enum_termina_resource_lock_type__mutex_params_t @. "mutex_id" @: __termina_id_t
+                        no_cr $ poolId @: __termina_pool_t @. resourceLockTypeField @: __termina_resource_lock_type_t @. "mutex" @: termina__enum__termina_resource_lock_type__mutex_params_t @. "mutex_id" @: __termina_id_t
                             @= mutexId @: __termina_id_t
                         ]
                 Nothing -> throwError $ InternalError $ "Pool " ++ show poolId ++ " not found in resource locking map"
@@ -450,7 +450,7 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
             return [
                     no_cr $ "event" @: __termina_event_t @. "emitter_id" @: __termina_id_t @= emitterId @: __termina_id_t,
                     no_cr $ "event" @: __termina_event_t @. "owner" @: __termina_active_entity_t @. "type" @: enumFieldType @= "__termina_active_entity__handler" @: enumFieldType,
-                    no_cr $ "event" @: __termina_event_t @. "owner" @: __termina_active_entity_t @. "handler" @: __enum_termina_active_entity__handler_params_t
+                    no_cr $ "event" @: __termina_event_t @. "owner" @: __termina_active_entity_t @. "handler" @: termina__enum__termina_active_entity__handler_params_t
                         @. "handler_id" @: __termina_id_t @= handlerId @: __termina_id_t,
                     no_cr $ "event" @: __termina_event_t @. "port_id" @: __termina_id_t @= dec 0 @: __termina_id_t,
                     pre_cr $ var "current" _TimeVal,
@@ -459,12 +459,12 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                         addrOf ("current" @: _TimeVal)],
                     -- classId * self = &identifier;
                     pre_cr $ var "self" (ptr classIdType) @:= addrOf (identifier @: classIdType),
-                    -- __status_int32_t result;
-                    pre_cr $ var "result" __status_int32_t,
+                    -- _Status__i32 result;
+                    pre_cr $ var "result" _Status__i32,
                     -- result._variant = Success;
-                    no_cr $ ("result" @: __status_int32_t) @. variant @: enumFieldType @= "Success" @: enumFieldType,
+                    no_cr $ ("result" @: _Status__i32) @. variant @: enumFieldType @= statusSuccessTag @: enumFieldType,
                     -- result = classFunctionName(&event, self, current);
-                    pre_cr $ "result" @: __status_int32_t @=
+                    pre_cr $ "result" @: _Status__i32 @=
                         timer_handler classId targetAction @@
                             [
                                 addrOf ("event" @: __termina_event_t),
@@ -473,7 +473,7 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                             ],
                     -- if (result._variant != Success)
                     pre_cr $ _if (
-                            (("result" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
+                            (("result" @: _Status__i32) @. variant) @: enumFieldType @!= statusSuccessTag @: enumFieldType)
                         $ trail_cr $ block [
                             -- ExceptSource source;
                             pre_cr $ var "source" (typeDef "ExceptSource"),
@@ -485,7 +485,7 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                             pre_cr $ __termina_except__action_failure @@ [
                                 "source" @: typeDef "ExceptSource",
                                 dec 0 @: size_t,
-                                ("result" @: __status_int32_t) @. statusFailureVariant @: enumFieldType @. variantParamField 0 @: int32_t
+                                ("result" @: _Status__i32) @. statusFailureVariant @: enumFieldType @. variantParamField 0 @: int32_t
                             ]
                         ],
                     pre_cr $ _return Nothing
@@ -502,7 +502,7 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
             return [
                     no_cr $ "event" @: __termina_event_t @. "emitter_id" @: __termina_id_t @= emitterId @: __termina_id_t,
                     no_cr $ "event" @: __termina_event_t @. "owner" @: __termina_active_entity_t @. "type" @: enumFieldType @= "__termina_active_entity__task" @: enumFieldType,
-                    no_cr $ "event" @: __termina_event_t @. "owner" @: __termina_active_entity_t @. "task" @: __enum_termina_active_entity__task_params_t
+                    no_cr $ "event" @: __termina_event_t @. "owner" @: __termina_active_entity_t @. "task" @: termina__enum__termina_active_entity__task_params_t
                         @. "task_id" @: __termina_id_t @= taskId @: __termina_id_t,
                     no_cr $ "event" @: __termina_event_t @. "port_id" @: __termina_id_t @= portId @: __termina_id_t,
                     pre_cr $ var "current" _TimeVal,
@@ -511,12 +511,12 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                         addrOf ("current" @: _TimeVal)],
                     -- classId * self = &identifier;
                     pre_cr $ var "self" (ptr classIdType) @:= addrOf (identifier @: classIdType),
-                    -- __status_int32_t result;
-                    pre_cr $ var "result" __status_int32_t,
+                    -- _Status__i32 result;
+                    pre_cr $ var "result" _Status__i32,
                     -- result._variant = Success;
-                    no_cr $ ("result" @: __status_int32_t) @. variant @: enumFieldType @= "Success" @: enumFieldType,
+                    no_cr $ ("result" @: _Status__i32) @. variant @: enumFieldType @= statusSuccessTag @: enumFieldType,
                     -- result = classFunctionName(self, current);
-                    pre_cr $ "result" @: __status_int32_t @=
+                    pre_cr $ "result" @: _Status__i32 @=
                         timer_handler classId targetAction @@
                             [
                                 "self" @: ptr classIdType,
@@ -524,7 +524,7 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                             ],
                     -- if (result._variant != Success)
                     pre_cr $ _if (
-                            (("result" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
+                            (("result" @: _Status__i32) @. variant) @: enumFieldType @!= statusSuccessTag @: enumFieldType)
                         $ trail_cr $ block [
                             -- ExceptSource source;
                             pre_cr $ var "source" (typeDef "ExceptSource"),
@@ -536,7 +536,7 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                             pre_cr $ __termina_except__action_failure @@ [
                                 "source" @: typeDef "ExceptSource",
                                 portId @: size_t,
-                                ("result" @: __status_int32_t) @. statusFailureVariant @: enumFieldType @. variantParamField 0 @: int32_t
+                                ("result" @: _Status__i32) @. statusFailureVariant @: enumFieldType @. variantParamField 0 @: int32_t
                             ]
                         ],
                     pre_cr $ _return Nothing

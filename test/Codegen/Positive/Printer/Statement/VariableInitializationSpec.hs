@@ -91,10 +91,10 @@ spec = do
   describe "Pretty printing option variable declarations" $ do
     it "Initializes an option-box with Some" $ do
       renderStatement option0 `shouldBe`
-        pack "\n__option_box_t option0 = { ._variant = Some, .Some = { ._0 = box_var0 } };"
+        pack "\nOption__box option0 = { ._variant = Option__Some, .Some = { ._0 = box_var0 } };"
     it "Initializes an option-box with None" $ do
       renderStatement option1 `shouldBe`
-        pack "\n__option_box_t option1 = { ._variant = None };"
+        pack "\nOption__box option1 = { ._variant = Option__None };"
   describe "Pretty printing enum variable declarations" $ do
     it "Initializes an enum variable with a parameterless variant" $ do
       renderStatement enum0 `shouldBe`

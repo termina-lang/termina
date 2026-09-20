@@ -52,7 +52,7 @@ spec = do
               "} id0;\n" ++
               "\n" ++
               "void id0__match_test0(const __termina_event_t * const termina__ev,\n" ++
-              "                      void * const termina__this, __option_box_t option0);\n" ++
+              "                      void * const termina__this, Option__box option0);\n" ++
               "\n" ++
               "#endif\n")
     it "Generates an option-box is-variant test" $ do
@@ -61,7 +61,7 @@ spec = do
               "#include \"test.h\"\n" ++
               "\n" ++
               "void id0__match_test0(const __termina_event_t * const termina__ev,\n" ++
-              "                      void * const termina__this, __option_box_t option0) {\n" ++
+              "                      void * const termina__this, Option__box option0) {\n" ++
               "    \n" ++
               "    id0 * self = (id0 *)termina__this;\n" ++
               "\n" ++
@@ -70,7 +70,7 @@ spec = do
               "\n" ++
               "    uint32_t foo = 0U;\n" ++
               "\n" ++
-              "    if (option0._variant == None) {\n" ++
+              "    if (option0._variant == Option__None) {\n" ++
               "        \n" ++
               "        foo = 1U;\n" ++
               "\n" ++
@@ -94,22 +94,22 @@ spec = do
               "    Message__Out,\n" ++
               "    Message__Stop,\n" ++
               "    Message__Reset\n" ++
-              "} __enum_Message_t;\n" ++
+              "} termina__enum__Message_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t _0;\n" ++
               "    uint32_t _1;\n" ++
-              "} __enum_Message__In_params_t;\n" ++
+              "} termina__enum__Message__In_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t _0;\n" ++
-              "} __enum_Message__Out_params_t;\n" ++
+              "} termina__enum__Message__Out_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __enum_Message_t _variant;\n" ++
+              "    termina__enum__Message_t _variant;\n" ++
               "    union {\n" ++
-              "        __enum_Message__In_params_t In;\n" ++
-              "        __enum_Message__Out_params_t Out;\n" ++
+              "        termina__enum__Message__In_params_t In;\n" ++
+              "        termina__enum__Message__Out_params_t Out;\n" ++
               "    };\n" ++
               "} Message;\n" ++
               "\n" ++

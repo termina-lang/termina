@@ -30,22 +30,22 @@ spec = do
               "    Message__Out,\n" ++
               "    Message__Stop,\n" ++
               "    Message__Reset\n" ++
-              "} __enum_Message_t;\n" ++
+              "} termina__enum__Message_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t _0;\n" ++
               "    uint32_t _1;\n" ++
-              "} __enum_Message__In_params_t;\n" ++
+              "} termina__enum__Message__In_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t _0;\n" ++
-              "} __enum_Message__Out_params_t;\n" ++
+              "} termina__enum__Message__Out_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __enum_Message_t _variant;\n" ++
+              "    termina__enum__Message_t _variant;\n" ++
               "    union {\n" ++
-              "        __enum_Message__In_params_t In;\n" ++
-              "        __enum_Message__Out_params_t Out;\n" ++
+              "        termina__enum__Message__In_params_t In;\n" ++
+              "        termina__enum__Message__Out_params_t Out;\n" ++
               "    };\n" ++
               "} Message;\n" ++
               "\n" ++

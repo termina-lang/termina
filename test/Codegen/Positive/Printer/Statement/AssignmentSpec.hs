@@ -133,12 +133,12 @@ spec = do
   describe "Pretty printing option-box assignments" $ do
     it "Assigns Some to an option-box" $ do
       renderStatement option0Assign `shouldBe`
-        pack (
-          "\noption0._variant = Some;\n" ++
-          "option0.Some._0 = box_var0;")
+        pack ("\n" ++
+              "option0._variant = Option__Some;\n" ++
+              "option0.Some._0 = box_var0;")
     it "Assigns None to an option-box" $ do
       renderStatement option1Assign `shouldBe`
-        pack "\noption1._variant = None;"
+        pack "\noption1._variant = Option__None;"
   describe "Pretty printing enum assignments" $ do
     it "Assigns a parameterless enum variant" $ do
       renderStatement enum0Assign `shouldBe`

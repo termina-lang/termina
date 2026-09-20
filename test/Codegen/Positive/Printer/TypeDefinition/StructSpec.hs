@@ -67,21 +67,21 @@ spec = do
             "\n" ++
             "typedef struct {\n" ++
             "    id0 _0;\n" ++
-            "} __option_id0__Some_params_t;\n" ++
+            "} termina__enum__Option__id0__Some_params_t;\n" ++
             "\n" ++     
             "typedef struct {\n" ++
-            "    __option_id0__Some_params_t Some;\n" ++
-            "    __enum_option_t _variant;\n" ++
-            "} __option_id0_t;\n" ++
+            "    termina__enum__Option__id0__Some_params_t Some;\n" ++
+            "    termina__enum__Option_t _variant;\n" ++
+            "} Option__id0;\n" ++
             "\n" ++
             "typedef struct {\n" ++
             "    id0 _0;\n" ++
-            "} __status_id0__Failure_params_t;\n" ++
+            "} termina__enum__Status__id0__Failure_params_t;\n" ++
             "\n" ++     
             "typedef struct {\n" ++
-            "    __status_id0__Failure_params_t Failure;\n" ++
-            "    __enum_status_t _variant;\n" ++
-            "} __status_id0_t;")
+            "    termina__enum__Status__id0__Failure_params_t Failure;\n" ++
+            "    termina__enum__Status_t _variant;\n" ++
+            "} Status__id0;")
     it "Prints a struct with two fields" $ do
       renderTypeDefinitionDecl (MonadicTypes S.empty (S.fromList [TStruct "id0"]) M.empty M.empty) structWithTwoFields `shouldBe`
         pack (
@@ -92,12 +92,12 @@ spec = do
             "\n" ++
             "typedef struct {\n" ++
             "    id0 _0;\n" ++
-            "} __status_id0__Failure_params_t;\n" ++
+            "} termina__enum__Status__id0__Failure_params_t;\n" ++
             "\n" ++     
             "typedef struct {\n" ++
-            "    __status_id0__Failure_params_t Failure;\n" ++
-            "    __enum_status_t _variant;\n" ++
-            "} __status_id0_t;")
+            "    termina__enum__Status__id0__Failure_params_t Failure;\n" ++
+            "    termina__enum__Status_t _variant;\n" ++
+            "} Status__id0;")
     it "Prints a packed struct" $ do
       renderTypeDefinitionDecl emptyMonadicTypes packedStruct `shouldBe`
         pack (

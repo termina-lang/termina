@@ -110,7 +110,7 @@ checkIdentifierLengths (Just limit) file =
 
 -- | Termina's pretty builtin types
 optionBox, boxStruct, sinkPort, inPort, outPort :: Identifier
-optionBox = namefy "option_box_t"
+optionBox = optionType <::> "box"
 boxStruct = namefy "termina_box_t"
 sinkPort = namefy "termina_id_t"
 inPort = namefy "termina_id_t"
@@ -142,6 +142,13 @@ fieldify = ("_" <>)
 terminafy :: Identifier -> Identifier
 terminafy = ("termina" <::>)
 
+-- | The names of the types of Termina that take type arguments, which the
+-- generated code carries as they are written.
+optionType, statusType, resultType :: Identifier
+optionType = "Option"
+statusType = "Status"
+resultType = "Result"
+
 -- | Name of the field that holds the parameter of a variant at the given
 -- position.
 variantParamField :: Integer -> Identifier
@@ -162,13 +169,13 @@ taskIDField = fieldify $ "task" <:> "id"
 handlerIDField = fieldify $ "handler" <:> "id"
 
 genEnumStructName :: (MonadError CGeneratorError m) => Identifier -> m Identifier
-genEnumStructName identifier = return $ namefy $ "enum" <:> identifier <:> "t"
+genEnumStructName identifier = return $ terminafy $ "enum" <::> identifier <:> "t"
 
 genEnumVariantName :: (MonadError CGeneratorError m) => Identifier -> Identifier -> m Identifier
 genEnumVariantName enumId this_variant = return $ enumId <::> this_variant
 
 genEnumParameterStructName :: (MonadError CGeneratorError m) => Identifier -> Identifier -> m Identifier
-genEnumParameterStructName enumId this_variant = return $ namefy $ "enum" <:> enumId <::> this_variant <:> "params" <:> "t"
+genEnumParameterStructName enumId this_variant = return $ terminafy $ "enum" <::> enumId <::> this_variant <:> "params" <:> "t"
 
 genClassFunctionName :: (MonadError CGeneratorError m) => Identifier -> Identifier -> m Identifier
 genClassFunctionName className functionName = return $ className <::> functionName
@@ -176,17 +183,17 @@ genClassFunctionName className functionName = return $ className <::> functionNa
 genTypeSpecName :: (MonadError CGeneratorError m) => TerminaType SemanticAnn -> m Identifier
 genTypeSpecName TBool = return "bool"
 genTypeSpecName TChar = return "char"
-genTypeSpecName TUInt8 = return "uint8"
-genTypeSpecName TUInt16 = return "uint16"
-genTypeSpecName TUInt32 = return "uint32"
-genTypeSpecName TUInt64 = return "uint64"
-genTypeSpecName TInt8 = return "int8"
-genTypeSpecName TInt16 = return "int16"
-genTypeSpecName TInt32 = return "int32"
-genTypeSpecName TInt64 = return "int64"
-genTypeSpecName TUSize = return "size"
-genTypeSpecName TFloat32 = return "float32"
-genTypeSpecName TFloat64 = return "float64"
+genTypeSpecName TUInt8 = return "u8"
+genTypeSpecName TUInt16 = return "u16"
+genTypeSpecName TUInt32 = return "u32"
+genTypeSpecName TUInt64 = return "u64"
+genTypeSpecName TInt8 = return "i8"
+genTypeSpecName TInt16 = return "i16"
+genTypeSpecName TInt32 = return "i32"
+genTypeSpecName TInt64 = return "i64"
+genTypeSpecName TUSize = return "usize"
+genTypeSpecName TFloat32 = return "f32"
+genTypeSpecName TFloat64 = return "f64"
 genTypeSpecName (TStruct ident) = return ident
 genTypeSpecName (TEnum ident) = return ident
 genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
@@ -194,15 +201,15 @@ genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifie
 -- | This function returns the name of the struct that represents the parameters
 -- of an option type. 
 genOptionParameterStructName :: (MonadError CGeneratorError m) => TerminaType SemanticAnn -> m Identifier
-genOptionParameterStructName (TBoxSubtype _) = return $ namefy "option" <:> "box" <:> "params" <:> "t"
+genOptionParameterStructName (TBoxSubtype _) = return $ terminafy $ "enum" <::> optionBox <::> optionSomeVariant <:> "params" <:> "t"
 genOptionParameterStructName ty = do
     tyName <- genTypeSpecName ty
-    return $ namefy "option" <:> tyName <::> "Some" <:> "params" <:> "t"
+    return $ terminafy $ "enum" <::> optionType <::> tyName <::> optionSomeVariant <:> "params" <:> "t"
 
 genStatusParameterStructName :: (MonadError CGeneratorError m) => TerminaType SemanticAnn -> m Identifier
 genStatusParameterStructName ty = do
     tyName <- genTypeSpecName ty
-    return $ namefy "status" <:> tyName <::> "Failure" <:> "params" <:> "t"
+    return $ terminafy $ "enum" <::> statusType <::> tyName <::> statusFailureVariant <:> "params" <:> "t"
 
 genResultParameterStructName :: (MonadError CGeneratorError m) => 
     TerminaType SemanticAnn 
@@ -212,11 +219,13 @@ genResultParameterStructName :: (MonadError CGeneratorError m) =>
 genResultParameterStructName okTy errorTy this_variant = do
     okTyName <- genTypeSpecName okTy
     errorTyName <- genTypeSpecName errorTy
-    return $ namefy "result" <:> okTyName <:> errorTyName <::> this_variant <:> "params" <:> "t"
+    return $ terminafy $ "enum" <::> resultType <::> okTyName <::> errorTyName <::> this_variant <:> "params" <:> "t"
 
 variant :: Identifier
 variant = fieldify "variant"
 
+-- | The name of a variant, which is the name of the field that holds its
+-- parameters.
 optionSomeVariant, optionNoneVariant :: Identifier
 optionSomeVariant = "Some"
 optionNoneVariant = "None"
@@ -228,6 +237,20 @@ resultErrorVariant = "Error"
 statusSuccessVariant, statusFailureVariant :: Identifier
 statusSuccessVariant = "Success"
 statusFailureVariant = "Failure"
+
+-- | The enum constant of a variant, qualified with the name of its type as the
+-- variants of an enum of the program are.
+optionSomeTag, optionNoneTag :: Identifier
+optionSomeTag = optionType <::> optionSomeVariant
+optionNoneTag = optionType <::> optionNoneVariant
+
+resultOkTag, resultErrorTag :: Identifier
+resultOkTag = resultType <::> resultOkVariant
+resultErrorTag = resultType <::> resultErrorVariant
+
+statusSuccessTag, statusFailureTag :: Identifier
+statusSuccessTag = statusType <::> statusSuccessVariant
+statusFailureTag = statusType <::> statusFailureVariant
 
 -- | This function returns the type of an object. The type is extracted from the
 -- object's semantic annotation. The function assumes that the object is well-typed
@@ -281,12 +304,12 @@ genOptionStructName :: (MonadError CGeneratorError m) => TerminaType SemanticAnn
 genOptionStructName (TBoxSubtype _) = return optionBox
 genOptionStructName ty = do
     tyName <- genTypeSpecName ty
-    return $ namefy "option" <:> tyName <:> "t"
+    return $ optionType <::> tyName
 
 genStatusStructName :: (MonadError CGeneratorError m) => TerminaType SemanticAnn -> m Identifier
 genStatusStructName ty = do
     tyName <- genTypeSpecName ty
-    return $ namefy "status" <:> tyName <:> "t"
+    return $ statusType <::> tyName
 
 
 genResultStructName :: (MonadError CGeneratorError m) => 
@@ -295,7 +318,7 @@ genResultStructName :: (MonadError CGeneratorError m) =>
 genResultStructName tyOk tyError = do
     tyOkName <- genTypeSpecName tyOk
     tyErrorName <- genTypeSpecName tyError
-    return $ namefy "result" <:> tyOkName <::> tyErrorName <:> "t"
+    return $ resultType <::> tyOkName <::> tyErrorName
 
 getCInteger :: TInteger -> CInteger
 getCInteger (TInteger i DecRepr) = CInteger i CDecRepr

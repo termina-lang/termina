@@ -60,9 +60,8 @@ spec = do
               "\n" ++
               "void __CHousekeeping__termina_task(void * const arg);\n" ++
               "\n" ++
-              "__status_int32_t CHousekeeping__action0(const __termina_event_t * const termina__ev,\n" ++
-              "                                        void * const termina__this,\n" ++
-              "                                        uint32_t _data);\n" ++
+              "Status__i32 CHousekeeping__action0(const __termina_event_t * const termina__ev,\n" ++
+              "                                   void * const termina__this, uint32_t _data);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints option header file of test0" $ do
@@ -74,11 +73,11 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t _0;\n" ++
-              "} __option_uint32__Some_params_t;\n" ++
+              "} termina__enum__Option__u32__Some_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __option_uint32__Some_params_t Some;\n" ++
-              "    __enum_option_t _variant;\n" ++
-              "} __option_uint32_t;\n" ++
+              "    termina__enum__Option__u32__Some_params_t Some;\n" ++
+              "    termina__enum__Option_t _variant;\n" ++
+              "} Option__u32;\n" ++
               "\n" ++
               "#endif\n")

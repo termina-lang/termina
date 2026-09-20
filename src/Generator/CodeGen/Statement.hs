@@ -198,21 +198,21 @@ genMonadicVariantAssign loc before level cObj expr =
             let cSomeVariantFieldObj = cObj @. optionSomeVariant @: enumFieldType
             fieldInitalization <- genFieldAssign loc False level cSomeVariantFieldObj (variantParamField 0) e
             let variantsFieldsObj = cObj @. variant @: enumFieldType
-            let someVariantExpr = optionSomeVariant @: enumFieldType |>> getLocation ann
+            let someVariantExpr = optionSomeTag @: enumFieldType |>> getLocation ann
             if before then
                 return $ pre_cr (variantsFieldsObj @= someVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
             else
                 return $ no_cr (variantsFieldsObj @= someVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
         (MonadicVariantInitializer None ann) -> do
             let variantsFieldsObj = cObj @. variant @: enumFieldType
-            let noneVariantExpr = optionNoneVariant @: enumFieldType |>> getLocation ann
+            let noneVariantExpr = optionNoneTag @: enumFieldType |>> getLocation ann
             if before then
                 return [pre_cr (variantsFieldsObj @= noneVariantExpr |>> getLocation ann) |>> getLocation ann]
             else
                 return [no_cr (variantsFieldsObj @= noneVariantExpr |>> getLocation ann) |>> getLocation ann]
         (MonadicVariantInitializer Success ann) -> do
             let variantsFieldsObj = cObj @. variant @: enumFieldType
-            let successVariantExpr = statusSuccessVariant @: enumFieldType |>> getLocation ann
+            let successVariantExpr = statusSuccessTag @: enumFieldType |>> getLocation ann
             if before then
                 return [pre_cr (variantsFieldsObj @= successVariantExpr |>> getLocation ann) |>> getLocation ann]
             else
@@ -221,7 +221,7 @@ genMonadicVariantAssign loc before level cObj expr =
             let cFailureVariantFieldObj = cObj @. statusFailureVariant @: enumFieldType
             fieldInitalization <- genFieldAssign loc False level cFailureVariantFieldObj (variantParamField 0) e
             let variantsFieldsObj = cObj @. variant @: enumFieldType
-            let failureVariantExpr = statusFailureVariant @: enumFieldType |>> getLocation ann
+            let failureVariantExpr = statusFailureTag @: enumFieldType |>> getLocation ann
             if before then
                 return $ pre_cr (variantsFieldsObj @= failureVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
             else
@@ -230,20 +230,20 @@ genMonadicVariantAssign loc before level cObj expr =
             let cOkVariantFieldObj = cObj @. resultOkVariant @: enumFieldType
             fieldInitalization <- genFieldAssign loc False level cOkVariantFieldObj (variantParamField 0) e
             let variantsFieldsObj = cObj @. variant @: enumFieldType
-            let failureVariantExpr = resultOkVariant @: enumFieldType |>> getLocation ann
+            let okVariantExpr = resultOkTag @: enumFieldType |>> getLocation ann
             if before then
-                return $ pre_cr (variantsFieldsObj @= failureVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
+                return $ pre_cr (variantsFieldsObj @= okVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
             else
-                return $ no_cr (variantsFieldsObj @= failureVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
+                return $ no_cr (variantsFieldsObj @= okVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
         (MonadicVariantInitializer (Error e) ann) -> do
             let cErrorVariantFieldObj = cObj @. resultErrorVariant @: enumFieldType
             fieldInitalization <- genFieldAssign loc False level cErrorVariantFieldObj (variantParamField 0) e
             let variantsFieldsObj = cObj @. variant @: enumFieldType
-            let failureVariantExpr = resultErrorVariant @: enumFieldType |>> getLocation ann
+            let errorVariantExpr = resultErrorTag @: enumFieldType |>> getLocation ann
             if before then
-                return $ pre_cr (variantsFieldsObj @= failureVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
+                return $ pre_cr (variantsFieldsObj @= errorVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
             else
-                return $ no_cr (variantsFieldsObj @= failureVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
+                return $ no_cr (variantsFieldsObj @= errorVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
         _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show expr
 
 genArrayAssign ::
@@ -446,7 +446,7 @@ genStructAssign loc before level cObj expr = do
                 return (cProcedures ++ rest)
             genFieldAssignments before' (FieldPortConnection AccessPortConnection fld resource (SemanticAnn (STy (PortConnection (APPoolConnTy {}))) _) : xs) = do
                 rest <- genFieldAssignments False xs
-                let allocFunctionType = CTFunction void [void_ptr, ptr __option_box_t]
+                let allocFunctionType = CTFunction void [void_ptr, ptr _Option__box]
                     freeFunctionType = CTFunction void [void_ptr, __termina_box_t]
                 let resourceExpr = addrOf (resource @: __termina_pool_t)
                     cPoolProcedures = [
@@ -646,25 +646,25 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
             (TOption ts) -> do
                 sname <- genOptionStructName ts
                 pname <- genOptionParameterStructName ts
-                return (id, sname, const (return pname))
+                return ((<::>) optionType, sname, const (return pname))
             (TReference _ (TOption ts)) -> do
                 sname <- genOptionStructName ts
                 pname <- genOptionParameterStructName ts
-                return (id, sname, const (return pname))
+                return ((<::>) optionType, sname, const (return pname))
             (TStatus ts) -> do
                 sname <- genStatusStructName ts
                 pname <- genStatusParameterStructName ts
-                return (id, sname, const (return pname))
+                return ((<::>) statusType, sname, const (return pname))
             (TReference _ (TStatus ts)) -> do
                 sname <- genStatusStructName ts
                 pname <- genStatusParameterStructName ts
-                return (id, sname, const (return pname))
+                return ((<::>) statusType, sname, const (return pname))
             (TReference _ (TResult okTy errorTy)) -> do
                 sname <- genResultStructName okTy errorTy
-                return (id, sname, genResultParameterStructName okTy errorTy)
+                return ((<::>) resultType, sname, genResultParameterStructName okTy errorTy)
             (TResult okTy errorTy) -> do
                 sname <- genResultStructName okTy errorTy
-                return (id, sname, genResultParameterStructName okTy errorTy)
+                return ((<::>) resultType, sname, genResultParameterStructName okTy errorTy)
             _ -> throwError $ InternalError $ "Unsupported match expression type: " ++ show expr
     case expr of
         (ReferenceExpression _ obj _) -> do

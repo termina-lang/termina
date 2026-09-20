@@ -67,43 +67,46 @@ spec = do
   describe "Pretty printing if statements" $ do
     it "Prints a single if statement" $ do
       renderStatement singleIf `shouldBe`
-        pack (
-          "\nif (foo0 == 0U) {\n" ++
-          "    \n" ++
-          "    uint32_t array1[10U] = { 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U };\n" ++
-          "\n" ++
-          "    __option_box_t option0 = { ._variant = Some, .Some = { ._0 = box_var0 } };\n" ++
-          "\n" ++
-          "}")
+        pack ("\n" ++
+              "if (foo0 == 0U) {\n" ++
+              "    \n" ++
+              "    uint32_t array1[10U] = { 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U };\n" ++
+              "\n" ++
+              "    Option__box option0 = { ._variant = Option__Some,\n" ++
+              "                            .Some = { ._0 = box_var0 } };\n" ++
+              "\n" ++
+              "}")
     it "Prints an if-else statement" $ do
       renderStatement ifElse `shouldBe`
-        pack (
-          "\nif (foo0 != 4294901760U) {\n" ++
-          "    \n" ++
-          "    uint32_t array1[10U] = { 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U };\n" ++
-          "\n" ++
-          "    __option_box_t option0 = { ._variant = Some, .Some = { ._0 = box_var0 } };\n" ++
-          "\n" ++
-          "} else {\n" ++
-          "    \n" ++
-          "    __option_box_t option1 = { ._variant = None };\n" ++
-          "\n" ++
-          "}")
+        pack ("\n" ++
+              "if (foo0 != 4294901760U) {\n" ++
+              "    \n" ++
+              "    uint32_t array1[10U] = { 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U };\n" ++
+              "\n" ++
+              "    Option__box option0 = { ._variant = Option__Some,\n" ++
+              "                            .Some = { ._0 = box_var0 } };\n" ++
+              "\n" ++
+              "} else {\n" ++
+              "    \n" ++
+              "    Option__box option1 = { ._variant = Option__None };\n" ++
+              "\n" ++
+              "}")
     it "Prints an if-else-if-else statement" $ do
       renderStatement ifElseIf `shouldBe`
-        pack (
-          "\nif (foo0 != 4294901760U) {\n" ++
-          "    \n" ++
-          "    uint32_t array1[10U] = { 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U };\n" ++
-          "\n" ++
-          "    __option_box_t option0 = { ._variant = Some, .Some = { ._0 = box_var0 } };\n" ++
-          "\n" ++
-          "} else if (foo0 == 0U) {\n" ++
-          "    \n" ++
-          "    foo0 = 0U;\n" ++
-          "\n" ++
-          "} else {\n" ++
-          "    \n" ++
-          "    __option_box_t option1 = { ._variant = None };\n" ++
-          "\n" ++
-          "}")
+        pack ("\n" ++
+              "if (foo0 != 4294901760U) {\n" ++
+              "    \n" ++
+              "    uint32_t array1[10U] = { 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U };\n" ++
+              "\n" ++
+              "    Option__box option0 = { ._variant = Option__Some,\n" ++
+              "                            .Some = { ._0 = box_var0 } };\n" ++
+              "\n" ++
+              "} else if (foo0 == 0U) {\n" ++
+              "    \n" ++
+              "    foo0 = 0U;\n" ++
+              "\n" ++
+              "} else {\n" ++
+              "    \n" ++
+              "    Option__box option1 = { ._variant = Option__None };\n" ++
+              "\n" ++
+              "}")

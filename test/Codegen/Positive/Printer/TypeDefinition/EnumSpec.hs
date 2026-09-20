@@ -47,63 +47,63 @@ spec = do
         pack (
             "\ntypedef enum {\n" ++
             "    id0__variant0\n" ++
-            "} __enum_id0_t;\n" ++
+            "} termina__enum__id0_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
-            "    __enum_id0_t _variant;\n" ++
+            "    termina__enum__id0_t _variant;\n" ++
             "} id0;\n" ++
             "\n" ++
             "typedef struct {\n" ++
             "    id0 _0;\n" ++
-            "} __option_id0__Some_params_t;\n" ++
+            "} termina__enum__Option__id0__Some_params_t;\n" ++
             "\n" ++     
             "typedef struct {\n" ++
-            "    __option_id0__Some_params_t Some;\n" ++
-            "    __enum_option_t _variant;\n" ++
-            "} __option_id0_t;\n" ++
+            "    termina__enum__Option__id0__Some_params_t Some;\n" ++
+            "    termina__enum__Option_t _variant;\n" ++
+            "} Option__id0;\n" ++
             "\n" ++
             "typedef struct {\n" ++
             "    id0 _0;\n" ++
-            "} __status_id0__Failure_params_t;\n" ++
+            "} termina__enum__Status__id0__Failure_params_t;\n" ++
             "\n" ++     
             "typedef struct {\n" ++
-            "    __status_id0__Failure_params_t Failure;\n" ++
-            "    __enum_status_t _variant;\n" ++
-            "} __status_id0_t;")
+            "    termina__enum__Status__id0__Failure_params_t Failure;\n" ++
+            "    termina__enum__Status_t _variant;\n" ++
+            "} Status__id0;")
     it "Prints an enum with two regular variants" $ do
       renderTypeDefinitionDecl (MonadicTypes S.empty (S.fromList [TEnum "id0"]) M.empty M.empty) enumWithTwoRegularFields `shouldBe`
         pack (
             "\ntypedef enum {\n" ++
             "    id0__variant0,\n" ++
             "    id0__variant1\n" ++
-            "} __enum_id0_t;\n" ++
+            "} termina__enum__id0_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
-            "    __enum_id0_t _variant;\n" ++
+            "    termina__enum__id0_t _variant;\n" ++
             "} id0;\n" ++
             "\n" ++
             "typedef struct {\n" ++
             "    id0 _0;\n" ++
-            "} __status_id0__Failure_params_t;\n" ++
+            "} termina__enum__Status__id0__Failure_params_t;\n" ++
             "\n" ++     
             "typedef struct {\n" ++
-            "    __status_id0__Failure_params_t Failure;\n" ++
-            "    __enum_status_t _variant;\n" ++
-            "} __status_id0_t;")
+            "    termina__enum__Status__id0__Failure_params_t Failure;\n" ++
+            "    termina__enum__Status_t _variant;\n" ++
+            "} Status__id0;")
     it "Prints an enum with one parameterized variant" $ do
       renderTypeDefinitionDecl emptyMonadicTypes enumWithOneParameterizedField `shouldBe`
         pack (
             "\ntypedef enum {\n" ++
             "    id0__variant0\n" ++
-            "} __enum_id0_t;\n" ++
+            "} termina__enum__id0_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
             "    uint32_t _0;\n" ++
-            "} __enum_id0__variant0_params_t;\n" ++
+            "} termina__enum__id0__variant0_params_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
-            "    __enum_id0_t _variant;\n" ++
-            "    __enum_id0__variant0_params_t variant0;\n" ++
+            "    termina__enum__id0_t _variant;\n" ++
+            "    termina__enum__id0__variant0_params_t variant0;\n" ++
             "} id0;")
     it "Prints an enum with multiple parameterized variants" $ do
       renderTypeDefinitionDecl emptyMonadicTypes enumWithMultipleParameterizedFields `shouldBe`
@@ -113,28 +113,28 @@ spec = do
             "    id0__variant1,\n" ++
             "    id0__variant2,\n" ++
             "    id0__variant3\n" ++
-            "} __enum_id0_t;\n" ++
+            "} termina__enum__id0_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
             "    uint32_t _0;\n" ++
-            "} __enum_id0__variant0_params_t;\n" ++
+            "} termina__enum__id0__variant0_params_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
             "    uint64_t _0;\n" ++
             "    id1 _1;\n" ++
             "    char _2;\n" ++
-            "} __enum_id0__variant2_params_t;\n" ++
+            "} termina__enum__id0__variant2_params_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
             "    int8_t _0;\n" ++
             "    char _1[35U][20U];\n" ++
-            "} __enum_id0__variant3_params_t;\n" ++
+            "} termina__enum__id0__variant3_params_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
-            "    __enum_id0_t _variant;\n" ++
+            "    termina__enum__id0_t _variant;\n" ++
             "    union {\n" ++
-            "        __enum_id0__variant0_params_t variant0;\n" ++
-            "        __enum_id0__variant2_params_t variant2;\n" ++
-            "        __enum_id0__variant3_params_t variant3;\n" ++
+            "        termina__enum__id0__variant0_params_t variant0;\n" ++
+            "        termina__enum__id0__variant2_params_t variant2;\n" ++
+            "        termina__enum__id0__variant3_params_t variant3;\n" ++
             "    };\n" ++
             "} id0;");
