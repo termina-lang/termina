@@ -15,6 +15,9 @@ spec = describe "Parser: modules and imports" $ do
   it "parses a deeply nested import path" $
     parses moduleImportParser "import drivers.char_dev.uart.apbuart;" `shouldBe` True
 
+  it "parses a path with termina below its root" $
+    parses moduleImportParser "import drivers.termina.uart;" `shouldBe` True
+
   it "parses a whole module with imports and a declaration" $
     either show ctorName
       (parseWith terminaModuleParser "import foo.bar;\n\nfunction f() { return; }")

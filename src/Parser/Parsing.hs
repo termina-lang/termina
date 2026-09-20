@@ -1350,16 +1350,22 @@ topLevel = many $
   <|> try typeDefintionParser
 
 moduleIdentifierParser :: TerminaParser [ String ]
-moduleIdentifierParser = sepBy1 firstCapital dot
+moduleIdentifierParser = do
+  path <- sepBy1 (many1 (alphaNum <|> char '_')) dot
+  endPos <- getPosition
+  let invalid msg = failAt endPos (msg ++ ": " ++ L.intercalate "." path ++ ".")
+  if not (all startsLower path) then
+    invalid "Namespace and module names begin with a lowercase letter"
+  else if any (any isUpper) path then
+    invalid "Namespace and module names only contain lowercase letters, digits and underscores"
+  else if any ("__" `L.isInfixOf`) path then
+    invalid "Namespace and module names cannot contain two consecutive underscores"
+  else case path of
+    "termina" : _ -> invalid "User-defined modules are not allowed in the termina namespace"
+    _ -> return path
   where
-    firstCapital = do
-      startPos <- getPosition
-      name <- (:)
-        <$> (lower <?> "Module paths begin with a lowercase letter.")
-        <*> (many (lower <|> char '_' <|> digit) <?> "Module names only accept lowercase letters or underscores.")
-      when ("__" `L.isInfixOf` name) $
-        failAt (incSourceColumn startPos (length name)) ("Module names cannot contain two consecutive underscores: " ++ name ++ ".")
-      return name
+    startsLower (c : _) = isLower c
+    startsLower [] = False
 
 moduleImportParser :: TerminaParser (ModuleImport ParserAnn)
 moduleImportParser = do

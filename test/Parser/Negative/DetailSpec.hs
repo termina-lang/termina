@@ -35,7 +35,7 @@ doubleUnderscore =
   , ("a local", "function f() -> u32 { var t__v : u32 = 0 : u32; return t__v; }", identifierMsg "t__v")
   , ("a method", "resource class C { method m__n(&priv self) { return; } };", identifierMsg "m__n")
   , ("a case argument", "function f(o : Option<u32>) -> u32 { var r : u32 = 0 : u32; match o { case Some(a__b) => { r = a__b; } case None => { r = 1 : u32; } } return r; }", identifierMsg "a__b")
-  , ("a module", "import foo__bar.baz;", "Module names cannot contain two consecutive underscores: foo__bar.")
+  , ("a module", "import foo__bar.baz;", "Namespace and module names cannot contain two consecutive underscores: foo__bar.baz.")
   ]
   where
     identifierMsg name = "Identifiers cannot contain two consecutive underscores: " ++ name ++ "."
@@ -50,6 +50,15 @@ spec = describe "Parser stage: error detail" $ do
     parserStageError [("pkg/a", modA), ("pkg/b", modB)] `shouldSatisfy` \case
       Just (AnnotatedError (EImportedFilesLoop deps) _) -> not (null deps)
       _ -> False
+  describe "PE-001 rejects an invalid module path, with that message alone" $ do
+    it "when it begins with termina" $
+      parseMessages "import termina.types;" `shouldBe` Just ["User-defined modules are not allowed in the termina namespace: termina.types."]
+    it "when a name begins with an uppercase letter" $
+      parseMessages "import Drivers.uart;" `shouldBe` Just ["Namespace and module names begin with a lowercase letter: Drivers.uart."]
+    it "when a name begins with a digit" $
+      parseMessages "import drivers.9uart;" `shouldBe` Just ["Namespace and module names begin with a lowercase letter: drivers.9uart."]
+    it "when a name contains an uppercase letter" $
+      parseMessages "import drivers.uArt;" `shouldBe` Just ["Namespace and module names only contain lowercase letters, digits and underscores: drivers.uArt."]
   describe "PE-001 rejects two consecutive underscores, with that message alone" $
     mapM_ (\(place, src, msg) -> it ("in " ++ place) $
               parseMessages src `shouldBe` Just [msg])
