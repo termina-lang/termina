@@ -39,6 +39,8 @@ data ReservedBy =
     -- | A name that the platform declares in the headers a generated module
     -- includes.
     | CPlatform
+    -- | The name of a type of Termina that takes type arguments.
+    | TerminaType
   deriving (Eq, Show)
 
 -- | What holds a name, if anything does. The answer is the same for a top-level
@@ -46,11 +48,21 @@ data ReservedBy =
 -- space is flat and the transpiler writes both kinds of name into it unchanged.
 reservedName :: Platform -> Identifier -> Maybe ReservedBy
 reservedName plt ident =
-  if S.member ident cKeywords then Just CKeyword
+  if S.member ident terminaTypes then Just TerminaType
+  else if S.member ident cKeywords then Just CKeyword
   else if S.member ident cStandardLibrary then Just CStandardLibrary
   else if underscoreUpper ident then Just CImplementation
   else if S.member ident (platformNames plt) then Just CPlatform
   else Nothing
+
+-- | The types of Termina that take type arguments, which the type checker
+-- recognises by their shape instead of reading them from the global
+-- environment.
+terminaTypes :: S.Set Identifier
+terminaTypes = S.fromList [
+    "Allocator", "Atomic", "AtomicAccess", "AtomicArray", "AtomicArrayAccess",
+    "MsgQueue", "Option", "Pool", "Result", "Status"
+  ]
 
 platformNames :: Platform -> S.Set Identifier
 platformNames POSIXGCC = POSIXGCC.reservedNames

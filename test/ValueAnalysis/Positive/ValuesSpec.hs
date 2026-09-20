@@ -132,21 +132,21 @@ spec = do
     -- | Every case of the match is a variant the callee gives back, so the
     -- match says no more than the type does.
     it "accepts a match every case of which the discriminant may hold" $ do
-      let src = "enum Status { Above, Below, Within };\n" ++
-                "function check(n : u32) -> Status {\n" ++
-                "    var s : Status;\n" ++
+      let src = "enum Range { Above, Below, Within };\n" ++
+                "function check(n : u32) -> Range {\n" ++
+                "    var s : Range;\n" ++
                 "    if (n == 1 : u32) {\n" ++
-                "        s = Status::Above;\n" ++
+                "        s = Range::Above;\n" ++
                 "    } else if (n == 2 : u32) {\n" ++
-                "        s = Status::Below;\n" ++
+                "        s = Range::Below;\n" ++
                 "    } else {\n" ++
-                "        s = Status::Within;\n" ++
+                "        s = Range::Within;\n" ++
                 "    }\n" ++
                 "    return s;\n" ++
                 "}\n" ++
                 "function f(n : u32) -> u32 {\n" ++
                 "    var y : u32;\n" ++
-                "    var s : Status = check(n);\n" ++
+                "    var s : Range = check(n);\n" ++
                 "    match s {\n" ++
                 "        case Above => {\n" ++
                 "            y = 1 : u32;\n" ++

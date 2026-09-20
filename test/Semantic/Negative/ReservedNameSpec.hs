@@ -71,6 +71,17 @@ localNamedMemory =
   "    return total;\n" ++
   "}\n"
 
+-- | The types of the prelude are in the global environment and collide there;
+-- the ones that take type arguments are recognised by their shape, so nothing
+-- held their names until SE-219 did.
+structNamedOption, structNamedOptions, globalNamedPool :: String
+structNamedOption = "struct Option {\n    a : u32;\n};\n"
+structNamedOptions = "struct Options {\n    a : u32;\n};\n"
+globalNamedPool =
+  "function Pool() -> u32 {\n" ++
+  "    return 0;\n" ++
+  "}\n"
+
 spec :: Spec
 spec = do
   describe "SE-219: names that C keeps for itself" $ do
@@ -82,6 +93,14 @@ spec = do
       typeCheckErrorOn TestPlatform paramNamedUnderscoreUpper `shouldBe` Just (pack "SE-219")
     it "rejects a function named after one of the standard library" $
       typeCheckErrorOn TestPlatform globalNamedMemcpy `shouldBe` Just (pack "SE-219")
+
+  describe "SE-219: the types of Termina that take type arguments" $ do
+    it "rejects a struct named Option" $
+      typeCheckErrorOn TestPlatform structNamedOption `shouldBe` Just (pack "SE-219")
+    it "rejects a function named Pool" $
+      typeCheckErrorOn TestPlatform globalNamedPool `shouldBe` Just (pack "SE-219")
+    it "accepts a name that only begins like one of them" $
+      typeCheckErrorOn TestPlatform structNamedOptions `shouldBe` Nothing
 
   describe "SE-219: names that look alike and are correct" $ do
     it "accepts a parameter whose underscore is followed by a lowercase letter" $
