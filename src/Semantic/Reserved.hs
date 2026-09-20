@@ -38,7 +38,7 @@ data ReservedBy =
     | CImplementation
     -- | A name that the platform declares in the headers a generated module
     -- includes.
-    | CPlatform
+    | CPlatform Platform
     -- | The name of a type of Termina that takes type arguments.
     | TerminaType
   deriving (Eq, Show)
@@ -52,7 +52,7 @@ reservedName plt ident =
   else if S.member ident cKeywords then Just CKeyword
   else if S.member ident cStandardLibrary then Just CStandardLibrary
   else if underscoreUpper ident then Just CImplementation
-  else if S.member ident (platformNames plt) then Just CPlatform
+  else if S.member ident (platformNames plt) then Just (CPlatform plt)
   else Nothing
 
 -- | The types of Termina that take type arguments, which the type checker
