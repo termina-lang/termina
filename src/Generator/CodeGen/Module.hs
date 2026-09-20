@@ -25,7 +25,7 @@ genModuleDefineLabel :: QualifiedName -> String
 genModuleDefineLabel mn =
     let filePath = map (pack . dropTrailingPathSeparator) (splitPath (mn <.> "h"))
     in
-    unpack $ pack "__" <> intercalate (pack "__") (map (toUpper . replace (pack ".") (pack "_")) filePath) <> pack "__"
+    unpack $ intercalate (pack "__") (map (toUpper . replace (pack ".") (pack "_")) filePath) <> pack "__"
 
 genInclude :: QualifiedName -> Bool -> CFileItem
 genInclude mName before = CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn before) Internal)

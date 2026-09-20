@@ -371,7 +371,7 @@ genFieldAssign loc before level cObj fid expr = do
 genProcedureType :: [Parameter SemanticAnn] -> CGenerator CType
 genProcedureType tsParams = do
     tsParams' <- traverse (genType noqual . paramType) tsParams
-    let cEventArgType = ptr __termina_event_t
+    let cEventArgType = ptr termina__event_t
         cThatArgType = _const . ptr $ void
     return $ CTFunction void (cEventArgType : cThatArgType : tsParams')
 
@@ -447,16 +447,16 @@ genStructAssign loc before level cObj expr = do
             genFieldAssignments before' (FieldPortConnection AccessPortConnection fld resource (SemanticAnn (STy (PortConnection (APPoolConnTy {}))) _) : xs) = do
                 rest <- genFieldAssignments False xs
                 let allocFunctionType = CTFunction void [void_ptr, ptr _Option__box]
-                    freeFunctionType = CTFunction void [void_ptr, __termina_box_t]
-                let resourceExpr = addrOf (resource @: __termina_pool_t)
+                    freeFunctionType = CTFunction void [void_ptr, termina__box_t]
+                let resourceExpr = addrOf (resource @: termina__pool_t)
                     cPoolProcedures = [
-                            no_cr $ cObj @. fld @: __termina_allocator_t @. "alloc" @: ptr allocFunctionType @= __termina_pool__alloc,
-                            no_cr $ cObj @. fld @: __termina_allocator_t @. "free" @: ptr freeFunctionType @= __termina_pool__free
+                            no_cr $ cObj @. fld @: termina__allocator_t @. "alloc" @: ptr allocFunctionType @= termina__pool__alloc,
+                            no_cr $ cObj @. fld @: termina__allocator_t @. "free" @: ptr freeFunctionType @= termina__pool__free
                         ]
                 if before' then
-                    return $ pre_cr ((cObj @. fld @: __termina_allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
+                    return $ pre_cr ((cObj @. fld @: termina__allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
                 else
-                    return $ no_cr ((cObj @. fld @: __termina_allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
+                    return $ no_cr ((cObj @. fld @: termina__allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
             genFieldAssignments before' (FieldPortConnection AccessPortConnection fld res (SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ts size _))) _) : xs) = do
                 rest <- genFieldAssignments False xs
                 cTs <- genType noqual (TArray ts size)
@@ -845,7 +845,7 @@ genBlocks (ContinueBlock expr ann) = do
     cExpr <- genExpression expr
     return [pre_cr (_return (Just cExpr)) |>> getLocation ann]
 genBlocks (RebootBlock ann) = do
-    return [pre_cr $ __termina_exec__reboot @@ [] |>> getLocation ann]
+    return [pre_cr $ termina__exec__reboot @@ [] |>> getLocation ann]
 genBlocks (SystemCall obj ident args ann) = do
     (cFuncType, _) <- case ann of
         SemanticAnn (ETy (AppType pts ts)) _ -> do
@@ -875,7 +875,7 @@ genBlocks (SystemCall obj ident args ann) = do
         genSystemCallType :: [Parameter SemanticAnn] -> CGenerator CType
         genSystemCallType tsParams = do
             tsParams' <- traverse (genType noqual . paramType) tsParams
-            let cEventArgType = ptr __termina_event_t
+            let cEventArgType = ptr termina__event_t
             return $ CTFunction void (cEventArgType : tsParams')
 
 genStatement :: Statement SemanticAnn -> CGenerator [CCompoundBlockItem]

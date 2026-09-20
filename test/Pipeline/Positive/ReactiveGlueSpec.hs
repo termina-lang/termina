@@ -1,7 +1,7 @@
 -- | Full-pipeline golden for the application glue that installs function
 -- pointers. A reactive application (a periodic task reaching a resource through
 -- an access port) drives the two glue sites that store a function's address:
--- the task entry passed to @__termina_task__init@ (rendered into the main file)
+-- the task entry passed to @termina__task__init@ (rendered into the main file)
 -- and the resource procedure stored into the task's access-port field (rendered
 -- into the init file). Both must be emitted as @&f@, the form MISRA-C:2023 Rule
 -- 17.12 requires for taking the address of a function. No other golden in the

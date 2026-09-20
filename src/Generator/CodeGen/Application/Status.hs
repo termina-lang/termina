@@ -20,7 +20,7 @@ genStatusPathName = "status" <.> "h"
 
 genStatusHeaderFile :: CGenerator CFile
 genStatusHeaderFile = do
-    let defineLabel = "__STATUS_H__"
+    let defineLabel = "STATUS_H__"
     statusSet <- gets (S.filter (\case {
         TStruct _ -> False;
         TEnum _ -> False;

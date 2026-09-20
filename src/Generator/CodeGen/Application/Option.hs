@@ -20,7 +20,7 @@ genOptionPathName = "option" <.> "h"
 
 genOptionHeaderFile :: CGenerator CFile
 genOptionHeaderFile = do
-    let defineLabel = "__OPTION_H__"
+    let defineLabel = "OPTION_H__"
     optionSet <- gets (S.filter (\case {
         TStruct _ -> False;
         TEnum _ -> False;

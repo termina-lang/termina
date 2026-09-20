@@ -168,7 +168,7 @@ genObject (ArrayIndexExpression obj index ann) = do
             cArraySize <- genExpression arraySize
             let cAnn = buildGenericAnn ann
                 cFuncType = CTFunction (CTSizeT noqual) [_const size_t, _const size_t]
-                cFunctionCall = CExprCall (CExprValOf (CVar "__termina_array__index" cFuncType) cFuncType cAnn) [cArraySize, cIndex] (CTSizeT noqual) cAnn
+                cFunctionCall = CExprCall (CExprValOf (CVar "termina__check__array_index" cFuncType) cFuncType cAnn) [cArraySize, cIndex] (CTSizeT noqual) cAnn
             return $ cObj @$$ cFunctionCall @: ctype
 genObject o@(MemberAccess obj identifier _ann) = do
     cObj <- genObject obj
@@ -318,7 +318,7 @@ genExpression (BinOp op left right ann) =
                             plt <- gets targetPlatform
                             let cFuncType = CTFunction (CTSizeT noqual) [_const size_t, _const size_t]
                                 cWidth = CExprConstant (CIntConst (CInteger (shiftWidth plt leftTy) CDecRepr)) (CTSizeT noqual) cAnn
-                            return $ CExprCall (CExprValOf (CVar "__termina_shift__amount" cFuncType) cFuncType cAnn) [cWidth, cRight] (CTSizeT noqual) cAnn
+                            return $ CExprCall (CExprValOf (CVar "termina__check__shift_amount" cFuncType) cFuncType cAnn) [cWidth, cRight] (CTSizeT noqual) cAnn
             cRight' <- case op of
                 BitwiseLeftShift  -> boundShift
                 BitwiseRightShift -> boundShift
@@ -403,7 +403,7 @@ genExpression expr@(ArraySliceExpression _ak obj lower upper ann) = do
             let cAnn = buildGenericAnn ann
                 cFuncType = CTFunction (CTSizeT noqual) [_const size_t, _const size_t, _const size_t, _const size_t]
                 cFunctionCall = 
-                    CExprCall (CExprValOf (CVar "__termina_array__slice" cFuncType) cFuncType cAnn) 
+                    CExprCall (CExprValOf (CVar "termina__check__array_slice" cFuncType) cFuncType cAnn) 
                             [cArraySize, cExpectedSize, cLower, cUpper] (CTSizeT noqual) cAnn
             return $ addrOf (cObj @$$ cFunctionCall @: cType) |>> getLocation ann
         (ty, _,  _, _) -> throwError $ InternalError $ "Unsupported object. Not a reference to an array: " ++ show ty

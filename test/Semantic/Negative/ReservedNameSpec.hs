@@ -102,6 +102,7 @@ spec = do
     it "accepts a name that only begins like one of them" $
       typeCheckErrorOn TestPlatform structNamedOptions `shouldBe` Nothing
 
+
   describe "SE-219: names that look alike and are correct" $ do
     it "accepts a parameter whose underscore is followed by a lowercase letter" $
       typeCheckErrorOn TestPlatform paramNamedUnderscoreLower `shouldBe` Nothing

@@ -20,8 +20,8 @@ spec = do
   describe "Pretty printing pool methods" $ do
     it "Prints declaration of Message type and external pool" $ do
       renderHeader test0 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
@@ -49,6 +49,6 @@ spec = do
               "    };\n" ++
               "} Message;\n" ++
               "\n" ++
-              "extern __termina_pool_t message_pool;\n" ++
+              "extern termina__pool_t message_pool;\n" ++
               "\n" ++
               "#endif\n")

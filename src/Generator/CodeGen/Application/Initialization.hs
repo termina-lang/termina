@@ -31,8 +31,8 @@ genInitializeObj loc before (Resource identifier ty@(TAtomicArray {}) (Just expr
 genInitializeObj loc before (Resource identifier _ mexpr _ _) = do
     let cObj = identifier @: typeDef identifier
     let cLockNone = 
-            cObj @. resourceLockTypeField @: __termina_resource_lock_type_t @. "type" @: enumFieldType
-                @= "__termina_resource_lock_type__none" @: enumFieldType
+            cObj @. resourceLockTypeField @: termina__resource_lock_type_t @. "type" @: enumFieldType
+                @= "termina__resource_lock_type__none" @: enumFieldType
     case mexpr of
         Just expr -> do
             strInitialization <- genStructAssign loc False 0 cObj expr
@@ -71,7 +71,7 @@ genInitFile mName prjprogs = do
         incs = map fst modsWithGlobals
         includes = genIncludes incs
 
-        initFunctionName = namefy $ "termina_app" <::> "init_globals"
+        initFunctionName = terminafy $ "app" <::> "init_globals"
 
         includeTermina = CPPDirective (CPPInclude True ("termina" <.> "h")) (internalAnn (CPPDirectiveAnn True))
 

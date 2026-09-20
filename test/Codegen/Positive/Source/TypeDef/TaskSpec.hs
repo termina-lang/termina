@@ -57,8 +57,8 @@ spec = do
   describe "Pretty printing class methods" $ do
     it "Prints declaration of task class CHousekeeping" $ do
       renderHeader test0 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
@@ -69,16 +69,16 @@ spec = do
               "} Message;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_id_t _task_id;\n" ++
-              "    __termina_id_t _task_msg_queue_id;\n" ++
-              "    __termina_id_t timer;\n" ++
-              "    __termina_allocator_t message_pool;\n" ++
+              "    termina__id_t _task_id;\n" ++
+              "    termina__id_t _task_msg_queue_id;\n" ++
+              "    termina__id_t timer;\n" ++
+              "    termina__allocator_t message_pool;\n" ++
               "    uint32_t interval;\n" ++
               "} CHousekeeping;\n" ++
               "\n" ++
-              "void __CHousekeeping__termina_task(void * const arg);\n" ++
+              "void termina__task_entry__CHousekeeping(void * const arg);\n" ++
               "\n" ++
-              "Status__i32 CHousekeeping__timeout(const __termina_event_t * const termina__ev,\n" ++
+              "Status__i32 CHousekeeping__timeout(const termina__event_t * const termina__ev,\n" ++
               "                                   void * const termina__this, TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
@@ -87,11 +87,11 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "static _Bool CHousekeeping__check_interval(const __termina_event_t * const termina__ev,\n" ++
+              "static _Bool CHousekeeping__check_interval(const termina__event_t * const termina__ev,\n" ++
               "                                           const CHousekeeping * const self,\n" ++
               "                                           uint32_t limit);\n" ++
               "\n" ++
-              "static _Bool CHousekeeping__check_interval(const __termina_event_t * const termina__ev,\n" ++
+              "static _Bool CHousekeeping__check_interval(const termina__event_t * const termina__ev,\n" ++
               "                                           const CHousekeeping * const self,\n" ++
               "                                           uint32_t limit) {\n" ++
               "    \n" ++
@@ -109,7 +109,7 @@ spec = do
               "\n" ++
               "}\n" ++
               "\n" ++
-              "Status__i32 CHousekeeping__timeout(const __termina_event_t * const termina__ev,\n" ++
+              "Status__i32 CHousekeeping__timeout(const termina__event_t * const termina__ev,\n" ++
               "                                   void * const termina__this,\n" ++
               "                                   TimeVal current) {\n" ++
               "    \n" ++
@@ -125,7 +125,7 @@ spec = do
               "\n" ++
               "    if (alloc_msg._variant == Option__Some) {\n" ++
               "        \n" ++
-              "        __termina_box_t msg = alloc_msg.Some._0;\n" ++
+              "        termina__box_t msg = alloc_msg.Some._0;\n" ++
               "\n" ++
               "        self->message_pool.free(termina__ev, self->message_pool._that, msg);\n" ++
               "\n" ++
@@ -147,13 +147,13 @@ spec = do
               "\n" ++
               "}\n" ++
               "\n" ++
-              "void __CHousekeeping__termina_task(void * arg) {\n" ++
+              "void termina__task_entry__CHousekeeping(void * arg) {\n" ++
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)arg;\n" ++
               "\n" ++
               "    int32_t status = 0L;\n" ++
               "\n" ++
-              "    __termina_event_t event;\n" ++
+              "    termina__event_t event;\n" ++
               "\n" ++
               "    Status__i32 result;\n" ++
               "\n" ++
@@ -161,7 +161,7 @@ spec = do
               "\n" ++
               "    for (;;) {\n" ++
               "        \n" ++
-              "        __termina_msg_queue__recv(self->_task_msg_queue_id, &event, &status);\n" ++
+              "        termina__msg_queue__recv(self->_task_msg_queue_id, &event, &status);\n" ++
               "\n" ++
               "        if (status != 0L) {\n" ++
               "            break;\n" ++
@@ -169,13 +169,13 @@ spec = do
               "\n" ++
               "        switch (event.port_id) {\n" ++
               "            \n" ++
-              "            case __CHousekeeping__timer:\n" ++
+              "            case CHousekeeping__timer:\n" ++
               "\n" ++
-              "                __termina_msg_queue__recv(self->timer,\n" ++
-              "                                          (void *)&timeout__msg_data, &status);\n" ++
+              "                termina__msg_queue__recv(self->timer,\n" ++
+              "                                         (void *)&timeout__msg_data, &status);\n" ++
               "\n" ++
               "                if (status != 0L) {\n" ++
-              "                    __termina_except__msg_queue_recv_error(self->timer, status);\n" ++
+              "                    termina__except__msg_queue_recv_error(self->timer, status);\n" ++
               "                }\n" ++
               "\n" ++
               "                result = CHousekeeping__timeout(&event, self,\n" ++
@@ -187,9 +187,9 @@ spec = do
               "                    source._variant = ExceptSource__Task;\n" ++
               "                    source.Task._0 = self->_task_id;\n" ++
               "\n" ++
-              "                    __termina_except__action_failure(source,\n" ++
-              "                                                     __CHousekeeping__timer,\n" ++
-              "                                                     result.Failure._0);\n" ++
+              "                    termina__except__action_failure(source,\n" ++
+              "                                                    CHousekeeping__timer,\n" ++
+              "                                                    result.Failure._0);\n" ++
               "\n" ++
               "                }\n" ++
               "\n" ++
@@ -197,7 +197,7 @@ spec = do
               "\n" ++
               "            default:\n" ++
               "\n" ++
-              "                __termina_exec__reboot();\n" ++
+              "                termina__exec__reboot();\n" ++
               "\n" ++
               "                break;\n" ++
               "\n" ++

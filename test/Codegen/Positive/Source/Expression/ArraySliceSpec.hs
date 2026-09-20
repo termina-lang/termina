@@ -23,8 +23,8 @@ spec = do
   describe "Pretty printing array slicing expressions" $ do
     it "Declares a function taking an array slice" $ do
       renderHeader test0 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
@@ -37,14 +37,14 @@ spec = do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
-              "\n" ++ 
+              "\n" ++
               "void add_one(uint32_t input[5U]) {\n" ++
               "    \n" ++
               "    for (size_t i = 0U; i < 5U; i = i + 1U) {\n" ++
               "        \n" ++
-              "        input[__termina_array__index(5U,\n" ++
-              "                                     i)] = input[__termina_array__index(5U,\n" ++
-              "                                                                        i)] + 1U;\n" ++
+              "        input[termina__check__array_index(5U,\n" ++
+              "                                          i)] = input[termina__check__array_index(5U,\n" ++
+              "                                                                                  i)] + 1U;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++

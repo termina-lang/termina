@@ -21,7 +21,7 @@ genResultPathName = "result" <.> "h"
 
 genResultHeaderFile :: CGenerator CFile
 genResultHeaderFile = do
-    let defineLabel = "__RESULT_H__"
+    let defineLabel = "RESULT_H__"
     resultSet <- gets (S.unions . M.elems . M.filterWithKey (\k _ -> case k of {
         TStruct _ -> False;
         TEnum _ -> False;

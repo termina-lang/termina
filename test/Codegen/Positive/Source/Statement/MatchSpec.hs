@@ -96,16 +96,16 @@ spec = do
   describe "Code generation for match statements" $ do
     it "Declares a procedure matching an option-box" $ do
       renderHeader test0 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_lock_type_t _lock_type;\n" ++
+              "    termina__resource_lock_type_t _lock_type;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__match_test0(const __termina_event_t * const termina__ev,\n" ++
+              "void id0__match_test0(const termina__event_t * const termina__ev,\n" ++
               "                      void * const termina__this, Option__box option0);\n" ++
               "\n" ++
               "#endif\n")
@@ -114,19 +114,19 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "void id0__match_test0(const __termina_event_t * const termina__ev,\n" ++
+              "void id0__match_test0(const termina__event_t * const termina__ev,\n" ++
               "                      void * const termina__this, Option__box option0) {\n" ++
               "    \n" ++
               "    id0 * self = (id0 *)termina__this;\n" ++
               "\n" ++
-              "    __termina_lock_t termina__lock = __termina_resource__lock(&termina__ev->owner,\n" ++
-              "                                                              &self->_lock_type);\n" ++
+              "    termina__lock_t termina__lock = termina__resource__lock(&termina__ev->owner,\n" ++
+              "                                                            &self->_lock_type);\n" ++
               "\n" ++
               "    uint32_t foo = 0U;\n" ++
               "\n" ++
               "    if (option0._variant == Option__Some) {\n" ++
               "        \n" ++
-              "        __termina_box_t value = option0.Some._0;\n" ++
+              "        termina__box_t value = option0.Some._0;\n" ++
               "\n" ++
               "        foo = *(uint32_t *)value.data;\n" ++
               "\n" ++
@@ -136,24 +136,24 @@ spec = do
               "\n" ++
               "    }\n" ++
               "\n" ++
-              "    __termina_resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
-              "                               termina__lock);\n" ++
+              "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
+              "                              termina__lock);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
               "}\n")
     it "Declares a procedure matching an option-box with reversed cases" $ do
       renderHeader test1 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_lock_type_t _lock_type;\n" ++
+              "    termina__resource_lock_type_t _lock_type;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__match_test1(const __termina_event_t * const termina__ev,\n" ++
+              "void id0__match_test1(const termina__event_t * const termina__ev,\n" ++
               "                      void * const termina__this, Option__box option0);\n" ++
               "\n" ++
               "#endif\n")
@@ -162,13 +162,13 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "void id0__match_test1(const __termina_event_t * const termina__ev,\n" ++
+              "void id0__match_test1(const termina__event_t * const termina__ev,\n" ++
               "                      void * const termina__this, Option__box option0) {\n" ++
               "    \n" ++
               "    id0 * self = (id0 *)termina__this;\n" ++
               "\n" ++
-              "    __termina_lock_t termina__lock = __termina_resource__lock(&termina__ev->owner,\n" ++
-              "                                                              &self->_lock_type);\n" ++
+              "    termina__lock_t termina__lock = termina__resource__lock(&termina__ev->owner,\n" ++
+              "                                                            &self->_lock_type);\n" ++
               "\n" ++
               "    uint32_t foo = 0U;\n" ++
               "\n" ++
@@ -177,22 +177,22 @@ spec = do
               "\n" ++
               "    } else {\n" ++
               "        \n" ++
-              "        __termina_box_t value = option0.Some._0;\n" ++
+              "        termina__box_t value = option0.Some._0;\n" ++
               "\n" ++
               "        foo = *(uint32_t *)value.data;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
-              "    __termina_resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
-              "                               termina__lock);\n" ++
+              "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
+              "                              termina__lock);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
               "}\n")
     it "Declares a function matching an enum" $ do
       renderHeader test2 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++

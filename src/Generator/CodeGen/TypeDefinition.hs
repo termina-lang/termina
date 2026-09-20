@@ -53,7 +53,7 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface Regular
         genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
         genInterfaceProcedureField (InterfaceProcedure _ak procedure params _modifiers _) = do
             cParams <- mapM genCParameter params
-            let cEventParam = CParameter eventParam (_const . ptr $ _const __termina_event_t)
+            let cEventParam = CParameter eventParam (_const . ptr $ _const termina__event_t)
                 cThisParam = CParameter thisParam (_const . ptr $ void)
                 cFuncPointerType = CTFunctionPointer (CTVoid noqual) (cEventParam : cThisParam : cParams) noqual
             return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
@@ -71,7 +71,7 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface SystemI
         genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
         genInterfaceProcedureField (InterfaceProcedure _ak procedure params _modifiers _) = do
             cParams <- mapM genCParameter params
-            let cEventParam = CParameter eventParam (_const . ptr $ _const __termina_event_t)
+            let cEventParam = CParameter eventParam (_const . ptr $ _const termina__event_t)
                 cFuncPointerType = CTFunctionPointer (CTVoid noqual) (cEventParam : cParams) noqual
             return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
 
@@ -256,7 +256,7 @@ genThatParam :: (MonadError CGeneratorError m) => m CDeclaration
 genThatParam = return $ field thatField (_const . ptr $ void)
 
 getEventParam :: (MonadError CGeneratorError m) => m CDeclaration
-getEventParam = return $ field eventParam (_const . ptr $ _const __termina_event_t)
+getEventParam = return $ field eventParam (_const . ptr $ _const termina__event_t)
 
 genSelfParam :: (MonadError CGeneratorError m) => AnnASTElement SemanticAnn -> m CDeclaration
 genSelfParam (TypeDefinition (Class _clsKind identifier _members _provides _modifiers) _) =
@@ -280,15 +280,15 @@ genConstSelfCastStmt ann identifier = do
     let cExpr = cast (ptr selfCType) (thisParam @: ptr (_const void))
     return $ pre_cr (var selfParam (ptr selfCType) @:= cExpr) |>> getLocation ann
 
--- | __termina_lock_t __lock = __termina_resource__lock(
+-- | termina__lock_t __lock = termina__resource__lock(
 --        &__ev->owner, &self->_lock_type);
 genResourceLockStmt :: SemanticAnn -> Identifier -> CGenerator CCompoundBlockItem
 genResourceLockStmt ann identifier = do
     selfCType <- genType noqual (TStruct identifier)
     cEventObj <- genEventParamObj
-    let lock = var lockVar __termina_lock_t @:= __termina_resource__lock @@ [
-            addrOf (cEventObj @. "owner" @: __termina_id_t),
-            addrOf ("self" @: ptr selfCType @. resourceLockTypeField @: __termina_resource_lock_type_t)
+    let lock = var lockVar termina__lock_t @:= termina__resource__lock @@ [
+            addrOf (cEventObj @. "owner" @: termina__id_t),
+            addrOf ("self" @: ptr selfCType @. resourceLockTypeField @: termina__resource_lock_type_t)
             ]
     return $ pre_cr lock |>> getLocation ann
 
@@ -296,10 +296,10 @@ genResourceUnlockStmt :: SemanticAnn -> Identifier -> CGenerator CCompoundBlockI
 genResourceUnlockStmt ann identifier = do
     selfCType <- genType noqual (TStruct identifier)
     cEventObj <- genEventParamObj
-    let unlock = __termina_resource__unlock @@ [
-            addrOf (cEventObj @. "owner" @: __termina_id_t),
-            addrOf ("self" @: ptr selfCType @. resourceLockTypeField @: __termina_resource_lock_type_t),
-            lockVar @: __termina_lock_t
+    let unlock = termina__resource__unlock @@ [
+            addrOf (cEventObj @. "owner" @: termina__id_t),
+            addrOf ("self" @: ptr selfCType @. resourceLockTypeField @: termina__resource_lock_type_t),
+            lockVar @: termina__lock_t
             ]
     return $ pre_cr unlock |>> getLocation ann
 
@@ -394,7 +394,7 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
                 let cIDField = field handlerIDField (typeDef terminaID) in
                 cIDField : cFields
             ResourceClass ->
-                let cIDField = field resourceLockTypeField __termina_resource_lock_type_t in
+                let cIDField = field resourceLockTypeField termina__resource_lock_type_t in
                 cIDField : cFields
             _ -> cFields
     case clsKind of
@@ -410,7 +410,7 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
 
         genTaskFunctionDeclaration :: CGenerator CFileItem
         genTaskFunctionDeclaration = do
-            return $ CExtDecl (CEDFunction Nothing void (namefy identifier <::> "termina_task") [
+            return $ CExtDecl (CEDFunction Nothing void (terminafy ("task_entry" <::> identifier)) [
                     CDecl (CTypeSpec (_const . ptr $ void)) (Just "arg") Nothing
                 ]) (buildDeclarationAnn ann True)
 
@@ -528,7 +528,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                     -- status = classFunctionName(self, action_msg_data);
                     indent . pre_cr $ "result" @: _Status__i32 @=
                         (classFunctionName @: classFunctionType) @@ [
-                            addrOf ("event" @: __termina_event_t),
+                            addrOf ("event" @: termina__event_t),
                             "self" @: classStructType],
                     -- if (result._variant != Status__Success)
                     indent . pre_cr $ _if (
@@ -539,10 +539,10 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                             -- source._variant = ExceptSource__Task;
                             no_cr $ "source" @: typeDef "ExceptSource" @. variant @: enumFieldType @= "ExceptSource__Task" @: enumFieldType,
                             -- source.Task._0 = self->_task_id;
-                            no_cr $ "source" @: typeDef "ExceptSource" @. "Task" @: enumFieldType @. variantParamField 0 @: __termina_id_t @= ("self" @: ptr classStructType) @. taskIDField @: __termina_id_t,
+                            no_cr $ "source" @: typeDef "ExceptSource" @. "Task" @: enumFieldType @. variantParamField 0 @: termina__id_t @= ("self" @: ptr classStructType) @. taskIDField @: termina__id_t,
 
-                            -- __termina_except__action_failure(source, , status.Failure._0);
-                            pre_cr $ __termina_except__action_failure @@ [
+                            -- termina__except__action_failure(source, , status.Failure._0);
+                            pre_cr $ termina__except__action_failure @@ [
                                 "source" @: typeDef "ExceptSource",
                                 this_variant @: size_t,
                                 ("result" @: _Status__i32) @. statusFailureVariant @: enumFieldType @. variantParamField 0 @: int32_t
@@ -562,9 +562,9 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                 [
                     -- case variant:
                     pre_cr $ _case (this_variant @: enumFieldType) $
-                    indent . pre_cr $ __termina_msg_queue__recv @@
+                    indent . pre_cr $ termina__msg_queue__recv @@
                             [
-                                ("self" @: ptr classStructType) @. port @: __termina_id_t,
+                                ("self" @: ptr classStructType) @. port @: termina__id_t,
                                 cast void_ptr (addrOf ((action <::> "msg_data") @: cDataType)),
                                 addrOf ("status" @: int32_t)
                             ],
@@ -572,16 +572,16 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                     indent . pre_cr $ _if (
                            "status" @: int32_t @!= dec 0 @: int32_t)
                         $ block [
-                            -- __termina_except__msg_queue_recv_error(port, status);
-                            no_cr $ __termina_except__msg_queue_recv_error @@ [
-                                ("self" @: ptr classStructType) @. port @: __termina_id_t,
+                            -- termina__except__msg_queue_recv_error(port, status);
+                            no_cr $ termina__except__msg_queue_recv_error @@ [
+                                ("self" @: ptr classStructType) @. port @: termina__id_t,
                                 "status" @: int32_t
                             ]
                         ],
                     -- status = classFunctionName(self, action_msg_data);
                     indent . pre_cr $ "result" @: _Status__i32 @=
                         (classFunctionName @: classFunctionType) @@ [
-                            addrOf ("event" @: __termina_event_t),
+                            addrOf ("event" @: termina__event_t),
                             "self" @: classStructType, (action <::> "msg_data") @: cDataType],
                     -- if (result._variant != Status__Success)
                     indent . pre_cr $ _if (
@@ -592,10 +592,10 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                             -- source._variant = ExceptSource__Task;
                             no_cr $ "source" @: typeDef "ExceptSource" @. variant @: enumFieldType @= "ExceptSource__Task" @: enumFieldType,
                             -- source.Task._0 = self->_task_id;
-                            no_cr $ "source" @: typeDef "ExceptSource" @. "Task" @: enumFieldType @. variantParamField 0 @: __termina_id_t @= ("self" @: ptr classStructType) @. taskIDField @: __termina_id_t,
+                            no_cr $ "source" @: typeDef "ExceptSource" @. "Task" @: enumFieldType @. variantParamField 0 @: termina__id_t @= ("self" @: ptr classStructType) @. taskIDField @: termina__id_t,
 
-                            -- __termina_except__action_failure(source, , status.Failure._0);
-                            pre_cr $ __termina_except__action_failure @@ [
+                            -- termina__except__action_failure(source, , status.Failure._0);
+                            pre_cr $ termina__except__action_failure @@ [
                                 "source" @: typeDef "ExceptSource",
                                 this_variant @: size_t,
                                 ("result" @: _Status__i32) @. statusFailureVariant @: enumFieldType @. variantParamField 0 @: int32_t
@@ -609,12 +609,12 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
             classStructType <- genType noqual (TStruct classId)
             cases <- concat <$> traverse genCase actions
             return $ trail_cr . block $ [
-                    -- | status = __termina_msg_queue__recv(
+                    -- | status = termina__msg_queue__recv(
                     -- |                self->__task.msgq_id, &next_msg);
-                    pre_cr $ __termina_msg_queue__recv @@
+                    pre_cr $ termina__msg_queue__recv @@
                             [
-                                ("self" @: ptr classStructType) @. taskMsgQueueIDField @: __termina_id_t,
-                                addrOf ("event" @: __termina_event_t),
+                                ("self" @: ptr classStructType) @. taskMsgQueueIDField @: termina__id_t,
+                                addrOf ("event" @: termina__event_t),
                                 addrOf ("status" @: int32_t)
                             ],
                     -- if (status != Status__Success)
@@ -624,13 +624,13 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                             -- break;
                             no_cr _break
                         ],
-                    pre_cr $ _switch ("event" @: __termina_event_t @. "port_id" @: __termina_id_t) $
+                    pre_cr $ _switch ("event" @: termina__event_t @. "port_id" @: termina__id_t) $
                         trail_cr . block $ (cases ++
                             [
                                 -- default:
                                 pre_cr $ _default $
-                                    -- __termina_exec__reboot(1);
-                                    indent . pre_cr $ __termina_exec__reboot @@ [],
+                                    -- termina__exec__reboot(1);
+                                    indent . pre_cr $ termina__exec__reboot @@ [],
                                     indent . pre_cr $ _break
                             ])
                 ]
@@ -644,8 +644,8 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                     pre_cr $ var "self" (ptr classId) @:= cast (ptr classId) ("arg" @: ptr void),
                     -- int32_t status = 0;
                     pre_cr $ var "status" int32_t @:= dec 0 @: int32_t,
-                    -- __termina_event_t ev;
-                    pre_cr $ var "event" __termina_event_t,
+                    -- termina__event_t ev;
+                    pre_cr $ var "event" termina__event_t,
                     -- _Status__i32 result;
                     pre_cr $ var "result" _Status__i32
                 ] ++ msgDataVars ++
@@ -758,6 +758,6 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
             ignored <- mapM (\(Parameter pid pty) -> do
                 cPty <- genType noqual pty
                 return (pid, cPty)) [p | p@(Parameter pid _) <- memberParams, isIgnoredParameter pid]
-            let cEventParamType = _const . ptr $ _const __termina_event_t
+            let cEventParamType = _const . ptr $ _const termina__event_t
             return $ genDiscardedParameters ([(eventParam, cEventParamType) | not used] ++ ignored) ++ cItems
 genClassDefinition e = throwError $ InternalError $ "AST element is not a class: " ++ show e

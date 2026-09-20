@@ -29,8 +29,8 @@ spec = do
   describe "Pretty printing array index expressions" $ do
     it "Declares a function indexing local arrays" $ do
       renderHeader test0 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
@@ -52,7 +52,7 @@ spec = do
               "\n" ++
               "    array0[3U] = 10U;\n" ++
               "\n" ++
-              "    array0[__termina_array__index(10U, foo)] = 1024U;\n" ++
+              "    array0[termina__check__array_index(10U, foo)] = 1024U;\n" ++
               "\n" ++
               "    array1[0U][1U] = INT64_C(1024);\n" ++
               "\n" ++
@@ -61,8 +61,8 @@ spec = do
               "}\n")    
     it "Declares a function indexing through a reference" $ do
       renderHeader test1 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
@@ -80,7 +80,7 @@ spec = do
               "\n" ++
               "    p_array0[3U] = 10U;\n" ++
               "\n" ++
-              "    p_array0[__termina_array__index(10U, (size_t)foo)] = 1024U;\n" ++
+              "    p_array0[termina__check__array_index(10U, (size_t)foo)] = 1024U;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

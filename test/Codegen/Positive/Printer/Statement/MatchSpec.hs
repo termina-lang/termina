@@ -80,7 +80,7 @@ spec = do
         pack ("\n" ++
               "if (option_var._variant == Option__Some) {\n" ++
               "    \n" ++
-              "    __termina_box_t param0 = option_var.Some._0;\n" ++
+              "    termina__box_t param0 = option_var.Some._0;\n" ++
               "\n" ++
               "    foo1 = *(uint32_t *)param0.data;\n" ++
               "\n" ++
@@ -98,7 +98,7 @@ spec = do
               "\n" ++
               "} else {\n" ++
               "    \n" ++
-              "    __termina_box_t param1 = option_var.Some._0;\n" ++
+              "    termina__box_t param1 = option_var.Some._0;\n" ++
               "\n" ++
               "    foo1 = ((uint32_t *)param1.data)[8U];\n" ++
               "\n" ++
@@ -112,7 +112,7 @@ spec = do
               "\n" ++
               "    if (termina__match._variant == Option__Some) {\n" ++
               "        \n" ++
-              "        __termina_box_t param0 = termina__match.Some._0;\n" ++
+              "        termina__box_t param0 = termina__match.Some._0;\n" ++
               "\n" ++
               "        foo1 = *(uint32_t *)param0.data;\n" ++
               "\n" ++

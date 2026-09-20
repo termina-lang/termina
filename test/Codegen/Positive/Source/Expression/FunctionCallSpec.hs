@@ -20,12 +20,13 @@ spec = do
   describe "Pretty printing function call expressions" $ do
     it "Declares the called functions" $ do
       renderHeader test0 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "uint16_t func_test0_0(uint16_t a);\n\n" ++
+              "uint16_t func_test0_0(uint16_t a);\n" ++
+              "\n" ++
               "uint16_t func_test0_1(uint16_t a);\n" ++
               "\n" ++
               "#endif\n")

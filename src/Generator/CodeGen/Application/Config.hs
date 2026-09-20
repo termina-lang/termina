@@ -55,8 +55,8 @@ genConfigFile mName config progArchitecture = do
     messageBufferMemory <- genMessageBufferMemory msgQueues
 
     return $ CHeaderFile mName $ [
-            _ifndef "__CONFIG_H__",
-            _define "__CONFIG_H__" Nothing
+            _ifndef "CONFIG_H__",
+            _define "CONFIG_H__" Nothing
         ] ++ cVariantsForTaskPorts
         ++ cEmitterDefines
         ++ cMutexDefines
@@ -66,17 +66,17 @@ genConfigFile mName config progArchitecture = do
         ++ cPoolDefines
         ++ cTimerDefines
         ++ [
-            pre_cr $ _define "__TERMINA_APP_CONFIG_POOLS" (Just [show (length progPools)]),
-            pre_cr $ _define "__TERMINA_APP_CONFIG_TASKS" (Just [show (length progTasks)]),
-            pre_cr $ _define "__TERMINA_APP_CONFIG_PERIODIC_TIMERS" (Just [show (length (M.elems periodicTimers))]),
-            pre_cr $ _define "__TERMINA_APP_CONFIG_MUTEXES" (Just [show (length mutexes)]),
-            pre_cr $ _define "__TERMINA_APP_CONFIG_MESSAGE_QUEUES" (Just [show (length msgQueues)])
+            pre_cr $ _define "TERMINA__APP_CONFIG__POOLS" (Just [show (length progPools)]),
+            pre_cr $ _define "TERMINA__APP_CONFIG__TASKS" (Just [show (length progTasks)]),
+            pre_cr $ _define "TERMINA__APP_CONFIG__PERIODIC_TIMERS" (Just [show (length (M.elems periodicTimers))]),
+            pre_cr $ _define "TERMINA__APP_CONFIG__MUTEXES" (Just [show (length mutexes)]),
+            pre_cr $ _define "TERMINA__APP_CONFIG__MESSAGE_QUEUES" (Just [show (length msgQueues)])
         ] ++ messageBufferMemory ++
         [
-            pre_cr $ _define "__TERMINA_MICROSECONDS_PER_TICK" (Just [show (10000 :: Integer)])
+            pre_cr $ _define "TERMINA__TIME__MICROSECONDS_PER_TICK" (Just [show (10000 :: Integer)])
         ] ++
-        ([pre_cr $ _define "__TERMINA_SYS_PRINT_OUTPUT_BUFFER_SIZE" (Just [show $ sysPrintOutputBufferSize config]) | sysPrintOutputBufferSize config /= defaultSysPrintOutputBufferSize]) ++
-        ([pre_cr $ _define "__TERMINA_SYS_READ_INPUT_BUFFER_SIZE" (Just [show $ sysReadInputBufferSize config]) | sysReadInputBufferSize config /= defaultSysReadInputBufferSize]) ++
+        ([pre_cr $ _define "TERMINA__SYS_PRINT__OUTPUT_BUFFER_SIZE" (Just [show $ sysPrintOutputBufferSize config]) | sysPrintOutputBufferSize config /= defaultSysPrintOutputBufferSize]) ++
+        ([pre_cr $ _define "TERMINA__SYS_READ__INPUT_BUFFER_SIZE" (Just [show $ sysReadInputBufferSize config]) | sysReadInputBufferSize config /= defaultSysReadInputBufferSize]) ++
         [
             pre_cr _endif
         ]
@@ -86,11 +86,11 @@ genConfigFile mName config progArchitecture = do
         genMessagesForQueue :: OSALMsgQueue -> CGenerator [String]
         genMessagesForQueue (OSALTaskMsgQueue _ _ size) = do
             cSize <- genExpression size
-            let cSizeOf = _sizeOfType __termina_event_t
+            let cSizeOf = _sizeOfType termina__event_t
                 ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
                 ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
             return [
-                    "    __TERMINA_APP_CONFIG_MESSAGE_QUEUE_BUFFER( ",
+                    "    TERMINA__APP_CONFIG__MESSAGE_QUEUE_BUFFER( ",
                     "        " <> ppSize <> ", ",
                     "        " <> ppSizeOf <> " ",
                     "    ) "
@@ -105,7 +105,7 @@ genConfigFile mName config progArchitecture = do
                 ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
                 ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
             return [
-                    "    __TERMINA_APP_CONFIG_MESSAGE_QUEUE_BUFFER( ",
+                    "    TERMINA__APP_CONFIG__MESSAGE_QUEUE_BUFFER( ",
                     "        " <> ppSize <> ", ",
                     "        " <> ppSizeOf <> " ",
                     "    ) "
@@ -117,7 +117,7 @@ genConfigFile mName config progArchitecture = do
                 ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
                 ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
             return [
-                    "    __TERMINA_APP_CONFIG_MESSAGE_QUEUE_BUFFER( ",
+                    "    TERMINA__APP_CONFIG__MESSAGE_QUEUE_BUFFER( ",
                     "        " <> ppSize <> ", ",
                     "        " <> ppSizeOf <> " ",
                     "    ) "
@@ -136,7 +136,7 @@ genConfigFile mName config progArchitecture = do
         genMessageBufferMemory msgq = do
             messagesForQueue <- genMessagesForQueues msgq
             return [
-                    CPPDirective (CPPDefine "__TERMINA_APP_CONFIG_MESSAGE_BUFFER_MEMORY"
+                    CPPDirective (CPPDefine "TERMINA__APP_CONFIG__MESSAGE_BUFFER_MEMORY"
                         (Just $
                             "( " : messagesForQueue ++ [")"]
                         )) (internalAnn (CPPDirectiveAnn True))

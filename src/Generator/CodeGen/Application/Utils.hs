@@ -98,7 +98,7 @@ genVariantForPort ::
     Identifier
     -- | Name of the port
     -> Identifier -> CGenerator Identifier
-genVariantForPort taskCls port = return $ namefy $ taskCls <::> port
+genVariantForPort taskCls port = return $ taskCls <::> port
 
 genVariantsForTaskPorts :: TPClass SemanticAnn -> CGenerator [CFileItem]
 genVariantsForTaskPorts tpClass@(TPClass classId _ _ _ _ _ _ _ _ _ _ _ _) =
@@ -125,7 +125,7 @@ genPoolMemoryArea :: Bool -> TPPool SemanticAnn -> CGenerator CFileItem
 genPoolMemoryArea before (TPPool identifier ts size _ _) = do
     cSize <- genExpression size
     cType <- genType noqual ts
-    let poolSize = __termina_pool__size @@ [_sizeOfType cType, cSize]
+    let poolSize = termina__pool__size @@ [_sizeOfType cType, cSize]
     if before then 
         return $ pre_cr $ static_global (var (poolMemoryArea identifier) (CTArray uint8_t poolSize))
     else
@@ -166,7 +166,7 @@ genAtomicArrayDeclarations (obj : objs) = do
     return $ decl : rest
 
 genDefineMutexIdLabel :: Identifier -> CGenerator Identifier
-genDefineMutexIdLabel m = return $ namefy m <::> "mutex_id"
+genDefineMutexIdLabel m = return $ m <::> "mutex_id"
 
 genDefineMutexId :: [Identifier] -> CGenerator [CFileItem]
 genDefineMutexId [] = return []
@@ -185,10 +185,10 @@ genDefineMutexId (mutex : xs) = do
             return $ _define this_mutex (Just [show value]) : rest
 
 genDefineTaskIdLabel :: Identifier -> CGenerator Identifier
-genDefineTaskIdLabel t = return $ namefy t <::> "task_id"
+genDefineTaskIdLabel t = return $ t <::> "task_id"
 
 genDefineHandlerIdLabel :: Identifier -> CGenerator Identifier
-genDefineHandlerIdLabel t = return $ namefy t <::> "handler_id"
+genDefineHandlerIdLabel t = return $ t <::> "handler_id"
 
 genDefineHandlerId :: [Identifier] -> CGenerator [CFileItem]
 genDefineHandlerId [] = return []
@@ -224,7 +224,7 @@ genDefineTaskId (task : xs) = do
             return $ _define this_task (Just [show value]) : rest
 
 genDefinePoolIdLabel :: Identifier -> CGenerator Identifier
-genDefinePoolIdLabel p = return $ namefy p <::> "pool_id"
+genDefinePoolIdLabel p = return $ p <::> "pool_id"
 
 genDefinePoolId :: [Identifier] -> CGenerator [CFileItem]
 genDefinePoolId [] = return []
@@ -243,7 +243,7 @@ genDefinePoolId (pl : xs) = do
             return $ _define this_pool (Just [show value]) : rest
 
 genDefineEmitterIdLabel :: Identifier -> CGenerator Identifier
-genDefineEmitterIdLabel e = return $ namefy e <::> "emitter" <:> "id"
+genDefineEmitterIdLabel e = return $ e <::> "emitter" <:> "id"
 
 genDefineEmitterId :: [Identifier] -> CGenerator [CFileItem]
 genDefineEmitterId [] = return []
@@ -262,7 +262,7 @@ genDefineEmitterId (emitter : xs) = do
             return $ _define this_emitter (Just [show value]) : rest
 
 genDefineTimerIdLabel :: Identifier -> CGenerator Identifier
-genDefineTimerIdLabel t = return $ namefy t <::> "timer" <:> "id"
+genDefineTimerIdLabel t = return $ t <::> "timer" <:> "id"
 
 genDefineTimerId :: [Identifier] -> CGenerator [CFileItem]
 genDefineTimerId [] = return []
@@ -281,13 +281,13 @@ genDefineTimerId (timer : xmp) = do
             return $ _define this_timer (Just [show value]) : rest
 
 genDefineTaskMsgQueueIdLabel :: Identifier -> CGenerator Identifier
-genDefineTaskMsgQueueIdLabel t = return $ namefy t <::> "task_msg_queue_id"
+genDefineTaskMsgQueueIdLabel t = return $ t <::> "task_msg_queue_id"
 
 genDefineChannelMsgQueueIdLabel :: Identifier -> CGenerator Identifier
-genDefineChannelMsgQueueIdLabel c = return $ namefy c <::> "channel_msg_queue_id"
+genDefineChannelMsgQueueIdLabel c = return $ c <::> "channel_msg_queue_id"
 
 genDefineSinkMsgQueueIdLabel :: Identifier -> Identifier -> CGenerator Identifier
-genDefineSinkMsgQueueIdLabel t p = return $ namefy t <::> p <::> "sink_msg_queue_id"
+genDefineSinkMsgQueueIdLabel t p = return $ t <::> p <::> "sink_msg_queue_id"
 
 genDefineMsgQueueIdLabel :: OSALMsgQueue -> CGenerator Identifier
 genDefineMsgQueueIdLabel (OSALTaskMsgQueue t _ _) = genDefineTaskMsgQueueIdLabel t

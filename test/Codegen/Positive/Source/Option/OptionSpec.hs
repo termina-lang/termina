@@ -47,27 +47,27 @@ spec = do
   describe "Pretty printing pool methods" $ do
     it "Prints header file of test0" $ do
       renderHeader test0 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_id_t _task_id;\n" ++
-              "    __termina_id_t _task_msg_queue_id;\n" ++
-              "    __termina_id_t data_in;\n" ++
+              "    termina__id_t _task_id;\n" ++
+              "    termina__id_t _task_msg_queue_id;\n" ++
+              "    termina__id_t data_in;\n" ++
               "} CHousekeeping;\n" ++
               "\n" ++
-              "void __CHousekeeping__termina_task(void * const arg);\n" ++
+              "void termina__task_entry__CHousekeeping(void * const arg);\n" ++
               "\n" ++
-              "Status__i32 CHousekeeping__action0(const __termina_event_t * const termina__ev,\n" ++
+              "Status__i32 CHousekeeping__action0(const termina__event_t * const termina__ev,\n" ++
               "                                   void * const termina__this, uint32_t _data);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints option header file of test0" $ do
       renderOption test0OptionMap `shouldBe`
-        pack ("#ifndef __OPTION_H__\n" ++
-              "#define __OPTION_H__\n" ++
+        pack ("#ifndef OPTION_H__\n" ++
+              "#define OPTION_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++

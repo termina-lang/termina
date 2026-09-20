@@ -30,8 +30,8 @@ spec = do
   describe "Code generation for for-loop statements" $ do
     it "Declares a function with a counting for loop" $ do
       renderHeader test0 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
@@ -49,7 +49,7 @@ spec = do
               "\n" ++
               "    for (size_t i = 0U; i < 10U; i = i + 1U) {\n" ++
               "        \n" ++
-              "        total = total + array0[__termina_array__index(10U, i)];\n" ++
+              "        total = total + array0[termina__check__array_index(10U, i)];\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -58,8 +58,8 @@ spec = do
               "}\n")
     it "Declares a function with a guarded for loop" $ do
       renderHeader test1 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
@@ -77,7 +77,7 @@ spec = do
               "\n" ++
               "    for (size_t i = 0U; i < 10U && found == false; i = i + 1U) {\n" ++
               "        \n" ++
-              "        if (array0[__termina_array__index(10U, i)] == 1024U) {\n" ++
+              "        if (array0[termina__check__array_index(10U, i)] == 1024U) {\n" ++
               "            \n" ++
               "            found = true;\n" ++
               "\n" ++

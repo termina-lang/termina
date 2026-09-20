@@ -28,11 +28,6 @@ data CGeneratorEnv = CGeneratorEnv {
 
 type CGenerator = ExceptT CGeneratorError (ST.State CGeneratorEnv)
 
--- |  This function is used to create the names of temporal variables
---  and symbols.
-namefy :: Identifier -> Identifier
-namefy = ("__" <>)
-
 (<::>) :: Identifier -> Identifier -> Identifier
 (<::>) id0 id1 = id0 <> "__" <> id1
 
@@ -111,28 +106,28 @@ checkIdentifierLengths (Just limit) file =
 -- | Termina's pretty builtin types
 optionBox, boxStruct, sinkPort, inPort, outPort :: Identifier
 optionBox = optionType <::> "box"
-boxStruct = namefy "termina_box_t"
-sinkPort = namefy "termina_id_t"
-inPort = namefy "termina_id_t"
-outPort = namefy "termina_out_port_t"
+boxStruct = terminafy "box_t"
+sinkPort = terminaID
+inPort = terminaID
+outPort = terminafy "out_port_t"
 
 terminaID :: Identifier
-terminaID = namefy "termina_id_t"
+terminaID = terminafy "id_t"
 
 pool, allocator, msgQueue, periodicTimer :: Identifier
-pool = namefy "termina_pool_t"
-allocator = namefy "termina_allocator_t"
-msgQueue = namefy "termina_msg_queue_t"
-periodicTimer = namefy "termina_periodic_timer_t"
+pool = terminafy "pool_t"
+allocator = terminafy "allocator_t"
+msgQueue = terminafy "msg_queue_t"
+periodicTimer = terminafy "periodic_timer_t"
 
 atomicMethodName :: Identifier -> Identifier
 atomicMethodName mName = "atomic" <:> mName
 
 poolMemoryArea :: Identifier -> Identifier
-poolMemoryArea identifier = namefy $ "pool" <:> identifier <:> "memory"
+poolMemoryArea identifier = terminafy $ "pool_memory" <::> identifier
 
 msgQueueSendMethodName :: Identifier
-msgQueueSendMethodName = namefy "termina_out_port" <::> "send"
+msgQueueSendMethodName = terminafy $ "out_port" <::> "send"
 
 -- | Name of a field that the generator adds to a struct.
 fieldify :: Identifier -> Identifier
@@ -427,7 +422,7 @@ enumFieldType :: CType
 enumFieldType = CTInt IntSize32 Unsigned noqual
 
 taskFunctionName :: (MonadError CGeneratorError m) => Identifier -> m Identifier
-taskFunctionName classId = return $ namefy classId <::> "termina" <:> "task"
+taskFunctionName classId = return $ terminafy $ "task_entry" <::> classId
 
 -- | Object that refers to the event parameter of the class member being
 -- generated. It records that the member uses the parameter, so that its
@@ -435,7 +430,7 @@ taskFunctionName classId = return $ namefy classId <::> "termina" <:> "task"
 genEventParamObj :: (ST.MonadState CGeneratorEnv m) => m CObject
 genEventParamObj = do
     ST.modify (\env -> env { eventParamUsed = True })
-    return $ CVar eventParam (CTPointer (CTTypeDef "__termina_event_t" noqual) noqual)
+    return $ CVar eventParam (CTPointer (CTTypeDef "termina__event_t" noqual) noqual)
 
 -- | Expression that passes the event parameter of the class member being
 -- generated as an argument.

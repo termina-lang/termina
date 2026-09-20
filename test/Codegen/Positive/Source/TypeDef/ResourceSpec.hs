@@ -40,17 +40,17 @@ spec = do
   describe "Pretty printing class methods" $ do
     it "Prints declaration of class TMChannel without no_handler" $ do
       renderHeader test0 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_lock_type_t _lock_type;\n" ++
+              "    termina__resource_lock_type_t _lock_type;\n" ++
               "    uint32_t tm_sent_packets;\n" ++
               "} TMChannel;\n" ++
               "\n" ++
-              "void TMChannel__get_tm_sent_packets(const __termina_event_t * const termina__ev,\n" ++
+              "void TMChannel__get_tm_sent_packets(const termina__event_t * const termina__ev,\n" ++
               "                                    void * const termina__this,\n" ++
               "                                    uint32_t * const packets);\n" ++
               "\n" ++
@@ -60,36 +60,36 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "void TMChannel__get_tm_sent_packets(const __termina_event_t * const termina__ev,\n" ++
+              "void TMChannel__get_tm_sent_packets(const termina__event_t * const termina__ev,\n" ++
               "                                    void * const termina__this,\n" ++
               "                                    uint32_t * const packets) {\n" ++
               "    \n" ++
               "    TMChannel * self = (TMChannel *)termina__this;\n" ++
               "\n" ++
-              "    __termina_lock_t termina__lock = __termina_resource__lock(&termina__ev->owner,\n" ++
-              "                                                              &self->_lock_type);\n" ++
+              "    termina__lock_t termina__lock = termina__resource__lock(&termina__ev->owner,\n" ++
+              "                                                            &self->_lock_type);\n" ++
               "\n" ++
               "    *packets = self->tm_sent_packets;\n" ++
               "\n" ++
-              "    __termina_resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
-              "                               termina__lock);\n" ++
+              "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
+              "                              termina__lock);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
               "}\n")
     it "Prints declaration of class UARTDriver" $ do
       renderHeader test1 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_lock_type_t _lock_type;\n" ++
+              "    termina__resource_lock_type_t _lock_type;\n" ++
               "    volatile uint32_t * status;\n" ++
               "} UARTDriver;\n" ++
               "\n" ++
-              "void UARTDriver__get_status(const __termina_event_t * const termina__ev,\n" ++
+              "void UARTDriver__get_status(const termina__event_t * const termina__ev,\n" ++
               "                            void * const termina__this, uint32_t * const ret);\n" ++
               "\n" ++
               "#endif\n")
@@ -98,18 +98,18 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "void UARTDriver__get_status(const __termina_event_t * const termina__ev,\n" ++
+              "void UARTDriver__get_status(const termina__event_t * const termina__ev,\n" ++
               "                            void * const termina__this, uint32_t * const ret) {\n" ++
               "    \n" ++
               "    UARTDriver * self = (UARTDriver *)termina__this;\n" ++
               "\n" ++
-              "    __termina_lock_t termina__lock = __termina_resource__lock(&termina__ev->owner,\n" ++
-              "                                                              &self->_lock_type);\n" ++
+              "    termina__lock_t termina__lock = termina__resource__lock(&termina__ev->owner,\n" ++
+              "                                                            &self->_lock_type);\n" ++
               "\n" ++
               "    *ret = *self->status;\n" ++
               "\n" ++
-              "    __termina_resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
-              "                               termina__lock);\n" ++
+              "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
+              "                              termina__lock);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

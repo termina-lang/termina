@@ -74,22 +74,22 @@ spec = do
         pack "*(uint16_t *)var1.data << 0x8U"
     it "Prints the expression: 8 : u8 << var0" $ do
       renderExpression constantLeftShiftVar0 `shouldBe`
-        pack "(uint8_t)0x8U << __termina_shift__amount(8U, var0)"
+        pack "(uint8_t)0x8U << termina__check__shift_amount(8U, var0)"
     it "Prints the expression: 8 : u8 << var1" $ do
       renderExpression constantLeftShiftVar1 `shouldBe`
-        pack "(uint8_t)0x8U << __termina_shift__amount(8U, *(uint16_t *)var1.data)"
+        pack "(uint8_t)0x8U << termina__check__shift_amount(8U, *(uint16_t *)var1.data)"
     it "Prints the expression: var0 << var1 : u16" $ do
       renderExpression var0LeftShiftVar1 `shouldBe`
-        pack "var0 << __termina_shift__amount(16U, *(uint16_t *)var1.data)"
+        pack "var0 << termina__check__shift_amount(16U, *(uint16_t *)var1.data)"
     it "Prints the expression: var0 << var1 << 0x8U : u8" $ do
       renderExpression var0LeftShiftVar1LeftShiftConstant `shouldBe`
-        pack "(uint16_t)(var0 << __termina_shift__amount(16U, *(uint16_t *)var1.data)) << 0x8U"
+        pack "(uint16_t)(var0 << termina__check__shift_amount(16U,\n                                                *(uint16_t *)var1.data)) << 0x8U"
     it "Prints the expression: var0 >> 0x8U : u8" $ do
       renderExpression var0RightShiftConstant `shouldBe`
         pack "var0 >> 0x8U"
     it "Prints the expression: 0x8U >> var0" $ do
       renderExpression constantRightShiftVar0 `shouldBe`
-        pack "(uint8_t)0x8U >> __termina_shift__amount(8U, var0)"
+        pack "(uint8_t)0x8U >> termina__check__shift_amount(8U, var0)"
     it "Prints the expression: var0 & 1024 : u16" $ do
       renderExpression var0BitwiseAndConstant `shouldBe`
         pack "var0 & 1024U"

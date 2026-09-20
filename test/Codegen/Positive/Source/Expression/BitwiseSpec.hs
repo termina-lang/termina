@@ -28,8 +28,8 @@ spec = do
   describe "Pretty printing bitwise shifting expressions" $ do
     it "Declares a function with bitwise shift expressions" $ do
       renderHeader test0 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
@@ -49,11 +49,11 @@ spec = do
               "\n" ++
               "    bar16 = foo << 8U;\n" ++
               "\n" ++
-              "    bar8 = (uint8_t)8U << __termina_shift__amount(8U, foo);\n" ++ 
+              "    bar8 = (uint8_t)8U << termina__check__shift_amount(8U, foo);\n" ++ 
               "\n" ++
               "    bar16 = foo >> 8U;\n" ++ 
               "\n" ++
-              "    bar8 = (uint8_t)8U << __termina_shift__amount(8U, foo);\n" ++
+              "    bar8 = (uint8_t)8U << termina__check__shift_amount(8U, foo);\n" ++
               "\n" ++
               "    bar16 = foo & 1024U;\n" ++
               "\n" ++
@@ -67,7 +67,7 @@ spec = do
               "\n" ++
               "    bar16 = 1024U ^ foo;\n" ++
               "\n" ++
-              "    bar16 = (uint16_t)1U << __termina_shift__amount(16U, foo);\n" ++
+              "    bar16 = (uint16_t)1U << termina__check__shift_amount(16U, foo);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

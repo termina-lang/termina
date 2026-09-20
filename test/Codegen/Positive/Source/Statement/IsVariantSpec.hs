@@ -42,16 +42,16 @@ spec = do
   describe "Code generation for is-variant expressions" $ do
     it "Declares a procedure with an option-box is-variant test" $ do
       renderHeader test0 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_lock_type_t _lock_type;\n" ++
+              "    termina__resource_lock_type_t _lock_type;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__match_test0(const __termina_event_t * const termina__ev,\n" ++
+              "void id0__match_test0(const termina__event_t * const termina__ev,\n" ++
               "                      void * const termina__this, Option__box option0);\n" ++
               "\n" ++
               "#endif\n")
@@ -60,13 +60,13 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "void id0__match_test0(const __termina_event_t * const termina__ev,\n" ++
+              "void id0__match_test0(const termina__event_t * const termina__ev,\n" ++
               "                      void * const termina__this, Option__box option0) {\n" ++
               "    \n" ++
               "    id0 * self = (id0 *)termina__this;\n" ++
               "\n" ++
-              "    __termina_lock_t termina__lock = __termina_resource__lock(&termina__ev->owner,\n" ++
-              "                                                              &self->_lock_type);\n" ++
+              "    termina__lock_t termina__lock = termina__resource__lock(&termina__ev->owner,\n" ++
+              "                                                            &self->_lock_type);\n" ++
               "\n" ++
               "    uint32_t foo = 0U;\n" ++
               "\n" ++
@@ -76,16 +76,16 @@ spec = do
               "\n" ++
               "    }\n" ++
               "\n" ++
-              "    __termina_resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
-              "                               termina__lock);\n" ++
+              "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
+              "                              termina__lock);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
               "}\n")
     it "Declares a function with an enum is-variant test" $ do
       renderHeader test1 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
+        pack ("#ifndef TEST_H__\n" ++
+              "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
