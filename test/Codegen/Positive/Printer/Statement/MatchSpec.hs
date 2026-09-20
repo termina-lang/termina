@@ -108,11 +108,11 @@ spec = do
         pack (
           "\n{\n" ++
           "    \n" ++
-          "    __option_box_t __match = get_integer();\n" ++
+          "    __option_box_t termina__match = get_integer();\n" ++
           "\n" ++
-          "    if (__match._variant == Some) {\n" ++
+          "    if (termina__match._variant == Some) {\n" ++
           "        \n" ++
-          "        __termina_box_t param0 = __match.Some._0;\n" ++
+          "        __termina_box_t param0 = termina__match.Some._0;\n" ++
           "\n" ++
           "        foo1 = *(uint32_t *)param0.data;\n" ++
           "\n" ++

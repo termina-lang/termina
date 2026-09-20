@@ -73,37 +73,40 @@ spec = do
     it "Declares a procedure assigning Some to an option-box" $ do
      renderHeader test1 `shouldBe`
        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
-              "\n" ++
-              "#include <termina.h>\n" ++
-              "\n" ++
-              "typedef struct {\n" ++
-              "    __termina_resource_lock_type_t _lock_type;\n" ++
-              "} id0;\n" ++
-              "\n" ++
-              "void id0__assignment_test1(const __termina_event_t * const __ev,\n" ++
-              "                           void * const __this, __termina_box_t box_var0);\n" ++
-              "\n" ++
-              "#endif\n")
+             "#define __TEST_H__\n" ++
+             "\n" ++
+             "#include <termina.h>\n" ++
+             "\n" ++
+             "typedef struct {\n" ++
+             "    __termina_resource_lock_type_t _lock_type;\n" ++
+             "} id0;\n" ++
+             "\n" ++
+             "void id0__assignment_test1(const __termina_event_t * const termina__ev,\n" ++
+             "                           void * const termina__this,\n" ++
+             "                           __termina_box_t box_var0);\n" ++
+             "\n" ++
+             "#endif\n")
     it "Generates an option-box assignment inside a locked resource" $ do
      renderSource test1 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
-              "\n" ++ 
-              "void id0__assignment_test1(const __termina_event_t * const __ev,\n" ++
-              "                           void * const __this, __termina_box_t box_var0) {\n" ++
-              "    \n" ++
-              "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
-              "    __termina_lock_t __lock = __termina_resource__lock(&__ev->owner,\n" ++
-              "                                                       &self->_lock_type);\n" ++
+              "void id0__assignment_test1(const __termina_event_t * const termina__ev,\n" ++
+              "                           void * const termina__this,\n" ++
+              "                           __termina_box_t box_var0) {\n" ++
+              "    \n" ++
+              "    id0 * self = (id0 *)termina__this;\n" ++
+              "\n" ++
+              "    __termina_lock_t termina__lock = __termina_resource__lock(&termina__ev->owner,\n" ++
+              "                                                              &self->_lock_type);\n" ++
               "\n" ++
               "    __option_box_t opt = { ._variant = None };\n" ++
               "\n" ++
               "    opt._variant = Some;\n" ++
               "    opt.Some._0 = box_var0;\n" ++
               "\n" ++
-              "    __termina_resource__unlock(&__ev->owner, &self->_lock_type, __lock);\n" ++
+              "    __termina_resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
+              "                               termina__lock);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -119,8 +122,8 @@ spec = do
               "    __termina_resource_lock_type_t _lock_type;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__assignment_test2(const __termina_event_t * const __ev,\n" ++
-              "                           void * const __this, __termina_box_t box_var0,\n" ++
+              "void id0__assignment_test2(const __termina_event_t * const termina__ev,\n" ++
+              "                           void * const termina__this, __termina_box_t box_var0,\n" ++
               "                           __termina_box_t box_var1);\n" ++
               "\n" ++
               "#endif\n")
@@ -128,15 +131,15 @@ spec = do
      renderSource test2 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
-              "\n" ++ 
-              "void id0__assignment_test2(const __termina_event_t * const __ev,\n" ++
-              "                           void * const __this, __termina_box_t box_var0,\n" ++
+              "\n" ++
+              "void id0__assignment_test2(const __termina_event_t * const termina__ev,\n" ++
+              "                           void * const termina__this, __termina_box_t box_var0,\n" ++
               "                           __termina_box_t box_var1) {\n" ++
               "    \n" ++
-              "    id0 * self = (id0 *)__this;\n" ++
+              "    id0 * self = (id0 *)termina__this;\n" ++
               "\n" ++
-              "    __termina_lock_t __lock = __termina_resource__lock(&__ev->owner,\n" ++
-              "                                                       &self->_lock_type);\n" ++
+              "    __termina_lock_t termina__lock = __termina_resource__lock(&termina__ev->owner,\n" ++
+              "                                                              &self->_lock_type);\n" ++
               "\n" ++
               "    uint32_t foo = 0U;\n" ++
               "\n" ++
@@ -146,7 +149,8 @@ spec = do
               "\n" ++
               "    *(uint32_t *)box_var1.data = *(uint32_t *)box_var0.data;\n" ++
               "\n" ++
-              "    __termina_resource__unlock(&__ev->owner, &self->_lock_type, __lock);\n" ++
+              "    __termina_resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
+              "                               termina__lock);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

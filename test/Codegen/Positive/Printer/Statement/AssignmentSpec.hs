@@ -152,64 +152,86 @@ spec = do
   describe "Pretty printing struct assignments" $ do
     it "Assigns a nested struct initializer" $ do
       renderStatement struct0Assign `shouldBe`
-        pack (
-        "\nstruct0.field0 = 0U;\n" ++
-        "struct0.field1.field_a = 0U;\n" ++
-        "for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
-        "    struct0.field1.field_b[__i0] = 0U;\n" ++
-        "}\n" ++
-        "struct0.field1.field_c = 4294901760U;")
+        pack ("\n" ++
+              "struct0.field0 = 0U;\n" ++
+              "struct0.field1.field_a = 0U;\n" ++
+              "for (size_t termina__i0 = 0U;\n" ++
+              "     termina__i0 < 10U;\n" ++
+              "     termina__i0 = termina__i0 + 1U) {\n" ++
+              "    struct0.field1.field_b[termina__i0] = 0U;\n" ++
+              "}\n" ++
+              "struct0.field1.field_c = 4294901760U;")
     it "Copies a struct variable" $ do
       renderStatement struct1Assign `shouldBe`
         pack "\nstruct1 = struct0;"
   describe "Pretty printing array assignments" $ do
     it "Copies a one-dimensional array element-wise" $ do
       renderStatement array1Assign `shouldBe`
-        pack (
-          "\nfor (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
-          "    array1[__i0] = array0[__i0];\n" ++
-          "}")
+        pack ("\n" ++
+              "for (size_t termina__i0 = 0U;\n" ++
+              "     termina__i0 < 10U;\n" ++
+              "     termina__i0 = termina__i0 + 1U) {\n" ++
+              "    array1[termina__i0] = array0[termina__i0];\n" ++
+              "}")
     it "Copies a two-dimensional array element-wise" $ do
       renderStatement array2Assign `shouldBe`
-        pack (
-          "\nfor (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
-          "    for (size_t __i1 = 0U; __i1 < 5U; __i1 = __i1 + 1U) {\n" ++
-          "        array2[__i0][__i1] = array1[__i0][__i1];\n" ++
-          "    }\n" ++
-          "}")
+        pack ("\n" ++
+              "for (size_t termina__i0 = 0U;\n" ++
+              "     termina__i0 < 10U;\n" ++
+              "     termina__i0 = termina__i0 + 1U) {\n" ++
+              "    for (size_t termina__i1 = 0U;\n" ++
+              "         termina__i1 < 5U;\n" ++
+              "         termina__i1 = termina__i1 + 1U) {\n" ++
+              "        array2[termina__i0][termina__i1] = array1[termina__i0][termina__i1];\n" ++
+              "    }\n" ++
+              "}")
     it "Fills a one-dimensional array with a constant" $ do
       renderStatement array3Assign `shouldBe`
-        pack (
-          "\nfor (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
-          "    array3[__i0] = 0U;\n" ++
-          "}")
+        pack ("\n" ++
+              "for (size_t termina__i0 = 0U;\n" ++
+              "     termina__i0 < 10U;\n" ++
+              "     termina__i0 = termina__i0 + 1U) {\n" ++
+              "    array3[termina__i0] = 0U;\n" ++
+              "}")
     it "Fills a two-dimensional array with a constant" $ do
       renderStatement array4Assign `shouldBe`
-        pack (
-          "\nfor (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
-          "    for (size_t __i1 = 0U; __i1 < 5U; __i1 = __i1 + 1U) {\n" ++
-          "        array4[__i0][__i1] = 0U;\n" ++
-          "    }\n" ++
-          "}")
+        pack ("\n" ++
+              "for (size_t termina__i0 = 0U;\n" ++
+              "     termina__i0 < 10U;\n" ++
+              "     termina__i0 = termina__i0 + 1U) {\n" ++
+              "    for (size_t termina__i1 = 0U;\n" ++
+              "         termina__i1 < 5U;\n" ++
+              "         termina__i1 = termina__i1 + 1U) {\n" ++
+              "        array4[termina__i0][termina__i1] = 0U;\n" ++
+              "    }\n" ++
+              "}")
     it "Fills a two-dimensional array from a row variable" $ do
       renderStatement array5Assign `shouldBe`
-        pack (
-          "\nfor (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
-          "    for (size_t __i1 = 0U; __i1 < 5U; __i1 = __i1 + 1U) {\n" ++
-          "        array5[__i0][__i1] = array_row[__i1];\n" ++
-          "    }\n" ++
-          "}")
+        pack ("\n" ++
+              "for (size_t termina__i0 = 0U;\n" ++
+              "     termina__i0 < 10U;\n" ++
+              "     termina__i0 = termina__i0 + 1U) {\n" ++
+              "    for (size_t termina__i1 = 0U;\n" ++
+              "         termina__i1 < 5U;\n" ++
+              "         termina__i1 = termina__i1 + 1U) {\n" ++
+              "        array5[termina__i0][termina__i1] = array_row[termina__i1];\n" ++
+              "    }\n" ++
+              "}")
     it "Fills an array with a struct initializer" $ do
       renderStatement array6Assign `shouldBe`
-        pack (
-          "\nfor (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
-          "    array6[__i0].field0 = 0U;\n" ++
-          "    array6[__i0].field1.field_a = 0U;\n" ++
-          "    for (size_t __i1 = 0U; __i1 < 10U; __i1 = __i1 + 1U) {\n" ++
-          "        array6[__i0].field1.field_b[__i1] = 0U;\n" ++
-          "    }\n" ++
-          "    array6[__i0].field1.field_c = 4294901760U;\n" ++
-          "}")
+        pack ("\n" ++
+              "for (size_t termina__i0 = 0U;\n" ++
+              "     termina__i0 < 10U;\n" ++
+              "     termina__i0 = termina__i0 + 1U) {\n" ++
+              "    array6[termina__i0].field0 = 0U;\n" ++
+              "    array6[termina__i0].field1.field_a = 0U;\n" ++
+              "    for (size_t termina__i1 = 0U;\n" ++
+              "         termina__i1 < 10U;\n" ++
+              "         termina__i1 = termina__i1 + 1U) {\n" ++
+              "        array6[termina__i0].field1.field_b[termina__i1] = 0U;\n" ++
+              "    }\n" ++
+              "    array6[termina__i0].field1.field_c = 4294901760U;\n" ++
+              "}")
     it "Assigns a string literal element-wise" $ do
       renderStatement str0Assign `shouldBe`
         pack (

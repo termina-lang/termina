@@ -57,11 +57,12 @@ spec = do
               "    __termina_id_t _task_msg_queue_id;\n" ++
               "    __termina_id_t data_in;\n" ++
               "} CHousekeeping;\n" ++
-              "\n" ++   
+              "\n" ++
               "void __CHousekeeping__termina_task(void * const arg);\n" ++
               "\n" ++
-              "__status_int32_t CHousekeeping__action0(const __termina_event_t * const __ev,\n" ++
-              "                                        void * const __this, uint32_t _data);\n" ++
+              "__status_int32_t CHousekeeping__action0(const __termina_event_t * const termina__ev,\n" ++
+              "                                        void * const termina__this,\n" ++
+              "                                        uint32_t _data);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints option header file of test0" $ do

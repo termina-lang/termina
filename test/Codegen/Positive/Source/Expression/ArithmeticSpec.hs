@@ -90,30 +90,30 @@ spec = do
     it "Declares a procedure with box arithmetic" $ do
      renderHeader test1 `shouldBe`
        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
-              "\n" ++
-              "#include <termina.h>\n" ++
-              "\n" ++
-              "typedef struct {\n" ++
-              "    __termina_resource_lock_type_t _lock_type;\n" ++
-              "} id0;\n" ++
-              "\n" ++
-              "void id0__test1(const __termina_event_t * const __ev, void * const __this,\n" ++
-              "                __termina_box_t foo);\n" ++
-              "\n" ++
-              "#endif\n")
+             "#define __TEST_H__\n" ++
+             "\n" ++
+             "#include <termina.h>\n" ++
+             "\n" ++
+             "typedef struct {\n" ++
+             "    __termina_resource_lock_type_t _lock_type;\n" ++
+             "} id0;\n" ++
+             "\n" ++
+             "void id0__test1(const __termina_event_t * const termina__ev,\n" ++
+             "                void * const termina__this, __termina_box_t foo);\n" ++
+             "\n" ++
+             "#endif\n")
     it "Generates arithmetic on an unboxed parameter" $ do
      renderSource test1 `shouldBe`
        pack ("\n" ++
              "#include \"test.h\"\n" ++
-             "\n" ++ 
-             "void id0__test1(const __termina_event_t * const __ev, void * const __this,\n" ++
-             "                __termina_box_t foo) {\n" ++
-             "    \n" ++
-             "    id0 * self = (id0 *)__this;\n" ++
              "\n" ++
-             "    __termina_lock_t __lock = __termina_resource__lock(&__ev->owner,\n" ++
-             "                                                       &self->_lock_type);\n" ++
+             "void id0__test1(const __termina_event_t * const termina__ev,\n" ++
+             "                void * const termina__this, __termina_box_t foo) {\n" ++
+             "    \n" ++
+             "    id0 * self = (id0 *)termina__this;\n" ++
+             "\n" ++
+             "    __termina_lock_t termina__lock = __termina_resource__lock(&termina__ev->owner,\n" ++
+             "                                                              &self->_lock_type);\n" ++
              "\n" ++
              "    *(uint16_t *)foo.data = *(uint16_t *)foo.data + 1024U;\n" ++
              "\n" ++
@@ -135,7 +135,8 @@ spec = do
              "\n" ++
              "    *(uint16_t *)foo.data = 1024U % *(uint16_t *)foo.data;\n" ++
              "\n" ++
-             "    __termina_resource__unlock(&__ev->owner, &self->_lock_type, __lock);\n" ++
+             "    __termina_resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
+             "                               termina__lock);\n" ++
              "\n" ++
              "    return;\n" ++
              "\n" ++

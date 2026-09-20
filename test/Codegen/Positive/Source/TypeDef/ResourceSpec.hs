@@ -50,8 +50,8 @@ spec = do
               "    uint32_t tm_sent_packets;\n" ++
               "} TMChannel;\n" ++
               "\n" ++
-              "void TMChannel__get_tm_sent_packets(const __termina_event_t * const __ev,\n" ++
-              "                                    void * const __this,\n" ++
+              "void TMChannel__get_tm_sent_packets(const __termina_event_t * const termina__ev,\n" ++
+              "                                    void * const termina__this,\n" ++
               "                                    uint32_t * const packets);\n" ++
               "\n" ++
               "#endif\n")
@@ -60,18 +60,19 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "void TMChannel__get_tm_sent_packets(const __termina_event_t * const __ev,\n" ++
-              "                                    void * const __this,\n" ++
+              "void TMChannel__get_tm_sent_packets(const __termina_event_t * const termina__ev,\n" ++
+              "                                    void * const termina__this,\n" ++
               "                                    uint32_t * const packets) {\n" ++
               "    \n" ++
-              "    TMChannel * self = (TMChannel *)__this;\n" ++
+              "    TMChannel * self = (TMChannel *)termina__this;\n" ++
               "\n" ++
-              "    __termina_lock_t __lock = __termina_resource__lock(&__ev->owner,\n" ++
-              "                                                       &self->_lock_type);\n" ++
+              "    __termina_lock_t termina__lock = __termina_resource__lock(&termina__ev->owner,\n" ++
+              "                                                              &self->_lock_type);\n" ++
               "\n" ++
               "    *packets = self->tm_sent_packets;\n" ++
               "\n" ++
-              "    __termina_resource__unlock(&__ev->owner, &self->_lock_type, __lock);\n" ++
+              "    __termina_resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
+              "                               termina__lock);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -88,27 +89,28 @@ spec = do
               "    volatile uint32_t * status;\n" ++
               "} UARTDriver;\n" ++
               "\n" ++
-              "void UARTDriver__get_status(const __termina_event_t * const __ev,\n" ++
-              "                            void * const __this, uint32_t * const ret);\n" ++
+              "void UARTDriver__get_status(const __termina_event_t * const termina__ev,\n" ++
+              "                            void * const termina__this, uint32_t * const ret);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of class UARTDriver" $ do
       renderSource test1 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
-              "\n" ++ 
-              "void UARTDriver__get_status(const __termina_event_t * const __ev,\n" ++
-              "                            void * const __this, uint32_t * const ret) {\n" ++
-              "    \n" ++
-              "    UARTDriver * self = (UARTDriver *)__this;\n" ++
               "\n" ++
-              "    __termina_lock_t __lock = __termina_resource__lock(&__ev->owner,\n" ++
-              "                                                       &self->_lock_type);\n" ++
+              "void UARTDriver__get_status(const __termina_event_t * const termina__ev,\n" ++
+              "                            void * const termina__this, uint32_t * const ret) {\n" ++
+              "    \n" ++
+              "    UARTDriver * self = (UARTDriver *)termina__this;\n" ++
+              "\n" ++
+              "    __termina_lock_t termina__lock = __termina_resource__lock(&termina__ev->owner,\n" ++
+              "                                                              &self->_lock_type);\n" ++
               "\n" ++
               "    *ret = *self->status;\n" ++
               "\n" ++
-              "    __termina_resource__unlock(&__ev->owner, &self->_lock_type, __lock);\n" ++
+              "    __termina_resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
+              "                               termina__lock);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}\n");
+              "}\n")

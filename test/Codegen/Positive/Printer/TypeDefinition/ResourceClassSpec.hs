@@ -96,15 +96,16 @@ spec = do
   describe "Pretty printing classes" $ do
     it "Prints a class with one procedure and zero fields" $ do
       renderTypeDefinitionDecl emptyMonadicTypes classWithOneProcedureAndZeroFields `shouldBe`
-        pack (
-          "\ntypedef struct {\n" ++
-          "    __termina_resource_lock_type_t _lock_type;\n" ++
-          "} Class0;\n" ++
-          "\n" ++
-          "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
-          "                        void * const __this, uint8_t param0, uint16_t param1,\n" ++
-          "                        uint32_t param2, uint64_t param3, int8_t param4,\n" ++
-          "                        int16_t param5, int32_t param6, int64_t param7);")
+        pack ("\n" ++
+              "typedef struct {\n" ++
+              "    __termina_resource_lock_type_t _lock_type;\n" ++
+              "} Class0;\n" ++
+              "\n" ++
+              "void Class0__procedure0(const __termina_event_t * const termina__ev,\n" ++
+              "                        void * const termina__this, uint8_t param0,\n" ++
+              "                        uint16_t param1, uint32_t param2, uint64_t param3,\n" ++
+              "                        int8_t param4, int16_t param5, int32_t param6,\n" ++
+              "                        int64_t param7);")
     it "Prints a class with two procedures and zero fields" $ do
       renderTypeDefinitionDecl emptyMonadicTypes classWithTwoProceduresAndZeroFields `shouldBe`
         pack (
@@ -112,12 +113,12 @@ spec = do
           "    __termina_resource_lock_type_t _lock_type;\n" ++
           "} Class0;\n" ++
           "\n" ++
-          "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
-          "                        void * const __this, uint8_t param0,\n" ++
+          "void Class0__procedure0(const __termina_event_t * const termina__ev,\n" ++
+          "                        void * const termina__this, uint8_t param0,\n" ++
           "                        __option_box_t param1);\n" ++
           "\n" ++
-          "void Class0__procedure1(const __termina_event_t * const __ev,\n" ++
-          "                        void * const __this, uint8_t param0,\n" ++
+          "void Class0__procedure1(const __termina_event_t * const termina__ev,\n" ++
+          "                        void * const termina__this, uint8_t param0,\n" ++
           "                        uint8_t param1[32U]);")
     it "Prints a class marked as no_handler with one procedure and zero fields" $ do
       renderTypeDefinitionDecl emptyMonadicTypes noHandlerClassWithoutOneProcedureAndZeroFields `shouldBe`
@@ -126,8 +127,8 @@ spec = do
             "    __termina_resource_lock_type_t _lock_type;\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
-            "                        void * const __this);")
+            "void Class0__procedure0(const __termina_event_t * const termina__ev,\n" ++
+            "                        void * const termina__this);")
     it "Prints a class marked as no_handler with two fields" $ do
       renderTypeDefinitionDecl emptyMonadicTypes noHandlerClassWithOneEmptyProcedure `shouldBe`
         pack (
@@ -137,8 +138,8 @@ spec = do
             "    uint64_t field1[24U];\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
-            "                        void * const __this);")
+            "void Class0__procedure0(const __termina_event_t * const termina__ev,\n" ++
+            "                        void * const termina__this);")
     it "Prints a class with one procedure and two fields" $ do
       renderTypeDefinitionDecl emptyMonadicTypes classWithOneProcedureAndTwoFields `shouldBe`
         pack (
@@ -148,20 +149,21 @@ spec = do
             "    uint64_t field1[24U];\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
-            "                        void * const __this);")
+            "void Class0__procedure0(const __termina_event_t * const termina__ev,\n" ++
+            "                        void * const termina__this);")
     it "Prints a packed class" $ do
       renderTypeDefinitionDecl emptyMonadicTypes packedClass `shouldBe`
-        pack (
-            "\ntypedef struct {\n" ++
-            "    __termina_resource_lock_type_t _lock_type;\n" ++
-            "    uint64_t field0;\n" ++
-            "    uint16_t field1;\n" ++
-            "    TMDescriptor field2[32U];\n" ++
-            "} __attribute__((packed)) Class0;\n" ++
-            "\n" ++
-            "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
-            "                        void * const __this, char param0, uint8_t param1[16U]);")
+        pack ("\n" ++
+              "typedef struct {\n" ++
+              "    __termina_resource_lock_type_t _lock_type;\n" ++
+              "    uint64_t field0;\n" ++
+              "    uint16_t field1;\n" ++
+              "    TMDescriptor field2[32U];\n" ++
+              "} __attribute__((packed)) Class0;\n" ++
+              "\n" ++
+              "void Class0__procedure0(const __termina_event_t * const termina__ev,\n" ++
+              "                        void * const termina__this, char param0,\n" ++
+              "                        uint8_t param1[16U]);")
     it "Prints a class with a fixed location field" $ do
       renderTypeDefinitionDecl emptyMonadicTypes classWithFixedLocationField `shouldBe`
         pack (
@@ -173,8 +175,8 @@ spec = do
             "    volatile uint32_t (* field3)[32U];\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
-            "                        void * const __this);")
+            "void Class0__procedure0(const __termina_event_t * const termina__ev,\n" ++
+            "                        void * const termina__this);")
     it "Prints a class with an access port field" $ do
       renderTypeDefinitionDecl emptyMonadicTypes classWithAccessPortField `shouldBe`
         pack (
@@ -183,10 +185,10 @@ spec = do
             "    uint32_t field0;\n" ++
             "    struct {\n" ++
             "        void * _that;\n" ++
-            "        void (* test0)(const __termina_event_t * const __ev,\n" ++
-            "                       void * const __this);\n" ++
+            "        void (* test0)(const __termina_event_t * const termina__ev,\n" ++
+            "                       void * const termina__this);\n" ++
             "    } field1;\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
-            "                        void * const __this);")
+            "void Class0__procedure0(const __termina_event_t * const termina__ev,\n" ++
+            "                        void * const termina__this);")

@@ -75,11 +75,12 @@ spec = do
               "    __termina_allocator_t message_pool;\n" ++
               "    uint32_t interval;\n" ++
               "} CHousekeeping;\n" ++
-              "\n" ++   
+              "\n" ++
               "void __CHousekeeping__termina_task(void * const arg);\n" ++
               "\n" ++
-              "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const __ev,\n" ++
-              "                                        void * const __this, TimeVal current);\n" ++
+              "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const termina__ev,\n" ++
+              "                                        void * const termina__this,\n" ++
+              "                                        TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of task class CHousekeeping" $ do
@@ -87,15 +88,15 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "static _Bool CHousekeeping__check_interval(const __termina_event_t * const __ev,\n" ++
+              "static _Bool CHousekeeping__check_interval(const __termina_event_t * const termina__ev,\n" ++
               "                                           const CHousekeeping * const self,\n" ++
               "                                           uint32_t limit);\n" ++
               "\n" ++
-              "static _Bool CHousekeeping__check_interval(const __termina_event_t * const __ev,\n" ++
+              "static _Bool CHousekeeping__check_interval(const __termina_event_t * const termina__ev,\n" ++
               "                                           const CHousekeeping * const self,\n" ++
               "                                           uint32_t limit) {\n" ++
               "    \n" ++
-              "    (void)__ev;\n" ++
+              "    (void)termina__ev;\n" ++
               "\n" ++
               "    _Bool ret = true;\n" ++
               "\n" ++
@@ -107,12 +108,13 @@ spec = do
               "\n" ++
               "    return ret;\n" ++
               "\n" ++
-              "}\n" ++ 
+              "}\n" ++
               "\n" ++
-              "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const __ev,\n" ++
-              "                                        void * const __this, TimeVal current) {\n" ++
+              "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const termina__ev,\n" ++
+              "                                        void * const termina__this,\n" ++
+              "                                        TimeVal current) {\n" ++
               "    \n" ++
-              "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
+              "    CHousekeeping * self = (CHousekeeping *)termina__this;\n" ++
               "\n" ++
               "    __status_int32_t ret = { ._variant = Success };\n" ++
               "\n" ++
@@ -120,20 +122,20 @@ spec = do
               "\n" ++
               "    __option_box_t alloc_msg = { ._variant = None };\n" ++
               "\n" ++
-              "    self->message_pool.alloc(__ev, self->message_pool._that, &alloc_msg);\n"  ++
-              "\n"  ++
-              "    if (alloc_msg._variant == Some) {\n"  ++
+              "    self->message_pool.alloc(termina__ev, self->message_pool._that, &alloc_msg);\n" ++
+              "\n" ++
+              "    if (alloc_msg._variant == Some) {\n" ++
               "        \n" ++
               "        __termina_box_t msg = alloc_msg.Some._0;\n" ++
               "\n" ++
-              "        self->message_pool.free(__ev, self->message_pool._that, msg);\n" ++
+              "        self->message_pool.free(termina__ev, self->message_pool._that, msg);\n" ++
               "\n" ++
               "    } else {\n" ++
-              "        \n"  ++
+              "        \n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
-              "    _Bool check = CHousekeeping__check_interval(__ev, self, 10U);\n" ++
+              "    _Bool check = CHousekeeping__check_interval(termina__ev, self, 10U);\n" ++
               "\n" ++
               "    if (check == false) {\n" ++
               "        \n" ++
@@ -149,30 +151,30 @@ spec = do
               "void __CHousekeeping__termina_task(void * arg) {\n" ++
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)arg;\n" ++
-              "\n" ++  
+              "\n" ++
               "    int32_t status = 0L;\n" ++
-              "\n" ++  
+              "\n" ++
               "    __termina_event_t event;\n" ++
-              "\n" ++   
+              "\n" ++
               "    __status_int32_t result;\n" ++
-              "\n" ++ 
+              "\n" ++
               "    TimeVal timeout__msg_data;\n" ++
-              "\n" ++ 
+              "\n" ++
               "    for (;;) {\n" ++
-              "        \n" ++  
+              "        \n" ++
               "        __termina_msg_queue__recv(self->_task_msg_queue_id, &event, &status);\n" ++
-              "\n" ++  
+              "\n" ++
               "        if (status != 0L) {\n" ++
               "            break;\n" ++
               "        }\n" ++
-              "\n" ++   
+              "\n" ++
               "        switch (event.port_id) {\n" ++
-              "            \n" ++               
+              "            \n" ++
               "            case __CHousekeeping__timer:\n" ++
-              "\n" ++   
+              "\n" ++
               "                __termina_msg_queue__recv(self->timer,\n" ++
               "                                          (void *)&timeout__msg_data, &status);\n" ++
-              "\n" ++   
+              "\n" ++
               "                if (status != 0L) {\n" ++
               "                    __termina_except__msg_queue_recv_error(self->timer, status);\n" ++
               "                }\n" ++
@@ -181,7 +183,7 @@ spec = do
               "                                                timeout__msg_data);\n" ++
               "\n" ++
               "                if (result._variant != Success) {\n" ++
-              "                    \n" ++ 
+              "                    \n" ++
               "                    ExceptSource source;\n" ++
               "                    source._variant = ExceptSource__Task;\n" ++
               "                    source.Task._0 = self->_task_id;\n" ++
@@ -191,19 +193,19 @@ spec = do
               "                                                     result.Failure._0);\n" ++
               "\n" ++
               "                }\n" ++
-              "\n" ++   
+              "\n" ++
               "                break;\n" ++
-              "\n" ++   
+              "\n" ++
               "            default:\n" ++
-              "\n" ++   
+              "\n" ++
               "                __termina_exec__reboot();\n" ++
-              "\n" ++   
+              "\n" ++
               "                break;\n" ++
-              "\n" ++   
+              "\n" ++
               "        }\n" ++
-              "\n" ++   
+              "\n" ++
               "    }\n" ++
-              "\n" ++   
+              "\n" ++
               "    return;\n" ++
               "\n" ++
               "}\n")

@@ -51,22 +51,22 @@ spec = do
               "    __termina_resource_lock_type_t _lock_type;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__match_test0(const __termina_event_t * const __ev, void * const __this,\n" ++
-              "                      __option_box_t option0);\n" ++
+              "void id0__match_test0(const __termina_event_t * const termina__ev,\n" ++
+              "                      void * const termina__this, __option_box_t option0);\n" ++
               "\n" ++
               "#endif\n")
     it "Generates an option-box is-variant test" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
-              "\n" ++ 
-              "void id0__match_test0(const __termina_event_t * const __ev, void * const __this,\n" ++
-              "                      __option_box_t option0) {\n" ++
-              "    \n" ++
-              "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
-              "    __termina_lock_t __lock = __termina_resource__lock(&__ev->owner,\n" ++
-              "                                                       &self->_lock_type);\n" ++
+              "void id0__match_test0(const __termina_event_t * const termina__ev,\n" ++
+              "                      void * const termina__this, __option_box_t option0) {\n" ++
+              "    \n" ++
+              "    id0 * self = (id0 *)termina__this;\n" ++
+              "\n" ++
+              "    __termina_lock_t termina__lock = __termina_resource__lock(&termina__ev->owner,\n" ++
+              "                                                              &self->_lock_type);\n" ++
               "\n" ++
               "    uint32_t foo = 0U;\n" ++
               "\n" ++
@@ -76,7 +76,8 @@ spec = do
               "\n" ++
               "    }\n" ++
               "\n" ++
-              "    __termina_resource__unlock(&__ev->owner, &self->_lock_type, __lock);\n" ++
+              "    __termina_resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
+              "                               termina__lock);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

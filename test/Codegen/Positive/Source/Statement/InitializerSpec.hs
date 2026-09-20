@@ -105,7 +105,7 @@ spec = do
   describe "Assignment to an already-declared variable (element-wise)" $ do
     it "Arrays: list, fill and string assignment" $
       renderSource assignArrays `shouldBe`
-        pack "\n#include \"test.h\"\n\nvoid td(void) {\n    \n    uint8_t a[3U] = { 0U, 0U, 0U };\n\n    a[0U] = 1U;\n    a[1U] = 2U;\n    a[2U] = 3U;\n\n    for (size_t __i0 = 0U; __i0 < 3U; __i0 = __i0 + 1U) {\n        a[__i0] = 9U;\n    }\n\n    char s[6U] = { 'a', 'a', 'a', 'a', 'a' };\n\n    s[0U] = 'h';\n    s[1U] = 'e';\n    s[2U] = 'l';\n    s[3U] = 'l';\n    s[4U] = 'o';\n    s[5U] = '\\0';\n\n    return;\n\n}\n"
+        pack "\n#include \"test.h\"\n\nvoid td(void) {\n    \n    uint8_t a[3U] = { 0U, 0U, 0U };\n\n    a[0U] = 1U;\n    a[1U] = 2U;\n    a[2U] = 3U;\n\n    for (size_t termina__i0 = 0U;\n         termina__i0 < 3U;\n         termina__i0 = termina__i0 + 1U) {\n        a[termina__i0] = 9U;\n    }\n\n    char s[6U] = { 'a', 'a', 'a', 'a', 'a' };\n\n    s[0U] = 'h';\n    s[1U] = 'e';\n    s[2U] = 'l';\n    s[3U] = 'l';\n    s[4U] = 'o';\n    s[5U] = '\\0';\n\n    return;\n\n}\n"
     it "Struct field-wise assignment, struct copy and Option assignment" $
       renderSource assignAggregates `shouldBe`
         pack "\n#include \"test.h\"\n\nvoid te(void) {\n    \n    Point p = { .x = 0U, .y = 0U };\n\n    p.x = 1U;\n    p.y = 2U;\n\n    Point p2 = { .x = 0U, .y = 0U };\n\n    p2 = p;\n\n    __option_uint32_t o = { ._variant = None };\n\n    o._variant = Some;\n    o.Some._0 = 7U;\n\n    return;\n\n}\n"

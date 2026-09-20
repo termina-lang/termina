@@ -39,7 +39,7 @@ genAtomicArrayInitialization loc before level cObj expr = do
             case assignmentExpr of
                 (ArrayInitializer expr' size _ann) -> do
                     cSize <- genExpression size
-                    let iterator = namefy $ "i" ++ show level
+                    let iterator = terminafy $ "i" ++ show level
                         cIteratorExpr = iterator @: size_t
                         initDecl = var iterator size_t @:= dec 0 @: size_t
                         condExpr = cIteratorExpr @< cSize
@@ -134,7 +134,7 @@ genStringAssign loc before level cObj value = do
                     if size > (fromIntegral (length value) + 1) then do
                         -- We need to fill the rest of the array with null characters. We do this with a for loop.
                         let cSize = dec size @: size_t |>> loc
-                            iterator = namefy $ "i" ++ show level'
+                            iterator = terminafy $ "i" ++ show level'
                             cIteratorExpr = iterator @: size_t |>> loc
                             initDecl = var iterator size_t @:= dec idx @: size_t
                             condExpr = cIteratorExpr @< cSize |>> loc
@@ -164,7 +164,7 @@ genStringAssign loc before level cObj value = do
                 CTArray (CTChar _) cArraySize -> do
                     -- | If we have an array whose size is not a literal constant, i.e., it depends on a constant parameter,
                     -- we need to fill the rest of the array with null characters. We do this with a for loop.
-                    let iterator = namefy $ "i" ++ show level'
+                    let iterator = terminafy $ "i" ++ show level'
                         cIteratorExpr = iterator @: size_t |>> loc
                         initDecl = var iterator size_t @:= dec idx @: size_t
                         condExpr = cIteratorExpr @< cArraySize |>> loc
@@ -260,7 +260,7 @@ genArrayAssign loc before level cObj expr = do
     case expr of
         (ArrayInitializer expr' size ann) -> do
             cSize <- genExpression size
-            let iterator = namefy $ "i" ++ show level
+            let iterator = terminafy $ "i" ++ show level
                 cIteratorExpr = iterator @: size_t |>> getLocation ann
                 initDecl = var iterator size_t @:= dec 0 @: size_t
                 condExpr = cIteratorExpr @< cSize |>> getLocation ann
@@ -310,7 +310,7 @@ genArrayAssign loc before level cObj expr = do
             case ts of
                 (TArray ts' arraySize) -> do
                     cSize <- genExpression arraySize
-                    let iterator = namefy $ "i" ++ show lvl
+                    let iterator = terminafy $ "i" ++ show lvl
                         cIteratorExpr = iterator @: size_t |>> getLocation ann
                         exprCAnn = buildGenericAnn ann
                         initExpr = var iterator size_t @:= dec 0 @: size_t
@@ -732,8 +732,8 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
         _ -> do
             cExpr <- genExpression expr
             cType <- genType noqual (TStruct structName)
-            let decl = var (namefy "match") cType @:= cExpr
-                cObj' = namefy "match" @: cType
+            let decl = var (terminafy "match") cType @:= cExpr
+                cObj' = terminafy "match" @: cType
             case matchCases of
                 [m@(MatchCase identifier _ _ ann')] -> do
                     let loc' = getLocation ann'

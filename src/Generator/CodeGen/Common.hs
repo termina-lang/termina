@@ -138,6 +138,10 @@ msgQueueSendMethodName = namefy "termina_out_port" <::> "send"
 fieldify :: Identifier -> Identifier
 fieldify = ("_" <>)
 
+-- | Name of a symbol that the generator adds to the generated code.
+terminafy :: Identifier -> Identifier
+terminafy = ("termina" <::>)
+
 -- | Name of the field that holds the parameter of a variant at the given
 -- position.
 variantParamField :: Integer -> Identifier
@@ -145,10 +149,10 @@ variantParamField = fieldify . show
 
 thatField, thisParam, eventParam, selfParam, lockVar :: Identifier
 thatField = fieldify "that"
-thisParam = namefy "this"
-eventParam = namefy "ev"
+thisParam = terminafy "this"
+eventParam = terminafy "ev"
 selfParam = "self"
-lockVar = namefy "lock"
+lockVar = terminafy "lock"
 
 resourceLockTypeField, taskMsgQueueIDField,
     taskIDField, handlerIDField :: Identifier
