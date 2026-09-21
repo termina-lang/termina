@@ -128,12 +128,13 @@ genFunctionType ts tsParams = do
 genParameterDeclaration :: Parameter SemanticAnn -> CGenerator CDeclaration
 genParameterDeclaration (Parameter identifier ts) = do
     cParamType <- genType noqual ts
-    return $ CDecl (CTypeSpec cParamType) (Just identifier) Nothing
+    return $ CDecl (CTypeSpec cParamType) (Just (genParameterIdentifier identifier)) Nothing
 
 -- | The same parameter as part of the prototype of a function pointer, where
 -- C asks for the name as well as the type.
 genCParameter :: Parameter SemanticAnn -> CGenerator CParameter
-genCParameter (Parameter identifier ts) = CParameter identifier <$> genType noqual ts
+genCParameter (Parameter identifier ts) =
+    CParameter (genParameterIdentifier identifier) <$> genType noqual ts
 
 
 genObject :: Object SemanticAnn -> CGenerator CObject

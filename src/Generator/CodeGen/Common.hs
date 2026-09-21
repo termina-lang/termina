@@ -445,6 +445,16 @@ isIgnoredParameter :: Identifier -> Bool
 isIgnoredParameter ('_' : c : _) = c /= '_'
 isIgnoredParameter _ = False
 
+-- | The name a parameter takes in the generated code. An ignored parameter
+-- reaches the C under the name of its category, since a leading underscore is
+-- the form that C keeps for the implementation at file scope and that the
+-- analysers report wherever it appears. The name written in Termina follows,
+-- so the parameter can still be traced back to its declaration.
+genParameterIdentifier :: Identifier -> Identifier
+genParameterIdentifier identifier
+    | isIgnoredParameter identifier = terminafy ("ignored" <::> drop 1 identifier)
+    | otherwise = identifier
+
 -- | Statements that discard the given parameters with a cast to void, to be
 -- placed at the beginning of a function body.
 genDiscardedParameters :: [(Identifier, CType)] -> [CCompoundBlockItem]
