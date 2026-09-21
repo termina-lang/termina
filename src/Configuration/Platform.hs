@@ -25,6 +25,17 @@ usizeWidth RTEMS5LEON3NEXYSA7    = 32
 usizeWidth FreeRTOS10STM32L432XX = 32
 usizeWidth TestPlatform          = 32
 
+-- | The bit width of C @int@ on the target, which is what decides whether an
+-- operation on a narrower type is carried out in that narrower type or in
+-- @int@: C promotes an operand whose type is narrower than @int@, so the
+-- result comes back wider than the type holds and the generator masks it back.
+-- A type as wide as @int@, or wider, is not promoted and wraps on its own.
+intWidth :: Platform -> Integer
+intWidth POSIXGCC              = 32
+intWidth RTEMS5LEON3NEXYSA7    = 32
+intWidth FreeRTOS10STM32L432XX = 32
+intWidth TestPlatform          = 32
+
 -- | Whether the target requires naturally-aligned memory accesses, i.e. a
 -- misaligned load/store traps or is penalized instead of being handled
 -- transparently. On such targets, taking a reference to a member of a @packed@

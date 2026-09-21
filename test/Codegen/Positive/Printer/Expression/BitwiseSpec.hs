@@ -83,7 +83,8 @@ spec = do
         pack "var0 << termina__check__shift_amount(16U, *(uint16_t *)var1.data)"
     it "Prints the expression: var0 << var1 << 0x8U : u8" $ do
       renderExpression var0LeftShiftVar1LeftShiftConstant `shouldBe`
-        pack "(uint16_t)(var0 << termina__check__shift_amount(16U,\n                                                *(uint16_t *)var1.data)) << 0x8U"
+        pack ("(uint16_t)(var0 << termina__check__shift_amount(16U,\n" ++
+              "                                                *(uint16_t *)var1.data) & 0xFFFFU) << 0x8U")
     it "Prints the expression: var0 >> 0x8U : u8" $ do
       renderExpression var0RightShiftConstant `shouldBe`
         pack "var0 >> 0x8U"

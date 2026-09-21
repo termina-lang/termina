@@ -11,6 +11,7 @@ import Generator.CodeGen.Common
 import Utils.Annotations
 import Generator.LanguageC.Embedded
 import Core.Utils (shiftWidth)
+import Configuration.Platform (Platform, intWidth)
 
 
 cBinOp :: Op -> CBinaryOp
@@ -257,8 +258,51 @@ genMemberFunctionAccess obj ident args ann = do
 -- promoted to int in C, and the result could otherwise keep bits that the
 -- Termina type does not have. Any other expression is returned unchanged.
 castBinOpToOwnType :: Location -> Expression SemanticAnn -> CExpression -> CGenerator CExpression
-castBinOpToOwnType loc (BinOp {}) cExpr = castToOwnType loc cExpr
+castBinOpToOwnType loc (BinOp op _ _ _) cExpr
+    | widens op = do
+        plt <- gets targetPlatform
+        castToOwnType loc (dropBitsAbove plt cExpr)
+    | otherwise = castToOwnType loc cExpr
 castBinOpToOwnType _ _ cExpr = return cExpr
+
+-- | Whether the result of the operation can need more bits than its operands
+-- hold. The rest give a result that fits: a quotient and a remainder are no
+-- greater than the dividend, a right shift no greater than the value shifted,
+-- and the bitwise operations work within the bits they are given.
+widens :: Op -> Bool
+widens Addition = True
+widens Subtraction = True
+widens Multiplication = True
+widens BitwiseLeftShift = True
+widens _ = False
+
+-- | Drops the bits that the width of the type does not hold, which is what an
+-- operation on a type narrower than the @int@ of the platform means: C
+-- promotes the operands of such a type, so the operation is carried out in
+-- @int@ and the result comes back with the bits above the width still in it.
+-- Masking them off says that they are dropped and leaves a value that provably
+-- fits the type, where the cast alone would be a conversion that an analyser
+-- reads as losing them. A type as wide as @int@, or wider, is not promoted and
+-- wraps on its own, and a signed type is left alone, since dropping the bits is
+-- not the value the operation gives.
+dropBitsAbove :: Platform -> CExpression -> CExpression
+dropBitsAbove plt cExpr = case getCExprType cExpr of
+    CTInt size Unsigned _ | widthOf size < intWidth plt -> maskWith (2 ^ widthOf size - 1)
+    _                                                   -> cExpr
+
+    where
+
+        widthOf IntSize8   = 8
+        widthOf IntSize16  = 16
+        widthOf IntSize32  = 32
+        widthOf IntSize64  = 64
+        widthOf IntSize128 = 128
+
+        maskWith mask =
+            let cType = getCExprType cExpr
+                cAnn = internalAnn CGenericAnn
+            in CExprBinaryOp COpAnd cExpr
+                (CExprConstant (CIntConst (CInteger mask CHexRepr)) cType cAnn) cType cAnn
 
 -- | Casts an integer C expression to its own type, without qualifiers.
 castToOwnType :: Location -> CExpression -> CGenerator CExpression
