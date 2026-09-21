@@ -117,6 +117,11 @@ data Transfer p g e = Transfer
   , onExpression :: Expression SemanticAnn -> DataflowM p g e ()
     -- | An expression whose value decides which path is taken.
   , onCondition :: Expression SemanticAnn -> DataflowM p g e ()
+    -- | The guard of a loop, which decides a path like any other condition but
+    -- is evaluated only while the iterator stays within its range: the
+    -- generated @for@ tests the range first and the guard after it. A pass
+    -- that does not care where the guard sits leaves this at 'onCondition'.
+  , onLoopGuard :: Expression SemanticAnn -> DataflowM p g e ()
     -- | Entering a case of a @match@, which binds the variables of its variant
     -- and says which variant the object it discriminates on holds.
   , onCaseEntry ::
@@ -182,7 +187,7 @@ walkForward transfer = walkBlock
       -- of scope with the loop and a later declaration of the same name writes
       -- over the record.
       onLoopEntry transfer iterator iteratorTy initE endE
-      fixpoint (mapM_ (onCondition transfer) mBreak >> walkBlock blk)
+      fixpoint (mapM_ (onLoopGuard transfer) mBreak >> walkBlock blk)
 
     walkBasicBlock block = onSimpleBlock transfer block
 

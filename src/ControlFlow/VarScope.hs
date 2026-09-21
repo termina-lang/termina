@@ -217,6 +217,7 @@ firstAccessAssigns ident body =
       , onSimpleBlock = simpleBlock
       , onExpression = readExpr
       , onCondition = readExpr
+      , onLoopGuard = readExpr
       , onCaseEntry = \_ _ -> return ()
       , onLoopEntry = \_ _ _ _ -> return ()
       , refineTrue = const (return ())

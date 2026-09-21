@@ -134,21 +134,25 @@ boxUsageCheckModule :: BasicBlocksModule -> Maybe BoxUsageError
 boxUsageCheckModule =
     runBoxUsageCheck . basicBlocksAST . metadata
 
+-- | The modules are checked in dependency order, threading the functions found
+-- to carry an effect from one module to the next, so that a call resolves
+-- against the function it calls even when that one lives in a module this one
+-- imports.
 sideEffectCheckModules :: Platform -> BasicBlocksProject -> Maybe SideEffectsError
-sideEffectCheckModules plt = check . M.elems
+sideEffectCheckModules plt bbProject =
+    case sortProjectDepsOrLoop (M.map importedModules bbProject) of
+        -- | The build pipeline orders the modules, and reports a cycle, before
+        -- reaching this point.
+        Left _ -> Nothing
+        Right orderedDependencies -> check M.empty orderedDependencies
 
     where
 
-        check [] = Nothing
-        check [x] = sideEffectCheckModule plt x
-        check (x:xs) =
-            case sideEffectCheckModule plt x of
-                Nothing -> check xs
-                Just err -> Just err
-
-sideEffectCheckModule :: Platform -> BasicBlocksModule -> Maybe SideEffectsError
-sideEffectCheckModule plt =
-    runSideEffectCheck plt . basicBlocksAST . metadata
+        check _ [] = Nothing
+        check functions (m:ms) =
+            case runSideEffectCheck plt functions (basicBlocksAST . metadata $ bbProject M.! m) of
+                (Nothing, functions') -> check functions' ms
+                (Just err, _) -> Just err
 
 varUsageCheckModules :: BasicBlocksProject -> Maybe VarUsageError
 varUsageCheckModules = check . M.elems

@@ -2,17 +2,21 @@ module ControlFlow.SideEffects where
 
 import ControlFlow.SideEffects.Monad
   (SideEffectsMonad, SideEffectsEnv, insertMutableReference, resetMutableReferences,
-   runSideEffects, setMutableSelfMethods, isMutableSelfMethod, getMutableSelfMethods)
-import ControlFlow.SideEffects.Errors (SideEffectsError, Error(..))
+   runSideEffects, isMutableSelfMethod, getMutableSelfMethods, getEffectful,
+   startClass, startCallable, noteEffect, endFunction, endMember, effectfulFunctions)
+import ControlFlow.SideEffects.Errors (SideEffectsError, Error(..), Effect(..))
 import ControlFlow.BasicBlocks.AST
-import ControlFlow.BasicBlocks.Traversal (childExpressions, indexExpressions)
+import ControlFlow.BasicBlocks.Traversal
+  (Child(..), childExpressions, expressionChildren, indexExpressions)
 import ControlFlow.Dataflow (Transfer(..), walkForward)
 import Semantic.Types
 import Semantic.Utils (objectPath, mayAlias, AccessPath)
 import Utils.Annotations (Location, getLocation, getAnnotation, annotateError)
 import Configuration.Platform (Platform)
+import Control.Applicative ((<|>))
 import Control.Monad (when, forM_)
 import Control.Monad.Except (throwError)
+import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe (listToMaybe, mapMaybe)
 
@@ -47,10 +51,119 @@ callMutations e = case e of
     referencedObject (ArraySliceExpression Mutable obj _ _ _) = Just obj
     referencedObject _                                        = Nothing
 
--- | Whether an expression subtree contains a persistent side effect, i.e. a
--- call that mutates through a @&mut@ argument anywhere inside it.
-hasEffect :: Expression SemanticAnn -> Bool
-hasEffect e = not (null (callMutations e)) || any hasEffect (childExpressions e)
+-- | Whether an expression subtree mutates state anywhere inside it, which is
+-- what decides whether the order in which two subexpressions are evaluated can
+-- change the result. A read is not a mutation, so an access to a loc field and a
+-- bounds check, which 'hasPersistentEffect' does count, are left out here: two
+-- of them among the arguments of a call give the same result in any order.
+mutatesState :: Expression SemanticAnn -> Bool
+mutatesState e = not (null (callMutations e)) || any mutatesState (childExpressions e)
+
+-- | Whether reading an object is itself an effect and not a plain load. Two
+-- cases, and in Termina both are written as a read:
+--
+-- A field declared @loc@ lives at a fixed address, which is storage the
+-- program does not own, e.g. a device register. The generated C reaches it
+-- through a pointer to @volatile@, so the access is kept where it is written
+-- and two reads of it may give different values, which makes where it happens
+-- part of the behaviour of the program.
+--
+-- An array access whose index the compiler does not know lowers to a call to
+-- the bounds check, which returns the index when it falls inside the array and
+-- raises the exception when it does not. An index that is a constant is
+-- checked while the program is compiled and lowers to the index alone, which
+-- is why the generator only emits the call for the rest (the same condition it
+-- uses to decide, in @genObject@).
+objectEffect :: Object SemanticAnn -> Maybe Effect
+objectEffect obj = case obj of
+  Variable _ ann                   -> location ann
+  ArrayIndexExpression o index ann -> location ann <|> checked index ann <|> objectEffect o
+  MemberAccess o _ ann             -> location ann <|> objectEffect o
+  DereferenceMemberAccess o _ ann  -> location ann <|> objectEffect o
+  Dereference o ann                -> location ann <|> objectEffect o
+  Unbox o ann                      -> location ann <|> objectEffect o
+
+  where
+
+    location :: SemanticAnn -> Maybe Effect
+    location ann = case getTypeSemAnn ann of
+      Just (TFixedLocation _) -> Just (ReadsLocation (getLocation ann))
+      _                       -> Nothing
+
+    checked :: Expression SemanticAnn -> SemanticAnn -> Maybe Effect
+    checked index ann = case getTypeSemAnn (getAnnotation index) of
+      Just (TConstSubtype _) -> Nothing
+      _                      -> Just (ChecksIndex (getLocation ann))
+
+-- | What the pass knows about the names an expression may call: the methods of
+-- the class that take @&mut self@, and the functions and members whose body
+-- was already found to carry an effect.
+data Callees = Callees
+  {
+    mutableSelf :: S.Set Identifier
+  , effectfulFuns :: M.Map Identifier Effect
+  , effectfulMems :: M.Map Identifier Effect
+  }
+
+-- | What the pass knows at this point of the walk.
+callees :: SideEffectsMonad Callees
+callees = do
+  ms <- getMutableSelfMethods
+  (functions, members) <- getEffectful
+  return (Callees ms functions members)
+
+-- | The objects an expression reaches at its own level, either by value or
+-- through a reference it takes of them.
+immediateObjects :: Expression SemanticAnn -> [Object SemanticAnn]
+immediateObjects = mapMaybe pick . expressionChildren
+
+  where
+
+    pick (ChildObject obj)      = Just obj
+    pick (ChildReference _ obj) = Just obj
+    pick _                      = Nothing
+
+-- | Whether an expression subtree carries a side effect that outlives it: a
+-- call that mutates through a @&mut@ argument, an access to a field declared @loc@,
+-- or a bounds check that can end in the exception path. It is the notion of
+-- the two rules that forbid such an effect in a position where it may or may
+-- not happen, the element of an initializer list and the right operand of a
+-- logical operator.
+persistentEffect :: Callees -> Expression SemanticAnn -> Maybe Effect
+persistentEffect known e =
+      mutation
+  <|> receiverMutation
+  <|> reachedEffect
+  <|> listToMaybe (mapMaybe objectEffect (immediateObjects e))
+  <|> listToMaybe (mapMaybe (persistentEffect known) (childExpressions e))
+
+  where
+
+    mutation = case callMutations e of
+      (_ : _) -> Just (MutatesThroughCall (getLocation (getAnnotation e)))
+      []      -> Nothing
+
+    -- | A method that takes @&mut self@ writes the state of its class, which
+    -- is not an argument of the call and so does not show up in
+    -- 'callMutations'.
+    receiverMutation = case e of
+      MemberFunctionCall _ method _ ann
+        | method `S.member` mutableSelf known -> Just (MutatesReceiver (getLocation ann))
+      DerefMemberFunctionCall _ method _ ann
+        | method `S.member` mutableSelf known -> Just (MutatesReceiver (getLocation ann))
+      _ -> Nothing
+
+    -- | A call reaches whatever its callee carries: a method that takes
+    -- @&self@ writes nothing, but it may read a loc field or index an
+    -- array, and that effect belongs to the expression that calls it.
+    reachedEffect = case e of
+      FunctionCall name _ ann           -> reaches name ann (effectfulFuns known)
+      MemberFunctionCall _ name _ ann   -> reaches name ann (effectfulMems known)
+      DerefMemberFunctionCall _ name _ ann -> reaches name ann (effectfulMems known)
+      _                                 -> Nothing
+
+    reaches name ann carried =
+      CallsEffectful (getLocation ann) name <$> M.lookup name carried
 
 -- | The objects mutated anywhere in a subtree, each paired with the location of
 -- the call that mutates it. A mutation is either a @&mut@ argument, or, for a
@@ -144,7 +257,7 @@ checkExpression expr = case expr of
 -- at most one may contain a persistent side effect.
 atMostOneEffect :: [Expression SemanticAnn] -> SideEffectsMonad ()
 atMostOneEffect siblings =
-  case filter hasEffect siblings of
+  case filter mutatesState siblings of
     (firstEff : secondEff : _) ->
       throwError $ annotateError
         (getLocation (getAnnotation secondEff))
@@ -201,15 +314,17 @@ checkEffectOrdering e = case e of
       checkInterference group
       mapM_ checkEffectOrdering group
 
-    -- | Reject a persistent side effect in a forbidden position.
-    rejectIfEffect :: Error -> Expression SemanticAnn -> SideEffectsMonad ()
-    rejectIfEffect err el =
-      when (hasEffect el) $
-        throwError $ annotateError (getLocation (getAnnotation el)) err
+    -- | Reject an effect that outlives the expression in a position where it
+    -- may or may not happen, naming what the effect is.
+    rejectIfEffect :: (Effect -> Error) -> Expression SemanticAnn -> SideEffectsMonad ()
+    rejectIfEffect err el = do
+      known <- callees
+      forM_ (persistentEffect known el) $ \effect ->
+        throwError $ annotateError (getLocation (getAnnotation el)) (err effect)
 
     -- | The right operand of && / || may be skipped by short-circuit
     -- evaluation, so it must carry no side effect; the left is always evaluated.
-    checkLogical :: Error -> Expression SemanticAnn -> Expression SemanticAnn -> SideEffectsMonad ()
+    checkLogical :: (Effect -> Error) -> Expression SemanticAnn -> Expression SemanticAnn -> SideEffectsMonad ()
     checkLogical err left right = do
       rejectIfEffect err right
       checkEffectOrdering left
@@ -239,6 +354,26 @@ checkFullExpression e = do
   resetMutableReferences
   checkExpression e
   checkEffectOrdering e
+  noteEffectOf e
+
+-- | The guard of a loop sits where the right operand of an && sits: the
+-- generated @for@ joins the range of the iterator and the guard with an &&, so
+-- an effect written in the guard happens or not depending on the iterator,
+-- which is what Rule 13.5 forbids. The user wrote no && here, so the error is
+-- its own and names the loop.
+checkLoopGuard :: Expression SemanticAnn -> SideEffectsMonad ()
+checkLoopGuard e = do
+  known <- callees
+  forM_ (persistentEffect known e) $ \effect ->
+    throwError $ annotateError (getLocation (getAnnotation e)) (ESideEffectInLoopGuard effect)
+  checkFullExpression e
+
+-- | Record what the expression carries, which is what the body being checked
+-- hands to whoever calls it.
+noteEffectOf :: Expression SemanticAnn -> SideEffectsMonad ()
+noteEffectOf e = do
+  known <- callees
+  forM_ (persistentEffect known e) noteEffect
 
 -- | Several expressions that together make up one full expression (e.g. the
 -- argument list of a call): they share one aliasing map, and form one sibling
@@ -250,11 +385,14 @@ checkFullExpressions es = do
   atMostOneEffect es
   checkInterference es
   mapM_ checkEffectOrdering es
+  mapM_ noteEffectOf es
 
 checkStatement :: Statement SemanticAnn -> SideEffectsMonad ()
 checkStatement stmt = case stmt of
   Declaration _ _ _ initExpr _ -> mapM_ checkFullExpression initExpr
-  AssignmentStmt _ rhs _       -> checkFullExpression rhs
+  -- | Writing through a field declared loc, or through an index that is checked
+  -- while the program runs, is an effect of the body as much as reading one.
+  AssignmentStmt lhs rhs _     -> forM_ (objectEffect lhs) noteEffect >> checkFullExpression rhs
   SingleExpStmt e _            -> checkFullExpression e
 
 -- | What each node means to this pass. It learns nothing from a condition and
@@ -267,6 +405,7 @@ transfer = Transfer
   , onSimpleBlock = checkSimpleBlock
   , onExpression = checkFullExpression
   , onCondition = checkFullExpression
+  , onLoopGuard = checkLoopGuard
   , onCaseEntry = \_ _ -> return ()
   , refineTrue = const (return ())
   , refineFalse = const (return ())
@@ -301,16 +440,23 @@ checkSimpleBlock bb = case bb of
   ForLoopBlock {}                -> return ()
   MatchBlock {}                  -> return ()
 
+-- | Checks the body of a member and records what it carries under its name,
+-- which is what a later member of the same class gets when it calls it.
 checkClassMember :: ClassMember SemanticAnn -> SideEffectsMonad ()
-checkClassMember (ClassMethod _ak _ident _ps _tyret body _ann)  = checkBlock body
-checkClassMember (ClassProcedure _ak _ident _ps body _ann)      = checkBlock body
-checkClassMember (ClassViewer _ident _ps _tyret body _ann)      = checkBlock body
-checkClassMember (ClassAction _ak _ident _mp _tyret body _ann)  = checkBlock body
-checkClassMember (ClassField {})                                = return ()
+checkClassMember member = case member of
+  ClassMethod _ak ident _ps _tyret body _ann -> checkBody ident body
+  ClassProcedure _ak ident _ps body _ann     -> checkBody ident body
+  ClassViewer ident _ps _tyret body _ann     -> checkBody ident body
+  ClassAction _ak ident _mp _tyret body _ann -> checkBody ident body
+  ClassField {}                              -> return ()
+
+  where
+
+    checkBody ident body = startCallable >> checkBlock body >> endMember ident
 
 checkTypeDef :: TypeDef SemanticAnn -> SideEffectsMonad ()
 checkTypeDef (Class _kind _ident members _provides _mods) = do
-    setMutableSelfMethods (mutableSelfMethodNames members)
+    startClass (mutableSelfMethodNames members)
     mapM_ checkClassMember members
 checkTypeDef _ = return ()
 
@@ -323,15 +469,19 @@ mutableSelfMethodNames members = S.fromList
     [ ident | ClassMethod Mutable ident _ _ _ _ <- members ]
 
 checkElement :: AnnASTElement SemanticAnn -> SideEffectsMonad ()
-checkElement (Function _ident _ps _ty body _mods _ann) = checkBlock body
+checkElement (Function ident _ps _ty body _mods _ann) =
+    startCallable >> checkBlock body >> endFunction ident
 checkElement (TypeDefinition tyDef _ann)               = checkTypeDef tyDef
 checkElement (GlobalDeclaration {})                    = return ()
 
--- | Run the side-effect check over a single top-level element.
-runSideEffectElement :: Platform -> AnnASTElement SemanticAnn -> Maybe SideEffectsError
-runSideEffectElement plt =
-    either Just (const Nothing) . runSideEffects plt . checkElement
-
--- | Run the side-effect check over a whole module, returning the first error.
-runSideEffectCheck :: Platform -> AnnotatedProgram SemanticAnn -> Maybe SideEffectsError
-runSideEffectCheck plt = listToMaybe . mapMaybe (runSideEffectElement plt)
+-- | Run the side-effect check over a whole module, returning the first error
+-- and the functions known to carry an effect once it is done. The elements are
+-- checked in the order they are written, which is the order in which a module
+-- sees its own names, and the modules in dependency order, so what a call
+-- reaches is already known by the time the call is checked.
+runSideEffectCheck :: Platform -> M.Map Identifier Effect -> AnnotatedProgram SemanticAnn
+  -> (Maybe SideEffectsError, M.Map Identifier Effect)
+runSideEffectCheck plt functions program =
+    case runSideEffects plt functions (mapM_ checkElement program) of
+      (Left err, env) -> (Just err, effectfulFunctions env)
+      (Right (), env) -> (Nothing, effectfulFunctions env)

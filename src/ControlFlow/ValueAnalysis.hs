@@ -730,6 +730,7 @@ transfer = Transfer
   , onSimpleBlock = mapM_ (mapM_ escapesIn) . simpleBlockChildren
   , onExpression = noteEscapes
   , onCondition = observeCondition
+  , onLoopGuard = observeCondition
   , onCaseEntry = enterCase
   , refineTrue = refine True
   , refineFalse = refine False

@@ -309,6 +309,7 @@ transfer = Transfer
   , onSimpleBlock = mapM_ (mapM_ readChild) . simpleBlockChildren
   , onExpression = readExpression
   , onCondition = readExpression
+  , onLoopGuard = readExpression
     -- | The variables a case binds are declared by the case itself.
   , onCaseEntry = \_ (MatchCase _ bvars _ ann) ->
       mapM_ (`markInitialized` getLocation ann) bvars
