@@ -52,7 +52,7 @@ spec = do
               "} id0;\n" ++
               "\n" ++
               "void id0__match_test0(const termina__event_t * const termina__ev,\n" ++
-              "                      void * const termina__this, Option__box option0);\n" ++
+              "                      void * const termina__this, const Option__box option0);\n" ++
               "\n" ++
               "#endif\n")
     it "Generates an option-box is-variant test" $ do
@@ -61,7 +61,7 @@ spec = do
               "#include \"test.h\"\n" ++
               "\n" ++
               "void id0__match_test0(const termina__event_t * const termina__ev,\n" ++
-              "                      void * const termina__this, Option__box option0) {\n" ++
+              "                      void * const termina__this, const Option__box option0) {\n" ++
               "    \n" ++
               "    id0 * self = (id0 *)termina__this;\n" ++
               "\n" ++

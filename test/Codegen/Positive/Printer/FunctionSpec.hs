@@ -129,10 +129,10 @@ spec = do
         pack "\nuint32_t function1(void);"
     it "Declares a function with one scalar parameter" $ do
       renderFunctionDecl emptyMonadicTypes function2 `shouldBe`
-        pack "\nuint32_t function2(uint32_t param0);"
+        pack "\nuint32_t function2(const uint32_t param0);"
     it "Declares a function with a scalar and an array parameter" $ do
       renderFunctionDecl emptyMonadicTypes function3 `shouldBe`
-        pack "\nuint32_t function3(uint32_t param0, uint32_t param1[10U]);"
+        pack "\nuint32_t function3(const uint32_t param0, uint32_t param1[10U]);"
   describe "Pretty printing function definitions" $ do
     it "Defines a void function with a struct body" $ do
       renderFunction function0 `shouldBe`

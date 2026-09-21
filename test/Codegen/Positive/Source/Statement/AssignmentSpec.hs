@@ -82,7 +82,8 @@ spec = do
              "} id0;\n" ++
              "\n" ++
              "void id0__assignment_test1(const termina__event_t * const termina__ev,\n" ++
-             "                           void * const termina__this, termina__box_t box_var0);\n" ++
+             "                           void * const termina__this,\n" ++
+             "                           const termina__box_t box_var0);\n" ++
              "\n" ++
              "#endif\n")
     it "Generates an option-box assignment inside a locked resource" $ do
@@ -92,7 +93,7 @@ spec = do
               "\n" ++
               "void id0__assignment_test1(const termina__event_t * const termina__ev,\n" ++
               "                           void * const termina__this,\n" ++
-              "                           termina__box_t box_var0) {\n" ++
+              "                           const termina__box_t box_var0) {\n" ++
               "    \n" ++
               "    id0 * self = (id0 *)termina__this;\n" ++
               "\n" ++
@@ -122,8 +123,9 @@ spec = do
              "} id0;\n" ++
              "\n" ++
              "void id0__assignment_test2(const termina__event_t * const termina__ev,\n" ++
-             "                           void * const termina__this, termina__box_t box_var0,\n" ++
-             "                           termina__box_t box_var1);\n" ++
+             "                           void * const termina__this,\n" ++
+             "                           const termina__box_t box_var0,\n" ++
+             "                           const termina__box_t box_var1);\n" ++
              "\n" ++
              "#endif\n")
     it "Generates assignments through unboxed box parameters" $ do
@@ -132,8 +134,9 @@ spec = do
               "#include \"test.h\"\n" ++
               "\n" ++
               "void id0__assignment_test2(const termina__event_t * const termina__ev,\n" ++
-              "                           void * const termina__this, termina__box_t box_var0,\n" ++
-              "                           termina__box_t box_var1) {\n" ++
+              "                           void * const termina__this,\n" ++
+              "                           const termina__box_t box_var0,\n" ++
+              "                           const termina__box_t box_var1) {\n" ++
               "    \n" ++
               "    id0 * self = (id0 *)termina__this;\n" ++
               "\n" ++

@@ -62,7 +62,7 @@ spec = do
               "\n" ++
               "Status__i32 CHousekeeping__action0(const termina__event_t * const termina__ev,\n" ++
               "                                   void * const termina__this,\n" ++
-              "                                   uint32_t termina__ignored__data);\n" ++
+              "                                   const uint32_t termina__ignored__data);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints option header file of test0" $ do

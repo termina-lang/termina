@@ -102,10 +102,11 @@ spec = do
               "} Class0;\n" ++
               "\n" ++
               "void Class0__procedure0(const termina__event_t * const termina__ev,\n" ++
-              "                        void * const termina__this, uint8_t param0,\n" ++
-              "                        uint16_t param1, uint32_t param2, uint64_t param3,\n" ++
-              "                        int8_t param4, int16_t param5, int32_t param6,\n" ++
-              "                        int64_t param7);")
+              "                        void * const termina__this, const uint8_t param0,\n" ++
+              "                        const uint16_t param1, const uint32_t param2,\n" ++
+              "                        const uint64_t param3, const int8_t param4,\n" ++
+              "                        const int16_t param5, const int32_t param6,\n" ++
+              "                        const int64_t param7);")
     it "Prints a class with two procedures and zero fields" $ do
       renderTypeDefinitionDecl emptyMonadicTypes classWithTwoProceduresAndZeroFields `shouldBe`
         pack (
@@ -114,11 +115,11 @@ spec = do
           "} Class0;\n" ++
           "\n" ++
           "void Class0__procedure0(const termina__event_t * const termina__ev,\n" ++
-          "                        void * const termina__this, uint8_t param0,\n" ++
-          "                        Option__box param1);\n" ++
+          "                        void * const termina__this, const uint8_t param0,\n" ++
+          "                        const Option__box param1);\n" ++
           "\n" ++
           "void Class0__procedure1(const termina__event_t * const termina__ev,\n" ++
-          "                        void * const termina__this, uint8_t param0,\n" ++
+          "                        void * const termina__this, const uint8_t param0,\n" ++
           "                        uint8_t param1[32U]);")
     it "Prints a class marked as no_handler with one procedure and zero fields" $ do
       renderTypeDefinitionDecl emptyMonadicTypes noHandlerClassWithoutOneProcedureAndZeroFields `shouldBe`
@@ -162,7 +163,7 @@ spec = do
               "} __attribute__((packed)) Class0;\n" ++
               "\n" ++
               "void Class0__procedure0(const termina__event_t * const termina__ev,\n" ++
-              "                        void * const termina__this, char param0,\n" ++
+              "                        void * const termina__this, const char param0,\n" ++
               "                        uint8_t param1[16U]);")
     it "Prints a class with a fixed location field" $ do
       renderTypeDefinitionDecl emptyMonadicTypes classWithFixedLocationField `shouldBe`

@@ -29,7 +29,7 @@ spec = do
   describe "Pretty printing method call expressions" $ do
     it "Prints the expression: tm_channel.foo0(bar0)" $ do
       renderStatement tmChannelSendStmt `shouldBe`
-        pack "\ntermina__out_port__send(termina__ev, tm_channel, (void *)&bar0);"
+        pack "\ntermina__out_port__send(termina__ev, tm_channel, (const void *)&bar0);"
     it "Prints the expression: (*self).foo0(bar0, bar1)" $ do
       renderStatement selfFoo0Stmt `shouldBe`
         pack "\nResource__foo0(termina__ev, self, bar0, bar1);"

@@ -136,7 +136,7 @@ genInitEmitters progArchitecture = do
                             no_cr $ "timer_connection" @: termina__periodic_timer_connection_t @. "handler" @: termina__periodic_timer_handler_connection_t
                                 @. "handler_id" @: termina__periodic_timer_action_t @= handlerId @: size_t,
                             no_cr $ "timer_connection" @: termina__periodic_timer_connection_t @. "handler" @: termina__periodic_timer_handler_connection_t
-                                @. "handler_action" @: termina__periodic_timer_action_t @= classId <::> targetAction @: termina__periodic_timer_action_t,
+                                @. "handler_action" @: termina__periodic_timer_action_t @= addrOf (classId <::> targetAction @: termina__periodic_timer_action_t),
                             pre_cr $ termina__periodic_timer__init @@ [
                                 timerId @: termina__id_t,
                                 emitterId @: termina__id_t,
@@ -196,7 +196,7 @@ genInitEmitters progArchitecture = do
                             no_cr $ "interrupt_connection" @: termina__interrupt_connection_t @. "handler" @: termina__interrupt_handler_connection_t
                                 @. "handler_id" @: termina__interrupt_action_t @= handlerId @: size_t,
                             no_cr $ "interrupt_connection" @: termina__interrupt_connection_t @. "handler" @: termina__interrupt_handler_connection_t
-                                @. "handler_action" @: termina__interrupt_action_t @= classId <::> targetAction @: termina__interrupt_action_t,
+                                @. "handler_action" @: termina__interrupt_action_t @= addrOf (classId <::> targetAction @: termina__interrupt_action_t),
                             pre_cr $ termina__interrupt__init @@ [
                                 dec irqVector @: termina__id_t,
                                 emitterId @: termina__id_t,

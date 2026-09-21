@@ -34,7 +34,7 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "void relational_test0(uint16_t foo);\n" ++
+              "void relational_test0(const uint16_t foo);\n" ++
               "\n" ++
               "#endif\n")
     it "Generates relational expressions" $ do

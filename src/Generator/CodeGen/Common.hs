@@ -366,12 +366,14 @@ genMsgQueueSendCall cObj cArg cAnn = do
     cEventArg <- genEventParamArg cAnn
     let cEventArgType = getCExprType cEventArg
         cArgType = getCExprType cArg
-        cFuncType = CTFunction (CTVoid noqual) [cEventArgType, cArgType, CTPointer (CTVoid noqual) noqual]
+        cPayloadType = CTPointer (CTVoid constqual) constqual
+        cPayloadCast = CTPointer (CTVoid constqual) noqual
+        cFuncType = CTFunction (CTVoid noqual) [cEventArgType, cArgType, cPayloadType]
         cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
     -- | If it is a send, the first parameter is the object to be sent. The
     -- function is expecting to receive a reference to that object.
     cArgObj <- getCObject cArg
-    let cDataArg = CExprCast (CExprAddrOf cArgObj (CTPointer cArgType noqual) cAnn) (CTPointer (CTVoid noqual) noqual) cAnn
+    let cDataArg = CExprCast (CExprAddrOf cArgObj (CTPointer cArgType noqual) cAnn) cPayloadCast cAnn
     return $
         CExprCall (CExprValOf (CVar msgQueueSendMethodName cFuncType) cFuncType cAnn) [cEventArg, cObjExpr, cDataArg] (CTVoid noqual) cAnn
 

@@ -33,7 +33,7 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "void bitwise_test0(uint16_t foo);\n" ++
+              "void bitwise_test0(const uint16_t foo);\n" ++
               "\n" ++
               "#endif\n")
     it "Generates bitwise shift expressions" $ do

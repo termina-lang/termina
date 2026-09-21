@@ -61,7 +61,8 @@ spec = do
               "void termina__task_entry__CHousekeeping(void * const arg);\n" ++
               "\n" ++
               "Status__i32 CHousekeeping__timeout(const termina__event_t * const termina__ev,\n" ++
-              "                                   void * const termina__this, TimeVal current);\n" ++
+              "                                   void * const termina__this,\n" ++
+              "                                   const TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of class with atomic access port" $ do
@@ -71,7 +72,7 @@ spec = do
               "\n" ++
               "Status__i32 CHousekeeping__timeout(const termina__event_t * const termina__ev,\n" ++
               "                                   void * const termina__this,\n" ++
-              "                                   TimeVal current) {\n" ++
+              "                                   const TimeVal current) {\n" ++
               "    \n" ++
               "    (void)termina__ev;\n" ++
               "\n" ++
@@ -89,7 +90,7 @@ spec = do
               "\n" ++
               "}\n" ++
               "\n" ++
-              "void termina__task_entry__CHousekeeping(void * arg) {\n" ++
+              "void termina__task_entry__CHousekeeping(void * const arg) {\n" ++
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)arg;\n" ++
               "\n" ++
@@ -167,7 +168,8 @@ spec = do
               "void termina__task_entry__CHousekeeping(void * const arg);\n" ++
               "\n" ++
               "Status__i32 CHousekeeping__timeout(const termina__event_t * const termina__ev,\n" ++
-              "                                   void * const termina__this, TimeVal current);\n" ++
+              "                                   void * const termina__this,\n" ++
+              "                                   const TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of class with atomic access port" $ do
@@ -177,7 +179,7 @@ spec = do
               "\n" ++
               "Status__i32 CHousekeeping__timeout(const termina__event_t * const termina__ev,\n" ++
               "                                   void * const termina__this,\n" ++
-              "                                   TimeVal current) {\n" ++
+              "                                   const TimeVal current) {\n" ++
               "    \n" ++
               "    (void)termina__ev;\n" ++
               "\n" ++
@@ -195,7 +197,7 @@ spec = do
               "\n" ++
               "}\n" ++
               "\n" ++
-              "void termina__task_entry__CHousekeeping(void * arg) {\n" ++
+              "void termina__task_entry__CHousekeeping(void * const arg) {\n" ++
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)arg;\n" ++
               "\n" ++

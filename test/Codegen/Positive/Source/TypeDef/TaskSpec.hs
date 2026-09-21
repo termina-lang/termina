@@ -79,7 +79,8 @@ spec = do
               "void termina__task_entry__CHousekeeping(void * const arg);\n" ++
               "\n" ++
               "Status__i32 CHousekeeping__timeout(const termina__event_t * const termina__ev,\n" ++
-              "                                   void * const termina__this, TimeVal current);\n" ++
+              "                                   void * const termina__this,\n" ++
+              "                                   const TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of task class CHousekeeping" $ do
@@ -89,11 +90,11 @@ spec = do
               "\n" ++
               "static _Bool CHousekeeping__check_interval(const termina__event_t * const termina__ev,\n" ++
               "                                           const CHousekeeping * const self,\n" ++
-              "                                           uint32_t limit);\n" ++
+              "                                           const uint32_t limit);\n" ++
               "\n" ++
               "static _Bool CHousekeeping__check_interval(const termina__event_t * const termina__ev,\n" ++
               "                                           const CHousekeeping * const self,\n" ++
-              "                                           uint32_t limit) {\n" ++
+              "                                           const uint32_t limit) {\n" ++
               "    \n" ++
               "    (void)termina__ev;\n" ++
               "\n" ++
@@ -111,7 +112,7 @@ spec = do
               "\n" ++
               "Status__i32 CHousekeeping__timeout(const termina__event_t * const termina__ev,\n" ++
               "                                   void * const termina__this,\n" ++
-              "                                   TimeVal current) {\n" ++
+              "                                   const TimeVal current) {\n" ++
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)termina__this;\n" ++
               "\n" ++
@@ -147,7 +148,7 @@ spec = do
               "\n" ++
               "}\n" ++
               "\n" ++
-              "void termina__task_entry__CHousekeeping(void * arg) {\n" ++
+              "void termina__task_entry__CHousekeeping(void * const arg) {\n" ++
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)arg;\n" ++
               "\n" ++

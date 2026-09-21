@@ -484,7 +484,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
     cBody <- genBody
     cTaskFunctionName <- taskFunctionName classId
     return $ pre_cr $ function cTaskFunctionName [
-            "arg" @: ptr void
+            "arg" @: (_const . ptr $ void)
         ] @-> void $ trail_cr . block $
             cBody ++ [pre_cr (_return Nothing)]
 

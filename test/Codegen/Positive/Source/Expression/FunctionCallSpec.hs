@@ -25,9 +25,9 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "uint16_t func_test0_0(uint16_t a);\n" ++
+              "uint16_t func_test0_0(const uint16_t a);\n" ++
               "\n" ++
-              "uint16_t func_test0_1(uint16_t a);\n" ++
+              "uint16_t func_test0_1(const uint16_t a);\n" ++
               "\n" ++
               "#endif\n")
     it "Generates a function call expression" $ do

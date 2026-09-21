@@ -106,7 +106,7 @@ spec = do
               "} id0;\n" ++
               "\n" ++
               "void id0__match_test0(const termina__event_t * const termina__ev,\n" ++
-              "                      void * const termina__this, Option__box option0);\n" ++
+              "                      void * const termina__this, const Option__box option0);\n" ++
               "\n" ++
               "#endif\n")
     it "Generates an option-box match (Some before None)" $ do
@@ -115,7 +115,7 @@ spec = do
               "#include \"test.h\"\n" ++
               "\n" ++
               "void id0__match_test0(const termina__event_t * const termina__ev,\n" ++
-              "                      void * const termina__this, Option__box option0) {\n" ++
+              "                      void * const termina__this, const Option__box option0) {\n" ++
               "    \n" ++
               "    id0 * self = (id0 *)termina__this;\n" ++
               "\n" ++
@@ -154,7 +154,7 @@ spec = do
               "} id0;\n" ++
               "\n" ++
               "void id0__match_test1(const termina__event_t * const termina__ev,\n" ++
-              "                      void * const termina__this, Option__box option0);\n" ++
+              "                      void * const termina__this, const Option__box option0);\n" ++
               "\n" ++
               "#endif\n")
     it "Generates an option-box match (None before Some)" $ do
@@ -163,7 +163,7 @@ spec = do
               "#include \"test.h\"\n" ++
               "\n" ++
               "void id0__match_test1(const termina__event_t * const termina__ev,\n" ++
-              "                      void * const termina__this, Option__box option0) {\n" ++
+              "                      void * const termina__this, const Option__box option0) {\n" ++
               "    \n" ++
               "    id0 * self = (id0 *)termina__this;\n" ++
               "\n" ++

@@ -99,7 +99,7 @@ spec = do
              "} id0;\n" ++
              "\n" ++
              "void id0__test1(const termina__event_t * const termina__ev,\n" ++
-             "                void * const termina__this, termina__box_t foo);\n" ++
+             "                void * const termina__this, const termina__box_t foo);\n" ++
              "\n" ++
              "#endif\n")
     it "Generates arithmetic on an unboxed parameter" $ do
@@ -108,7 +108,7 @@ spec = do
              "#include \"test.h\"\n" ++
              "\n" ++
              "void id0__test1(const termina__event_t * const termina__ev,\n" ++
-             "                void * const termina__this, termina__box_t foo) {\n" ++
+             "                void * const termina__this, const termina__box_t foo) {\n" ++
              "    \n" ++
              "    id0 * self = (id0 *)termina__this;\n" ++
              "\n" ++
