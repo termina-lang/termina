@@ -386,8 +386,8 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     -- | Check that the files are in place
     existSourceFolder <- doesDirectoryExist (sourceModulesFolder config)
     unless existSourceFolder (die . errorMessage $ "Source folder \"" ++ sourceModulesFolder config ++ "\" does not exist")
-    existAppFolder <- doesDirectoryExist (appFolder config)
-    unless existAppFolder (die . errorMessage $ "Application folder \"" ++ appFolder config ++ "\" does not exist")
+    existAppFolder <- doesDirectoryExist appFolder
+    unless existAppFolder (die . errorMessage $ "Application folder \"" ++ appFolder ++ "\" does not exist")
     -- | Create output header and source folder if it does not exist
     let outputSrcFolder = outputFolder config </> "src"
     let outputIncludeFolder = outputFolder config </> "include"
@@ -396,8 +396,8 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     when chatty (putStrLn . debugMessage $ "Creating output include folder (if missing): \"" ++ outputIncludeFolder ++ "\"")
     createDirectoryIfMissing True outputIncludeFolder
     -- | Load the main application module
-    when chatty (putStrLn . debugMessage $ "Loading application's main module: \"" ++ appFolder config </> appFilename config <.> "fin" ++ "\"")
-    appModule <- loadTerminaModule (appFilename config) (appFolder config) (sourceModulesFolder config)
+    when chatty (putStrLn . debugMessage $ "Loading application's main module: \"" ++ appFolder </> appFilename <.> "fin" ++ "\"")
+    appModule <- loadTerminaModule appFilename appFolder (sourceModulesFolder config)
     -- | Load the project
     when chatty (putStrLn . debugMessage $ "Loading project modules")
     parsedModules <- loadModules (importedModules appModule) (sourceModulesFolder config)

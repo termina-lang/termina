@@ -46,16 +46,16 @@ initializeHandler _req = do
             -- The platform is OK
             -- Then we have to check the folder's structure
             existSourceFolder <- liftIO $ doesDirectoryExist (sourceModulesFolder cfg)
-            existAppFolder <- liftIO $ doesDirectoryExist (appFolder cfg)
+            existAppFolder <- liftIO $ doesDirectoryExist appFolder
             if not existSourceFolder then
               errorM ("Source folder \"" <> T.pack (sourceModulesFolder cfg) <> "\" does not exist")
             else if not existAppFolder then
-              errorM ("Application folder \"" <> T.pack (appFolder cfg) <> "\" does not exist")
+              errorM ("Application folder \"" <> T.pack appFolder <> "\" does not exist")
             else do
               -- At this point, no files have been loaded into the VFS, so we must read all
               -- the files directly from the file system.
-              absPath <- liftIO $ canonicalizePath (appFolder cfg)
-              let fullP = absPath </> appFilename cfg <.> "fin"
+              absPath <- liftIO $ canonicalizePath appFolder
+              let fullP = absPath </> appFilename <.> "fin"
               mappModule <- loadTerminaModule fullP (Just (sourceModulesFolder cfg))
               case mappModule of
                 Nothing -> return ()

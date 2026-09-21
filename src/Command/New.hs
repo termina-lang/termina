@@ -69,8 +69,8 @@ newCommand (NewCmdArgs project pltName chatty) = do
     -- | Create project default structure
     let config = defaultConfig project plt
     let configFile = project </> "termina" <.> "yaml"
-    let appFolderPath = project </> appFolder config
-    let appModulePath = appFolderPath </> appFilename config <.> "fin"
+    let appFolderPath = project </> appFolder
+    let appModulePath = appFolderPath </> appFilename <.> "fin"
     let sourceModulesFolderPath = project </> sourceModulesFolder config
     let outputFolderPath = project </> outputFolder config
     when chatty (putStrLn . debugMessage $ "Creating project configuration file: " ++ configFile)

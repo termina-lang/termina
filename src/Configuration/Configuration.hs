@@ -6,7 +6,9 @@ module Configuration.Configuration (
     ProjectBuilder(..),
     defaultConfig,
     defaultSysPrintOutputBufferSize,
-    defaultSysReadInputBufferSize
+    defaultSysReadInputBufferSize,
+    appFolder,
+    appFilename
 ) where
 
 import qualified Data.Text as T
@@ -19,6 +21,15 @@ data ProjectProfile = Debug | Release deriving (Eq, Show)
 defaultSysPrintOutputBufferSize, defaultSysReadInputBufferSize :: Integer
 defaultSysPrintOutputBufferSize = 256
 defaultSysReadInputBufferSize = 256
+
+-- | Folder that holds the application module and name of the module itself.
+-- They are fixed and not configurable: the application module is always
+-- "app/app.fin" and its generated header is always "app.h", guarded by
+-- APP_H__. A configurable name could collide with the headers that the
+-- generator emits on its own, such as "config.h".
+appFolder, appFilename :: FilePath
+appFolder = "app"
+appFilename = "app"
 
 instance FromJSON ProjectProfile where
     parseJSON (String "debug") = return Debug
@@ -45,8 +56,6 @@ data TerminaConfig =
   TerminaConfig {
     name :: !T.Text,
     platform :: !T.Text,
-    appFolder :: !FilePath,
-    appFilename :: !FilePath,
     sourceModulesFolder :: !FilePath,
     outputFolder :: !FilePath,
     efpFolder :: !FilePath,
@@ -66,8 +75,6 @@ instance FromJSON TerminaConfig where
     TerminaConfig <$>
     o .:   "name"           <*>
     o .:   "platform"       <*>
-    o .:   "app-folder"     <*>
-    o .:   "app-file"       <*>
     o .:   "source-modules" <*>
     o .:   "output-folder"  <*>
     o .:?  "efp-folder" .!= "efp" <*>
@@ -85,10 +92,8 @@ instance ToJSON TerminaConfig where
     toJSON (
         TerminaConfig 
             prjName 
-            prjPlatform 
-            prjAppFolder 
-            prjAppFilename 
-            prjSourceModulesFolder 
+            prjPlatform
+            prjSourceModulesFolder
             prjOutputFolder
             prjEFPFolder
             prjProfile
@@ -102,8 +107,6 @@ instance ToJSON TerminaConfig where
         ) = object $ [
             "name" .= prjName,
             "platform" .= prjPlatform,
-            "app-folder" .= prjAppFolder,
-            "app-file" .= prjAppFilename,
             "source-modules" .= prjSourceModulesFolder,
             "output-folder" .= prjOutputFolder,
             "efp-folder" .= prjEFPFolder
@@ -128,8 +131,6 @@ defaultConfig :: String -> Platform -> TerminaConfig
 defaultConfig projectName plt = TerminaConfig {
     name = T.pack projectName,
     platform = T.pack $ show plt,
-    appFolder = "app",
-    appFilename = "app",
     sourceModulesFolder = "src",
     outputFolder = "output",
     efpFolder = "efp",
