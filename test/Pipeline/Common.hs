@@ -2,7 +2,10 @@ module Pipeline.Common
   ( runFullBuild
   , runFullProjectBuild
   , runFullProjectApp
+  , runFullProjectAppWith
+  , systemInitConfig
   , renderMainFile
+  , renderMainFileWith
   , renderInitFile
   , buildAndRenderModule
   , compileErrorCode
@@ -26,7 +29,7 @@ import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import Semantic.Environment (makeInitialGlobalEnv, Environment, addDeclaredNames)
 import Semantic.Types (SemanticAnn)
 
-import Configuration.Configuration (defaultConfig, TerminaConfig)
+import Configuration.Configuration (defaultConfig, TerminaConfig (..))
 import Configuration.Platform (Platform(TestPlatform))
 import Generator.Environment
     (getPlatformInitialGlobalEnv, getPlatformInitialProgram)
@@ -72,7 +75,7 @@ import Utils.Errors (ErrorMessage(errorIdent, toText))
 -- comparable 'Text' (@Left@) the spec can assert on, never a process exit.
 runFullProjectBuild :: [(QualifiedName, String)] -> Either Failure (M.Map QualifiedName Text)
 runFullProjectBuild sources = do
-  (foldedProject, _, _) <- runProjectPipeline sources
+  (foldedProject, _, _) <- runProjectPipeline configParams sources
   mapM renderModule foldedProject
 
 -- | Drives the same full pipeline as 'runFullProjectBuild' but stops before
@@ -84,8 +87,17 @@ runFullProjectBuild sources = do
 runFullProjectApp ::
   [(QualifiedName, String)]
   -> Either Failure (TerminaProgArch SemanticAnn, [(QualifiedName, AnnotatedProgram SemanticAnn)])
-runFullProjectApp sources = do
-  (foldedProject, ordered, progArch) <- runProjectPipeline sources
+runFullProjectApp = runFullProjectAppWith configParams
+
+-- | 'runFullProjectApp' under a given configuration, for the glue that only
+-- exists when a feature is switched on. The system-init emitter is one:
+-- 'systemInitConfig' turns it on so an application can connect @system_init@.
+runFullProjectAppWith ::
+  TerminaConfig
+  -> [(QualifiedName, String)]
+  -> Either Failure (TerminaProgArch SemanticAnn, [(QualifiedName, AnnotatedProgram SemanticAnn)])
+runFullProjectAppWith cfg sources = do
+  (foldedProject, ordered, progArch) <- runProjectPipeline cfg sources
   let prjprogs = [ (m, basicBlocksAST . metadata $ foldedProject M.! m) | m <- ordered ]
   pure (progArch, prjprogs)
 
@@ -94,13 +106,14 @@ runFullProjectApp sources = do
 -- 'runFullProjectApp' (which renders the application glue). Returns the
 -- constant-folded project, the dependency order, and the program architecture.
 runProjectPipeline ::
-  [(QualifiedName, String)]
+  TerminaConfig
+  -> [(QualifiedName, String)]
   -> Either Failure (BasicBlocksProject, [QualifiedName], TerminaProgArch SemanticAnn)
-runProjectPipeline sources = do
+runProjectPipeline cfg sources = do
   let files = M.fromList [ (qname, pack src) | (qname, src) <- sources ]
   parsedProject <- M.fromList <$> mapM parseModule sources
   ordered <- orderModules parsedProject
-  typedProject <- typeProject files parsedProject ordered
+  typedProject <- typeProject cfg files parsedProject ordered
   bbProject <- stage files (genBasicBlocks typedProject)
   mapM_ (\check -> noCheckError files (runCheck check TestPlatform bbProject)) basicBlockChecks
   -- | Constant folding runs before architecture so the architecture pass and
@@ -109,7 +122,7 @@ runProjectPipeline sources = do
   -- | The constant propagation check follows the folding, which is what gives
   -- it the constants of each module.
   analyseValues files foldedProject constEnvs ordered
-  progArch <- genProjectArchitecture files foldedProject ordered
+  progArch <- genProjectArchitecture cfg files foldedProject ordered
   runChecks files progArch
   pure (foldedProject, ordered, progArch)
 
@@ -117,8 +130,12 @@ runProjectPipeline sources = do
 -- entry point) from a program architecture, collapsing a codegen failure into
 -- the returned 'Text'.
 renderMainFile :: TerminaProgArch SemanticAnn -> Either Text Text
-renderMainFile progArch =
-  case runGenMainFile configParams TestPlatform "main" progArch of
+renderMainFile = renderMainFileWith configParams
+
+-- | 'renderMainFile' under a given configuration.
+renderMainFileWith :: TerminaConfig -> TerminaProgArch SemanticAnn -> Either Text Text
+renderMainFileWith cfg progArch =
+  case runGenMainFile cfg TestPlatform "main" progArch of
     Left err -> Left . T.pack $ show err
     Right cFile -> Right $ runCPrinter False cFile
 
@@ -233,10 +250,10 @@ orderModules parsedProject =
       (annotateError Internal (EImportedFilesLoop loop) :: ParsingErrors))
     Right ordered -> Right ordered
 
-typeProject :: M.Map FilePath Text -> ParsedProject -> [QualifiedName]
+typeProject :: TerminaConfig -> M.Map FilePath Text -> ParsedProject -> [QualifiedName]
   -> Either Failure TypedProject
-typeProject files parsedProject =
-  go M.empty (addDeclaredNames (projectDeclaredNames parsedProject) initialEnv)
+typeProject cfg files parsedProject =
+  go M.empty (addDeclaredNames (projectDeclaredNames parsedProject) (initialEnv cfg))
 
   where
 
@@ -254,9 +271,9 @@ typeProject files parsedProject =
                    (sourcecode parsedModule) (SemanticData typedProgram)
              in go (M.insert m typedModule typed) newState ms
 
-genProjectArchitecture :: M.Map FilePath Text -> BasicBlocksProject -> [QualifiedName]
-  -> Either Failure (TerminaProgArch SemanticAnn)
-genProjectArchitecture files bbProject = go initialProg
+genProjectArchitecture :: TerminaConfig -> M.Map FilePath Text -> BasicBlocksProject
+  -> [QualifiedName] -> Either Failure (TerminaProgArch SemanticAnn)
+genProjectArchitecture cfg files bbProject = go (initialProg cfg)
 
   where
 
@@ -287,12 +304,17 @@ renderModule bbModule =
 configParams :: TerminaConfig
 configParams = defaultConfig "test" TestPlatform
 
-initialEnv :: Environment
-initialEnv = makeInitialGlobalEnv (Just configParams) TestPlatform
-               (getPlatformInitialGlobalEnv configParams TestPlatform)
+-- | The configuration a project needs to connect @system_init@, which the
+-- default leaves switched off.
+systemInitConfig :: TerminaConfig
+systemInitConfig = configParams { enableSystemInit = True }
 
-initialProg :: TerminaProgArch SemanticAnn
-initialProg = getPlatformInitialProgram configParams TestPlatform
+initialEnv :: TerminaConfig -> Environment
+initialEnv cfg = makeInitialGlobalEnv (Just cfg) TestPlatform
+               (getPlatformInitialGlobalEnv cfg TestPlatform)
+
+initialProg :: TerminaConfig -> TerminaProgArch SemanticAnn
+initialProg cfg = getPlatformInitialProgram cfg TestPlatform
 
 -- | A placeholder modification time: only the IO file-caching logic in
 -- Command.Build reads it; the pure pipeline never inspects it.
