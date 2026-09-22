@@ -10,6 +10,7 @@ module Pipeline.Common
   , buildAndRenderModule
   , compileErrorCode
   , compileProjectErrorCode
+  , compileProjectErrorCodeWith
   , compileErrorMessage
   , compileProjectErrorMessage
   , Failure(..)
@@ -74,8 +75,13 @@ import Utils.Errors (ErrorMessage(errorIdent, toText))
 -- errors and @exitFailure@. We call the pure runners directly so a failure is a
 -- comparable 'Text' (@Left@) the spec can assert on, never a process exit.
 runFullProjectBuild :: [(QualifiedName, String)] -> Either Failure (M.Map QualifiedName Text)
-runFullProjectBuild sources = do
-  (foldedProject, _, _) <- runProjectPipeline configParams sources
+runFullProjectBuild = runFullProjectBuildWith configParams
+
+-- | 'runFullProjectBuild' under a given configuration.
+runFullProjectBuildWith :: TerminaConfig -> [(QualifiedName, String)]
+  -> Either Failure (M.Map QualifiedName Text)
+runFullProjectBuildWith cfg sources = do
+  (foldedProject, _, _) <- runProjectPipeline cfg sources
   mapM renderModule foldedProject
 
 -- | Drives the same full pipeline as 'runFullProjectBuild' but stops before
@@ -190,8 +196,13 @@ compileErrorCode input = compileProjectErrorCode [("test", input)]
 
 -- | Multi-module variant of 'compileErrorCode'.
 compileProjectErrorCode :: [(QualifiedName, String)] -> Maybe Text
-compileProjectErrorCode =
-  either (Just . failCode) (const Nothing) . runFullProjectBuild
+compileProjectErrorCode = compileProjectErrorCodeWith configParams
+
+-- | 'compileProjectErrorCode' under a given configuration, for an error that
+-- only a project with a feature switched on can reach.
+compileProjectErrorCodeWith :: TerminaConfig -> [(QualifiedName, String)] -> Maybe Text
+compileProjectErrorCodeWith cfg =
+  either (Just . failCode) (const Nothing) . runFullProjectBuildWith cfg
 
 -- | The message the compiler prints for the first failing stage, which is what
 -- the golden of messages fixes.

@@ -1,21 +1,23 @@
--- | Full-pipeline goldens for @termina__app__initial_event@, the function the
--- generator emits when an application connects @system_init@. It has two
--- shapes, one per kind of entity the emitter can reach, and they are written by
--- two separate branches of the generator: a handler, whose action takes the
--- event, and a task, whose action takes it too but through a different call
--- site. Nothing else in the suite renders either of them, and the task branch
--- spent a while emitting a call with two arguments and a dereferenced TimeVal,
--- which does not compile, without a single test turning red.
+-- | Full-pipeline coverage of @termina__app__initial_event@, the function the
+-- generator emits when an application connects @system_init@. It builds the
+-- connection and hands it to the runtime, which dispatches the event; nothing
+-- else in the suite renders it, and the function spent a while emitting a call
+-- with two arguments and a dereferenced TimeVal, which does not compile,
+-- without a single test turning red.
+--
+-- The second case is the other half of the contract: only a handler may attend
+-- this emitter, which the type checker rejects with SE-220. Before that rule
+-- existed the generator carried a second branch for a task target, unreachable
+-- in practice and broken for as long as it existed.
 module Pipeline.Positive.InitialEventSpec (spec) where
 
 import Pipeline.Common
 import Golden
 
-import Data.Text (unpack)
+import Data.Text (pack, unpack)
 import Test.Hspec
 
--- | The action both entities run on the initial event. Written once, since the
--- two applications differ only in the class that carries it.
+-- | The action the entity runs on the initial event.
 bootAction :: String
 bootAction =
     "    boot_ev : sink TimeVal triggers boot;\n" ++
@@ -25,7 +27,8 @@ bootAction =
     "        return ret;\n" ++
     "    }\n"
 
--- | An application whose @system_init@ reaches a handler.
+-- | An application whose @system_init@ reaches a handler, which is the only
+-- shape the language admits.
 handlerApp :: String
 handlerApp =
     "handler class BootHandler {\n" ++
@@ -44,20 +47,18 @@ taskApp =
     "#[priority(10)]\n" ++
     "task boot_task : BootTask = { count = 0, boot_ev <- system_init };\n"
 
--- | Render the main file of an application under a configuration that has the
--- system-init emitter switched on, which is what makes @system_init@ nameable.
-mainFileOf :: String -> String -> Spec
-mainFileOf name source =
-  case runFullProjectAppWith systemInitConfig [("test", source)] of
-    Left err ->
-      it ("builds " ++ name) $
-        expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
-    Right (progArch, _) ->
-      it ("emits the initial event of " ++ name) $
-        either (expectationFailure . unpack) (goldenC name)
-          (renderMainFileWith systemInitConfig progArch)
-
 spec :: Spec
 spec = describe "Full pipeline: the initial event" $ do
-  mainFileOf "initial_event_handler" handlerApp
-  mainFileOf "initial_event_task" taskApp
+
+  case runFullProjectAppWith systemInitConfig [("test", handlerApp)] of
+    Left err ->
+      it "builds an application whose system_init reaches a handler" $
+        expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
+    Right (progArch, _) ->
+      it "emits the initial event as a connection handed to the runtime" $
+        either (expectationFailure . unpack) (goldenC "initial_event_handler")
+          (renderMainFileWith systemInitConfig progArch)
+
+  it "SE-220: rejects an initial event attended by a task" $
+    compileProjectErrorCodeWith systemInitConfig [("test", taskApp)]
+      `shouldBe` Just (pack "SE-220")

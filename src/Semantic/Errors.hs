@@ -267,7 +267,19 @@ data Error
   | ECharLiteralOutOfRange Char -- ^ Character literal whose code point is outside the 7-bit ASCII range (SE-217)
   | EReferenceToPackedMember Identifier -- ^ Reference to a member reached through a packed struct, on a strict-alignment target (SE-218)
   | EReservedIdentifier Identifier ReservedBy -- ^ Identifier that C keeps for itself (SE-219)
+  | EEmitterOnlyForHandler Identifier Identifier HandlerOnlyBecause -- ^ Emitter that only a handler may attend, connected to something else (SE-220)
   deriving Show
+
+-- | Why an emitter takes a handler and not a task.
+data HandlerOnlyBecause =
+    -- | The initialization sequence dispatches the event of this emitter before
+    -- it creates the tasks.
+    FiresBeforeTheTasks
+    -- | The emitter reports a failure that the system cannot recover from, and
+    -- the system reboots once its action has run, so attending it would need a
+    -- task that is never going to run.
+    | ReportsOnTheFatalPath
+    deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
 
@@ -996,6 +1008,15 @@ instance Diagnosable Error where
     describe (EReferenceToPackedMember ident) =
         diagnostic "SE-218" "reference to a packed struct member"
             ("This reference reaches into the packed struct \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Taking a reference to a member of a packed struct yields an under-aligned pointer, whose\n" <> "packed provenance is lost at the call boundary; on a strict-alignment target the callee then\n" <> "performs a misaligned access (undefined behavior). Read or write the member by value instead.")
+    describe (EEmitterOnlyForHandler emitter cls because) =
+        diagnostic "SE-220" "emitter that only a handler may attend"
+            ("The emitter \x1b[31m" <> T.pack emitter <> "\x1b[0m is connected to a sink port of \x1b[31m" <> T.pack cls <> "\x1b[0m, which is a task class.\n" <> reason <> "\nIts action has to be attended by a handler.")
+      where
+        reason = case because of
+            FiresBeforeTheTasks ->
+                "The initialization sequence dispatches this event before it creates the tasks."
+            ReportsOnTheFatalPath ->
+                "This emitter reports a failure that the system cannot recover from, and the system\nreboots once its action has run, so a task attending it would never run."
 
     -- | The two clauses below pick their detail with a case, which the script
     -- that moved the rest of this table does not read, so they were moved by

@@ -294,6 +294,23 @@ checkEmitterActionReturnType loc "SystemExcept" action ty =
   unless (sameTy ty TUnit) (throwError $ annotateError loc (EInvalidSystemExceptActionReturnType action ty))
 checkEmitterActionReturnType _ _ _ _ = throwError $ annotateError Internal EInvalidEmitterClass
 
+-- | The third axis of the per-emitter table, beside the type of the payload and
+-- the return type of the action: which kind of entity may attend the emitter.
+-- SystemInit fires before the tasks of the application run and SystemExcept
+-- reports a failure that has to be attended where it happens, so both of them
+-- take a handler. The catch-all is total over the emitter classes, so a new one
+-- has to state where it belongs.
+checkEmitterTargetClass :: Location -> Identifier -> ClassKind -> Identifier -> SemanticMonad ()
+checkEmitterTargetClass loc "SystemInit" TaskClass cls =
+  throwError $ annotateError loc (EEmitterOnlyForHandler "system_init" cls FiresBeforeTheTasks)
+checkEmitterTargetClass loc "SystemExcept" TaskClass cls =
+  throwError $ annotateError loc (EEmitterOnlyForHandler "system_except" cls ReportsOnTheFatalPath)
+checkEmitterTargetClass _ "SystemInit" _ _ = return ()
+checkEmitterTargetClass _ "SystemExcept" _ _ = return ()
+checkEmitterTargetClass _ "Interrupt" _ _ = return ()
+checkEmitterTargetClass _ "PeriodicTimer" _ _ = return ()
+checkEmitterTargetClass _ _ _ _ = throwError $ annotateError Internal EInvalidEmitterClass
+
 collectExtendedInterfaces :: Location -> Identifier -> SemanticMonad [Identifier]
 collectExtendedInterfaces loc ident = do
   catchError (getGlobalTypeDef loc ident)
@@ -1455,13 +1472,14 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection Inb
     \gentry ->
     case fty of
       TSinkPort ty action -> do
-        rty <- case tyDef of
-          (TGlobal _ clsId, _) -> getActionReturnType clsId action
+        (targetKind, targetCls, rty) <- case tyDef of
+          (TGlobal kind clsId, _) -> (kind, clsId,) <$> getActionReturnType clsId action
           _ -> throwError $ annotateError Internal EExpectedClassType
         case gentry of
           LocatedElement  (GGlob ets@(TGlobal EmitterClass clsId)) _ -> do
             checkEmitterDataType pann clsId ty
             checkEmitterActionReturnType pann clsId action rty
+            checkEmitterTargetClass pann clsId targetKind targetCls
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets action)
           _ -> throwError $ annotateError pann $ ESinkPortConnectionInvalidGlobal sid
       TInPort ty action  -> do
