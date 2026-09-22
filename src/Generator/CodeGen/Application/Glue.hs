@@ -515,12 +515,13 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                     pre_cr $ var "result" _Status__i32,
                     -- result._variant = Success;
                     no_cr $ ("result" @: _Status__i32) @. variant @: enumFieldType @= statusSuccessTag @: enumFieldType,
-                    -- result = classFunctionName(self, current);
+                    -- result = classFunctionName(&event, self, current);
                     pre_cr $ "result" @: _Status__i32 @=
                         timer_handler classId targetAction @@
                             [
+                                addrOf ("event" @: termina__event_t),
                                 "self" @: ptr classIdType,
-                                deref ("current" @: (_const . ptr $ _TimeVal))
+                                "current" @: _TimeVal
                             ],
                     -- if (result._variant != Success)
                     pre_cr $ _if (
