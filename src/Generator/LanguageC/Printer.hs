@@ -37,6 +37,17 @@ binPrec COpAnd = 15
 binPrec COpXor = 14
 binPrec COpOr  = 13
 
+isBitwiseOp :: CBinaryOp -> Bool
+isBitwiseOp COpAnd = True
+isBitwiseOp COpXor = True
+isBitwiseOp COpOr = True
+isBitwiseOp _ = False
+
+isAdditiveOp :: CBinaryOp -> Bool
+isAdditiveOp COpAdd = True
+isAdditiveOp COpSub = True
+isAdditiveOp _ = False
+
 isComparisonOp :: CBinaryOp -> Bool
 isComparisonOp COpLt = True
 isComparisonOp COpGt = True
@@ -263,13 +274,12 @@ instance CPrint CExpression where
         return $ parenPrec p 25 $ pretty op <> pexpr
     pprintPrec p (CExprBinaryOp op expr1 expr2 _ _) = do
         let prec = binPrec op
-        -- Force parentheses on a left operand that is itself a comparison
-        -- when the outer operator is also a comparison. Avoids GCC's
-        -- -Wparentheses warning on chained comparisons (e.g., `a == b == c`)
-        -- and keeps the emitted C aligned with MISRA-C:2012 rule 12.1.
+        -- Force parentheses on a left operand that is a comparison under a
+        -- comparison, or an addition or a subtraction under a bitwise operator.
         let leftPrec = case expr1 of
               CExprBinaryOp lop _ _ _ _
                 | isComparisonOp op && isComparisonOp lop -> prec + 1
+                | isBitwiseOp op && isAdditiveOp lop -> binPrec lop + 1
               _ -> prec
         pexpr1 <- pprintPrec leftPrec expr1
         pexpr2 <- pprintPrec (prec + 1) expr2
