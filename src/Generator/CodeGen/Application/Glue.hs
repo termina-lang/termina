@@ -423,121 +423,37 @@ genInitalEventFunction :: TerminaProgArch a -> TPEmitter a -> CGenerator [CFileI
 genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
     (targetEntity, targetPort) <- case M.lookup systemInit (emitterTargets progArchitecture) of
         Just (entity, port, _) -> return (entity, port)
-        -- | If the interrupt emitter is not connected, throw an error
+        -- | If the system init emitter is not connected, throw an error
         Nothing -> throwError $ InternalError $ "System init emitter not connected: " ++ show systemInit
-    -- |  Now we have to check if the target entity is a task or a handler
-    let event = pre_cr $ var "event" termina__event_t
-    eventFunctionBody <-
-        case M.lookup targetEntity (handlers progArchitecture) of
-            Just (TPHandler identifier classId _ _ _ _ _ _) -> genHandlerEventFunction identifier classId targetPort
-            Nothing -> case M.lookup targetEntity (tasks progArchitecture) of
-                Just (TPTask identifier classId _ _ _ _ _ _ _) -> genTaskEventFunction identifier classId targetPort
-                Nothing -> throwError $ InternalError $ "Invalid connection for system init: " ++ show targetEntity
+    (identifier, classId) <- case M.lookup targetEntity (handlers progArchitecture) of
+        Just (TPHandler ident cls _ _ _ _ _ _) -> return (ident, cls)
+        Nothing -> throwError $ InternalError $ "Invalid connection for system init: " ++ show targetEntity
+    let cls = handlerClasses progArchitecture M.! classId
+        (_, targetAction) = sinkPorts cls M.! targetPort
+        classIdType = typeDef classId
+        connection = "connection" @: termina__system_init_connection_t
+    handlerId <- genDefineHandlerIdLabel identifier
+    emitterId <- genDefineEmitterIdLabel systemInit
     return [pre_cr $ static_function (terminafy $ "app" <::> "initial_event") [] @-> void $
-            trail_cr . block $ event : eventFunctionBody ]
-
-    where
-
-        
-
-        genHandlerEventFunction :: Identifier -> Identifier -> Identifier -> CGenerator [CCompoundBlockItem]
-        genHandlerEventFunction identifier classId targetPort = do
-            let cls = handlerClasses progArchitecture M.! classId
-                (_, targetAction) = sinkPorts cls M.! targetPort
-                classIdType = typeDef classId
-            handlerId <- genDefineHandlerIdLabel identifier
-            emitterId <- genDefineEmitterIdLabel systemInit
-            return [
-                    no_cr $ "event" @: termina__event_t @. "emitter_id" @: termina__id_t @= emitterId @: termina__id_t,
-                    no_cr $ "event" @: termina__event_t @. "owner" @: termina__active_entity_t @. "type" @: enumFieldType @= "termina__active_entity__handler" @: enumFieldType,
-                    no_cr $ "event" @: termina__event_t @. "owner" @: termina__active_entity_t @. "handler" @: termina__enum__active_entity__handler_params_t
-                        @. "handler_id" @: termina__id_t @= handlerId @: termina__id_t,
-                    no_cr $ "event" @: termina__event_t @. "port_id" @: termina__id_t @= dec 0 @: termina__id_t,
-                    pre_cr $ var "current" _TimeVal,
-                    no_cr $ _SystemEntry__clock_get_uptime @@ [
-                        addrOf ("event" @: termina__event_t),
-                        addrOf ("current" @: _TimeVal)],
-                    -- classId * self = &identifier;
-                    pre_cr $ var "self" (ptr classIdType) @:= addrOf (identifier @: classIdType),
-                    -- _Status__i32 result;
-                    pre_cr $ var "result" _Status__i32,
-                    -- result = classFunctionName(&event, self, current);
-                    pre_cr $ "result" @: _Status__i32 @=
-                        timer_handler classId targetAction @@
-                            [
-                                addrOf ("event" @: termina__event_t),
-                                "self" @: ptr classIdType,
-                                "current" @: _TimeVal
-                            ],
-                    -- if (result._variant != Success)
-                    pre_cr $ _if (
-                            (("result" @: _Status__i32) @. variant) @: enumFieldType @!= statusSuccessTag @: enumFieldType)
-                        $ trail_cr $ block [
-                            -- ExceptSource source;
-                            pre_cr $ var "source" (typeDef "ExceptSource"),
-                            -- source._variant = ExceptSource__Handler;
-                            no_cr $ "source" @: typeDef "ExceptSource" @. variant @: enumFieldType @= "ExceptSource__Handler" @: enumFieldType,
-                            -- source.Handler._0 = handler_id;
-                            no_cr $ "source" @: typeDef "ExceptSource" @. "Handler" @: enumFieldType @. variantParamField 0 @: termina__id_t @= handlerId @: termina__id_t,
-                            -- termina__except__action_failure(source, 0, result.Failure._0);
-                            pre_cr $ termina__except__action_failure @@ [
-                                "source" @: typeDef "ExceptSource",
-                                dec 0 @: size_t,
-                                ("result" @: _Status__i32) @. statusFailureVariant @: enumFieldType @. variantParamField 0 @: int32_t
-                            ]
-                        ],
-                    pre_cr $ _return Nothing
-                ]
-
-        genTaskEventFunction :: Identifier -> Identifier -> Identifier -> CGenerator [CCompoundBlockItem]
-        genTaskEventFunction identifier classId targetPort = do
-            let cls = taskClasses progArchitecture M.! classId
-                (_, targetAction) = sinkPorts cls M.! targetPort
-                classIdType = typeDef classId
-            taskId <- genDefineTaskIdLabel identifier
-            portId <- genVariantForPort classId targetPort
-            emitterId <- genDefineEmitterIdLabel systemInit
-            return [
-                    no_cr $ "event" @: termina__event_t @. "emitter_id" @: termina__id_t @= emitterId @: termina__id_t,
-                    no_cr $ "event" @: termina__event_t @. "owner" @: termina__active_entity_t @. "type" @: enumFieldType @= "termina__active_entity__task" @: enumFieldType,
-                    no_cr $ "event" @: termina__event_t @. "owner" @: termina__active_entity_t @. "task" @: termina__enum__active_entity__task_params_t
-                        @. "task_id" @: termina__id_t @= taskId @: termina__id_t,
-                    no_cr $ "event" @: termina__event_t @. "port_id" @: termina__id_t @= portId @: termina__id_t,
-                    pre_cr $ var "current" _TimeVal,
-                    no_cr $ _SystemEntry__clock_get_uptime @@ [
-                        addrOf ("event" @: termina__event_t), 
-                        addrOf ("current" @: _TimeVal)],
-                    -- classId * self = &identifier;
-                    pre_cr $ var "self" (ptr classIdType) @:= addrOf (identifier @: classIdType),
-                    -- _Status__i32 result;
-                    pre_cr $ var "result" _Status__i32,
-                    -- result = classFunctionName(&event, self, current);
-                    pre_cr $ "result" @: _Status__i32 @=
-                        timer_handler classId targetAction @@
-                            [
-                                addrOf ("event" @: termina__event_t),
-                                "self" @: ptr classIdType,
-                                "current" @: _TimeVal
-                            ],
-                    -- if (result._variant != Success)
-                    pre_cr $ _if (
-                            (("result" @: _Status__i32) @. variant) @: enumFieldType @!= statusSuccessTag @: enumFieldType)
-                        $ trail_cr $ block [
-                            -- ExceptSource source;
-                            pre_cr $ var "source" (typeDef "ExceptSource"),
-                            -- source._variant = ExceptSource__Task;
-                            no_cr $ "source" @: typeDef "ExceptSource" @. variant @: enumFieldType @= "ExceptSource__Task" @: enumFieldType,
-                            -- source.Task._0 = task_id;
-                            no_cr $ "source" @: typeDef "ExceptSource" @. "Task" @: enumFieldType @. variantParamField 0 @: termina__id_t @= taskId @: termina__id_t,
-                            -- termina__except__action_failure(source, port_id, result.Failure._0);
-                            pre_cr $ termina__except__action_failure @@ [
-                                "source" @: typeDef "ExceptSource",
-                                portId @: size_t,
-                                ("result" @: _Status__i32) @. statusFailureVariant @: enumFieldType @. variantParamField 0 @: int32_t
-                            ]
-                        ],
-                    pre_cr $ _return Nothing
-                ]
+            trail_cr . block $ [
+                -- termina__system_init_connection_t connection;
+                pre_cr $ var "connection" termina__system_init_connection_t,
+                -- connection.handler_object = (void *)&identifier;
+                pre_cr $ connection @. "handler_object" @: ptr void
+                    @= cast (ptr void) (addrOf (identifier @: classIdType)),
+                -- connection.handler_id = handlerId;
+                no_cr $ connection @. "handler_id" @: termina__id_t
+                    @= handlerId @: termina__id_t,
+                -- connection.handler_action = &classId__targetAction;
+                no_cr $ connection @. "handler_action" @: termina__system_init_action_t
+                    @= addrOf (classId <::> targetAction @: termina__system_init_action_t),
+                -- termina__system_init__dispatch(emitterId, &connection);
+                pre_cr $ termina__system_init__dispatch @@ [
+                    emitterId @: termina__id_t,
+                    addrOf connection
+                ],
+                pre_cr $ _return Nothing
+            ]]
 genInitalEventFunction _ _ = throwError $ InternalError "Invalid event emitter"
 
 -- | Step of the application initialization: the call to the function that

@@ -11,30 +11,13 @@ static void termina__app__init_handlers(void) {
 
 static void termina__app__initial_event(void) {
     
-    termina__event_t event;
-    event.emitter_id = system_init__emitter_id;
-    event.owner.type = termina__active_entity__handler;
-    event.owner.handler.handler_id = boot_hdlr__handler_id;
-    event.port_id = 0;
+    termina__system_init_connection_t connection;
 
-    TimeVal current;
-    SystemEntry__clock_get_uptime(&event, &current);
+    connection.handler_object = (void *)&boot_hdlr;
+    connection.handler_id = boot_hdlr__handler_id;
+    connection.handler_action = &BootHandler__boot;
 
-    BootHandler * self = &boot_hdlr;
-
-    Status__i32 result;
-
-    result = BootHandler__boot(&event, self, current);
-
-    if (result._variant != Status__Success) {
-        
-        ExceptSource source;
-        source._variant = ExceptSource__Handler;
-        source.Handler._0 = boot_hdlr__handler_id;
-
-        termina__except__action_failure(source, 0U, result.Failure._0);
-
-    }
+    termina__system_init__dispatch(system_init__emitter_id, &connection);
 
     return;
 

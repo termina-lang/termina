@@ -78,6 +78,11 @@ termina__interrupt_connection_t = typeDef "termina__interrupt_connection_t"
 termina__interrupt_handler_connection_t = typeDef "termina__interrupt_handler_connection_t"
 termina__interrupt_action_t = typeDef "termina__interrupt_action_t"
 
+termina__system_init_connection_t,
+    termina__system_init_action_t :: CType
+termina__system_init_connection_t = typeDef "termina__system_init_connection_t"
+termina__system_init_action_t = typeDef "termina__system_init_action_t"
+
 timer_handler :: Ident -> Ident -> CExpression
 timer_handler classId handler = (classId <::> handler) @:
     CTFunction void
@@ -146,6 +151,16 @@ termina__periodic_timer__init = "termina__periodic_timer__init" @:
             _const . ptr $ _const _TimeVal,
             -- | int32_t * const status
             _const . ptr $ int32_t
+        ]
+
+termina__system_init__dispatch :: CExpression
+termina__system_init__dispatch = "termina__system_init__dispatch" @:
+    CTFunction void
+        [
+            -- | const termina__id_t emitter_id
+            _const termina__id_t,
+            -- | const termina__system_init_connection_t * const connection
+            _const . ptr $ _const termina__system_init_connection_t
         ]
 
 termina__interrupt__init :: CExpression
