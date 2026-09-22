@@ -461,8 +461,6 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                     pre_cr $ var "self" (ptr classIdType) @:= addrOf (identifier @: classIdType),
                     -- _Status__i32 result;
                     pre_cr $ var "result" _Status__i32,
-                    -- result._variant = Success;
-                    no_cr $ ("result" @: _Status__i32) @. variant @: enumFieldType @= statusSuccessTag @: enumFieldType,
                     -- result = classFunctionName(&event, self, current);
                     pre_cr $ "result" @: _Status__i32 @=
                         timer_handler classId targetAction @@
@@ -513,8 +511,6 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                     pre_cr $ var "self" (ptr classIdType) @:= addrOf (identifier @: classIdType),
                     -- _Status__i32 result;
                     pre_cr $ var "result" _Status__i32,
-                    -- result._variant = Success;
-                    no_cr $ ("result" @: _Status__i32) @. variant @: enumFieldType @= statusSuccessTag @: enumFieldType,
                     -- result = classFunctionName(&event, self, current);
                     pre_cr $ "result" @: _Status__i32 @=
                         timer_handler classId targetAction @@
