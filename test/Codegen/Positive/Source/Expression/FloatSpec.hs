@@ -201,7 +201,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "uint32_t test_bits(float32_t x) {\n" ++
+              "uint32_t test_bits(const float32_t x) {\n" ++
               "    \n" ++
               "    return f32_to_bits(x);\n" ++
               "\n" ++

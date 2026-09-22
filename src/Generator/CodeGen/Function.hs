@@ -25,7 +25,7 @@ genFunction :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genFunction (Function identifier parameters rts (Block stmts _) _ ann) = do
     cRetType <- maybe (return (CTVoid noqual)) (genType noqual) rts
     cParamDecls <- mapM (\(Parameter pid pty) -> do
-        cPty <- genType noqual pty
+        cPty <- genParameterType pty
         return $ genParameterIdentifier pid @: cPty) parameters
     cBody <- foldM (\acc x -> do
         cStmt <- genBlocks x

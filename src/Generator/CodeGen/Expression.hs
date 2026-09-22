@@ -126,16 +126,24 @@ genFunctionType ts tsParams = do
     tsParams' <- traverse (genType noqual . paramType) tsParams
     return (CTFunction ts' tsParams')
 
+-- | The C type of a parameter, which every place that emits one takes from
+-- here: the declaration of a function, its definition, and the prototype of a
+-- function pointer. A value is taken const, since a parameter of Termina
+-- cannot be assigned, and a reference already comes out qualified from
+-- genType.
+genParameterType :: TerminaType SemanticAnn -> CGenerator CType
+genParameterType ts = _const <$> genType noqual ts
+
 genParameterDeclaration :: Parameter SemanticAnn -> CGenerator CDeclaration
 genParameterDeclaration (Parameter identifier ts) = do
-    cParamType <- genType noqual ts
-    return $ CDecl (CTypeSpec (_const cParamType)) (Just (genParameterIdentifier identifier)) Nothing
+    cParamType <- genParameterType ts
+    return $ CDecl (CTypeSpec cParamType) (Just (genParameterIdentifier identifier)) Nothing
 
 -- | The same parameter as part of the prototype of a function pointer, where
 -- C asks for the name as well as the type.
 genCParameter :: Parameter SemanticAnn -> CGenerator CParameter
 genCParameter (Parameter identifier ts) =
-    CParameter (genParameterIdentifier identifier) . _const <$> genType noqual ts
+    CParameter (genParameterIdentifier identifier) <$> genParameterType ts
 
 
 genObject :: Object SemanticAnn -> CGenerator CObject

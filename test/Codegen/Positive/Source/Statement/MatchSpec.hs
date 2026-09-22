@@ -265,7 +265,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "uint32_t match_test3(Sample s) {\n" ++
+              "uint32_t match_test3(const Sample s) {\n" ++
               "    \n" ++
               "    uint32_t ret;\n" ++
               "\n" ++

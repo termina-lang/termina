@@ -42,7 +42,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void relational_test0(uint16_t foo) {\n" ++
+              "void relational_test0(const uint16_t foo) {\n" ++
               "    \n" ++
               "    _Bool res = false;\n" ++
               "\n" ++

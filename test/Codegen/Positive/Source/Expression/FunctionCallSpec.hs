@@ -35,13 +35,13 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "uint16_t func_test0_0(uint16_t a) {\n" ++
+              "uint16_t func_test0_0(const uint16_t a) {\n" ++
               "    \n" ++
               "    return a + 1U;\n" ++
               "\n" ++
               "}\n" ++
               "\n" ++
-              "uint16_t func_test0_1(uint16_t a) {\n" ++
+              "uint16_t func_test0_1(const uint16_t a) {\n" ++
               "    \n" ++
               "    uint16_t foo = func_test0_0(2U);\n" ++
               "\n" ++

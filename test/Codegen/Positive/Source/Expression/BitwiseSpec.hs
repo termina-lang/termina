@@ -41,7 +41,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void bitwise_test0(uint16_t foo) {\n" ++
+              "void bitwise_test0(const uint16_t foo) {\n" ++
               "    \n" ++
               "    uint8_t bar8 = 0U;\n" ++ 
               "\n" ++
