@@ -300,6 +300,7 @@ dropBitsAbove plt cExpr = case getCExprType cExpr of
 
     where
 
+        widthOf :: CIntSize -> Integer
         widthOf IntSize8   = 8
         widthOf IntSize16  = 16
         widthOf IntSize32  = 32
