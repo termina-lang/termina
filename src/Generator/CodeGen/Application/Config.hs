@@ -4,7 +4,7 @@ import Generator.LanguageC.AST
 import qualified Data.Map.Strict as M
 import Generator.LanguageC.Embedded
 import Generator.CodeGen.Common
-import Configuration.Platform (Platform)
+import Configuration.Platform (Platform, interruptTableSize)
 import Control.Monad.Except (MonadError(throwError), runExceptT)
 import Control.Monad.Reader (runReader)
 import Data.Text (unpack)
@@ -54,6 +54,8 @@ genConfigFile mName config progArchitecture = do
     let msgQueues = taskMessageQueues ++ sinkPortMessageQueues ++ channelMessageQueues
     messageBufferMemory <- genMessageBufferMemory msgQueues
 
+    plt <- gets targetPlatform
+
     return $ CHeaderFile mName $ [
             _ifndef "CONFIG_H__",
             _define "CONFIG_H__" Nothing
@@ -73,8 +75,18 @@ genConfigFile mName config progArchitecture = do
             pre_cr $ _define "TERMINA__APP_CONFIG__MESSAGE_QUEUES" (Just [show (length msgQueues)])
         ] ++ messageBufferMemory ++
         [
-            pre_cr $ _define "TERMINA__TIME__MICROSECONDS_PER_TICK" (Just [show (10000 :: Integer)])
+            pre_cr $ _define "TERMINA__TIME__MICROSECONDS_PER_TICK" (Just [show (10000 :: Integer)]),
+            -- | The size of the table the runtime indexes by interrupt vector,
+            -- a property of the target. It travelled as a -D of each
+            -- platform.mk until 2026-09-23, which kept the value in two places
+            -- and left it invisible to make and to every tool that reads the
+            -- headers.
+            pre_cr $ _define "TERMINA__INTERRUPT__NUMBER_OF_INTERRUPTS" (Just [show (interruptTableSize plt)])
         ] ++
+        -- | The debug profile, which the runtime reads to stop at a breakpoint
+        -- before it resets. Absent means release, so a build that says nothing
+        -- gets the behaviour of the target.
+        ([pre_cr $ _define "TERMINA__DEBUG" Nothing | profile config == Debug]) ++
         ([pre_cr $ _define "TERMINA__SYS_PRINT__OUTPUT_BUFFER_SIZE" (Just [show $ sysPrintOutputBufferSize config]) | sysPrintOutputBufferSize config /= defaultSysPrintOutputBufferSize]) ++
         ([pre_cr $ _define "TERMINA__SYS_READ__INPUT_BUFFER_SIZE" (Just [show $ sysReadInputBufferSize config]) | sysReadInputBufferSize config /= defaultSysReadInputBufferSize]) ++
         [

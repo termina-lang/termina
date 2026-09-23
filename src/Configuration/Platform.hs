@@ -151,6 +151,17 @@ getPlatformInterruptMap FreeRTOS10STM32L432XX =
     ]
 getPlatformInterruptMap TestPlatform = M.empty
 
+-- | The size of the interrupt table of the platform, which the runtime
+-- declares and indexes by vector. It is therefore the highest vector plus one
+-- and not the number of interrupts: a platform may leave gaps, as the STM32
+-- does with 60 interrupts over a table of 83. Derived from the map rather than
+-- declared, so that adding an interrupt cannot leave the table short.
+interruptTableSize :: Platform -> Integer
+interruptTableSize plt =
+    case M.elems (getPlatformInterruptMap plt) of
+        [] -> 0
+        vectors -> maximum vectors + 1
+
 defaultPlatformFlags :: PlatformFlags
 defaultPlatformFlags = PlatformFlags {
     rtems5_leon3_nexysa7      = defaultRTEMS5LEON3NEXYSA7Flags,
