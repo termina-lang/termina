@@ -10,8 +10,7 @@ import Generator.CodeGen.Common
 import Semantic.Types
 import ControlFlow.Architecture.Types
 import Configuration.Configuration
-import Configuration.Platform (Platform)
-import Generator.Environment (getPlatformInterruptMap)
+import Configuration.Platform (Platform, getPlatformInterruptMap)
 import Generator.LanguageC.Embedded
 import ControlFlow.Architecture.Utils
 import System.FilePath

@@ -3,6 +3,8 @@
 module Configuration.Platform where
 
 import Data.Yaml
+import qualified Data.Map.Strict as M
+import Core.AST (Identifier)
 import Configuration.Platform.RTEMS5LEON3NEXYSA7
 import Configuration.Platform.POSIXGCC
 import Configuration.Platform.FreeRTOS10STM32L432XX
@@ -72,6 +74,82 @@ data PlatformFlags = PlatformFlags {
     posix_gcc                :: POSIXGCCFlags,
     freertos10_stm32l432xx   :: FreeRTOS10STM32L432XXFlags
 } deriving (Eq, Show)
+
+-- | The interrupts the platform exposes, each one with the vector it is wired
+-- to. It lives here, beside the rest of what the transpiler knows about a
+-- target, so that a single file answers what a platform is.
+getPlatformInterruptMap :: Platform -> M.Map Identifier Integer
+getPlatformInterruptMap POSIXGCC =
+    M.fromList [("kbd_irq", 0)]
+getPlatformInterruptMap RTEMS5LEON3NEXYSA7 =
+    M.fromList [("irq_1", 1), ("irq_2", 2), ("irq_3", 3), ("irq_4", 4), 
+                ("irq_5", 5), ("irq_6", 6), ("irq_7", 7), ("irq_8", 8), 
+                ("irq_9", 9), ("irq_10", 10), ("irq_11", 11), ("irq_12", 12), 
+                ("irq_13", 13), ("irq_14", 14), ("irq_15", 15)]
+getPlatformInterruptMap FreeRTOS10STM32L432XX =
+    M.fromList [
+        ("wwdg_irq",          0),
+        ("pvd_irq",           1),
+        ("tamp_stamp_irq",    2),
+        ("rtc_wkup_irq",      3),
+        ("flash_irq",         4),
+        ("rcc_irq",           5),
+        ("exti0_irq",         6),
+        ("exti1_irq",         7),
+        ("exti2_irq",         8),
+        ("exti3_irq",         9),
+        ("exti4_irq",         10),
+        ("dma1_channel1_irq", 11),
+        ("dma1_channel2_irq", 12),
+        ("dma1_channel3_irq", 13),
+        ("dma1_channel4_irq", 14),
+        ("dma1_channel5_irq", 15),
+        ("dma1_channel6_irq", 16),
+        ("dma1_channel7_irq", 17),
+        ("adc1_irq",          18),
+        ("can1_tx_irq",       19),
+        ("can1_rx0_irq",      20),
+        ("can1_rx1_irq",      21),
+        ("can1_sce_irq",      22),
+        ("exti9_5_irq",       23),
+        ("tim1_brk_tim15_irq",     24),
+        ("tim1_up_tim16_irq",      25),
+        ("tim1_trg_com_tim17_irq", 26),
+        ("tim1_cc_irq",       27),
+        ("tim2_irq",          28),
+        ("i2c1_ev_irq",       31),
+        ("i2c1_er_irq",       32),
+        ("spi1_irq",          35),
+        ("usart1_irq",        37),
+        ("usart2_irq",        38),
+        ("exti15_10_irq",     40),
+        ("rtc_alarm_irq",     41),
+        ("spi3_irq",          51),
+        ("tim6_dac_irq",      54),
+        ("tim7_irq",          55),
+        ("dma2_channel1_irq", 56),
+        ("dma2_channel2_irq", 57),
+        ("dma2_channel3_irq", 58),
+        ("dma2_channel4_irq", 59),
+        ("dma2_channel5_irq", 60),
+        ("comp_irq",          64),
+        ("lptim1_irq",        65),
+        ("lptim2_irq",        66),
+        ("usb_irq",           67),
+        ("dma2_channel6_irq", 68),
+        ("dma2_channel7_irq", 69),
+        ("lpuart1_irq",       70),
+        ("quad_spi_irq",      71),
+        ("i2c3_ev_irq",       72),
+        ("i2c3_er_irq",       73),
+        ("sai1_irq",          74),
+        ("swpmi1_irq",        76),
+        ("tsc_irq",           77),
+        ("rng_irq",           80),
+        ("fpu_irq",           81),
+        ("crs_irq",           82)
+    ]
+getPlatformInterruptMap TestPlatform = M.empty
 
 defaultPlatformFlags :: PlatformFlags
 defaultPlatformFlags = PlatformFlags {
