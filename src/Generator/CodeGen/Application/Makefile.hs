@@ -22,7 +22,11 @@ genMakefile params bbProject =
         MakeBlock [
             MVariable MSimple "PROJECT_NAME" [MFragment . T.unpack . name $ params],
             MVariable MSimple "PLATFORM" [MFragment . T.unpack . platform $ params],
-            MVariable MSimple "TERMINA_OSAL_DIR" [MFragment "/opt/termina-osal"]
+            MVariable MSimple "TERMINA_OSAL_DIR" [MFragment "/opt/termina-osal"],
+            -- | The profile the platform reads to choose its build flags. The
+            -- runtime reads it as TERMINA__DEBUG, which config.h carries.
+            MVariable MSimple "TERMINA_PROFILE"
+                [MFragment (case profile params of { Debug -> "debug"; Release -> "release" })]
         ],
         MakeBlock [
             MInclude True $ "$(TERMINA_OSAL_DIR)" </> "platform" </> "$(PLATFORM)" </> "platform" <.> "mk"
