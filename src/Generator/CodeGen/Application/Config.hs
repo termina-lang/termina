@@ -86,7 +86,7 @@ genConfigFile mName config progArchitecture = do
         -- | The debug profile, which the runtime reads to stop at a breakpoint
         -- before it resets. Absent means release, so a build that says nothing
         -- gets the behaviour of the target.
-        ([pre_cr $ _define "TERMINA__DEBUG" Nothing | profile config == Debug]) ++
+        ([pre_cr $ _define "TERMINA__PROFILE__DEBUG" Nothing | profile config == Debug]) ++
         ([pre_cr $ _define "TERMINA__SYS_PRINT__OUTPUT_BUFFER_SIZE" (Just [show $ sysPrintOutputBufferSize config]) | sysPrintOutputBufferSize config /= defaultSysPrintOutputBufferSize]) ++
         ([pre_cr $ _define "TERMINA__SYS_READ__INPUT_BUFFER_SIZE" (Just [show $ sysReadInputBufferSize config]) | sysReadInputBufferSize config /= defaultSysReadInputBufferSize]) ++
         [
