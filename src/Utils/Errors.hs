@@ -13,6 +13,7 @@ import Text.Parsec.Pos
 import qualified Language.LSP.Protocol.Types as LSP
 import qualified Data.Map.Strict as M
 import qualified Data.Text.Lazy as TL
+import Data.Char (toUpper)
 import Data.List (sortOn)
 import Data.Maybe (mapMaybe)
 
@@ -97,6 +98,13 @@ errorToText (AnnotatedError err pos) files =
             Position _ start _end -> M.member (sourceName start) files
             _ -> False
 
+-- | The same text with its first letter in upper case.
+capitalize :: T.Text -> T.Text
+capitalize text =
+    case T.uncons text of
+        Nothing -> text
+        Just (c, rest) -> T.cons (toUpper c) rest
+
 -- | The source every diagnostic of the transpiler carries. The server groups
 -- the diagnostics it publishes by this field and clears them by it too, so both
 -- read it from here.
@@ -124,11 +132,13 @@ errorToDiagnostics (AnnotatedError err pos) _files =
         diag = describe err
 
         -- | The editor shows the explanation next to the title, without the
-        -- colour escapes the terminal reads.
+        -- colour escapes the terminal reads. The title opens the message here
+        -- and opens a sentence, so it takes a capital: the terminal writes it
+        -- after "error [SE-150]: " and keeps it lowercase.
         message =
             case diagDetail diag of
-                Nothing -> diagTitle diag <> "."
-                Just detail -> diagTitle diag <> ".\n" <> stripAnsi detail
+                Nothing -> capitalize (diagTitle diag) <> "."
+                Just detail -> capitalize (diagTitle diag) <> ".\n" <> stripAnsi detail
 
         tags = [LSP.DiagnosticTag_Unnecessary | diagUnnecessary diag]
 
