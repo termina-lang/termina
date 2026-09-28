@@ -18,6 +18,7 @@ import Utils.Annotations
 import Parser.Errors
 import qualified Data.Map.Strict as M
 import Utils.Errors (ErrorMessage(toDiagnostics), diagnosticSource)
+import LSP.Index
 import Control.Monad.State
 import Parser.AST
 import LSP.Logging
@@ -135,7 +136,7 @@ loadTerminaModule fullP srcPath = do
         Left err -> do
           let pErr = annotateError (Position fullP (errorPos err) (errorPos err)) (EParseError err)
               fileMap = M.singleton fullP src_code
-              newModule = TerminaStoredModule fullP [] src_code (toDiagnostics pErr fileMap) Nothing Nothing
+              newModule = TerminaStoredModule fullP [] src_code (toDiagnostics pErr fileMap) Nothing Nothing emptyIndex
           modify (\s -> 
             s { 
               project_modules = M.insert fullP 
@@ -147,7 +148,7 @@ loadTerminaModule fullP srcPath = do
           case mimports of
             Left err -> do
               let fileMap = M.singleton fullP src_code
-                  newModule = TerminaStoredModule fullP [] src_code (toDiagnostics err fileMap) Nothing Nothing
+                  newModule = TerminaStoredModule fullP [] src_code (toDiagnostics err fileMap) Nothing Nothing emptyIndex
               modify (\s -> 
                 s { 
                   project_modules = M.insert fullP 
@@ -155,7 +156,7 @@ loadTerminaModule fullP srcPath = do
                     (project_modules s) })
               return $ Just newModule
             Right imports -> do
-              let newModule = TerminaStoredModule fullP imports src_code [] (Just $ ParsingData . frags $ term) Nothing
+              let newModule = TerminaStoredModule fullP imports src_code [] (Just $ ParsingData . frags $ term) Nothing emptyIndex
               modify (\s -> s { project_modules = M.insert fullP 
                 newModule
                 (project_modules s) })
@@ -208,7 +209,8 @@ typeModules' srcPath prevModsMap prevState (m:ms) = do
               project_modules = M.insert m 
                   parsedModule { 
                     diagnostics = toDiagnostics err sourceFilesMap,
-                    semantic = Nothing }
+                    semantic = Nothing,
+                    moduleIndex = emptyIndex }
                   (project_modules s) })
           return prevState
         (Right (typedProgram, newState)) -> do
@@ -217,108 +219,84 @@ typeModules' srcPath prevModsMap prevState (m:ms) = do
           modify (\s -> 
             s { 
               project_modules = M.insert m 
-                  parsedModule { semantic = Just semanticData }
+                  parsedModule { semantic = Just semanticData,
+                                 moduleIndex = indexModule typedProgram }
                   (project_modules s) })          
           -- | We need to update the project store
           typeModules' srcPath newModsMap newState ms
 
-getDocumentSymbols :: LSP.Uri -> SAST.AnnotatedProgram SemanticAnn -> [LSP.SymbolInformation]
-getDocumentSymbols fileURI = Prelude.concatMap toDocumentSymbol
+-- | The symbols of a module, each class and struct holding its own members, so
+-- the outline of the editor and its breadcrumb read as the source is written.
+-- The flat SymbolInformation the protocol started with is deprecated.
+getDocumentSymbols :: SAST.AnnotatedProgram SemanticAnn -> [LSP.DocumentSymbol]
+getDocumentSymbols = Prelude.concatMap toDocumentSymbol
 
   where
 
-    getLSPLocation :: Location -> Maybe LSP.Location
-    getLSPLocation (Position _ sourceStart sourceEnd) =
+    getRange :: Location -> Maybe LSP.Range
+    getRange (Position _ sourceStart sourceEnd) =
       let startLine = fromIntegral $ sourceLine sourceStart - 1
           startCol = fromIntegral $ sourceColumn sourceStart - 1
           endLine = fromIntegral $ sourceLine sourceEnd - 1
           endCol = fromIntegral $ sourceColumn sourceEnd - 1
-      in  Just $ LSP.Location fileURI (LSP.Range (LSP.Position startLine startCol) (LSP.Position endLine endCol))
-    getLSPLocation _ = Nothing 
+      in  Just $ LSP.Range (LSP.Position startLine startCol) (LSP.Position endLine endCol)
+    getRange _ = Nothing
 
-    toFieldDefinitionSymbol :: Text -> SAST.FieldDefinition SemanticAnn -> [LSP.SymbolInformation]
-    toFieldDefinitionSymbol parent (SAST.FieldDefinition name _ ann) =
-      case getLSPLocation (getLocation ann) of
-        Just loc -> [LSP.SymbolInformation (T.pack name) LSP.SymbolKind_Field Nothing (Just parent) Nothing loc]
+    -- | A symbol with its children, which the editor nests under it.
+    symbol :: Text -> LSP.SymbolKind -> Location -> [LSP.DocumentSymbol] -> [LSP.DocumentSymbol]
+    symbol name kind loc children =
+      case getRange loc of
+        Just range ->
+          [LSP.DocumentSymbol name Nothing kind Nothing Nothing range range
+            (if Prelude.null children then Nothing else Just children)]
         Nothing -> []
-    
-    toClassMemberSymbol :: Text -> SAST.ClassMember SemanticAnn -> [LSP.SymbolInformation]
-    toClassMemberSymbol parent (SAST.ClassMethod _ name _ _ _ ann) =
-      case getLSPLocation (getLocation ann) of
-        Just loc -> [LSP.SymbolInformation (T.pack name) LSP.SymbolKind_Method Nothing (Just parent) Nothing loc]
-        Nothing -> []
-    toClassMemberSymbol parent (SAST.ClassField fieldDef) =
-      toFieldDefinitionSymbol parent fieldDef
-    toClassMemberSymbol parent (SAST.ClassViewer name _ _ _ ann) =
-      case getLSPLocation (getLocation ann) of
-        Just loc -> [LSP.SymbolInformation (T.pack name) LSP.SymbolKind_Method Nothing (Just parent) Nothing loc]
-        Nothing -> []
-    toClassMemberSymbol parent (SAST.ClassProcedure _ name _ _ ann) =
-      case getLSPLocation (getLocation ann) of
-        Just loc -> [LSP.SymbolInformation (T.pack name) LSP.SymbolKind_Method Nothing (Just parent) Nothing loc]
-        Nothing -> []
-    toClassMemberSymbol parent (SAST.ClassAction _ name _ _ _ ann) =
-      case getLSPLocation (getLocation ann) of
-        Just loc -> [LSP.SymbolInformation (T.pack name) LSP.SymbolKind_Method Nothing (Just parent) Nothing loc]
-        Nothing -> []
-    
-    toGlobalSymbol :: SAST.Global SemanticAnn -> [LSP.SymbolInformation]
-    toGlobalSymbol (SAST.Task name _ _ _ ann) =
-      case getLSPLocation (getLocation ann) of
-        Just loc -> [LSP.SymbolInformation (T.pack name) LSP.SymbolKind_Variable Nothing Nothing Nothing loc]
-        Nothing -> []
-    toGlobalSymbol (SAST.Resource name _ _ _ ann) =
-      case getLSPLocation (getLocation ann) of
-        Just loc -> [LSP.SymbolInformation (T.pack name) LSP.SymbolKind_Variable Nothing Nothing Nothing loc]
-        Nothing -> []
-    toGlobalSymbol (SAST.Handler name _ _ _ ann) =
-      case getLSPLocation (getLocation ann) of
-        Just loc -> [LSP.SymbolInformation (T.pack name) LSP.SymbolKind_Variable Nothing Nothing Nothing loc]
-        Nothing -> []
-    toGlobalSymbol (SAST.Channel name _ _ _ ann) =
-      case getLSPLocation (getLocation ann) of
-        Just loc -> [LSP.SymbolInformation (T.pack name) LSP.SymbolKind_Variable Nothing Nothing Nothing loc]
-        Nothing -> []
-    toGlobalSymbol (SAST.Emitter name _ _ _ ann) =
-      case getLSPLocation (getLocation ann) of
-        Just loc -> [LSP.SymbolInformation (T.pack name) LSP.SymbolKind_Variable Nothing Nothing Nothing loc]
-        Nothing -> []
+
+    toFieldSymbol :: SAST.FieldDefinition SemanticAnn -> [LSP.DocumentSymbol]
+    toFieldSymbol (SAST.FieldDefinition name _ ann) =
+      symbol (T.pack name) LSP.SymbolKind_Field (getLocation ann) []
+
+    toClassMemberSymbol :: SAST.ClassMember SemanticAnn -> [LSP.DocumentSymbol]
+    toClassMemberSymbol (SAST.ClassField fieldDef) = toFieldSymbol fieldDef
+    toClassMemberSymbol (SAST.ClassMethod _ name _ _ _ ann) =
+      symbol (T.pack name) LSP.SymbolKind_Method (getLocation ann) []
+    toClassMemberSymbol (SAST.ClassProcedure _ name _ _ ann) =
+      symbol (T.pack name) LSP.SymbolKind_Method (getLocation ann) []
+    toClassMemberSymbol (SAST.ClassViewer name _ _ _ ann) =
+      symbol (T.pack name) LSP.SymbolKind_Method (getLocation ann) []
+    toClassMemberSymbol (SAST.ClassAction _ name _ _ _ ann) =
+      symbol (T.pack name) LSP.SymbolKind_Method (getLocation ann) []
+
+    toInterfaceMemberSymbol :: SAST.InterfaceMember SemanticAnn -> [LSP.DocumentSymbol]
+    toInterfaceMemberSymbol (SAST.InterfaceProcedure _ name _ _ ann) =
+      symbol (T.pack name) LSP.SymbolKind_Method (getLocation ann) []
+
+    toGlobalSymbol :: SAST.Global SemanticAnn -> [LSP.DocumentSymbol]
+    toGlobalSymbol (SAST.Task name _ _ _ ann) = objectSymbol name ann
+    toGlobalSymbol (SAST.Resource name _ _ _ ann) = objectSymbol name ann
+    toGlobalSymbol (SAST.Handler name _ _ _ ann) = objectSymbol name ann
+    toGlobalSymbol (SAST.Channel name _ _ _ ann) = objectSymbol name ann
+    toGlobalSymbol (SAST.Emitter name _ _ _ ann) = objectSymbol name ann
     toGlobalSymbol (SAST.Const name _ _ _ ann) =
-      case getLSPLocation (getLocation ann) of
-        Just loc -> [LSP.SymbolInformation (T.pack name) LSP.SymbolKind_Constant Nothing Nothing Nothing loc]
-        Nothing -> []
+      symbol (T.pack name) LSP.SymbolKind_Constant (getLocation ann) []
     toGlobalSymbol (SAST.ConstExpr name _ _ _ ann) =
-      case getLSPLocation (getLocation ann) of
-        Just loc -> [LSP.SymbolInformation (T.pack name) LSP.SymbolKind_Constant Nothing Nothing Nothing loc]
-        Nothing -> []
-    
-    toDocumentSymbol :: SAST.AnnASTElement SemanticAnn -> [LSP.SymbolInformation]
+      symbol (T.pack name) LSP.SymbolKind_Constant (getLocation ann) []
+
+    objectSymbol name ann = symbol (T.pack name) LSP.SymbolKind_Variable (getLocation ann) []
+
+    toDocumentSymbol :: SAST.AnnASTElement SemanticAnn -> [LSP.DocumentSymbol]
     toDocumentSymbol (SAST.Function name _ _ _ _ ann) =
-      case getLSPLocation (getLocation ann) of
-        Just loc -> 
-          [LSP.SymbolInformation (T.pack name) LSP.SymbolKind_Function Nothing Nothing Nothing loc]
-        Nothing -> []
-    toDocumentSymbol (SAST.TypeDefinition (Class _ name members _ _ ) ann) =
-      let textName = T.pack name in
-      case getLSPLocation (getLocation ann) of
-        Just loc -> 
-          LSP.SymbolInformation textName LSP.SymbolKind_Class Nothing Nothing Nothing loc :
-          Prelude.concatMap (toClassMemberSymbol textName) members 
-        Nothing -> []
+      symbol (T.pack name) LSP.SymbolKind_Function (getLocation ann) []
+    toDocumentSymbol (SAST.TypeDefinition (Class _ name members _ _) ann) =
+      symbol (T.pack name) LSP.SymbolKind_Class (getLocation ann)
+        (Prelude.concatMap toClassMemberSymbol members)
     toDocumentSymbol (SAST.TypeDefinition (Struct name fields _) ann) =
-      let textName = T.pack name in
-      case getLSPLocation (getLocation ann) of
-        Just loc -> 
-          LSP.SymbolInformation textName LSP.SymbolKind_Struct Nothing Nothing Nothing loc :
-          Prelude.concatMap (toFieldDefinitionSymbol textName) fields
-        Nothing -> []
-    toDocumentSymbol (SAST.TypeDefinition (Enum name _ _) ann) =
-      case getLSPLocation (getLocation ann) of
-        Just loc -> [LSP.SymbolInformation (T.pack name) LSP.SymbolKind_Enum Nothing Nothing Nothing loc]
-        Nothing -> []
-    toDocumentSymbol (SAST.TypeDefinition (Interface _ name _ _ _) ann) =
-      case getLSPLocation (getLocation ann) of
-        Just loc -> [LSP.SymbolInformation (T.pack name) LSP.SymbolKind_Interface Nothing Nothing Nothing loc]
-        Nothing -> []
-    toDocumentSymbol (SAST.GlobalDeclaration glb) =
-      toGlobalSymbol glb
+      symbol (T.pack name) LSP.SymbolKind_Struct (getLocation ann)
+        (Prelude.concatMap toFieldSymbol fields)
+    toDocumentSymbol (SAST.TypeDefinition (Enum name variants _) ann) =
+      symbol (T.pack name) LSP.SymbolKind_Enum (getLocation ann)
+        [ v | SAST.EnumVariant variantName _ <- variants
+            , v <- symbol (T.pack variantName) LSP.SymbolKind_EnumMember (getLocation ann) [] ]
+    toDocumentSymbol (SAST.TypeDefinition (Interface _ name _ members _) ann) =
+      symbol (T.pack name) LSP.SymbolKind_Interface (getLocation ann)
+        (Prelude.concatMap toInterfaceMemberSymbol members)
+    toDocumentSymbol (SAST.GlobalDeclaration glb) = toGlobalSymbol glb

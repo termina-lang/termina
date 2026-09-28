@@ -3,6 +3,7 @@ module Pipeline.Common
   , runFullProjectBuild
   , runFullProjectApp
   , runFullProjectAppWith
+  , runTypedModule
   , systemInitConfig
   , renderMainFile
   , renderMainFileWith
@@ -39,6 +40,7 @@ import Generator.CodeGen.Application.Glue (runGenMainFile)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
 import Generator.LanguageC.Printer (runCPrinter)
 import ControlFlow.BasicBlocks.AST (AnnotatedProgram)
+import qualified Semantic.AST as SAST
 
 import Command.Types
 import Command.Utils
@@ -131,6 +133,18 @@ runProjectPipeline cfg sources = do
   progArch <- genProjectArchitecture cfg files foldedProject ordered
   runChecks files progArch
   pure (foldedProject, ordered, progArch)
+
+-- | The typed AST of one module of a project, which is the stage the language
+-- server keeps and the one its index is built from. The stages after it, basic
+-- blocks included, produce a different AST and answer other questions.
+runTypedModule :: QualifiedName -> [(QualifiedName, String)]
+  -> Either Failure (SAST.AnnotatedProgram SemanticAnn)
+runTypedModule target sources = do
+  let files = M.fromList [ (qname, pack src) | (qname, src) <- sources ]
+  parsedProject <- M.fromList <$> mapM parseModule sources
+  ordered <- orderModules parsedProject
+  typedProject <- typeProject configParams files parsedProject ordered
+  pure (typedAST . metadata $ typedProject M.! target)
 
 -- | Render the generated @main@ file (task/emitter installation, the app init
 -- entry point) from a program architecture, collapsing a codegen failure into

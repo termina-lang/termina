@@ -4,6 +4,7 @@ import Modules.Modules (ModuleDependency)
 import qualified Data.Text as T
 import Command.Types (SemanticData, ParsingData)
 import qualified Language.LSP.Protocol.Types as LSP
+import LSP.Index (ModuleIndex)
 
 -- | Data type used to represented a loaded module
 -- | It contains the module's name, the list of imported modules, the source code
@@ -22,6 +23,8 @@ data TerminaStoredModule = TerminaStoredModule {
   -- | Module's parsed AST
   parsing :: Maybe ParsingData,
   -- | Module's semantic AST
-  semantic :: Maybe SemanticData
+  semantic :: Maybe SemanticData,
+  -- | Where the module defines each name and what each use of a name points at
+  moduleIndex :: ModuleIndex
 
-} 
+}
