@@ -1,6 +1,9 @@
 module Main (main) where
 
 import Options.Applicative
+import Data.List (intercalate)
+import Data.Version (versionBranch)
+import Paths_termina (version)
 import Command.New
 import Command.Build
 import Command.Try
@@ -44,9 +47,14 @@ commandParser = subparser
  <> command "sched" (info schedCommandParser ( progDesc "Generate scheduling models" ))
   )
 
+-- The package version is PVP (X.Y.Z.0); the public one drops the fourth
+-- component.
+publicVersion :: String
+publicVersion = intercalate "." (map show (take 3 (versionBranch version)))
+
 main :: IO ()
 main = do
-    cmd <- customExecParser (prefs showHelpOnEmpty) $ info (commandParser <**> helper)
+    cmd <- customExecParser (prefs showHelpOnEmpty) $ info (commandParser <**> simpleVersioner ("termina " ++ publicVersion) <**> helper)
         (fullDesc
             <> header "termina: a domain-specific language for real-time critical systems" )
     case cmd of
