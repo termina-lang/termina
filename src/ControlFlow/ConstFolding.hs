@@ -60,8 +60,8 @@ foldType loc (TFixedLocation (TArray ty arraySize)) = do
 foldType _ ty = return ty
 
 foldParam :: Location -> Parameter SemanticAnn -> ConstFoldMonad (Parameter SemanticAnn)
-foldParam loc (Parameter name ty) = 
-  Parameter name <$> foldType loc ty
+foldParam loc (Parameter name ty ann) = 
+  (\ty' -> Parameter name ty' ann) <$> foldType loc ty
 
 foldInterfaceMember :: InterfaceMember SemanticAnn -> ConstFoldMonad (InterfaceMember SemanticAnn)
 foldInterfaceMember (InterfaceProcedure ak procId params mods ann) = do
@@ -312,7 +312,7 @@ foldExpression (FunctionCall ident args ann) = do
   case ann' of
     (SemanticAnn (ETy (AppType params _ty)) exprLoc) ->
       zipWithM_ (\param arg -> case param of
-        Parameter _ paramTy -> checkType exprLoc paramTy arg) params args'
+        Parameter _ paramTy _ -> checkType exprLoc paramTy arg) params args'
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
   return $ FunctionCall ident args' ann'
 foldExpression (MemberFunctionCall obj ident args ann) = do
@@ -322,7 +322,7 @@ foldExpression (MemberFunctionCall obj ident args ann) = do
   case ann' of
     (SemanticAnn (ETy (AppType params _ty)) exprLoc) ->
       zipWithM_ (\param arg -> case param of
-        Parameter _ paramTy -> checkType exprLoc paramTy arg) params args'
+        Parameter _ paramTy _ -> checkType exprLoc paramTy arg) params args'
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
   return $ MemberFunctionCall obj' ident args' ann'
 foldExpression (DerefMemberFunctionCall obj ident args ann) = do
@@ -332,7 +332,7 @@ foldExpression (DerefMemberFunctionCall obj ident args ann) = do
   case ann' of
     (SemanticAnn (ETy (AppType params _ty)) exprLoc) ->
       zipWithM_ (\param arg -> case param of
-        Parameter _ paramTy -> checkType exprLoc paramTy arg) params args'
+        Parameter _ paramTy _ -> checkType exprLoc paramTy arg) params args'
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
   return $ DerefMemberFunctionCall obj' ident args' ann'
 foldExpression (ArraySliceExpression ak obj lower upper ann) = do

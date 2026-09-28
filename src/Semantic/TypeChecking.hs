@@ -47,7 +47,7 @@ typeElement (Function ident ps_ts mts bret mds_ts anns) = do
   mty <- mapM (typeTypeSpecifier anns typeGlobalObject >=>
       (\ty -> checkReturnType anns ty >> return ty)) mts
   (ps_ty, typedBret) <- localScope $ do
-      ps_ty <- forM ps_ts (\param@(Parameter paramId _) -> do
+      ps_ty <- forM ps_ts (\param@(Parameter paramId _ _) -> do
           typedParam <- typeParameter anns param
           insertLocalImmutObj anns paramId (paramType typedParam)
           return typedParam)

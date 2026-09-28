@@ -181,7 +181,7 @@ instance Annotated Expression where
 data MatchCase a = MatchCase
   {
     matchIdentifier :: Identifier
-  , matchBVars      :: [Identifier]
+  , matchBVars      :: [(Identifier, a)] -- ^ variables the variant binds, each with its own position
   , matchBody       :: Block a
   , matchAnnotation :: a
   } deriving (Show, Functor)

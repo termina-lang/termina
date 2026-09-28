@@ -301,9 +301,12 @@ objectIdentifierParser = do
 
 parameterParser :: TerminaParser (Parameter ParserAnn)
 parameterParser = do
+  current <- getState
+  startPos <- getPosition
   identifier <- objectIdentifierParser
   reservedOp ":"
-  Parameter identifier <$> typeSpecifierParser
+  typeSpecifier <- typeSpecifierParser
+  Parameter identifier typeSpecifier . Position current startPos <$> getPosition
 
 -- | TerminaParser for a field value assignments expression
 -- This expression is used to create annonymous structures to serve as right
@@ -941,13 +944,23 @@ assignmentStmtPaser = do
   _ <- semi
   return $ AssignmentStmt lval rval (Position current startPos endPos)
 
+-- | A variable a match case binds, which carries its own position so that a use
+-- of it inside the body can be traced back to where the case declares it.
+boundVarParser :: TerminaParser (Identifier, ParserAnn)
+boundVarParser = do
+  current <- getState
+  startPos <- getPosition
+  ident <- objectIdentifierParser
+  endPos <- getPosition
+  return (ident, Position current startPos endPos)
+
 matchCaseParser :: TerminaParser (MatchCase ParserAnn)
 matchCaseParser = do
   current <- getState
   startPos <- getPosition
   reserved "case"
   caseId <- identifierParser
-  args <- try (parens (sepBy objectIdentifierParser comma)) <|> return []
+  args <- try (parens (sepBy boundVarParser comma)) <|> return []
   reservedOp "=>"
   caseBlk <- blockParser
   MatchCase caseId args caseBlk . Position current startPos <$> getPosition

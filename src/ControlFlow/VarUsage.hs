@@ -311,8 +311,8 @@ transfer = Transfer
   , onCondition = readExpression
   , onLoopGuard = readExpression
     -- | The variables a case binds are declared by the case itself.
-  , onCaseEntry = \_ (MatchCase _ bvars _ ann) ->
-      mapM_ (`markInitialized` getLocation ann) bvars
+  , onCaseEntry = \_ (MatchCase _ bvars _ _) ->
+      mapM_ (\(ident, bann) -> markInitialized ident (getLocation bann)) bvars
   , refineTrue = const (return ())
   , refineFalse = const (return ())
     -- | The iterator is read by the loop itself, so it needs no marking.

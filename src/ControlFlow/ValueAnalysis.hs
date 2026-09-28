@@ -472,7 +472,7 @@ enterCase discriminant (MatchCase variant bvars _ ann) = do
             (observed g) })
   -- | The variables a case binds are declared by the case, with a value that
   -- comes from the variant it matched.
-  mapM_ forget bvars
+  mapM_ (forget . fst) bvars
   case discriminant of
     AccessObject obj | Just cell <- cellOf obj -> do
       range <- rangeOfVariable obj

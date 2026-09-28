@@ -68,8 +68,8 @@ mapParameterMonadic ::
   -- | The new parameter
   Parameter SemanticAnn
   -> MonadicTypesMonad ()
-mapParameterMonadic (Parameter _ (TReference _ ts)) = insertMonadicType ts
-mapParameterMonadic (Parameter _ ts) = insertMonadicType ts
+mapParameterMonadic (Parameter _ (TReference _ ts) _) = insertMonadicType ts
+mapParameterMonadic (Parameter _ ts _) = insertMonadicType ts
 
 mapMaybeMonadic ::
   -- | The new element

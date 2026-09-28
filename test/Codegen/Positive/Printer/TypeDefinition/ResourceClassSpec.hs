@@ -9,30 +9,31 @@ import Utils.Annotations
 import Generator.Monadic
 
 import Codegen.Positive.Printer.Common
+import Semantic.Environment (builtinParameter)
 
 classWithOneProcedureAndZeroFields :: AnnASTElement SemanticAnn
 classWithOneProcedureAndZeroFields = TypeDefinition (Class ResourceClass "Class0" [
     ClassProcedure Mutable "procedure0" [
-      Parameter "param0" TUInt8,
-      Parameter "param1" TUInt16,
-      Parameter "param2" TUInt32,
-      Parameter "param3" TUInt64,
-      Parameter "param4" TInt8,
-      Parameter "param5" TInt16,
-      Parameter "param6" TInt32,
-      Parameter "param7" TInt64
+      builtinParameter "param0" TUInt8,
+      builtinParameter "param1" TUInt16,
+      builtinParameter "param2" TUInt32,
+      builtinParameter "param3" TUInt64,
+      builtinParameter "param4" TInt8,
+      builtinParameter "param5" TInt16,
+      builtinParameter "param6" TInt32,
+      builtinParameter "param7" TInt64
     ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] []) (buildTypeAnn Internal)
 
 classWithTwoProceduresAndZeroFields :: AnnASTElement SemanticAnn
 classWithTwoProceduresAndZeroFields = TypeDefinition (Class ResourceClass "Class0" [
     ClassProcedure Mutable "procedure0" [
-      Parameter "param0" TUInt8,
-      Parameter "param1" (TOption (TBoxSubtype (TStruct "TMPacket")))
+      builtinParameter "param0" TUInt8,
+      builtinParameter "param1" (TOption (TBoxSubtype (TStruct "TMPacket")))
     ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined,
     ClassProcedure Mutable "procedure1" [
-      Parameter "param0" TUInt8,
-      Parameter "param1" (TReference Mutable (TArray TUInt8 (buildConstExprTUSize 32)))
+      builtinParameter "param0" TUInt8,
+      builtinParameter "param1" (TReference Mutable (TArray TUInt8 (buildConstExprTUSize 32)))
     ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] []) (buildTypeAnn Internal)
 
@@ -67,8 +68,8 @@ packedClass = TypeDefinition
     ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (buildConstExprTUSize 32))
       (buildFieldAnn Internal)),
     ClassProcedure Mutable "procedure0" [
-      Parameter "param0" TChar,
-      Parameter "param1" (TReference Mutable (TArray TUInt8 (buildConstExprTUSize 16)))
+      builtinParameter "param0" TChar,
+      builtinParameter "param1" (TReference Mutable (TArray TUInt8 (buildConstExprTUSize 16)))
     ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] [Modifier "packed" Nothing]) (buildTypeAnn Internal)
 

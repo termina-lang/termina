@@ -6,6 +6,7 @@ import Test.Hspec
 import Semantic.AST
 import Data.Text
 import Semantic.Types
+import Semantic.Environment (builtinParameter)
 
 var0, var1, pVar :: Object SemanticAnn
 -- | var0 : u16
@@ -54,35 +55,35 @@ dereferencepVar2PlusVar1 = BinOp Addition (AccessObject dereferencepVar) unboxVa
 
 functionCallSingleVar0, functionCallSingleBoxVar1,
   functionCallSinglepVar :: Expression SemanticAnn
-functionCallSingleVar0 = FunctionCall "foo" [AccessObject var0] (funSemAnn [Parameter "bar" TUInt16] TUInt16)
-functionCallSingleBoxVar1 = FunctionCall "foo" [AccessObject var1] (funSemAnn [Parameter "element" (TBoxSubtype TUInt16)] TUnit)
-functionCallSinglepVar = FunctionCall "foo" [AccessObject pVar] (funSemAnn [Parameter "p" (TReference Mutable TUInt16)] TUnit)
+functionCallSingleVar0 = FunctionCall "foo" [AccessObject var0] (funSemAnn [builtinParameter "bar" TUInt16] TUInt16)
+functionCallSingleBoxVar1 = FunctionCall "foo" [AccessObject var1] (funSemAnn [builtinParameter "element" (TBoxSubtype TUInt16)] TUnit)
+functionCallSinglepVar = FunctionCall "foo" [AccessObject pVar] (funSemAnn [builtinParameter "p" (TReference Mutable TUInt16)] TUnit)
 
 functionCallSingleRefVar0, functionCallSingleRefBoxVar1,
   functionCallSingleDerefpVar :: Expression SemanticAnn
-functionCallSingleRefVar0 = FunctionCall "foo" [referenceVar0] (funSemAnn [Parameter "p" (TReference Mutable TUInt16)] TUnit)
-functionCallSingleRefBoxVar1 = FunctionCall "foo" [referenceVar1] (funSemAnn [Parameter "p" (TReference Mutable TUInt16)] TUnit)
-functionCallSingleDerefpVar = FunctionCall "foo" [AccessObject dereferencepVar] (funSemAnn [Parameter "bar" TInt16] TUnit)
+functionCallSingleRefVar0 = FunctionCall "foo" [referenceVar0] (funSemAnn [builtinParameter "p" (TReference Mutable TUInt16)] TUnit)
+functionCallSingleRefBoxVar1 = FunctionCall "foo" [referenceVar1] (funSemAnn [builtinParameter "p" (TReference Mutable TUInt16)] TUnit)
+functionCallSingleDerefpVar = FunctionCall "foo" [AccessObject dereferencepVar] (funSemAnn [builtinParameter "bar" TInt16] TUnit)
 
 functionCallSingleVar0PlusConstant, functionCallSingleBoxVar1PlusConstant,
   functionCallSingleVar0PlusVar1,
   functionCallSingleDerefpVarPlusConstant,
   functionCallSingleDerefpVarPlusDerefRefVar1 :: Expression SemanticAnn
-functionCallSingleVar0PlusConstant = FunctionCall "foo" [var0PlusConstant] (funSemAnn [Parameter "bar" TUInt16] TUnit)
-functionCallSingleBoxVar1PlusConstant = FunctionCall "foo" [var1PlusConstant] (funSemAnn [Parameter "bar" TUInt16] TUnit)
-functionCallSingleVar0PlusVar1 = FunctionCall "foo" [var0PlusVar1] (funSemAnn [Parameter "bar" TUInt16] TUnit)
-functionCallSingleDerefpVarPlusConstant = FunctionCall "foo" [dereferencepVarPlusConstant] (funSemAnn [Parameter "bar" TUInt16] TUnit)
-functionCallSingleDerefpVarPlusDerefRefVar1 = FunctionCall "foo" [dereferencepVar2PlusVar1] (funSemAnn [Parameter "bar" TUInt16] TUnit)
+functionCallSingleVar0PlusConstant = FunctionCall "foo" [var0PlusConstant] (funSemAnn [builtinParameter "bar" TUInt16] TUnit)
+functionCallSingleBoxVar1PlusConstant = FunctionCall "foo" [var1PlusConstant] (funSemAnn [builtinParameter "bar" TUInt16] TUnit)
+functionCallSingleVar0PlusVar1 = FunctionCall "foo" [var0PlusVar1] (funSemAnn [builtinParameter "bar" TUInt16] TUnit)
+functionCallSingleDerefpVarPlusConstant = FunctionCall "foo" [dereferencepVarPlusConstant] (funSemAnn [builtinParameter "bar" TUInt16] TUnit)
+functionCallSingleDerefpVarPlusDerefRefVar1 = FunctionCall "foo" [dereferencepVar2PlusVar1] (funSemAnn [builtinParameter "bar" TUInt16] TUnit)
 
 functionCallSingleBoxArray0, functionCallSinglepArray1 :: Expression SemanticAnn
-functionCallSingleBoxArray0 = FunctionCall "foo" [AccessObject boxArray0] (funSemAnn [Parameter "element" (TBoxSubtype (TArray TUInt32 (buildConstExprTUSize 10)))] TUnit)
-functionCallSinglepArray1 = FunctionCall "foo" [pArray1] (funSemAnn [Parameter "p" (TReference Mutable (TArray TUInt32 (buildConstExprTUSize 10)))] TUnit)
+functionCallSingleBoxArray0 = FunctionCall "foo" [AccessObject boxArray0] (funSemAnn [builtinParameter "element" (TBoxSubtype (TArray TUInt32 (buildConstExprTUSize 10)))] TUnit)
+functionCallSinglepArray1 = FunctionCall "foo" [pArray1] (funSemAnn [builtinParameter "p" (TReference Mutable (TArray TUInt32 (buildConstExprTUSize 10)))] TUnit)
 
 functionCallSingleRefArray0 :: Expression SemanticAnn
-functionCallSingleRefArray0 = FunctionCall "foo" [referenceArray0] (funSemAnn [Parameter "p" (TReference Mutable (TArray TUInt32 (buildConstExprTUSize 10)))] TUnit)
+functionCallSingleRefArray0 = FunctionCall "foo" [referenceArray0] (funSemAnn [builtinParameter "p" (TReference Mutable (TArray TUInt32 (buildConstExprTUSize 10)))] TUnit)
 
 call2Parameters, call3Parameters :: Expression SemanticAnn
-call2Parameters = FunctionCall "foo2" [var0PlusConstant, var0PlusVar1] (funSemAnn [Parameter "bar0" TUInt16, Parameter "bar1" TUInt16] TUInt16)
+call2Parameters = FunctionCall "foo2" [var0PlusConstant, var0PlusVar1] (funSemAnn [builtinParameter "bar0" TUInt16, builtinParameter "bar1" TUInt16] TUInt16)
 call3Parameters = FunctionCall "foo4"
   [
     AccessObject boxArray0,
@@ -90,10 +91,10 @@ call3Parameters = FunctionCall "foo4"
     functionCallSingleVar0,
     call2Parameters
   ] (funSemAnn [
-      Parameter "element" (TBoxSubtype (TArray TUInt32 (buildConstExprTUSize 10))),
-      Parameter "p" (TReference Mutable TUInt16),
-      Parameter "bar0" TUInt16,
-      Parameter "bar1" TUInt16
+      builtinParameter "element" (TBoxSubtype (TArray TUInt32 (buildConstExprTUSize 10))),
+      builtinParameter "p" (TReference Mutable TUInt16),
+      builtinParameter "bar0" TUInt16,
+      builtinParameter "bar1" TUInt16
     ] TUnit)
 
 spec :: Spec

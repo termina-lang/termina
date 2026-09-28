@@ -755,9 +755,9 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
             modify (\env -> env { eventParamUsed = False })
             cItems <- genItems
             used <- gets eventParamUsed
-            ignored <- mapM (\(Parameter pid pty) -> do
+            ignored <- mapM (\(Parameter pid pty _) -> do
                 cPty <- genType noqual pty
-                return (genParameterIdentifier pid, cPty)) [p | p@(Parameter pid _) <- memberParams, isIgnoredParameter pid]
+                return (genParameterIdentifier pid, cPty)) [p | p@(Parameter pid _ _) <- memberParams, isIgnoredParameter pid]
             let cEventParamType = _const . ptr $ _const termina__event_t
             return $ genDiscardedParameters ([(eventParam, cEventParamType) | not used] ++ ignored) ++ cItems
 genClassDefinition e = throwError $ InternalError $ "AST element is not a class: " ++ show e

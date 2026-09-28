@@ -286,12 +286,17 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
 
           typeMatchCase' (MatchCase cIdent bVars bd mcann) tVars =
               let psLen = length tVars
-                  asLen = length bVars in
+                  asLen = length bVars
+                  -- | Each bound variable keeps the position the parser gave it
+                  -- and takes the type the variant declares for it.
+                  typedBVars = [ (ident, buildExpAnn loc tVar)
+                               | ((ident, loc), tVar) <- zip bVars tVars ] in
               if psLen == asLen then
-              flip (SAST.MatchCase cIdent bVars)
+              flip (SAST.MatchCase cIdent typedBVars)
                   (buildStmtMatchCaseAnn (matchAnnotation c) tVars)
                   <$> localScope (
-                        mapM_ (uncurry $ insertLocalImmutObj mcann) (zip bVars tVars) >>
+                        mapM_ (\((ident, loc), tVar) -> insertLocalImmutObj loc ident tVar)
+                          (zip bVars tVars) >>
                         typeBlock retTy bd
                       )
               else if psLen < asLen
@@ -342,7 +347,7 @@ typeStatement _rTy (ContinueStmt contE anns) =
                 Just _ -> throwError $ annotateError ann (EContinueInvalidMethodOrViewerCall ident)
                 Nothing ->
                   case findClassAction ident cls of
-                    Just (Just param@(Parameter _ ty), rty, SemanticAnn _ loc) -> do
+                    Just (Just param@(Parameter _ ty _), rty, SemanticAnn _ loc) -> do
                         case args of
                           [arg] -> do
                             typed_arg <- typeExpression (Just ty) typeRHSObject arg

@@ -407,10 +407,10 @@ spec = do
     isENotCasteableTBoolTUInt32 = \case Just (ENotCasteable TBool TUInt32) -> True; _ -> False
 
     isEInvalidParameterTypeBox :: Maybe Error -> Bool
-    isEInvalidParameterTypeBox = \case Just (EInvalidParameterType (Parameter _ (TBoxSubtype _))) -> True; _ -> False
+    isEInvalidParameterTypeBox = \case Just (EInvalidParameterType (Parameter _ (TBoxSubtype _) _)) -> True; _ -> False
 
     isEInvalidParameterTypeArray :: Maybe Error -> Bool
-    isEInvalidParameterTypeArray = \case Just (EInvalidParameterType (Parameter _ (TArray _ _))) -> True; _ -> False
+    isEInvalidParameterTypeArray = \case Just (EInvalidParameterType (Parameter _ (TArray _ _) _)) -> True; _ -> False
 
     isEInvalidReturnType :: Maybe Error -> Bool
     isEInvalidReturnType = \case Just (EInvalidReturnType _) -> True; _ -> False

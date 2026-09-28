@@ -24,15 +24,15 @@ genFunctionDecl item = throwError $ InternalError $ "Not a function: " ++ show i
 genFunction :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genFunction (Function identifier parameters rts (Block stmts _) _ ann) = do
     cRetType <- maybe (return (CTVoid noqual)) (genType noqual) rts
-    cParamDecls <- mapM (\(Parameter pid pty) -> do
+    cParamDecls <- mapM (\(Parameter pid pty _) -> do
         cPty <- genParameterType pty
         return $ genParameterIdentifier pid @: cPty) parameters
     cBody <- foldM (\acc x -> do
         cStmt <- genBlocks x
         return $ acc ++ cStmt) [] stmts
-    ignored <- mapM (\(Parameter pid pty) -> do
+    ignored <- mapM (\(Parameter pid pty _) -> do
         cPty <- genType noqual pty
-        return (genParameterIdentifier pid, cPty)) [p | p@(Parameter pid _) <- parameters, isIgnoredParameter pid]
+        return (genParameterIdentifier pid, cPty)) [p | p@(Parameter pid _ _) <- parameters, isIgnoredParameter pid]
     return [ pre_cr $ function identifier cParamDecls @-> cRetType $
                     ((trail_cr . block $ genDiscardedParameters ignored ++ cBody) |>> getLocation ann) |>> getLocation ann]
 genFunction item = throwError $ InternalError $ "Not a function: " ++ show item

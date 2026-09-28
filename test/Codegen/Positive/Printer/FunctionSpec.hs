@@ -6,6 +6,7 @@ import Data.Text
 import Generator.Monadic
 import Semantic.Types
 import Codegen.Positive.Printer.Common
+import Semantic.Environment (builtinParameter)
 
 tmDescriptorTS :: TerminaType SemanticAnn
 tmDescriptorTS = TStruct "TMDescriptor"
@@ -103,7 +104,7 @@ function1 :: AnnASTElement SemanticAnn
 function1 = Function "function1" [] (Just TUInt32) (Block [struct0Declaration0, struct1Declaration, struct0Assignment0, returnStructField0] stmtSemAnn) [] unitSemAnn
 
 function2 :: AnnASTElement SemanticAnn
-function2 = Function "function2" [Parameter "param0" TUInt32] (Just TUInt32)
+function2 = Function "function2" [builtinParameter "param0" TUInt32] (Just TUInt32)
   (Block [
     struct0Declaration1, 
     struct1Declaration, 
@@ -111,7 +112,7 @@ function2 = Function "function2" [Parameter "param0" TUInt32] (Just TUInt32)
     returnStructField0] stmtSemAnn) [] unitSemAnn
 
 function3 :: AnnASTElement SemanticAnn
-function3 = Function "function3" [Parameter "param0" TUInt32, Parameter "param1" (TReference Mutable (TArray TUInt32 (buildConstExprTUSize 10)))] (Just TUInt32) 
+function3 = Function "function3" [builtinParameter "param0" TUInt32, builtinParameter "param1" (TReference Mutable (TArray TUInt32 (buildConstExprTUSize 10)))] (Just TUInt32) 
   (Block [
     struct0Declaration2, 
     struct1Declaration, 

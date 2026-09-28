@@ -177,12 +177,12 @@ checkBasicBlock (MatchBlock e mcase mDefaultCase ann) = do
               [ml,mr] -> do
                 let (mSome, mNone) = if matchIdentifier ml == "Some" then (ml,mr) else (mr,ml)
                 someBlk <- runEncapsWithEmptyVars (checkBasicBlocks (blockBody . matchBody $ mSome)
-                  >> defBox (head (matchBVars mSome)) (getLocation (matchAnnotation mSome)) >> ST.get)
+                  >> defBox (fst (head (matchBVars mSome))) (getLocation (matchAnnotation mSome)) >> ST.get)
                 noneBlk <- runEncapsWithEmptyVars (checkBasicBlocks (blockBody . matchBody $ mNone) >> ST.get)
                 return [(someBlk, getLocation . matchAnnotation $ mSome), (noneBlk, getLocation . matchAnnotation $ mNone)]
               [mSome@(MatchCase "Some" _ _ _)] -> do
                 someBlk <- runEncapsWithEmptyVars (checkBasicBlocks (blockBody . matchBody $ mSome)
-                  >> defBox (head (matchBVars mSome)) (getLocation (matchAnnotation mSome)) >> ST.get)
+                  >> defBox (fst (head (matchBVars mSome))) (getLocation (matchAnnotation mSome)) >> ST.get)
                 return [(someBlk, getLocation . matchAnnotation $ mSome)]
               [MatchCase "None" _ _ _] -> 
                 throwError $ annotateError (getLocation ann) EOptionBoxMatchMissingSomeCase

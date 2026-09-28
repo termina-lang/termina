@@ -303,7 +303,7 @@ instance Diagnosable Error where
     describe (ENotCasteable ty1 ty2) =
         diagnostic "SE-006" "invalid cast"
             ("You cannot cast a value of type \x1b[31m" <> showText ty1 <> "\x1b[0m to type \x1b[31m" <> showText ty2 <> "\x1b[0m.")
-    describe (EInvalidParameterType (Parameter ident ts)) =
+    describe (EInvalidParameterType (Parameter ident ts _)) =
         diagnostic "SE-007" "invalid parameter type"
             ("Parameter \x1b[31m" <> T.pack ident <> "\x1b[0m has an invalid type \x1b[31m" <> showText ts <> "\x1b[0m.")
     describe (EInvalidReturnType ty) =
@@ -317,7 +317,7 @@ instance Diagnosable Error where
         relatedTo procPos ("Procedure \x1b[31m" <> T.pack ident <> "\x1b[0m is defined here:") $
         diagnostic "SE-010" "missing arguments in procedure call"
             ("Procedure \x1b[31m" <> T.pack ident <> "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show numArgs) <> "\x1b[0m.")
-    describe (EProcedureCallArgTypeMismatch (ident, Parameter _ expectedTy, procPos) numArgs actualTy) =
+    describe (EProcedureCallArgTypeMismatch (ident, Parameter _ expectedTy _, procPos) numArgs actualTy) =
         relatedTo procPos ("Procedure \x1b[31m" <> T.pack ident <> "\x1b[0m is defined here:") $
         diagnostic "SE-011" "argument type mismatch in procedure call"
             ("Argument \x1b[31m#" <> T.pack (show numArgs) <> "\x1b[0m of procedure \x1b[31m" <> T.pack ident <> "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
@@ -410,7 +410,7 @@ instance Diagnosable Error where
         relatedTo funcPos ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") $
         diagnostic "SE-036" "missing arguments in function call"
             ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.\n")
-    describe (EFunctionCallArgTypeMismatch (funcId, Parameter _ expectedTy, funcPos) argNumber actualTy) =
+    describe (EFunctionCallArgTypeMismatch (funcId, Parameter _ expectedTy _, funcPos) argNumber actualTy) =
         relatedTo funcPos ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") $
         diagnostic "SE-037" "argument type mismatch in function call"
             ("Argument \x1b[31m#" <> T.pack (show argNumber) <> "\x1b[0m of function \x1b[31m" <> T.pack funcId <> "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")
@@ -655,7 +655,7 @@ instance Diagnosable Error where
         relatedTo funcPos ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") $
         diagnostic "SE-111" "missing arguments in member function call"
             ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.")
-    describe (EMemberFunctionCallArgTypeMismatch (funcId, Parameter _ expectedTy, funcPos) argNumber actualTy) =
+    describe (EMemberFunctionCallArgTypeMismatch (funcId, Parameter _ expectedTy _, funcPos) argNumber actualTy) =
         relatedTo funcPos ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") $
         diagnostic "SE-112" "member function call argument type mismatch"
             ("Argument \x1b[31m#" <> T.pack (show argNumber) <> "\x1b[0m of member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")

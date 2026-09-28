@@ -115,7 +115,7 @@ typeWCET plt (TransactionalWCET classId functionId pathName constParams wcet ann
                 Nothing -> return ()
                 Just (TransactionalWCET _ _ _ _ _ ann') ->
                     throwError . annotateError (getLocation ann) $ EDuplicatedWCETAssignment pathName plt (classId, functionId, getLocation ann')
-            let funcConstParams = [name | Parameter name (TConstSubtype _) <- params]
+            let funcConstParams = [name | Parameter name (TConstSubtype _) _ <- params]
             if length funcConstParams /= length constParams then
                 throwError . annotateError (getLocation ann) $ 
                     EConstParamsNumMismatch classId functionId (toInteger (length funcConstParams)) (toInteger (length constParams)) (getLocation fann)

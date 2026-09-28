@@ -827,7 +827,7 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                         CTPointer {} -> var param cParamType @:= addrOf (cField @: cParamType)
                         _ -> var param cParamType @:= cField @: cParamType
                 decls = [paramDecl param index cParamType
-                            | (param, index, cParamType) <- zip3 params [0..] cParamTypes
+                            | ((param, _), index, cParamType) <- zip3 params [0..] cParamTypes
                             , not (isIgnoredParameter param)]
             case decls of
                 [] -> return []

@@ -61,11 +61,11 @@ inOutDestroyOptionMatchCases :: InOptionBox SemanticAnn -> [MatchCase SemanticAn
 inOutDestroyOptionMatchCases optionBoxSource [fstCase, sndCase] = do 
     let (someCase, MatchCase _ _ noneBody _) = if matchIdentifier fstCase == "Some" then (fstCase, sndCase) else (sndCase, fstCase)
     case someCase of
-        MatchCase "Some" [arg] body _ -> do
+        MatchCase "Some" [(arg, _)] body _ -> do
             localInputScope (addBox arg (getInBox optionBoxSource) >> mapM_ inOutBasicBlock (blockBody body))
         _ -> throwError $ annotateError Internal EInvalidMatchCase
     localInputScope (mapM_ inOutBasicBlock (blockBody noneBody))
-inOutDestroyOptionMatchCases optionBoxSource [MatchCase "Some" [arg] body _] =
+inOutDestroyOptionMatchCases optionBoxSource [MatchCase "Some" [(arg, _)] body _] =
     localInputScope (addBox arg (getInBox optionBoxSource) >> mapM_ inOutBasicBlock (blockBody body))
 inOutDestroyOptionMatchCases _ [MatchCase "None" _ noneBody _] = 
     localInputScope (mapM_ inOutBasicBlock (blockBody noneBody))

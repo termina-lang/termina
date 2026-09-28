@@ -540,6 +540,7 @@ data ClassMember' ty blk a
 data Parameter' ty a = Parameter {
   paramIdentifier      :: Identifier -- ^ paramter identifier (name)
   , paramType :: ty a -- ^ type of the parameter
+  , paramAnnotation :: a -- ^ transpiler annotations
 } deriving (Show, Functor)
 
 data FieldAssignment' expr a =

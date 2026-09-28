@@ -135,14 +135,14 @@ genParameterType :: TerminaType SemanticAnn -> CGenerator CType
 genParameterType ts = _const <$> genType noqual ts
 
 genParameterDeclaration :: Parameter SemanticAnn -> CGenerator CDeclaration
-genParameterDeclaration (Parameter identifier ts) = do
+genParameterDeclaration (Parameter identifier ts _) = do
     cParamType <- genParameterType ts
     return $ CDecl (CTypeSpec cParamType) (Just (genParameterIdentifier identifier)) Nothing
 
 -- | The same parameter as part of the prototype of a function pointer, where
 -- C asks for the name as well as the type.
 genCParameter :: Parameter SemanticAnn -> CGenerator CParameter
-genCParameter (Parameter identifier ts) =
+genCParameter (Parameter identifier ts _) =
     CParameter (genParameterIdentifier identifier) <$> genParameterType ts
 
 

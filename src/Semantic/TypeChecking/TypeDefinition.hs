@@ -38,30 +38,30 @@ import qualified Data.Set as S
 import qualified Data.List as L
 
 typeProcedureParameter :: Location -> Parameter ParserAnn -> SemanticMonad (SAST.Parameter SemanticAnn)
-typeProcedureParameter loc (Parameter ident ts) = do
+typeProcedureParameter loc (Parameter ident ts pann) = do
   ty <- typeTypeSpecifier loc typeRHSObject ts
-  let procParam = SAST.Parameter ident ty
+  let procParam = SAST.Parameter ident ty (buildExpAnn pann ty)
   checkProcedureParameterType loc procParam
   return procParam
 
 typeViewerParameter :: Location -> Parameter ParserAnn -> SemanticMonad (SAST.Parameter SemanticAnn)
-typeViewerParameter loc (Parameter ident ts) = do
+typeViewerParameter loc (Parameter ident ts pann) = do
   ty <- typeTypeSpecifier loc typeRHSObject ts
-  let param = SAST.Parameter ident ty
+  let param = SAST.Parameter ident ty (buildExpAnn pann ty)
   checkViewerParameterType loc param
   return param
 
 typeParameter :: Location -> Parameter ParserAnn -> SemanticMonad (SAST.Parameter SemanticAnn)
-typeParameter loc (Parameter ident ts) = do
+typeParameter loc (Parameter ident ts pann) = do
   ty <- typeTypeSpecifier loc typeRHSObject ts
-  let param = SAST.Parameter ident ty
+  let param = SAST.Parameter ident ty (buildExpAnn pann ty)
   checkParameterType loc param
   return param
 
 typeActionParameter :: Location -> Parameter ParserAnn -> SemanticMonad (SAST.Parameter SemanticAnn)
-typeActionParameter loc (Parameter ident ts) = do
+typeActionParameter loc (Parameter ident ts pann) = do
   ty <- typeTypeSpecifier loc typeRHSObject ts
-  let param = SAST.Parameter ident ty
+  let param = SAST.Parameter ident ty (buildExpAnn pann ty)
   checkActionParameterType loc param
   return param
 
@@ -133,7 +133,7 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
     typeInterfaceProcedure :: InterfaceMember Location -> SemanticMonad (SAST.InterfaceMember SemanticAnn)
     typeInterfaceProcedure (InterfaceProcedure ak procId ps_ts mds_ts' annIP) = do
       ps_ty <- localScope $ do
-          forM ps_ts (\param@(Parameter paramId _) -> do
+          forM ps_ts (\param@(Parameter paramId _ _) -> do
             typedParam <- typeProcedureParameter annIP param
             insertLocalImmutObj annIP paramId (paramType typedParam)
             return typedParam)
@@ -310,7 +310,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
               -- We have checked the validity of the parameters when sorting the class members.
               (ps_ty, typed_bret) <- localScope $ do
                   insertLocalImmutObj mann "self" (TReference ak (TGlobal kind ident))
-                  ps_ty <- forM ps_ts (\param@(Parameter paramId _) -> do
+                  ps_ty <- forM ps_ts (\param@(Parameter paramId _ _) -> do
                       typedParam <- typeProcedureParameter mann param
                       insertLocalImmutObj mann paramId (paramType typedParam)
                       return typedParam)
@@ -323,7 +323,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
                   (\ty -> checkReturnType mann ty >> return ty)) mts
               (ps_ty, typed_bret) <- localScope $ do 
                   insertLocalImmutObj mann "self" (TReference ak (TGlobal kind ident))
-                  ps_ty <- forM ps_ts (\param@(Parameter paramId _) -> do
+                  ps_ty <- forM ps_ts (\param@(Parameter paramId _ _) -> do
                       typedParam <- typeParameter mann param
                       insertLocalImmutObj mann paramId (paramType typedParam)
                       return typedParam)
@@ -336,7 +336,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
                   (\ty -> checkReturnType mann ty >> return ty)) mts
               (ps_ty, typed_bret) <- localScope $ do
                   insertLocalImmutObj mann "self" (TReference Immutable (TGlobal kind ident))
-                  ps_ty <- forM ps_ts (\param@(Parameter paramId _) -> do
+                  ps_ty <- forM ps_ts (\param@(Parameter paramId _ _) -> do
                       typedParam <- typeViewerParameter mann param
                       insertLocalImmutObj mann paramId (paramType typedParam)
                       return typedParam)
@@ -493,7 +493,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts, _methods, viewers) prov
           psLen' = length ps'
       when (psLen < psLen') (throwError $ annotateError ann (EProcedureExtraParams (ifaceId, prcId, map paramType ps, loc) (fromIntegral psLen')))
       when (psLen > psLen') (throwError $ annotateError ann (EProcedureMissingParams (ifaceId, prcId, map paramType ps, loc) (fromIntegral psLen')))
-      localScope $ zipWithM_ (\p@(Parameter _ ty) (Parameter pId ts) -> do
+      localScope $ zipWithM_ (\p@(Parameter _ ty _) (Parameter pId ts _) -> do
           ty' <- typeTypeSpecifier loc typeRHSObject ts
           unless (sameTy ty ty') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, paramType p, loc) ty'))
           insertLocalImmutObj ann pId ty'

@@ -498,65 +498,65 @@ typeMemberFunctionCall ann ak obj_ty ident args =
         "alloc" ->
           case args of
             [opt] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallArgTypeMismatch ("alloc", Parameter "opt" (TReference Mutable (TOption (TBoxSubtype ty_pool))), Builtin) 0)
+              typed_arg <- catchMismatch ann (EProcedureCallArgTypeMismatch ("alloc", builtinParameter "opt" (TReference Mutable (TOption (TBoxSubtype ty_pool))), Builtin) 0)
                 (typeExpression (Just (TReference Mutable (TOption (TBoxSubtype ty_pool)))) typeRHSObject opt)
-              return (([Parameter "opt" (TReference Mutable (TOption (TBoxSubtype ty_pool)))], [typed_arg]), TUnit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingArgs ("alloc", [Parameter "opt" (TReference Mutable (TOption (TBoxSubtype ty_pool)))], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraArgs ("alloc", [Parameter "opt" (TReference Mutable (TOption (TBoxSubtype ty_pool)))], Builtin) (fromIntegral (length args)))
+              return (([builtinParameter "opt" (TReference Mutable (TOption (TBoxSubtype ty_pool)))], [typed_arg]), TUnit)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingArgs ("alloc", [builtinParameter "opt" (TReference Mutable (TOption (TBoxSubtype ty_pool)))], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraArgs ("alloc", [builtinParameter "opt" (TReference Mutable (TOption (TBoxSubtype ty_pool)))], Builtin) (fromIntegral (length args)))
         "free" ->
           case args of
             [elemnt] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallArgTypeMismatch ("free", Parameter "element" (TBoxSubtype ty_pool), Builtin) 0)
+              typed_arg <- catchMismatch ann (EProcedureCallArgTypeMismatch ("free", builtinParameter "element" (TBoxSubtype ty_pool), Builtin) 0)
                 (typeExpression (Just (TBoxSubtype ty_pool)) typeRHSObject elemnt)
-              return (([Parameter "element" (TBoxSubtype ty_pool)], [typed_arg]), TUnit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingArgs ("free", [Parameter "element" (TBoxSubtype ty_pool)], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraArgs ("free", [Parameter "element" (TBoxSubtype ty_pool)], Builtin) (fromIntegral (length args)))
+              return (([builtinParameter "element" (TBoxSubtype ty_pool)], [typed_arg]), TUnit)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingArgs ("free", [builtinParameter "element" (TBoxSubtype ty_pool)], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraArgs ("free", [builtinParameter "element" (TBoxSubtype ty_pool)], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     TAccessPort (TAtomicAccess ty_atomic) -> do
       case ident of
         "load" ->
           case args of
             [retval] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallArgTypeMismatch ("load", Parameter "p" (TReference Mutable ty_atomic), Builtin) 0)
+              typed_arg <- catchMismatch ann (EProcedureCallArgTypeMismatch ("load", builtinParameter "p" (TReference Mutable ty_atomic), Builtin) 0)
                 (typeExpression (Just (TReference Mutable ty_atomic)) typeRHSObject retval)
-              return (([Parameter "p" (TReference Mutable ty_atomic)], [typed_arg]), TUnit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingArgs ("load", [Parameter "p" (TReference Mutable ty_atomic)], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraArgs ("load", [Parameter "p" (TReference Mutable ty_atomic)], Builtin) (fromIntegral (length args)))
+              return (([builtinParameter "p" (TReference Mutable ty_atomic)], [typed_arg]), TUnit)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingArgs ("load", [builtinParameter "p" (TReference Mutable ty_atomic)], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraArgs ("load", [builtinParameter "p" (TReference Mutable ty_atomic)], Builtin) (fromIntegral (length args)))
         "store" -> do
           when (ak == Immutable) (throwError $ annotateError ann EInvalidAccessToProcedureFromImmutableSelfReference)
           case args of
             [value] -> do
-              typed_value <- catchMismatch ann (EProcedureCallArgTypeMismatch ("store", Parameter "v" ty_atomic, Builtin) 0)
+              typed_value <- catchMismatch ann (EProcedureCallArgTypeMismatch ("store", builtinParameter "v" ty_atomic, Builtin) 0)
                 (typeExpression (Just ty_atomic) typeRHSObject value)
-              return (([Parameter "v" ty_atomic], [typed_value]), TUnit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingArgs ("store", [Parameter "v" ty_atomic], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraArgs ("store", [Parameter "v" ty_atomic], Builtin) (fromIntegral (length args)))
+              return (([builtinParameter "v" ty_atomic], [typed_value]), TUnit)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingArgs ("store", [builtinParameter "v" ty_atomic], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraArgs ("store", [builtinParameter "v" ty_atomic], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     TAccessPort (TAtomicArrayAccess ty_atomic _size) ->
       case ident of
         "load_index" ->
           case args of
             [index, retval] -> do
-              typed_idx <- catchMismatch ann (EProcedureCallArgTypeMismatch ("load_index", Parameter "idx" TUSize, Builtin) 0)
+              typed_idx <- catchMismatch ann (EProcedureCallArgTypeMismatch ("load_index", builtinParameter "idx" TUSize, Builtin) 0)
                 (typeExpression (Just TUSize) typeRHSObject index)
-              typed_ref <- catchMismatch ann (EProcedureCallArgTypeMismatch ("load_index", Parameter "p" (TReference Mutable ty_atomic), Builtin) 1)
+              typed_ref <- catchMismatch ann (EProcedureCallArgTypeMismatch ("load_index", builtinParameter "p" (TReference Mutable ty_atomic), Builtin) 1)
                 (typeExpression (Just (TReference Mutable ty_atomic)) typeRHSObject retval)
-              return (([Parameter "idx" TUSize, Parameter "p" (TReference Mutable ty_atomic)], [typed_idx, typed_ref]), TUnit)
+              return (([builtinParameter "idx" TUSize, builtinParameter "p" (TReference Mutable ty_atomic)], [typed_idx, typed_ref]), TUnit)
             _ -> if length args < 2 then
-              throwError $ annotateError ann (EProcedureCallMissingArgs ("load_index", [Parameter "idx" TUSize, Parameter "p" (TReference Mutable ty_atomic)], Builtin) (fromIntegral (length args)))
-              else throwError $ annotateError ann (EProcedureCallExtraArgs ("load_index", [Parameter "idx" TUSize, Parameter "p" (TReference Mutable ty_atomic)], Builtin) (fromIntegral (length args)))
+              throwError $ annotateError ann (EProcedureCallMissingArgs ("load_index", [builtinParameter "idx" TUSize, builtinParameter "p" (TReference Mutable ty_atomic)], Builtin) (fromIntegral (length args)))
+              else throwError $ annotateError ann (EProcedureCallExtraArgs ("load_index", [builtinParameter "idx" TUSize, builtinParameter "p" (TReference Mutable ty_atomic)], Builtin) (fromIntegral (length args)))
         "store_index" -> do
           when (ak == Immutable) (throwError $ annotateError ann EInvalidAccessToProcedureFromImmutableSelfReference)
           case args of
             [index, retval] -> do
-              typed_idx <- catchMismatch ann (EProcedureCallArgTypeMismatch ("store_index", Parameter "idx" TUSize, Builtin) 0)
+              typed_idx <- catchMismatch ann (EProcedureCallArgTypeMismatch ("store_index", builtinParameter "idx" TUSize, Builtin) 0)
                 (typeExpression (Just TUSize) typeRHSObject index)
-              typed_value <- catchMismatch ann (EProcedureCallArgTypeMismatch ("store_index", Parameter "v" ty_atomic, Builtin) 1)
+              typed_value <- catchMismatch ann (EProcedureCallArgTypeMismatch ("store_index", builtinParameter "v" ty_atomic, Builtin) 1)
                 (typeExpression (Just ty_atomic) typeRHSObject retval)
-              return (([Parameter "idx" TUSize, Parameter "v" ty_atomic], [typed_idx, typed_value]), TUnit)
+              return (([builtinParameter "idx" TUSize, builtinParameter "v" ty_atomic], [typed_idx, typed_value]), TUnit)
             _ -> if length args < 2 then
-              throwError $ annotateError ann (EProcedureCallMissingArgs ("store_index", [Parameter "idx" TUSize, Parameter "v" ty_atomic], Builtin) (fromIntegral (length args)))
-              else throwError $ annotateError ann (EProcedureCallExtraArgs ("store_index", [Parameter "idx" TUSize, Parameter "v" ty_atomic], Builtin) (fromIntegral (length args)))
+              throwError $ annotateError ann (EProcedureCallMissingArgs ("store_index", [builtinParameter "idx" TUSize, builtinParameter "v" ty_atomic], Builtin) (fromIntegral (length args)))
+              else throwError $ annotateError ann (EProcedureCallExtraArgs ("store_index", [builtinParameter "idx" TUSize, builtinParameter "v" ty_atomic], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     TOutPort ty -> do
       when (ak == Immutable) (throwError $ annotateError ann EInvalidAccessToOutPortFromImmutableSelfReference)
@@ -567,7 +567,7 @@ typeMemberFunctionCall ann ak obj_ty ident args =
             [elemnt] -> do
               -- Type the first argument element
               typed_element <- catchMismatch ann (EOutboundPortArgTypeMismatch ty) (typeExpression (Just ty) typeRHSObject elemnt)
-              return (([Parameter "element" ty] , [typed_element]), TUnit)
+              return (([builtinParameter "element" ty] , [typed_element]), TUnit)
             _ -> throwError $ annotateError ann (EOutboundPortSendInvalidNumArgs (fromIntegral $ length args))
         _ -> throwError $ annotateError ann $ EOutboundPortInvalidProcedure ident
     ty -> throwError $ annotateError ann (EMemberFunctionCallInvalidType ty)
