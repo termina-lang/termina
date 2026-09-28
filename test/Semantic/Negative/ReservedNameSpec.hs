@@ -5,7 +5,7 @@
 -- through, and a global one called @memory@ must not.
 module Semantic.Negative.ReservedNameSpec (spec) where
 
-import Semantic.Common (typeCheckErrorOn)
+import Semantic.Common (typeCheckErrorOn, typeCheckErrorPosOn)
 
 import Test.Hspec
 import Data.Text (pack)
@@ -43,6 +43,32 @@ paramNamedUnderscoreUpper =
   "function ignore(_Unused : u32) -> u32 {\n" ++
   "    return 0 : u32;\n" ++
   "}\n"
+
+-- | The error points at the parameter and not at the function or the member
+-- that declares it, which here start on the line above.
+secondParamNamedAbs :: String
+secondParamNamedAbs =
+  "function scale(value : u32,\n" ++
+  "               abs : u32) -> u32 {\n" ++
+  "    return value * abs;\n" ++
+  "}\n"
+
+methodParamNamedAbs :: String
+methodParamNamedAbs =
+  "interface IScaler {\n" ++
+  "    procedure reset(&mut self);\n" ++
+  "};\n" ++
+  "resource class CScaler provides IScaler {\n" ++
+  "    factor : u32;\n" ++
+  "    procedure reset(&mut self) {\n" ++
+  "        self->factor = self->scale(1);\n" ++
+  "        return;\n" ++
+  "    }\n" ++
+  "    method scale(&priv self,\n" ++
+  "                 abs : u32) -> u32 {\n" ++
+  "        return self->factor * abs;\n" ++
+  "    }\n" ++
+  "};\n"
 
 paramNamedUnderscoreLower :: String
 paramNamedUnderscoreLower =
@@ -93,6 +119,10 @@ spec = do
       typeCheckErrorOn TestPlatform paramNamedUnderscoreUpper `shouldBe` Just (pack "SE-219")
     it "rejects a function named after one of the standard library" $
       typeCheckErrorOn TestPlatform globalNamedMemcpy `shouldBe` Just (pack "SE-219")
+    it "points at the parameter of a function" $
+      typeCheckErrorPosOn TestPlatform secondParamNamedAbs `shouldBe` Just (2, 16)
+    it "points at the parameter of a method" $
+      typeCheckErrorPosOn TestPlatform methodParamNamedAbs `shouldBe` Just (11, 18)
 
   describe "SE-219: the types of Termina that take type arguments" $ do
     it "rejects a struct named Option" $

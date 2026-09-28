@@ -36,3 +36,16 @@ typeCheckErrorOn plt input = case runP (contents topLevel) "test" "" input of
     case runTypeChecking (makeInitialGlobalEnv (Just config) plt []) (typeTerminaModule (S.singleton "test") ast) of
       Left err -> Just $ errorIdent err
       Right _ -> Nothing
+
+-- | Type-checks module @test@ on a given target platform, returning the line
+-- and column where the first error starts (or 'Nothing' if it type-checks).
+typeCheckErrorPosOn :: Platform -> String -> Maybe (Line, Column)
+typeCheckErrorPosOn plt input = case runP (contents topLevel) "test" "" input of
+  Left err -> error $ "Parser Error: " ++ show err
+  Right ast ->
+    let config = defaultConfig "test" plt in
+    case runTypeChecking (makeInitialGlobalEnv (Just config) plt []) (typeTerminaModule (S.singleton "test") ast) of
+      Left err -> case getAnnotation err of
+        Position _ start _ -> Just (sourceLine start, sourceColumn start)
+        _ -> error "The error carries no position in the source"
+      Right _ -> Nothing

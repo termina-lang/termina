@@ -133,9 +133,9 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
     typeInterfaceProcedure :: InterfaceMember Location -> SemanticMonad (SAST.InterfaceMember SemanticAnn)
     typeInterfaceProcedure (InterfaceProcedure ak procId ps_ts mds_ts' annIP) = do
       ps_ty <- localScope $ do
-          forM ps_ts (\param@(Parameter paramId _ _) -> do
+          forM ps_ts (\param@(Parameter paramId _ pann) -> do
             typedParam <- typeProcedureParameter annIP param
-            insertLocalImmutObj annIP paramId (paramType typedParam)
+            insertLocalImmutObj pann paramId (paramType typedParam)
             return typedParam)
       mds_ty' <- mapM (typeModifier ann typeGlobalObject) mds_ts'
       return $ InterfaceProcedure ak procId ps_ty mds_ty' (buildExpAnn annIP TUnit)
@@ -310,9 +310,9 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
               -- We have checked the validity of the parameters when sorting the class members.
               (ps_ty, typed_bret) <- localScope $ do
                   insertLocalImmutObj mann "self" (TReference ak (TGlobal kind ident))
-                  ps_ty <- forM ps_ts (\param@(Parameter paramId _ _) -> do
+                  ps_ty <- forM ps_ts (\param@(Parameter paramId _ pann) -> do
                       typedParam <- typeProcedureParameter mann param
-                      insertLocalImmutObj mann paramId (paramType typedParam)
+                      insertLocalImmutObj pann paramId (paramType typedParam)
                       return typedParam)
                   typed_bret <- typeBlock Nothing blk
                   return (ps_ty, typed_bret)
@@ -323,9 +323,9 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
                   (\ty -> checkReturnType mann ty >> return ty)) mts
               (ps_ty, typed_bret) <- localScope $ do 
                   insertLocalImmutObj mann "self" (TReference ak (TGlobal kind ident))
-                  ps_ty <- forM ps_ts (\param@(Parameter paramId _ _) -> do
+                  ps_ty <- forM ps_ts (\param@(Parameter paramId _ pann) -> do
                       typedParam <- typeParameter mann param
-                      insertLocalImmutObj mann paramId (paramType typedParam)
+                      insertLocalImmutObj pann paramId (paramType typedParam)
                       return typedParam)
                   typed_bret <- typeBlock mty mbody
                   return (ps_ty, typed_bret)
@@ -336,9 +336,9 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
                   (\ty -> checkReturnType mann ty >> return ty)) mts
               (ps_ty, typed_bret) <- localScope $ do
                   insertLocalImmutObj mann "self" (TReference Immutable (TGlobal kind ident))
-                  ps_ty <- forM ps_ts (\param@(Parameter paramId _ _) -> do
+                  ps_ty <- forM ps_ts (\param@(Parameter paramId _ pann) -> do
                       typedParam <- typeViewerParameter mann param
-                      insertLocalImmutObj mann paramId (paramType typedParam)
+                      insertLocalImmutObj pann paramId (paramType typedParam)
                       return typedParam)
                   typed_bret <- typeBlock mty mbody
                   return (ps_ty, typed_bret)
@@ -350,7 +350,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
               checkReturnType mann ty
               typed_bret <- localScope $ do 
                   insertLocalImmutObj mann "self" (TReference ak (TGlobal kind ident))
-                  mapM_ (\p_ty -> insertLocalImmutObj mann (paramIdentifier p_ty) (paramType p_ty)) param_ty
+                  mapM_ (\p_ty -> insertLocalImmutObj (getLocation (paramAnnotation p_ty)) (paramIdentifier p_ty) (paramType p_ty)) param_ty
                   typeBlock (Just ty) mbody
               let newAct = SAST.ClassAction ak mIdent param_ty ty typed_bret (buildExpAnn mann ty)
               return (newAct : prevMembers)
@@ -493,10 +493,10 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts, _methods, viewers) prov
           psLen' = length ps'
       when (psLen < psLen') (throwError $ annotateError ann (EProcedureExtraParams (ifaceId, prcId, map paramType ps, loc) (fromIntegral psLen')))
       when (psLen > psLen') (throwError $ annotateError ann (EProcedureMissingParams (ifaceId, prcId, map paramType ps, loc) (fromIntegral psLen')))
-      localScope $ zipWithM_ (\p@(Parameter _ ty _) (Parameter pId ts _) -> do
+      localScope $ zipWithM_ (\p@(Parameter _ ty _) (Parameter pId ts pann) -> do
           ty' <- typeTypeSpecifier loc typeRHSObject ts
           unless (sameTy ty ty') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, paramType p, loc) ty'))
-          insertLocalImmutObj ann pId ty'
+          insertLocalImmutObj pann pId ty'
         ) ps ps'
       checkSortedProcedures ds as
     checkSortedProcedures _ _ = throwError (annotateError Internal EMalformedClassTyping)
