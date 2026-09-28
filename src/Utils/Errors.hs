@@ -97,6 +97,12 @@ errorToText (AnnotatedError err pos) files =
             Position _ start _end -> M.member (sourceName start) files
             _ -> False
 
+-- | The source every diagnostic of the transpiler carries. The server groups
+-- the diagnostics it publishes by this field and clears them by it too, so both
+-- read it from here.
+diagnosticSource :: Maybe T.Text
+diagnosticSource = Just "termina"
+
 -- | The LSP diagnostic of an annotated error, from its description. The fields
 -- are, in order, range, severity, code, code description, source, message, tags,
 -- related information and data.
@@ -107,7 +113,7 @@ errorToDiagnostics (AnnotatedError err pos) _files =
         (Just LSP.DiagnosticSeverity_Error)
         (Just (LSP.InR (diagCode diag)))
         Nothing
-        (Just "termina")
+        diagnosticSource
         message
         (Just tags)
         (Just related)

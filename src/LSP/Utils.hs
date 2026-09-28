@@ -17,7 +17,7 @@ import qualified Data.Text as T
 import Utils.Annotations
 import Parser.Errors
 import qualified Data.Map.Strict as M
-import Utils.Errors (ErrorMessage(toDiagnostics))
+import Utils.Errors (ErrorMessage(toDiagnostics), diagnosticSource)
 import Control.Monad.State
 import Parser.AST
 import LSP.Logging
@@ -78,7 +78,8 @@ emitDiagnostics filePath mdiag = do
         version = Just 0
         normUri = LSP.toNormalizedUri . LSP.filePathToUri $ filePath
     case mdiag of
-      [] -> LSP.publishDiagnostics maxDiags normUri version (M.singleton Nothing (SL.toSortedList []))
+      [] -> LSP.publishDiagnostics maxDiags normUri version
+              (M.singleton diagnosticSource (SL.toSortedList []))
       diags -> LSP.publishDiagnostics maxDiags normUri version (LSP.partitionBySource diags)
 
 -- | Load the modules of the project
