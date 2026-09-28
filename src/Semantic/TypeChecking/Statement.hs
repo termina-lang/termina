@@ -289,13 +289,13 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
                   asLen = length bVars
                   -- | Each bound variable keeps the position the parser gave it
                   -- and takes the type the variant declares for it.
-                  typedBVars = [ (ident, buildExpAnn loc tVar)
-                               | ((ident, loc), tVar) <- zip bVars tVars ] in
+                  typedBVars = [ (ident, buildExpAnn bloc tVar)
+                               | ((ident, bloc), tVar) <- zip bVars tVars ] in
               if psLen == asLen then
               flip (SAST.MatchCase cIdent typedBVars)
                   (buildStmtMatchCaseAnn (matchAnnotation c) tVars)
                   <$> localScope (
-                        mapM_ (\((ident, loc), tVar) -> insertLocalImmutObj loc ident tVar)
+                        mapM_ (\((ident, bloc), tVar) -> insertLocalImmutObj bloc ident tVar)
                           (zip bVars tVars) >>
                         typeBlock retTy bd
                       )
