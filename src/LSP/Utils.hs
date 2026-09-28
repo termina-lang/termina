@@ -242,12 +242,12 @@ getDocumentSymbols = Prelude.concatMap toDocumentSymbol
       in  Just $ LSP.Range (LSP.Position startLine startCol) (LSP.Position endLine endCol)
     getRange _ = Nothing
 
-    -- | A symbol with its children, which the editor nests under it.
+    -- | A symbol with its children, which the editor nests under it. 
     symbol :: Text -> LSP.SymbolKind -> Location -> [LSP.DocumentSymbol] -> [LSP.DocumentSymbol]
     symbol name kind loc children =
       case getRange loc of
-        Just range ->
-          [LSP.DocumentSymbol name Nothing kind Nothing Nothing range range
+        Just range@(LSP.Range from _) ->
+          [LSP.DocumentSymbol name Nothing kind Nothing Nothing range (LSP.Range from from)
             (if Prelude.null children then Nothing else Just children)]
         Nothing -> []
 

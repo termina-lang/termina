@@ -182,7 +182,7 @@ requestDefinition = requestHandler SMethod_TextDocumentDefinition $ \req respond
             [] -> Nothing
 
     definitionOf :: Ann.Location -> Maybe Definition
-    definitionOf loc = Definition . InL <$> loc2Location loc
+    definitionOf loc = Definition . InL . collapse <$> loc2Location loc
 
 -- | Every use of the name under the cursor, across the project. Two uses are
 -- the same name when they resolve to the same target, which is what makes a
@@ -204,11 +204,26 @@ requestReferences = requestHandler SMethod_TextDocumentReferences $ \req respond
 -- | The uses of a target in every module of the project.
 usesOf :: M.Map QualifiedName TerminaStoredModule -> Target -> [Location]
 usesOf modules target =
-  [ lspLoc
+  [ narrow (sourcecode loadedModule) lspLoc
   | loadedModule <- M.elems modules
   , (loc, found) <- indexRefs (moduleIndex loadedModule)
   , found == target
   , Just lspLoc <- [loc2Location loc] ]
+
+-- | The range of a use, cut down to the identifier written at its start. 
+narrow :: T.Text -> Location -> Location
+narrow source (Location uri range@(Range start _)) =
+  case wordAt source (fromIntegral (start ^. J.line) + 1, fromIntegral (start ^. J.character) + 1) of
+    Just word ->
+      Location uri (Range start (start { _character = start ^. J.character + fromIntegral (length word) }))
+    Nothing -> Location uri (collapseRange range)
+
+-- | A location the editor only jumps to, with nothing to highlight.
+collapse :: Location -> Location
+collapse (Location uri range) = Location uri (collapseRange range)
+
+collapseRange :: Range -> Range
+collapseRange (Range start _) = Range start start
 
 -- | The same name highlighted wherever it appears in the file being read.
 requestHighlight :: Handlers HandlerM
@@ -225,10 +240,11 @@ requestHighlight = requestHandler SMethod_TextDocumentDocumentHighlight $ \req r
         Nothing -> responder (Right (InR Null))
         Just target ->
           responder (Right (InL
-            [ DocumentHighlight range (Just DocumentHighlightKind_Text)
+            [ DocumentHighlight narrowed (Just DocumentHighlightKind_Text)
             | (loc, found) <- indexRefs idx
             , found == target
-            , Just (Location _ range) <- [loc2Location loc] ]))
+            , Just lspLoc <- [loc2Location loc]
+            , let Location _ narrowed = narrow (sourcecode loadedModule) lspLoc ]))
 
 -- | The definitions of the project whose name matches what is typed, which is
 -- what answers the "go to symbol in workspace" of the editor.
@@ -237,7 +253,7 @@ requestWorkspaceSymbols = requestHandler SMethod_WorkspaceSymbol $ \req responde
   let query = T.toLower (req ^. J.params . J.query)
   modules <- gets project_modules
   responder (Right (InL
-    [ SymbolInformation (T.pack ident) SymbolKind_Object Nothing Nothing Nothing lspLoc
+    [ SymbolInformation (T.pack ident) SymbolKind_Object Nothing Nothing Nothing (collapse lspLoc)
     | loadedModule <- M.elems modules
     , (ident, loc) <- M.toList (indexTopLevel (moduleIndex loadedModule))
     , T.null query || query `T.isInfixOf` T.toLower (T.pack ident)
