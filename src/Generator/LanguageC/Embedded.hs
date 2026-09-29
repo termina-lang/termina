@@ -9,7 +9,8 @@ module Generator.LanguageC.Embedded (
     (@&&), (@||), (@!=),
     (@==), (|>>), (@->),
     (@>), (@<), (@>=), (@<=),
-    (@+), (@-), (@*), (@/), (@%),
+    (@+), (@-), (@*), (@/), (@%), (@&), binOp,
+    (@::), (@.:), (@.=),
     cast, addrOf, deref, ptr, 
     void, void_ptr, size_t, typeDef, char,
     uint8_t, uint16_t, uint32_t, uint64_t,
@@ -74,10 +75,34 @@ data BinOp =
 (@%) :: CExpression -> CExpression -> BinOp
 (@%) l = BinOp l COpMod
 
+(@&) :: CExpression -> CExpression -> BinOp
+(@&) l = BinOp l COpAnd
+
+-- | A binary operation whose operator is only known at run time.
+binOp :: CBinaryOp -> CExpression -> CExpression -> BinOp
+binOp op l = BinOp l op
+
 instance TypeElement BinOp CExpression where
     (@:) (BinOp l op r) cType =
         let cAnn = internalAnn CGenericAnn in
         CExprBinaryOp op l r cType cAnn
+
+-- | An initializer list { e0, e1, ... } of the given type.
+(@::) :: [CExpression] -> CType -> CExpression
+(@::) elems cType =
+    let cAnn = internalAnn CGenericAnn in
+    CExprArrayInitializer elems cType cAnn
+
+-- | A designated initializer list { .f0 = e0, .f1 = e1, ... } of the given
+-- type.
+(@.:) :: [(Ident, CExpression)] -> CType -> CExpression
+(@.:) fields cType =
+    let cAnn = internalAnn CGenericAnn in
+    CExprDesignatedInitializer fields cType cAnn
+
+-- | A field of a designated initializer list, .f = e.
+(@.=) :: Ident -> CExpression -> (Ident, CExpression)
+(@.=) = (,)
 
 data ObjField =
     ObjField CObject Ident
@@ -282,12 +307,14 @@ instance TypeElement CConstant CExpression where
 (|>>) = updateLocation
 
 infix 1 @=
+infix 1 @.=
 infix 1 @:=
 infix 5 @+
 infix 5 @-
 infix 6 @*
 infix 6 @/
 infix 6 @%
+infix 4 @&
 infix 7 @!=
 infix 7 @==
 

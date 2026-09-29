@@ -45,6 +45,6 @@ spec = do
               "    \n" ++
               "    uint16_t foo = func_test0_0(2U);\n" ++
               "\n" ++
-              "    return foo * 2U;\n" ++
+              "    return (uint16_t)((uint32_t)foo * 2U & 0xFFFFU);\n" ++
               "\n" ++
               "}\n")    

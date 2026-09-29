@@ -60,9 +60,12 @@ spec = do
               "\n" ++
               "    bar_u32 = (uint32_t)bar_u8 + (uint32_t)bar_i8;\n" ++
               "\n" ++
-              "    bar_i16 = bar_i16 * (int16_t)bar_u8;\n" ++
+              "    bar_i16 = termina__check__mul_i16(bar_i16, (int16_t)bar_u8);\n" ++
               "\n" ++
-              "    bar_i32 = (int32_t)((int32_t)((int32_t)bar_i8 * (int32_t)bar_i16) * (int32_t)bar_u8) * (int32_t)bar_u16;\n" ++
+              "    bar_i32 = termina__check__mul_i32(termina__check__mul_i32(termina__check__mul_i32((int32_t)bar_i8,\n" ++
+              "                                                                                      (int32_t)bar_i16),\n" ++
+              "                                                              (int32_t)bar_u8),\n" ++
+              "                                      (int32_t)bar_u16);\n" ++
               "\n" ++
               "    bar_u32 = (uint32_t)(uint16_t)((bar_u16 + bar_u16) & 0xFFFFU);\n" ++
               "\n" ++

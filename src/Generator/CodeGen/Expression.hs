@@ -176,9 +176,9 @@ genObject (ArrayIndexExpression obj index ann) = do
             -- If the index is not a constant, we need to call the index
             -- checker function
             cArraySize <- genExpression arraySize
-            let cAnn = buildGenericAnn ann
-                cFuncType = CTFunction (CTSizeT noqual) [_const size_t, _const size_t]
-                cFunctionCall = CExprCall (CExprValOf (CVar "termina__check__array_index" cFuncType) cFuncType cAnn) [cArraySize, cIndex] (CTSizeT noqual) cAnn
+            let cFuncType = CTFunction size_t [_const size_t, _const size_t]
+                cFunctionCall = ("termina__check__array_index" @: cFuncType |>> getLocation ann)
+                    @@ [cArraySize, cIndex] |>> getLocation ann
             return $ cObj @$$ cFunctionCall @: ctype
 genObject o@(MemberAccess obj identifier _ann) = do
     cObj <- genObject obj
@@ -224,7 +224,6 @@ genMemberFunctionAccess ::
     -> SemanticAnn 
     -> CGenerator CExpression
 genMemberFunctionAccess obj ident args ann = do
-    let cAnn = buildGenericAnn ann
     -- | Obtain the function type
     (cFuncType, _) <- case ann of
         SemanticAnn (ETy (AppType pts ts)) _ -> do
@@ -234,7 +233,7 @@ genMemberFunctionAccess obj ident args ann = do
         _ -> throwError $ InternalError $ "Invalid function annotation: " ++ show ann
     -- Generate the C code for the object
     cObj <- genObject obj
-    let cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
+    let cObjExpr = cObj @: getCObjType cObj |>> getLocation ann
     -- Generate the C code for the parameters
     cArgs <- mapM genExpression args
     -- | Obtain the type of the object
@@ -266,12 +265,126 @@ genMemberFunctionAccess obj ident args ann = do
 -- promoted to int in C, and the result could otherwise keep bits that the
 -- Termina type does not have. Any other expression is returned unchanged.
 castBinOpToOwnType :: Location -> Expression SemanticAnn -> CExpression -> CGenerator CExpression
-castBinOpToOwnType loc (BinOp op _ _ _) cExpr
-    | widens op = do
-        plt <- gets targetPlatform
+castBinOpToOwnType _ (BinOp _ _ _ _) cExpr@(CExprCall {}) =
+    -- | checkedArithmetic has already brought the result to its type.
+    return cExpr
+castBinOpToOwnType loc (BinOp op _ _ _) cExpr = do
+    plt <- gets targetPlatform
+    if productLeavesInt plt op cExpr then
+        -- | multiplyInUnsignedInt has already cast the product to its type.
+        return cExpr
+    else if widens op then
         castToOwnType loc (dropBitsAbove plt cExpr)
-    | otherwise = castToOwnType loc cExpr
+    else
+        castToOwnType loc cExpr
 castBinOpToOwnType _ _ cExpr = return cExpr
+
+-- | Whether the product of two operands of this unsigned type can leave the
+-- range of the signed int they are promoted to, which is undefined in C.
+productLeavesInt :: Platform -> Op -> CExpression -> Bool
+productLeavesInt plt Multiplication cExpr =
+    case getCExprType cExpr of
+        CTInt size Unsigned _ ->
+            let width = intSizeWidth size in
+            width < intWidth plt && 2 * width >= intWidth plt
+        _ -> False
+productLeavesInt _ _ _ = False
+
+-- | Multiplies in the unsigned type as wide as the int of the platform, so that
+-- the operation is carried out without promotion to a signed int, and brings
+-- the product back to the type of the operands. Converting one operand is
+-- enough, since the usual arithmetic conversions convert the other one.
+multiplyInUnsignedInt :: Platform -> CExpression -> CExpression -> Location -> CExpression
+multiplyInUnsignedInt plt cLeft cRight loc =
+    let ownType = getCExprType cLeft
+        uintType = CTInt (intSizeOfWidth (intWidth plt)) Unsigned noqual
+        cProduct = (cast uintType cLeft @* cRight) @: uintType |>> loc
+    in
+    case ownType of
+        CTInt size Unsigned _ ->
+            cast (CTInt size Unsigned noqual) (maskToWidth size cProduct)
+        _ -> cProduct
+
+-- | The run-time checks of an integer operation, if it needs any. A signed
+-- operation goes to the function of the OSAL that carries it out once it has
+-- checked that its result is representable, and the divisor of an unsigned
+-- division or remainder is checked not to be zero. An operation on two
+-- constants is left to the constant folding.
+checkedArithmetic :: Op -> CExpression -> CExpression -> Location -> Maybe CExpression
+checkedArithmetic op cLeft cRight loc =
+    if isConstant cLeft && isConstant cRight then
+        Nothing
+    else
+        case getCExprType cLeft of
+            CTInt size Signed _ ->
+                let suffix = "i" ++ show (intSizeWidth size)
+                    ownType = CTInt size Signed noqual
+                in
+                case op of
+                    Addition -> Just $ checkOperation "add" suffix ownType
+                    Subtraction -> Just $ checkOperation "sub" suffix ownType
+                    Multiplication -> Just $ checkOperation "mul" suffix ownType
+                    Division ->
+                        if constantDivisorExcept [-1] then Nothing
+                        else Just $ checkOperation "div" suffix ownType
+                    Modulo ->
+                        if constantDivisorExcept [-1] then Nothing
+                        else Just $ checkOperation "mod" suffix ownType
+                    _ -> Nothing
+            CTInt size Unsigned _ ->
+                checkUnsignedDivisor ("u" ++ show (intSizeWidth size)) (CTInt size Unsigned noqual)
+            CTSizeT _ ->
+                checkUnsignedDivisor "usize" (CTSizeT noqual)
+            _ -> Nothing
+
+    where
+
+        -- | The value of an integer constant, which a negative literal reaches
+        -- as a prefix minus applied to the constant.
+        constantValue :: CExpression -> Maybe Integer
+        constantValue (CExprConstant (CIntConst (CInteger value _)) _ _) = Just value
+        constantValue (CExprUnaryOp CMinOp cExpr _ _) = negate <$> constantValue cExpr
+        constantValue _ = Nothing
+
+        isConstant :: CExpression -> Bool
+        isConstant cExpr =
+            case cExpr of
+                CExprConstant {} -> True
+                _ -> constantValue cExpr /= Nothing
+
+        -- | Whether the divisor is a constant other than the given values. A
+        -- constant divisor needs no check, since the constant folding rejects a
+        -- zero, except -1 in a signed operation, where the quotient of the
+        -- minimum value is not representable.
+        constantDivisorExcept :: [Integer] -> Bool
+        constantDivisorExcept excluded =
+            case constantValue cRight of
+                Just value -> value `notElem` excluded
+                Nothing -> False
+
+        checkCall :: String -> [CType] -> CType -> [CExpression] -> CExpression
+        checkCall name paramTypes retType args =
+            let cFuncType = CTFunction retType paramTypes in
+            (name @: cFuncType |>> loc) @@ args |>> loc
+
+        checkOperation :: String -> String -> CType -> CExpression
+        checkOperation name suffix ownType =
+            checkCall ("termina__check__" ++ name ++ "_" ++ suffix) [ownType, ownType] ownType [cLeft, cRight]
+
+        checkUnsignedDivisor :: String -> CType -> Maybe CExpression
+        checkUnsignedDivisor suffix ownType =
+            case op of
+                Division -> divided
+                Modulo -> divided
+                _ -> Nothing
+
+            where
+
+                divided =
+                    if constantDivisorExcept [] then Nothing
+                    else Just $ binOp (cBinOp op) cLeft
+                        (checkCall ("termina__check__divisor_" ++ suffix) [ownType] ownType [cRight])
+                        @: getCExprType cLeft |>> loc
 
 -- | Whether the result of the operation can need more bits than its operands
 -- hold. The rest give a result that fits: a quotient and a remainder are no
@@ -295,23 +408,33 @@ widens _ = False
 -- not the value the operation gives.
 dropBitsAbove :: Platform -> CExpression -> CExpression
 dropBitsAbove plt cExpr = case getCExprType cExpr of
-    CTInt size Unsigned _ | widthOf size < intWidth plt -> maskWith (2 ^ widthOf size - 1)
-    _                                                   -> cExpr
+    CTInt size Unsigned _ ->
+        if intSizeWidth size < intWidth plt then maskToWidth size cExpr else cExpr
+    _ -> cExpr
 
-    where
+-- | Masks an integer C expression with the bits of the given width, keeping the
+-- type of the expression.
+maskToWidth :: CIntSize -> CExpression -> CExpression
+maskToWidth size cExpr =
+    let cType = getCExprType cExpr
+        mask = 2 ^ intSizeWidth size - 1
+    in (cExpr @& (CInteger mask CHexRepr @: cType)) @: cType
 
-        widthOf :: CIntSize -> Integer
-        widthOf IntSize8   = 8
-        widthOf IntSize16  = 16
-        widthOf IntSize32  = 32
-        widthOf IntSize64  = 64
-        widthOf IntSize128 = 128
+intSizeWidth :: CIntSize -> Integer
+intSizeWidth IntSize8   = 8
+intSizeWidth IntSize16  = 16
+intSizeWidth IntSize32  = 32
+intSizeWidth IntSize64  = 64
+intSizeWidth IntSize128 = 128
 
-        maskWith mask =
-            let cType = getCExprType cExpr
-                cAnn = internalAnn CGenericAnn
-            in CExprBinaryOp COpAnd cExpr
-                (CExprConstant (CIntConst (CInteger mask CHexRepr)) cType cAnn) cType cAnn
+intSizeOfWidth :: Integer -> CIntSize
+intSizeOfWidth width =
+    case width of
+        8 -> IntSize8
+        16 -> IntSize16
+        32 -> IntSize32
+        64 -> IntSize64
+        _ -> IntSize128
 
 -- | Casts an integer C expression to its own type, without qualifiers.
 castToOwnType :: Location -> CExpression -> CGenerator CExpression
@@ -335,29 +458,29 @@ genExpression (AccessObject obj) = do
             return $ deref cObj |>> getLocation (getAnnotation obj)
         _ -> 
             return $ cObj @: getCObjType cObj |>> getLocation (getAnnotation obj)
-genExpression (BinOp op left right ann) = 
-    let cAnn = buildGenericAnn ann in
+genExpression (BinOp op left right ann) =
+    let loc = getLocation ann in
     case op of
         LogicalAnd -> do
             cLeft <- genExpression left
             cRight <- genExpression right
-            return $ cLeft @&& cRight |>> location cAnn
+            return $ cLeft @&& cRight |>> loc
         LogicalOr -> do
             cLeft <- genExpression left
             cRight <- genExpression right
-            return $ cLeft @|| cRight |>> location cAnn
+            return $ cLeft @|| cRight |>> loc
         _ -> do
             -- | We need to check if the left and right expressions are binary operations
             -- If they are, we need to cast them to ensure that the resulting value
             -- is truncated to the correct type
-            cLeft <- genExpression left >>= castBinOpToOwnType (getLocation ann) left
-            cRight <- genExpression right >>= castBinOpToOwnType (getLocation ann) right
+            cLeft <- genExpression left >>= castBinOpToOwnType loc left
+            cRight <- genExpression right >>= castBinOpToOwnType loc right
             -- | The type of a shift is the one of its left operand. A constant
             -- left operand is cast to its type, so that the type written in the
             -- source is the one of the shift, regardless of the value.
             let castShiftConstant =
                     case left of
-                        Constant {} -> castToOwnType (getLocation ann) cLeft
+                        Constant {} -> castToOwnType loc cLeft
                         _ -> return cLeft
             cLeft' <- case op of
                 BitwiseLeftShift  -> castShiftConstant
@@ -370,14 +493,22 @@ genExpression (BinOp op left right ann) =
                         _ -> do
                             leftTy <- getExprType left
                             plt <- gets targetPlatform
-                            let cFuncType = CTFunction (CTSizeT noqual) [_const size_t, _const size_t]
-                                cWidth = CExprConstant (CIntConst (CInteger (shiftWidth plt leftTy) CDecRepr)) (CTSizeT noqual) cAnn
-                            return $ CExprCall (CExprValOf (CVar "termina__check__shift_amount" cFuncType) cFuncType cAnn) [cWidth, cRight] (CTSizeT noqual) cAnn
+                            let cFuncType = CTFunction size_t [_const size_t, _const size_t]
+                                cWidth = dec (shiftWidth plt leftTy) @: size_t |>> loc
+                            return $ ("termina__check__shift_amount" @: cFuncType |>> loc)
+                                @@ [cWidth, cRight] |>> loc
             cRight' <- case op of
                 BitwiseLeftShift  -> boundShift
                 BitwiseRightShift -> boundShift
                 _ -> return cRight
-            return $ CExprBinaryOp (cBinOp op) cLeft' cRight' (getCExprType cLeft) cAnn
+            plt <- gets targetPlatform
+            case checkedArithmetic op cLeft' cRight' loc of
+                Just cChecked -> return cChecked
+                Nothing ->
+                    if productLeavesInt plt op cLeft' then
+                        return $ multiplyInUnsignedInt plt cLeft' cRight' loc
+                    else
+                        return $ binOp (cBinOp op) cLeft' cRight' @: getCExprType cLeft |>> loc
 
 genExpression e@(Constant c ann) = do
     cType <- getExprType e >>= genType noqual
@@ -454,11 +585,9 @@ genExpression expr@(ArraySliceExpression _ak obj lower upper ann) = do
             cUpper <- genExpression upper
             cArraySize <- genExpression arraySize
             cExpectedSize <- genExpression expectedSize
-            let cAnn = buildGenericAnn ann
-                cFuncType = CTFunction (CTSizeT noqual) [_const size_t, _const size_t, _const size_t, _const size_t]
-                cFunctionCall = 
-                    CExprCall (CExprValOf (CVar "termina__check__array_slice" cFuncType) cFuncType cAnn) 
-                            [cArraySize, cExpectedSize, cLower, cUpper] (CTSizeT noqual) cAnn
+            let cFuncType = CTFunction size_t [_const size_t, _const size_t, _const size_t, _const size_t]
+                cFunctionCall = ("termina__check__array_slice" @: cFuncType |>> getLocation ann)
+                    @@ [cArraySize, cExpectedSize, cLower, cUpper] |>> getLocation ann
             return $ addrOf (cObj @$$ cFunctionCall @: cType) |>> getLocation ann
         (ty, _,  _, _) -> throwError $ InternalError $ "Unsupported object. Not a reference to an array: " ++ show ty
 genExpression o = throwError $ InternalError $ "Unsupported expression: " ++ show o
@@ -472,7 +601,7 @@ genInitializerExpr :: Expression SemanticAnn -> CGenerator CExpression
 genInitializerExpr e@(ArrayExprListInitializer exprs ann) = do
     cType <- getExprType e >>= genType noqual
     cElems <- mapM genInitializerExpr exprs
-    return $ CExprArrayInitializer cElems cType (buildGenericAnn ann)
+    return $ cElems @:: cType |>> getLocation ann
 genInitializerExpr e@(ArrayInitializer iexpr _size ann) = do
     -- | A fill [e; N] nested in an initializer position must be expanded to an
     -- explicit list { e, ..., e } (N copies): a C initializer list cannot hold
@@ -481,7 +610,7 @@ genInitializerExpr e@(ArrayInitializer iexpr _size ann) = do
     case cType of
         CTArray _ (CExprConstant (CIntConst (CInteger n _)) _ _) -> do
             cElem <- genInitializerExpr iexpr
-            return $ CExprArrayInitializer (replicate (fromIntegral n) cElem) cType (buildGenericAnn ann)
+            return $ replicate (fromIntegral n) cElem @:: cType |>> getLocation ann
         _ -> throwError $ InternalError $ "array fill initializer with non-literal size: " ++ show cType
 genInitializerExpr e@(StringInitializer value ann) = do
     -- | A char-array string initializer is emitted as an explicit list of
@@ -494,34 +623,32 @@ genInitializerExpr e@(StringInitializer value ann) = do
     cType <- getExprType e >>= genType noqual
     case cType of
         CTArray _ (CExprConstant (CIntConst (CInteger n _)) _ _) -> do
-            let cAnn = buildGenericAnn ann
-                cChars = map (@: char) value
+            let cChars = map (@: char) value
                 cPadding = replicate (max 0 (fromIntegral n - length value)) ('\0' @: char)
-            return $ CExprArrayInitializer (cChars ++ cPadding) cType cAnn
+            return $ (cChars ++ cPadding) @:: cType |>> getLocation ann
         _ -> throwError $ InternalError $ "string initializer with non-literal size: " ++ show cType
 genInitializerExpr e@(StructInitializer fas ann) = do
     cType <- getExprType e >>= genType noqual
     cFields <- mapM genFieldInit fas
-    return $ CExprDesignatedInitializer cFields cType (buildGenericAnn ann)
+    return $ cFields @.: cType |>> getLocation ann
     where
         genFieldInit (FieldValueAssignment fld fexpr _) = do
             ce <- genInitializerExpr fexpr
-            return (fld, ce)
+            return (fld @.= ce)
         genFieldInit (FieldAddressAssignment fld addr (SemanticAnn (ETy (SimpleType ts)) _)) = do
             cTs <- genType noqual ts
             cAddr <- genExpression addr
-            return (fld, cast cTs cAddr)
+            return (fld @.= cast cTs cAddr)
         genFieldInit fa = throwError $ InternalError $ "Unsupported field in data struct initializer: " ++ show fa
 genInitializerExpr e@(MonadicVariantInitializer mv ann) = do
     cType <- getExprType e >>= genType noqual
-    let cAnn = buildGenericAnn ann
-        variantTag name = name @: enumFieldType |>> getLocation ann
+    let variantTag name = name @: enumFieldType |>> getLocation ann
         singlePayload tag fieldName v = do
             cv <- genInitializerExpr v
-            let inner = CExprDesignatedInitializer [(variantParamField 0, cv)] cType cAnn
-            return $ CExprDesignatedInitializer [(variant, variantTag tag), (fieldName, inner)] cType cAnn
+            let inner = [variantParamField 0 @.= cv] @.: cType |>> getLocation ann
+            return $ [variant @.= variantTag tag, fieldName @.= inner] @.: cType |>> getLocation ann
         noPayload tag =
-            return $ CExprDesignatedInitializer [(variant, variantTag tag)] cType cAnn
+            return $ [variant @.= variantTag tag] @.: cType |>> getLocation ann
     case mv of
         Some v -> singlePayload optionSomeTag optionSomeVariant v
         None -> noPayload optionNoneTag
@@ -531,12 +658,11 @@ genInitializerExpr e@(MonadicVariantInitializer mv ann) = do
         Error v -> singlePayload resultErrorTag resultErrorVariant v
 genInitializerExpr e@(EnumVariantInitializer ts this_variant params ann) = do
     cType <- getExprType e >>= genType noqual
-    let cAnn = buildGenericAnn ann
-        tagExpr = CExprValOf (CVar (ts <::> this_variant) enumFieldType) enumFieldType cAnn
+    let tagExpr = (ts <::> this_variant) @: enumFieldType |>> getLocation ann
     cParams <- zipWithM (\p i -> do
         cp <- genInitializerExpr p
-        return (variantParamField (i :: Integer), cp)) params [0..]
-    let designators = (variant, tagExpr) :
-            [(this_variant, CExprDesignatedInitializer cParams cType cAnn) | not (null cParams)]
-    return $ CExprDesignatedInitializer designators cType cAnn
+        return (variantParamField (i :: Integer) @.= cp)) params [0..]
+    let designators = (variant @.= tagExpr) :
+            [this_variant @.= cParams @.: cType |>> getLocation ann | not (null cParams)]
+    return $ designators @.: cType |>> getLocation ann
 genInitializerExpr e = genExpression e

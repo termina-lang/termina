@@ -72,17 +72,17 @@ spec = do
               "\n" ++
               "    foo = 1024U - foo;\n" ++
               "\n" ++
-              "    foo = foo * 1024U;\n" ++
+              "    foo = (uint16_t)((uint32_t)foo * 1024U & 0xFFFFU);\n" ++
               "\n" ++
-              "    foo = 1024U * foo;\n" ++
+              "    foo = (uint16_t)((uint32_t)1024U * foo & 0xFFFFU);\n" ++
               "\n" ++
               "    foo = foo / 1024U;\n" ++
               "\n" ++
-              "    foo = 1024U / foo;\n" ++
+              "    foo = 1024U / termina__check__divisor_u16(foo);\n" ++
               "\n" ++
               "    foo = foo % 1024U;\n" ++
               "\n" ++
-              "    foo = 1024U % foo;\n" ++
+              "    foo = 1024U % termina__check__divisor_u16(foo);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -123,17 +123,17 @@ spec = do
              "\n" ++
              "    *(uint16_t *)foo.data = 1024U - *(uint16_t *)foo.data;\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data * 1024U;\n" ++
+             "    *(uint16_t *)foo.data = (uint16_t)((uint32_t)*(uint16_t *)foo.data * 1024U & 0xFFFFU);\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = 1024U * *(uint16_t *)foo.data;\n" ++
+             "    *(uint16_t *)foo.data = (uint16_t)((uint32_t)1024U * *(uint16_t *)foo.data & 0xFFFFU);\n" ++
              "\n" ++
              "    *(uint16_t *)foo.data = *(uint16_t *)foo.data / 1024U;\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = 1024U / *(uint16_t *)foo.data;\n" ++
+             "    *(uint16_t *)foo.data = 1024U / termina__check__divisor_u16(*(uint16_t *)foo.data);\n" ++
              "\n" ++
              "    *(uint16_t *)foo.data = *(uint16_t *)foo.data % 1024U;\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = 1024U % *(uint16_t *)foo.data;\n" ++
+             "    *(uint16_t *)foo.data = 1024U % termina__check__divisor_u16(*(uint16_t *)foo.data);\n" ++
              "\n" ++
              "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
              "                              termina__lock);\n" ++

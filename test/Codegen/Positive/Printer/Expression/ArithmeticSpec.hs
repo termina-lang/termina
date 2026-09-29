@@ -95,23 +95,23 @@ spec = do
         pack "1024U - var0"
     it "Prints the expression: var0 * 1024 : u16" $ do
       renderExpression var0MultConstant `shouldBe`
-        pack "var0 * 1024U"
+        pack "(uint16_t)((uint32_t)var0 * 1024U & 0xFFFFU)"
     it "Prints the expression: 1024 : u16 * var0" $ do
       renderExpression constantMultVar0 `shouldBe`
-        pack "1024U * var0"
+        pack "(uint16_t)((uint32_t)1024U * var0 & 0xFFFFU)"
     it "Prints the expression: var0 * var1 : u16" $ do
       renderExpression var0MultVar1 `shouldBe`
-        pack "var0 * *(uint16_t *)var1.data"
+        pack "(uint16_t)((uint32_t)var0 * *(uint16_t *)var1.data & 0xFFFFU)"
     it "Prints the expression: var1 / 1024 : u16" $ do
       renderExpression var1DivConstant `shouldBe`
         pack "*(uint16_t *)var1.data / 1024U"
     it "Prints the expression: var0 / var1 : u16" $ do
       renderExpression var0DivVar1 `shouldBe`
-        pack "var0 / *(uint16_t *)var1.data"
+        pack "var0 / termina__check__divisor_u16(*(uint16_t *)var1.data)"
     it "Prints the expression: var1 % 1024 : u16" $ do
       renderExpression var1ModConstant `shouldBe`
         pack "*(uint16_t *)var1.data % 1024U"
     it "Prints the expression: var0 % var1 : u16" $ do
       renderExpression var0ModVar1 `shouldBe`
-        pack "var0 % *(uint16_t *)var1.data"
+        pack "var0 % termina__check__divisor_u16(*(uint16_t *)var1.data)"
 
