@@ -3,9 +3,9 @@
 
 #include "test.h"
 
-static void termina__app__init_tasks(int32_t * const status) {
+static void termina__app__init_tasks(termina__error_code_t * const status) {
     
-    *status = 0L;
+    *status = termina__error__none;
 
     t._task_id = t__task_id;
 
@@ -16,11 +16,11 @@ static void termina__app__init_tasks(int32_t * const status) {
 
 }
 
-static void termina__app__init_emitters(int32_t * const status) {
+static void termina__app__init_emitters(termina__error_code_t * const status) {
     
     termina__periodic_timer_connection_t timer_connection;
 
-    *status = 0L;
+    *status = termina__error__none;
 
     timer_connection.type = termina__emitter_connection_type__task;
     timer_connection.task.task_msg_queue_id = t__task_msg_queue_id;
@@ -34,14 +34,14 @@ static void termina__app__init_emitters(int32_t * const status) {
 
 }
 
-static void termina__app__init_msg_queues(int32_t * const status) {
+static void termina__app__init_msg_queues(termina__error_code_t * const status) {
     
-    *status = 0L;
+    *status = termina__error__none;
 
     termina__msg_queue__init(t__task_msg_queue_id, sizeof(termina__event_t), 1U,
                              status);
 
-    if (0L == *status) {
+    if (termina__error__none == *status) {
         
         termina__msg_queue__init(t__timer_port__sink_msg_queue_id,
                                  sizeof(TimeVal), 1U, status);
@@ -50,21 +50,21 @@ static void termina__app__init_msg_queues(int32_t * const status) {
 
 }
 
-void termina__app__init(int32_t * const status) {
+void termina__app__init(termina__error_code_t * const status) {
     
-    *status = 0L;
+    *status = termina__error__none;
 
     termina__app__init_globals();
 
     termina__app__init_msg_queues(status);
 
-    if (0L == *status) {
+    if (termina__error__none == *status) {
         
         termina__app__init_emitters(status);
 
     }
 
-    if (0L == *status) {
+    if (termina__error__none == *status) {
         
         termina__app__init_tasks(status);
 

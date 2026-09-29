@@ -152,7 +152,7 @@ spec = do
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)arg;\n" ++
               "\n" ++
-              "    int32_t status = 0L;\n" ++
+              "    termina__error_code_t status = termina__error__none;\n" ++
               "\n" ++
               "    termina__event_t event;\n" ++
               "\n" ++
@@ -164,7 +164,7 @@ spec = do
               "        \n" ++
               "        termina__msg_queue__recv(self->_task_msg_queue_id, &event, &status);\n" ++
               "\n" ++
-              "        if (status != 0L) {\n" ++
+              "        if (status != termina__error__none) {\n" ++
               "            break;\n" ++
               "        }\n" ++
               "\n" ++
@@ -175,7 +175,7 @@ spec = do
               "                termina__msg_queue__recv(self->timer,\n" ++
               "                                         (void *)&timeout__msg_data, &status);\n" ++
               "\n" ++
-              "                if (status != 0L) {\n" ++
+              "                if (status != termina__error__none) {\n" ++
               "                    termina__except__msg_queue_recv_error(self->timer, status);\n" ++
               "                }\n" ++
               "\n" ++

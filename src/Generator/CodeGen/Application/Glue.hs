@@ -33,7 +33,7 @@ import Utils.Annotations
 genStatusSteps :: [CCompoundBlockItem] -> [[CCompoundBlockItem]] -> [CCompoundBlockItem]
 genStatusSteps declarations steps =
     declarations ++
-    pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t) :
+    pre_cr (deref ("status" @: (_const . ptr $ termina__error_code_t)) @= termina__error__none) :
         case steps of
             [] -> []
             (firstStep : restSteps) -> firstStep ++ map statusCheck restSteps
@@ -42,7 +42,7 @@ genStatusSteps declarations steps =
 
         statusCheck :: [CCompoundBlockItem] -> CCompoundBlockItem
         statusCheck items =
-            pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
+            pre_cr $ _if (termina__error__none @== deref ("status" @: (_const . ptr $ termina__error_code_t)))
                 $ trail_cr . block $ items
 
 genInitHandlers :: TerminaProgArch a -> CGenerator [CFileItem]
@@ -64,7 +64,7 @@ genInitTasks :: TerminaProgArch a -> CGenerator [CFileItem]
 genInitTasks progArchitecture = do
     let progTasks = M.elems $ tasks progArchitecture
     initTasks <- mapM genOSALTaskInit progTasks
-    return [pre_cr $ static_function (terminafy $ "app" <::> "init_tasks") ["status" @: (_const . ptr $ int32_t)] @-> void $
+    return [pre_cr $ static_function (terminafy $ "app" <::> "init_tasks") ["status" @: (_const . ptr $ termina__error_code_t)] @-> void $
             trail_cr . block $ genStatusSteps [] initTasks | not (null initTasks)]
 
     where
@@ -88,7 +88,7 @@ genInitTasks progArchitecture = do
                         taskStackSize @: size_t,
                         addrOf (cTaskFunctionName @: termina__task_entry_t),
                         addrOf (tskName @: typeDef classId),
-                        "status" @: (_const . ptr $ int32_t)
+                        "status" @: (_const . ptr $ termina__error_code_t)
                     ]
                 ]
 
@@ -107,7 +107,7 @@ genInitEmitters progArchitecture = do
             ++ [pre_cr $ var "interrupt_connection" termina__interrupt_connection_t
                 | any (\case { TPInterruptEmitter {} -> True; _ -> False }) installedEmitters]
     initEmitter <- mapM genEmitterConnection installedEmitters
-    return [pre_cr $ static_function (terminafy $ "app" <::> "init_emitters") ["status" @: (_const . ptr $ int32_t)] @-> void $
+    return [pre_cr $ static_function (terminafy $ "app" <::> "init_emitters") ["status" @: (_const . ptr $ termina__error_code_t)] @-> void $
             trail_cr . block $ genStatusSteps declarations initEmitter | not (null initEmitter)]
 
     where
@@ -141,7 +141,7 @@ genInitEmitters progArchitecture = do
                                 emitterId @: termina__id_t,
                                 addrOf ("timer_connection" @: termina__periodic_timer_connection_t),
                                 addrOf (timer @: termina__periodic_timer_t @. "period" @: _TimeVal),
-                                "status" @: (_const . ptr $ int32_t)
+                                "status" @: (_const . ptr $ termina__error_code_t)
                             ]
                         ]
                 Nothing -> case M.lookup targetEntity (tasks progArchitecture) of
@@ -165,7 +165,7 @@ genInitEmitters progArchitecture = do
                                     emitterId @: termina__id_t,
                                     addrOf ("timer_connection" @: termina__periodic_timer_connection_t),
                                     addrOf (timer @: termina__periodic_timer_t @. "period" @: _TimeVal),
-                                    "status" @: (_const . ptr $ int32_t)
+                                    "status" @: (_const . ptr $ termina__error_code_t)
                                 ]
                             ]
                     Nothing -> throwError $ InternalError $ "Invalid connection for timer: " ++ show targetEntity
@@ -200,7 +200,7 @@ genInitEmitters progArchitecture = do
                                 dec irqVector @: termina__id_t,
                                 emitterId @: termina__id_t,
                                 addrOf ("interrupt_connection" @: termina__interrupt_connection_t),
-                                "status" @: (_const . ptr $ int32_t)
+                                "status" @: (_const . ptr $ termina__error_code_t)
                             ]
                         ]
                 Nothing -> case M.lookup targetEntity (tasks progArchitecture) of
@@ -223,7 +223,7 @@ genInitEmitters progArchitecture = do
                                     dec irqVector @: termina__id_t,
                                     emitterId @: termina__id_t,
                                     addrOf ("interrupt_connection" @: termina__interrupt_connection_t),
-                                    "status" @: (_const . ptr $ int32_t)
+                                    "status" @: (_const . ptr $ termina__error_code_t)
                                 ]
                             ]
                     Nothing -> throwError $ InternalError $ "Invalid connection for interrupt: " ++ show targetEntity
@@ -237,7 +237,7 @@ genInitMutexes :: ResourceLockingMap -> CGenerator [CFileItem]
 genInitMutexes mutexes = do
     let mutexesList = M.toList mutexes
     initMutexes <- mapM genOSALMutexInit mutexesList
-    return [pre_cr $ static_function (terminafy $ "app" <::> "init_mutexes") ["status" @: (_const . ptr $ int32_t)] @-> void $
+    return [pre_cr $ static_function (terminafy $ "app" <::> "init_mutexes") ["status" @: (_const . ptr $ termina__error_code_t)] @-> void $
             trail_cr . block $ genStatusSteps [pre_cr $ var "protocol" _MutexProtocol] initMutexes | not (null initMutexes)]
 
     where
@@ -253,7 +253,7 @@ genInitMutexes mutexes = do
                     pre_cr $ termina__mutex__init @@ [
                         mutexId @: termina__id_t,
                         "protocol" @: _MutexProtocol,
-                        "status" @: (_const . ptr $ int32_t)
+                        "status" @: (_const . ptr $ termina__error_code_t)
                     ]
                 ]
         genOSALMutexInit _ = throwError $ InternalError "Invalid resource lock"
@@ -297,7 +297,7 @@ genChannelConnections progArchitecture = do
 genInitPools :: [TPPool SemanticAnn] -> CGenerator [CFileItem]
 genInitPools pls = do
     initPools <- mapM genPoolInit pls
-    return [pre_cr $ static_function (terminafy $ "app" <::> "init_pools") ["status" @: (_const . ptr $ int32_t)] @-> void $
+    return [pre_cr $ static_function (terminafy $ "app" <::> "init_pools") ["status" @: (_const . ptr $ termina__error_code_t)] @-> void $
             trail_cr . block $ genStatusSteps [] initPools | not (null initPools)]
 
     where
@@ -315,14 +315,14 @@ genInitPools pls = do
                                 cast (ptr void) (poolMemoryArea identifier @: ptr uint8_t),
                                 _sizeOfExpr (poolMemoryArea identifier @: ptr uint8_t),
                                 _sizeOfType cTs,
-                                "status" @: (_const . ptr $ int32_t)
+                                "status" @: (_const . ptr $ termina__error_code_t)
                             ]
                 ]
 
 genInitMessageQueues :: [OSALMsgQueue] -> CGenerator [CFileItem]
 genInitMessageQueues queues = do
     initMsgQueues <- concat <$> traverse genOSALMsgQueueInit queues
-    return [pre_cr $ static_function (terminafy $ "app" <::> "init_msg_queues") ["status" @: (_const . ptr $ int32_t)] @-> void $
+    return [pre_cr $ static_function (terminafy $ "app" <::> "init_msg_queues") ["status" @: (_const . ptr $ termina__error_code_t)] @-> void $
             trail_cr . block $ genStatusSteps [] initMsgQueues | not (null initMsgQueues)]
 
     where
@@ -337,7 +337,7 @@ genInitMessageQueues queues = do
                         msgQueueId @: termina__id_t,
                         _sizeOfType termina__event_t,
                         cSize,
-                        "status" @: (_const . ptr $ int32_t)
+                        "status" @: (_const . ptr $ termina__error_code_t)
                     ]
                 ]]
         -- | Message queues with unit type do not need a definition
@@ -351,7 +351,7 @@ genInitMessageQueues queues = do
                                 msgQueueId @: termina__id_t,
                                 _sizeOfType cTs,
                                 cSize,
-                                "status" @: (_const . ptr $ int32_t)
+                                "status" @: (_const . ptr $ termina__error_code_t)
                             ]
                 ]]
         genOSALMsgQueueInit mq@(OSALSinkPortMsgQueue _ _ _ ty size) = do
@@ -363,7 +363,7 @@ genInitMessageQueues queues = do
                                 msgQueueId @: termina__id_t,
                                 _sizeOfType cTs,
                                 cSize,
-                                "status" @: (_const . ptr $ int32_t)
+                                "status" @: (_const . ptr $ termina__error_code_t)
                             ]
                 ]]
 
@@ -464,11 +464,11 @@ data InitStep = InitStep CExpression Bool [CFileItem]
 genAppInit :: [InitStep] -> CGenerator CFileItem
 genAppInit initSteps = do
     return $ pre_cr $ function (terminafy $ "app" <::> "init") [
-            "status" @: (_const . ptr $ int32_t)
+            "status" @: (_const . ptr $ termina__error_code_t)
         ] @-> void $
         trail_cr . block $
             [
-                pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t),
+                pre_cr (deref ("status" @: (_const . ptr $ termina__error_code_t)) @= termina__error__none),
                 -- | External call to termina__app__init_globals().
                 -- This function cannot fail, so we do not check the status.
                 pre_cr $ termina__app__init_globals @@ []
@@ -502,7 +502,7 @@ genAppInit initSteps = do
 
         statusCheck :: [InitStep] -> CCompoundBlockItem
         statusCheck steps =
-            pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
+            pre_cr $ _if (termina__error__none @== deref ("status" @: (_const . ptr $ termina__error_code_t)))
                 $ trail_cr . block $ map stepCall steps
 
 genMainFile :: QualifiedName
@@ -536,15 +536,15 @@ genMainFile mName progArchitecture = do
 
     -- | The steps are listed in the order in which they are called
     appInit <- genAppInit [
-            InitStep (termina__app__init_msg_queues @@ ["status" @: (_const . ptr $ int32_t)]) True initMessageQueues,
+            InitStep (termina__app__init_msg_queues @@ ["status" @: (_const . ptr $ termina__error_code_t)]) True initMessageQueues,
             InitStep (termina__app__init_channel_connections @@ []) False channelConnections,
-            InitStep (termina__app__init_pools @@ ["status" @: (_const . ptr $ int32_t)]) True initPools,
+            InitStep (termina__app__init_pools @@ ["status" @: (_const . ptr $ termina__error_code_t)]) True initPools,
             InitStep (termina__app__initial_event @@ []) False initialEventFunction,
-            InitStep (termina__app__init_mutexes @@ ["status" @: (_const . ptr $ int32_t)]) True initMutexes,
+            InitStep (termina__app__init_mutexes @@ ["status" @: (_const . ptr $ termina__error_code_t)]) True initMutexes,
             InitStep (termina__app__enable_protection @@ []) False enableProtection,
-            InitStep (termina__app__init_emitters @@ ["status" @: (_const . ptr $ int32_t)]) True initEmitters,
+            InitStep (termina__app__init_emitters @@ ["status" @: (_const . ptr $ termina__error_code_t)]) True initEmitters,
             InitStep (termina__app__init_handlers @@ []) False initHandlers,
-            InitStep (termina__app__init_tasks @@ ["status" @: (_const . ptr $ int32_t)]) True initTasks
+            InitStep (termina__app__init_tasks @@ ["status" @: (_const . ptr $ termina__error_code_t)]) True initTasks
         ]
 
     return $ CSourceFile mName $ [

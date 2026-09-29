@@ -29,6 +29,14 @@ termina__active_entity_t = typeDef "termina__active_entity_t"
 termina__enum__active_entity__handler_params_t = typeDef "termina__enum__active_entity__handler_params_t"
 termina__enum__active_entity__task_params_t = typeDef "termina__enum__active_entity__task_params_t"
 
+-- | The status that the functions of the runtime return, and the value that
+-- means that they did not fail.
+termina__error_code_t :: CType
+termina__error_code_t = typeDef "termina__error_code_t"
+
+termina__error__none :: CExpression
+termina__error__none = "termina__error__none" @: termina__error_code_t
+
 termina__lock_t, termina__resource_lock_type_t,
     termina__enum__resource_lock_type__mutex_params_t :: CType
 termina__lock_t = typeDef "termina__lock_t"
@@ -154,8 +162,8 @@ termina__periodic_timer__init = "termina__periodic_timer__init" @:
             _const . ptr $ _const termina__periodic_timer_connection_t,
             -- | const TimeVal * const period,
             _const . ptr $ _const _TimeVal,
-            -- | int32_t * const status
-            _const . ptr $ int32_t
+            -- | termina__error_code_t * const status
+            _const . ptr $ termina__error_code_t
         ]
 
 termina__system_init__dispatch :: CExpression
@@ -176,8 +184,8 @@ termina__interrupt__init = "termina__interrupt__init" @:
             _const termina__id_t,
             -- | const termina__interrupt_connection_t * const connection,
             _const . ptr $ _const termina__interrupt_connection_t,
-            -- | int32_t * const status
-            _const . ptr $ int32_t
+            -- | termina__error_code_t * const status
+            _const . ptr $ termina__error_code_t
         ]
 
 _MutexProtocol, termina__task_prio_t :: CType
@@ -201,8 +209,8 @@ termina__task__init = "termina__task__init" @:
             termina__task_entry_t,
             -- | void * arg,
             ptr void,
-            -- | int32_t * const status
-            _const . ptr $ int32_t
+            -- | termina__error_code_t * const status
+            _const . ptr $ termina__error_code_t
         ]
 
 termina__mutex__init :: CExpression
@@ -213,8 +221,8 @@ termina__mutex__init = "termina__mutex__init" @:
             _const termina__id_t,
             -- | const MutexProtocol protocol,
             _const _MutexProtocol,
-            -- | int32_t * const status
-            _const . ptr $ int32_t
+            -- | termina__error_code_t * const status
+            _const . ptr $ termina__error_code_t
         ]
 
 termina__msg_queue__init :: CExpression
@@ -227,8 +235,8 @@ termina__msg_queue__init = "termina__msg_queue__init" @:
             _const size_t,
             -- | const size_t message_queue_size,
             _const size_t,
-            -- | int32_t * const status
-            _const . ptr $ int32_t
+            -- | termina__error_code_t * const status
+            _const . ptr $ termina__error_code_t
         ]
 
 termina__msg_queue__recv :: CExpression
@@ -239,8 +247,8 @@ termina__msg_queue__recv = "termina__msg_queue__recv" @:
             _const termina__id_t,
             -- | void * const element,
             ptr void,
-            -- | int32_t * const status
-            _const . ptr $ int32_t
+            -- | termina__error_code_t * const status
+            _const . ptr $ termina__error_code_t
         ]
 
 termina__except__msg_queue_recv_error :: CExpression
@@ -249,8 +257,8 @@ termina__except__msg_queue_recv_error = "termina__except__msg_queue_recv_error" 
         [
             -- | const size_t msg_queue_id
             _const size_t,
-            -- | const int32_t error_code
-            _const int32_t
+            -- | const termina__error_code_t error_code
+            _const termina__error_code_t
         ]
 
 termina__except__action_failure :: CExpression
@@ -291,8 +299,8 @@ termina__app__init_tasks :: CExpression
 termina__app__init_tasks = "termina__app__init_tasks" @:
     CTFunction void
         [
-            -- | int32_t * const status
-            _const . ptr $ int32_t
+            -- | termina__error_code_t * const status
+            _const . ptr $ termina__error_code_t
         ]
 
 termina__app__init_handlers :: CExpression
@@ -303,8 +311,8 @@ termina__app__install_emitters :: CExpression
 termina__app__install_emitters = "termina__app__install_emitters" @:
     CTFunction void
         [
-            -- | int32_t * const status
-            _const . ptr $ int32_t
+            -- | termina__error_code_t * const status
+            _const . ptr $ termina__error_code_t
         ]
 
 termina__app__enable_protection :: CExpression
@@ -319,8 +327,8 @@ termina__app__init_msg_queues :: CExpression
 termina__app__init_msg_queues = "termina__app__init_msg_queues" @:
     CTFunction void
         [
-            -- | int32_t * const status
-            _const . ptr $ int32_t
+            -- | termina__error_code_t * const status
+            _const . ptr $ termina__error_code_t
         ]
 
 termina__app__initial_event :: CExpression
@@ -331,24 +339,24 @@ termina__app__init_emitters :: CExpression
 termina__app__init_emitters = "termina__app__init_emitters" @:
     CTFunction void
         [
-            -- | int32_t * const status
-            _const . ptr $ int32_t
+            -- | termina__error_code_t * const status
+            _const . ptr $ termina__error_code_t
         ]
 
 termina__app__init_pools :: CExpression
 termina__app__init_pools = "termina__app__init_pools" @:
     CTFunction void
         [
-            -- | int32_t * const status
-            _const . ptr $ int32_t
+            -- | termina__error_code_t * const status
+            _const . ptr $ termina__error_code_t
         ]
 
 termina__app__init_mutexes :: CExpression
 termina__app__init_mutexes = "termina__app__init_mutexes" @:
     CTFunction void
         [
-            -- | int32_t * const status
-            _const . ptr $ int32_t
+            -- | termina__error_code_t * const status
+            _const . ptr $ termina__error_code_t
         ]
 
 termina__mutex__lock :: CExpression
@@ -357,8 +365,8 @@ termina__mutex__lock = "termina__mutex__lock" @:
         [
             -- | const termina__id_t mutex_id
             _const termina__id_t,
-            -- | int32_t * const status
-            _const . ptr $ int32_t
+            -- | termina__error_code_t * const status
+            _const . ptr $ termina__error_code_t
         ]
 
 termina__mutex__unlock :: CExpression
@@ -367,8 +375,8 @@ termina__mutex__unlock = "termina__mutex__unlock" @:
         [
             -- | const termina__id_t mutex_id
             _const termina__id_t,
-            -- | int32_t * const status
-            _const . ptr $ int32_t
+            -- | termina__error_code_t * const status
+            _const . ptr $ termina__error_code_t
         ]
 
 termina__task_lock_t :: CType

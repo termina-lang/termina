@@ -566,16 +566,16 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                             [
                                 ("self" @: ptr classStructType) @. port @: termina__id_t,
                                 cast void_ptr (addrOf ((action <::> "msg_data") @: cDataType)),
-                                addrOf ("status" @: int32_t)
+                                addrOf ("status" @: termina__error_code_t)
                             ],
                     -- if (status._variant != Status__Success)
                     indent . pre_cr $ _if (
-                           "status" @: int32_t @!= dec 0 @: int32_t)
+                           "status" @: termina__error_code_t @!= termina__error__none)
                         $ block [
                             -- termina__except__msg_queue_recv_error(port, status);
                             no_cr $ termina__except__msg_queue_recv_error @@ [
                                 ("self" @: ptr classStructType) @. port @: termina__id_t,
-                                "status" @: int32_t
+                                "status" @: termina__error_code_t
                             ]
                         ],
                     -- status = classFunctionName(self, action_msg_data);
@@ -615,11 +615,11 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                             [
                                 ("self" @: ptr classStructType) @. taskMsgQueueIDField @: termina__id_t,
                                 addrOf ("event" @: termina__event_t),
-                                addrOf ("status" @: int32_t)
+                                addrOf ("status" @: termina__error_code_t)
                             ],
                     -- if (status != Status__Success)
                     pre_cr $ _if
-                            ("status" @: int32_t @!= dec 0 @: int32_t)
+                            ("status" @: termina__error_code_t @!= termina__error__none)
                         $ block [
                             -- break;
                             no_cr _break
@@ -643,7 +643,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                     -- ClassIdentifier * self = (ClassIdentifier *)&arg;
                     pre_cr $ var "self" (ptr classId) @:= cast (ptr classId) ("arg" @: ptr void),
                     -- int32_t status = 0;
-                    pre_cr $ var "status" int32_t @:= dec 0 @: int32_t,
+                    pre_cr $ var "status" termina__error_code_t @:= termina__error__none,
                     -- termina__event_t ev;
                     pre_cr $ var "event" termina__event_t,
                     -- _Status__i32 result;

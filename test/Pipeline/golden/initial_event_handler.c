@@ -23,9 +23,9 @@ static void termina__app__initial_event(void) {
 
 }
 
-void termina__app__init(int32_t * const status) {
+void termina__app__init(termina__error_code_t * const status) {
     
-    *status = 0L;
+    *status = termina__error__none;
 
     termina__app__init_globals();
 
