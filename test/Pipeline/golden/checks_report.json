@@ -1,0 +1,93 @@
+{
+    "summary": {
+        "obligations": 6,
+        "discharged": 3,
+        "checked": 3
+    },
+    "modules": [
+        {
+            "module": "test",
+            "file": "test",
+            "obligations": [
+                {
+                    "start": {
+                        "line": 2,
+                        "column": 12
+                    },
+                    "end": {
+                        "line": 2,
+                        "column": 26
+                    },
+                    "property": "index-in-bounds",
+                    "status": "discharged",
+                    "prover": "constant",
+                    "reason": "the index is a constant"
+                },
+                {
+                    "start": {
+                        "line": 6,
+                        "column": 29
+                    },
+                    "end": {
+                        "line": 6,
+                        "column": 36
+                    },
+                    "property": "index-in-bounds",
+                    "status": "discharged",
+                    "prover": "guard",
+                    "reason": "a guard keeps the index inside the array"
+                },
+                {
+                    "start": {
+                        "line": 10,
+                        "column": 12
+                    },
+                    "end": {
+                        "line": 10,
+                        "column": 19
+                    },
+                    "property": "index-in-bounds",
+                    "status": "checked"
+                },
+                {
+                    "start": {
+                        "line": 14,
+                        "column": 12
+                    },
+                    "end": {
+                        "line": 14,
+                        "column": 17
+                    },
+                    "property": "non-zero-divisor",
+                    "status": "checked"
+                },
+                {
+                    "start": {
+                        "line": 18,
+                        "column": 12
+                    },
+                    "end": {
+                        "line": 18,
+                        "column": 24
+                    },
+                    "property": "shift-below-width",
+                    "status": "discharged",
+                    "prover": "constant",
+                    "reason": "the amount is a constant"
+                },
+                {
+                    "start": {
+                        "line": 22,
+                        "column": 12
+                    },
+                    "end": {
+                        "line": 22,
+                        "column": 17
+                    },
+                    "property": "no-overflow",
+                    "status": "checked"
+                }
+            ]
+        }
+    ]
+}

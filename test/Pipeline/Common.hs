@@ -1,6 +1,7 @@
 module Pipeline.Common
   ( runFullBuild
   , runFullProjectBuild
+  , runChecksReport
   , runFullProjectApp
   , runFullProjectAppWith
   , runTypedModule
@@ -18,6 +19,9 @@ module Pipeline.Common
   ) where
 
 import Elaboration (provers, elaborateProgram)
+import Elaboration.Report (checksReport)
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.Text.Encoding as TE
 import Data.Text (Text, pack)
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
@@ -87,6 +91,16 @@ runFullProjectBuildWith :: TerminaConfig -> [(QualifiedName, String)]
 runFullProjectBuildWith cfg sources = do
   (foldedProject, _, _) <- runProjectPipeline cfg sources
   mapM renderModule foldedProject
+
+-- | The report of the run-time checks that @termina build@ writes to
+-- @output/checks.json@, for a single module named @test@.
+runChecksReport :: String -> Text
+runChecksReport input =
+  case runProjectPipeline configParams [("test", input)] of
+    Left err -> failMessage err
+    Right (foldedProject, _, _) ->
+      let reports = snd (elaborateProject TestPlatform foldedProject)
+      in TE.decodeUtf8 . BL.toStrict $ checksReport reports (fullPath <$> foldedProject)
 
 -- | Drives the same full pipeline as 'runFullProjectBuild' but stops before
 -- per-module source rendering, returning the whole-program architecture and

@@ -40,6 +40,8 @@ dependencies:
 - errata
 - optparse-applicative
 - yaml
+- aeson
+- aeson-pretty
 - lens
 - lsp
 - co-log-core

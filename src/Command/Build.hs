@@ -45,6 +45,9 @@ import ControlFlow.Architecture.PlantUML
 import Extras.PlantUML.Printer
 import Text.Read
 import Data.Char
+import qualified Data.ByteString.Lazy as BL
+import Elaboration (ElaborationReport)
+import Elaboration.Report (checksReport)
 
 
 data CmpDiagramParam =
@@ -178,6 +181,16 @@ genComponentDiagramFile params progArch param = do
         Right diagram -> do
             createDirectoryIfMissing True (takeDirectory cmpFile)
             TIO.writeFile cmpFile $ runPlantUMLPrinter diagram
+
+genChecksReportFile ::
+  TerminaConfig
+  -> LoweredProject
+  -> M.Map QualifiedName ElaborationReport
+  -> IO ()
+genChecksReportFile params loweredProject reports = do
+    let reportFile = outputFolder params </> "checks" <.> "json"
+    createDirectoryIfMissing True (takeDirectory reportFile)
+    BL.writeFile reportFile $ checksReport reports (fullPath <$> loweredProject)
 
 genModules ::
   TerminaConfig
@@ -434,7 +447,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     valueAnalysisCheck plt constEnvs loweredProject
     -- | Decide the run-time checks
     when chatty (putStrLn . debugMessage $ "Elaborating the run-time checks")
-    let (elaboratedProject, _checksReport) = elaborateProject plt loweredProject
+    let (elaboratedProject, checksReports) = elaborateProject plt loweredProject
     when chatty (putStrLn . debugMessage $ "Side-effect checking project modules")
     sideEffectCheck plt elaboratedProject
     -- | Obtain the architectural description of the program
@@ -451,6 +464,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     genModules config plt monadicTypes elaboratedProject
     genInitFile config plt elaboratedProject (qualifiedName appModule)
     genPlatformCode config plt loweredProject (qualifiedName appModule) programArchitecture
+    genChecksReportFile config loweredProject checksReports
     unless (S.null (S.filter (\case {
         TStruct _ -> False;
         TEnum _ -> False;

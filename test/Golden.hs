@@ -1,4 +1,4 @@
-module Golden (goldenC, goldenMessage) where
+module Golden (goldenC, goldenJSON, goldenMessage) where
 
 import Data.Text (Text)
 import qualified Data.Text.IO as TIO
@@ -33,6 +33,11 @@ goldenMessageDir = "test" </> "Errors" </> "golden"
 --   * Otherwise the actual output is compared against the committed golden.
 goldenC :: String -> Text -> Expectation
 goldenC = goldenIn goldenCDir "c"
+
+-- | Assert that a report the build writes matches the golden file
+-- @test\/Pipeline\/golden\/\<name\>.json@.
+goldenJSON :: String -> Text -> Expectation
+goldenJSON = goldenIn goldenCDir "json"
 
 -- | Assert that the message the compiler prints for an error matches the golden
 -- file @test\/Errors\/golden\/\<name\>.txt@. It fixes the text a user reads,
