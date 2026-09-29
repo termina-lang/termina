@@ -91,7 +91,7 @@ instance Diagnosable Error where
         diagnostic "RTE-001" "unknown component"
             ("Unknown component \x1b[31m" <> T.pack ident <> "\x1b[0m.")
     describe (EDuplicatedStepName ident stepPos) =
-        relatedTo stepPos "the step was previoulsy defined here" $
+        relatedTo stepPos "the step was previously defined here" $
         diagnostic "RTE-002" "duplicated step name"
             ("There is a step with the name \x1b[31m" <> T.pack ident <> "\x1b[0m in the current transaction.\n")
     describe (EUnknownAction actionId (clsId, clsLoc)) =

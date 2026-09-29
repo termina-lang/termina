@@ -554,7 +554,7 @@ instance Diagnosable Error where
         diagnostic "SE-080" "invalid write to a constant"
             ("The constant \x1b[31m" <> T.pack ident <> "\x1b[0m is read-only and cannot be modified.")
     describe (ESymbolAlreadyDefined (ident, symbolPos)) =
-        relatedTo symbolPos "the symbol was previoulsy defined here" $
+        relatedTo symbolPos "the symbol was previously defined here" $
         diagnostic "SE-081" "symbol already defined"
             ("The symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already defined.\n")
     describe EContinueInvalidExpression =
