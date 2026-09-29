@@ -1,13 +1,13 @@
-module ControlFlow.BasicBlocks.Checks.ExitPaths where
+module ControlFlow.ExitPaths where
 
-import ControlFlow.BasicBlocks.Checks.ExitPaths.Types
-import ControlFlow.BasicBlocks.AST
+import ControlFlow.ExitPaths.Types
+import Lowering.AST
 import Semantic.Types
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Except
 import Utils.Annotations
-import ControlFlow.BasicBlocks.Checks.ExitPaths.Errors
+import ControlFlow.ExitPaths.Errors
 import Data.Foldable
 import qualified Control.Monad.State as ST
 import Utils.Monad

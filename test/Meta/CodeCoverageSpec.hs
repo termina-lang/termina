@@ -62,7 +62,7 @@ families =
       ["test/Architecture/Negative/CodeSpec.hs"] []
       []
   , Family "ExitPaths (EE)" "EE"
-      "src/ControlFlow/BasicBlocks/Checks/ExitPaths/Errors.hs"
+      "src/ControlFlow/ExitPaths/Errors.hs"
       [] ["test/ExitPaths/fixtures"]
       []
   , Family "ConstFolding (CFE)" "CFE"

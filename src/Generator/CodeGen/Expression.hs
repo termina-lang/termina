@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Generator.CodeGen.Expression where
 
-import ControlFlow.BasicBlocks.AST
+import Lowering.AST
 import Generator.LanguageC.AST
 import Semantic.Types
 import Control.Monad.Except

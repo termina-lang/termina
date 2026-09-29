@@ -16,7 +16,7 @@ import Semantic.Environment (makeInitialGlobalEnv)
 import Configuration.Platform (Platform(TestPlatform))
 import Configuration.Configuration (defaultConfig)
 import Generator.Environment (getPlatformInitialGlobalEnv)
-import ControlFlow.BasicBlocks (runGenBBModule)
+import Lowering (runLowerModule)
 import ControlFlow.ConstFolding (runConstFolding, constFoldModule)
 import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
 import ControlFlow.ConstFolding.Errors (ConstFoldError)
@@ -31,7 +31,7 @@ constFoldError input = case runP (contents topLevel) "test" "" input of
         env = makeInitialGlobalEnv (Just config) TestPlatform (getPlatformInitialGlobalEnv config TestPlatform)
     in case runTypeChecking env (typeTerminaModule (S.singleton "test") ast) of
       Left err -> error $ "Typing error: " ++ show err
-      Right (typed, _) -> case runGenBBModule typed of
+      Right (typed, _) -> case runLowerModule typed of
         Left err -> error $ "Basic Blocks error: " ++ show err
         Right bb ->
           let bbModule = TerminaModuleData "test" "test" dummyTime [] [] (pack input) (BasicBlockData bb)

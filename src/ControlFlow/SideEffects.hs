@@ -5,8 +5,8 @@ import ControlFlow.SideEffects.Monad
    runSideEffects, isMutableSelfMethod, getMutableSelfMethods, getEffectful,
    startClass, startCallable, noteEffect, endFunction, endMember, effectfulFunctions)
 import ControlFlow.SideEffects.Errors (SideEffectsError, Error(..), Effect(..))
-import ControlFlow.BasicBlocks.AST
-import ControlFlow.BasicBlocks.Traversal
+import Lowering.AST
+import ControlFlow.Traversal
   (Child(..), childExpressions, expressionChildren, indexExpressions)
 import ControlFlow.Dataflow (Transfer(..), walkForward)
 import Semantic.Types

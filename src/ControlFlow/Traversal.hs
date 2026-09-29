@@ -12,7 +12,7 @@
 -- What a pass may not delegate here is the control flow. 'simpleBlockChildren'
 -- covers the blocks that only evaluate expressions and returns 'Nothing' for the
 -- four that branch, which every pass has to interpret for itself.
-module ControlFlow.BasicBlocks.Traversal (
+module ControlFlow.Traversal (
     Child(..)
   , ObjectVisitor(..)
   , Rewriter(..)
@@ -27,7 +27,7 @@ module ControlFlow.BasicBlocks.Traversal (
   , rewriteFieldAssignment
 ) where
 
-import ControlFlow.BasicBlocks.AST
+import Lowering.AST
 
 import Data.Maybe (maybeToList)
 

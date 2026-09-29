@@ -1,6 +1,6 @@
 module ControlFlow.Architecture.BoxInOut where
 
-import ControlFlow.BasicBlocks.AST
+import Lowering.AST
 import ControlFlow.Architecture.Types
 
 import Control.Monad

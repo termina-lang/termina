@@ -11,7 +11,7 @@ import Semantic.Environment (makeInitialGlobalEnv)
 import Configuration.Platform (Platform(TestPlatform))
 import Configuration.Configuration (defaultConfig)
 import Generator.Environment (getPlatformInitialGlobalEnv, getPlatformInitialProgram)
-import ControlFlow.BasicBlocks (runGenBBModule)
+import Lowering (runLowerModule)
 import ControlFlow.Architecture (runGenArchitecture)
 import ControlFlow.Architecture.Checks
   ( runCheckEmitterConnections, runCheckChannelConnections
@@ -28,7 +28,7 @@ architectureError input = case runP (contents topLevel) "test" "" input of
         initialProg = getPlatformInitialProgram config TestPlatform
     in case runTypeChecking env (typeTerminaModule (S.singleton "test") ast) of
       Left err -> error $ "Typing error: " ++ show err
-      Right (typed, _) -> case runGenBBModule typed of
+      Right (typed, _) -> case runLowerModule typed of
         Left err -> error $ "Basic Blocks error: " ++ show err
         Right bb -> case runGenArchitecture initialProg "test" bb of
           Left err -> Just err

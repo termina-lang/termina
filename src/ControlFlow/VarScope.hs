@@ -33,8 +33,8 @@ import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Data.Maybe (listToMaybe, mapMaybe)
 
-import ControlFlow.BasicBlocks.AST
-import ControlFlow.BasicBlocks.Traversal
+import Lowering.AST
+import ControlFlow.Traversal
     (Child(..), ObjectVisitor(..), expressionChildren, simpleBlockChildren,
      walkObject, rootIdent, indexExpressions)
 import ControlFlow.Dataflow

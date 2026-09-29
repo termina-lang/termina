@@ -30,7 +30,7 @@ module ControlFlow.Dataflow (
   , runDataflow
 ) where
 
-import ControlFlow.BasicBlocks.AST
+import Lowering.AST
 import Semantic.Types (SemanticAnn)
 
 import Control.Monad.Except
@@ -110,7 +110,7 @@ data Transfer p g e = Transfer
     -- | A statement of a regular block.
     onStatement :: Statement SemanticAnn -> DataflowM p g e ()
     -- | A block that only evaluates expressions, which the pass reads through
-    -- 'ControlFlow.BasicBlocks.Traversal.simpleBlockChildren'.
+    -- 'ControlFlow.Traversal.simpleBlockChildren'.
   , onSimpleBlock :: BasicBlock SemanticAnn -> DataflowM p g e ()
     -- | An expression evaluated in a control position without deciding a path,
     -- such as the bounds of a loop or the object a @match@ inspects.

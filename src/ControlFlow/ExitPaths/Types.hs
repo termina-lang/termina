@@ -1,4 +1,4 @@
-module ControlFlow.BasicBlocks.Checks.ExitPaths.Types (
+module ControlFlow.ExitPaths.Types (
     BBPathsCheck,
     ExitPathsCheckST(..),
     setMustExit,
@@ -9,7 +9,7 @@ module ControlFlow.BasicBlocks.Checks.ExitPaths.Types (
 ) where
 
 import Control.Monad.Except
-import ControlFlow.BasicBlocks.Checks.ExitPaths.Errors
+import ControlFlow.ExitPaths.Errors
 import qualified Control.Monad.State as ST
 
 -- | State of the exit paths check

@@ -2,7 +2,7 @@
 
 module Generator.CodeGen.Common where
 
-import ControlFlow.BasicBlocks.AST
+import Lowering.AST
 import Semantic.Types
 import Control.Monad.Except
 import Generator.LanguageC.AST

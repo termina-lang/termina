@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-module ControlFlow.BasicBlocks.Checks.ExitPaths.Errors where
+module ControlFlow.ExitPaths.Errors where
 import Utils.Annotations
 import Utils.Errors
 

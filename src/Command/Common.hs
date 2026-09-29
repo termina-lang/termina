@@ -128,7 +128,7 @@ typeModules parsedProject initialState =
                   (SemanticData typedProgram)
           typeModules' (M.insert m typedModule typedProject) newState ms
 
-genArchitecture :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> [QualifiedName] -> IO (TerminaProgArch SemanticAnn)
+genArchitecture :: LoweredProject -> TerminaProgArch SemanticAnn -> [QualifiedName] -> IO (TerminaProgArch SemanticAnn)
 genArchitecture bbProject initialTerminaProgram orderedDependencies = do
   genArchitecture' initialTerminaProgram orderedDependencies
 
@@ -137,7 +137,7 @@ genArchitecture bbProject initialTerminaProgram orderedDependencies = do
     genArchitecture' :: TerminaProgArch SemanticAnn -> [QualifiedName] -> IO (TerminaProgArch SemanticAnn)
     genArchitecture' tp [] = pure tp
     genArchitecture' tp (m:ms) = do
-      let typedModule = basicBlocksAST . metadata $ bbProject M.! m
+      let typedModule = loweredAST . metadata $ bbProject M.! m
       let result = runGenArchitecture tp m typedModule
       case result of
         Left err ->
@@ -150,7 +150,7 @@ genArchitecture bbProject initialTerminaProgram orderedDependencies = do
           TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
         Right tp' -> genArchitecture' tp' ms
 
-checkEmitterConnections :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
+checkEmitterConnections :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
 checkEmitterConnections bbProject progArchitecture =
   let result = runCheckEmitterConnections progArchitecture in
   case result of
@@ -161,7 +161,7 @@ checkEmitterConnections bbProject progArchitecture =
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
-checkChannelConnections :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
+checkChannelConnections :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
 checkChannelConnections bbProject progArchitecture =
   let result = runCheckChannelConnections progArchitecture in
   case result of
@@ -172,7 +172,7 @@ checkChannelConnections bbProject progArchitecture =
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
-checkResourceUsage :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
+checkResourceUsage :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
 checkResourceUsage bbProject progArchitecture =
   let result = runCheckResourceUsage progArchitecture in
   case result of
@@ -183,7 +183,7 @@ checkResourceUsage bbProject progArchitecture =
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
-checkPoolUsage :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
+checkPoolUsage :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
 checkPoolUsage bbProject progArchitecture =
   let result = runCheckPoolUsage progArchitecture in
   case result of
@@ -194,7 +194,7 @@ checkPoolUsage bbProject progArchitecture =
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
-checkProjectBoxSources :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
+checkProjectBoxSources :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
 checkProjectBoxSources bbProject progArchitecture =
   let result = runCheckBoxSources progArchitecture in
   case result of
@@ -208,7 +208,7 @@ checkProjectBoxSources bbProject progArchitecture =
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
-constFolding :: Platform -> BasicBlocksProject -> IO (BasicBlocksProject, ProjectConstEnvs)
+constFolding :: Platform -> LoweredProject -> IO (LoweredProject, ProjectConstEnvs)
 constFolding plt bbProject =
   -- | Fold the modules in dependency order, threading the constant environment
   -- from one module to the next so that a module can resolve the constants
@@ -222,8 +222,8 @@ constFolding plt bbProject =
 
   where
 
-    foldModules :: ConstFoldEnv -> BasicBlocksProject -> ProjectConstEnvs -> [QualifiedName]
-      -> IO (BasicBlocksProject, ProjectConstEnvs)
+    foldModules :: ConstFoldEnv -> LoweredProject -> ProjectConstEnvs -> [QualifiedName]
+      -> IO (LoweredProject, ProjectConstEnvs)
     foldModules _ foldedProject constEnvs [] = return (foldedProject, constEnvs)
     foldModules env foldedProject constEnvs (m:ms) =
       case runConstFolding env (constFoldModule (bbProject M.! m)) of
@@ -244,7 +244,7 @@ constFolding plt bbProject =
 -- each function gives back from one module to the next, so that a call resolves
 -- against the function it calls even when that one lives in a module this one
 -- imports.
-valueAnalysisCheck :: Platform -> ProjectConstEnvs -> BasicBlocksProject -> IO ()
+valueAnalysisCheck :: Platform -> ProjectConstEnvs -> LoweredProject -> IO ()
 valueAnalysisCheck plt constEnvs bbProject =
   case sortProjectDepsOrLoop (M.map importedModules bbProject) of
     -- | The build pipeline orders the modules (and reports dependency cycles)
@@ -259,7 +259,7 @@ valueAnalysisCheck plt constEnvs bbProject =
       case runValueAnalysisCheck plt
              (M.findWithDefault M.empty m constEnvs)
              returned
-             (basicBlocksAST . metadata $ bbProject M.! m) of
+             (loweredAST . metadata $ bbProject M.! m) of
         (Just err, _) ->
           TIO.putStrLn (toText err (projectSourceFiles bbProject)) >> exitFailure
         (Nothing, returned') -> checkModules returned' ms

@@ -16,7 +16,7 @@ fixturesDir :: FilePath
 fixturesDir = "test" </> "ExitPaths" </> "fixtures"
 
 -- | Human-readable title per error code (mirrors @errorTitle@ in
--- @ControlFlow.BasicBlocks.Checks.ExitPaths.Errors@).
+-- @ControlFlow.ExitPaths.Errors@).
 titles :: [(String, String)]
 titles =
   [ ("EE-001", "invalid return statement")

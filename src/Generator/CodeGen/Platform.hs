@@ -27,7 +27,7 @@ import Control.Monad
 import Control.Exception
 import System.IO.Error
 
-genPlatformCode :: TerminaConfig -> Platform -> BasicBlocksProject -> QualifiedName -> TerminaProgArch SemanticAnn -> IO ()
+genPlatformCode :: TerminaConfig -> Platform -> LoweredProject -> QualifiedName -> TerminaProgArch SemanticAnn -> IO ()
 genPlatformCode _ TestPlatform _ _ _ = return ()
 genPlatformCode params plt bbProject appModName progArchitecture = do
   let appModule = bbProject M.! appModName

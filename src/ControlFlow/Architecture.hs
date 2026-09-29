@@ -7,7 +7,7 @@ import Control.Monad
 import Control.Monad.Except
 import ControlFlow.Architecture.Errors
 import qualified Control.Monad.State.Strict as ST
-import ControlFlow.BasicBlocks.AST
+import Lowering.AST
 import Data.Maybe
 import ControlFlow.Architecture.Utils
 import Semantic.Types

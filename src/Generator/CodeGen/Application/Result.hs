@@ -9,7 +9,7 @@ import System.FilePath
 import Generator.CodeGen.TypeDefinition
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
-import ControlFlow.BasicBlocks.AST
+import Lowering.AST
 import Utils.Annotations
 import Control.Monad.Except
 import Configuration.Configuration

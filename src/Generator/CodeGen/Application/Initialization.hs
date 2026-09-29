@@ -6,7 +6,7 @@ import Generator.LanguageC.AST
 import Generator.CodeGen.Common
 import Configuration.Platform (Platform)
 import System.FilePath
-import ControlFlow.BasicBlocks.AST
+import Lowering.AST
 import Semantic.Types
 import Generator.CodeGen.Statement
 import Control.Monad.Except (runExceptT)

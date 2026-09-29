@@ -10,7 +10,7 @@ import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
 
-genMakefile :: TerminaConfig -> BasicBlocksProject -> Makefile
+genMakefile :: TerminaConfig -> LoweredProject -> Makefile
 genMakefile params bbProject =
     Makefile [
         MakeBlock [

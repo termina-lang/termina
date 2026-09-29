@@ -7,7 +7,7 @@
 module ExitPaths.Negative.DetailSpec (spec) where
 
 import ExitPaths.Common (exitPathsError)
-import ControlFlow.BasicBlocks.Checks.ExitPaths.Errors (ExitCheckError(..))
+import ControlFlow.ExitPaths.Errors (ExitCheckError(..))
 import Utils.Annotations (AnnotatedError(..), Location(Position))
 
 import System.FilePath ((</>))

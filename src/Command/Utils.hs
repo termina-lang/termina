@@ -9,7 +9,7 @@ import Core.AST
 
 import Parser.Types
 
-import ControlFlow.BasicBlocks
+import Lowering
 
 import Modules.Modules
 
@@ -19,16 +19,16 @@ import ControlFlow.VarScope (runVarScopeCheck)
 import ControlFlow.SideEffects (runSideEffectCheck)
 import ControlFlow.SideEffects.Errors (SideEffectsError)
 import Configuration.Platform (Platform)
-import ControlFlow.BasicBlocks.Checks.ExitPaths
+import ControlFlow.ExitPaths
 import Configuration.Configuration
 import Data.Yaml
 import System.Directory
 import Utils.Annotations
-import ControlFlow.BasicBlocks.Checks.ExitPaths.Errors (PathsCheckError)
+import ControlFlow.ExitPaths.Errors (PathsCheckError)
 import ControlFlow.BoxUsage.Errors (BoxUsageError)
 import ControlFlow.VarUsage.Errors (VarUsageError)
 import ControlFlow.VarScope.Errors (VarScopeError)
-import ControlFlow.BasicBlocks.Errors (BBGeneratorError)
+import Lowering.Errors (LoweringError)
 import Parser.Errors
 import Control.Monad.IO.Class
 import Data.Functor ((<&>))
@@ -81,7 +81,7 @@ getVisibleModules prevModsMap importedMods =
 projectDeclaredNames :: ParsedProject -> DeclaredEnv
 projectDeclaredNames = M.unions . fmap (declaredNames . parsedAST . metadata) . M.elems
 
-changedDependendencies :: BasicBlocksProject -> UTCTime -> [QualifiedName] -> IO Bool
+changedDependendencies :: LoweredProject -> UTCTime -> [QualifiedName] -> IO Bool
 changedDependendencies _ _ [] = return False
 changedDependendencies bbProject t (x:xs) = do
   let dep = bbProject M.! x
@@ -118,7 +118,7 @@ getModuleImports Nothing m =
                 Right qname -> do
                     return $ Left (annotateError ann (EImportedFileNotFound (qname <.> "fin")))
 
-boxUsageCheckModules :: BasicBlocksProject -> Maybe BoxUsageError
+boxUsageCheckModules :: LoweredProject -> Maybe BoxUsageError
 boxUsageCheckModules = check . M.elems
 
     where
@@ -132,13 +132,13 @@ boxUsageCheckModules = check . M.elems
 
 boxUsageCheckModule :: BasicBlocksModule -> Maybe BoxUsageError
 boxUsageCheckModule =
-    runBoxUsageCheck . basicBlocksAST . metadata
+    runBoxUsageCheck . loweredAST . metadata
 
 -- | The modules are checked in dependency order, threading the functions found
 -- to carry an effect from one module to the next, so that a call resolves
 -- against the function it calls even when that one lives in a module this one
 -- imports.
-sideEffectCheckModules :: Platform -> BasicBlocksProject -> Maybe SideEffectsError
+sideEffectCheckModules :: Platform -> LoweredProject -> Maybe SideEffectsError
 sideEffectCheckModules plt bbProject =
     case sortProjectDepsOrLoop (M.map importedModules bbProject) of
         -- | The build pipeline orders the modules, and reports a cycle, before
@@ -150,11 +150,11 @@ sideEffectCheckModules plt bbProject =
 
         check _ [] = Nothing
         check functions (m:ms) =
-            case runSideEffectCheck plt functions (basicBlocksAST . metadata $ bbProject M.! m) of
+            case runSideEffectCheck plt functions (loweredAST . metadata $ bbProject M.! m) of
                 (Nothing, functions') -> check functions' ms
                 (Just err, _) -> Just err
 
-varUsageCheckModules :: BasicBlocksProject -> Maybe VarUsageError
+varUsageCheckModules :: LoweredProject -> Maybe VarUsageError
 varUsageCheckModules = check . M.elems
 
     where
@@ -168,21 +168,21 @@ varUsageCheckModules = check . M.elems
 
 varUsageCheckModule :: BasicBlocksModule -> Maybe VarUsageError
 varUsageCheckModule =
-    runVarUsageCheck . basicBlocksAST . metadata
+    runVarUsageCheck . loweredAST . metadata
 
-varScopeCheckModules :: BasicBlocksProject -> Maybe VarScopeError
+varScopeCheckModules :: LoweredProject -> Maybe VarScopeError
 varScopeCheckModules = listToMaybe . mapMaybe varScopeCheckModule . M.elems
 
 varScopeCheckModule :: BasicBlocksModule -> Maybe VarScopeError
 varScopeCheckModule =
-    runVarScopeCheck . basicBlocksAST . metadata
+    runVarScopeCheck . loweredAST . metadata
 
-genBasicBlocks :: TypedProject -> Either BBGeneratorError BasicBlocksProject
+genBasicBlocks :: TypedProject -> Either LoweringError LoweredProject
 genBasicBlocks = mapM genBasicBlocksModule
 
-genBasicBlocksModule :: TypedModule -> Either BBGeneratorError BasicBlocksModule
+genBasicBlocksModule :: TypedModule -> Either LoweringError BasicBlocksModule
 genBasicBlocksModule typedModule = do
-    let result = runGenBBModule . typedAST . metadata $ typedModule
+    let result = runLowerModule . typedAST . metadata $ typedModule
     case result of
         Left err -> Left err
         Right bbAST -> pure $ TerminaModuleData
@@ -194,7 +194,7 @@ genBasicBlocksModule typedModule = do
             (sourcecode typedModule)
             (BasicBlockData bbAST)
 
-basicBlockPathsCheckModules :: BasicBlocksProject -> Maybe PathsCheckError
+basicBlockPathsCheckModules :: LoweredProject -> Maybe PathsCheckError
 basicBlockPathsCheckModules = check . M.elems
 
     where
@@ -208,7 +208,7 @@ basicBlockPathsCheckModules = check . M.elems
 
 basicBlockPathsCheckModule :: BasicBlocksModule -> Maybe PathsCheckError
 basicBlockPathsCheckModule bbModule = do
-    let result = runCheckExitPaths . basicBlocksAST . metadata $ bbModule
+    let result = runCheckExitPaths . loweredAST . metadata $ bbModule
     case result of
         Left err -> Just err
         Right _ -> Nothing
@@ -235,7 +235,7 @@ checkFailure err = CheckFailure (errorIdent err) (show err) (toText err)
 data Check = Check
   {
     checkMessage :: String
-  , runCheck :: Platform -> BasicBlocksProject -> Maybe CheckFailure
+  , runCheck :: Platform -> LoweredProject -> Maybe CheckFailure
   }
 
 -- | The checks the basic-block AST goes through, in the order they run. Reading
@@ -261,12 +261,12 @@ basicBlockChecks =
 
 -- | The source of each module of a project, which is what the error printer
 -- quotes from.
-projectSourceFiles :: BasicBlocksProject -> M.Map FilePath T.Text
+projectSourceFiles :: LoweredProject -> M.Map FilePath T.Text
 projectSourceFiles =
   M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) M.empty
 
 -- | Runs every check over the basic-block AST, stopping at the first error.
-runBasicBlockChecks :: Bool -> Platform -> BasicBlocksProject -> IO ()
+runBasicBlockChecks :: Bool -> Platform -> LoweredProject -> IO ()
 runBasicBlockChecks chatty plt bbProject = mapM_ runOne basicBlockChecks
 
   where

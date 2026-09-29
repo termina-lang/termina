@@ -13,7 +13,7 @@ import Generator.LanguageC.Printer
 import qualified Data.Set as S
 import Semantic.AST
 import Data.Text
-import ControlFlow.BasicBlocks
+import Lowering
 import Generator.CodeGen.Statement
 import Generator.CodeGen.TypeDefinition
 import Generator.CodeGen.Function
@@ -187,7 +187,7 @@ renderExpression expr =
 
 renderStatement :: Statement SemanticAnn -> Text
 renderStatement stmt = 
-  case runExcept (genBBlocks [] [stmt]) of
+  case runExcept (lowerStatements [] [stmt]) of
     Left err -> pack $ show err
     Right bBlocks ->
       let config = defaultConfig "test" TestPlatform in
@@ -197,7 +197,7 @@ renderStatement stmt =
 
 renderTypeDefinitionDecl :: MonadicTypes -> AnnASTElement SemanticAnn -> Text
 renderTypeDefinitionDecl monTypes decl = 
-  case runExcept . genBBAnnASTElement $ decl of
+  case runExcept . lowerElement $ decl of
     Left err -> pack $ show err
     Right bbDecl ->
       let config = defaultConfig "test" TestPlatform in
@@ -207,7 +207,7 @@ renderTypeDefinitionDecl monTypes decl =
 
 renderFunctionDecl :: MonadicTypes -> AnnASTElement SemanticAnn -> Text
 renderFunctionDecl monTypes decl = 
-  case runExcept . genBBAnnASTElement $ decl of
+  case runExcept . lowerElement $ decl of
     Left err -> pack $ show err
     Right bbAST -> 
       let config = defaultConfig "test" TestPlatform in
@@ -217,7 +217,7 @@ renderFunctionDecl monTypes decl =
 
 renderFunction :: AnnASTElement SemanticAnn -> Text
 renderFunction func = 
-  case runExcept . genBBAnnASTElement $ func of
+  case runExcept . lowerElement $ func of
     Left err -> pack $ show err
     Right bbAST -> 
       let config = defaultConfig "test" TestPlatform in

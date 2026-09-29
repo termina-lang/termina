@@ -4,7 +4,7 @@
 
 module Generator.CodeGen.Application.Utils where
 
-import ControlFlow.BasicBlocks.AST
+import Lowering.AST
 import Control.Monad
 import Control.Monad.Except
 import Generator.CodeGen.Common

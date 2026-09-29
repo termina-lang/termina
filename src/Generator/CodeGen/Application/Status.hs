@@ -8,7 +8,7 @@ import Configuration.Platform (Platform)
 import System.FilePath
 import Generator.CodeGen.TypeDefinition
 import qualified Data.Set as S
-import ControlFlow.BasicBlocks.AST
+import Lowering.AST
 import Utils.Annotations
 import Control.Monad.Except
 import Configuration.Configuration

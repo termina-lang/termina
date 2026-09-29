@@ -1,7 +1,7 @@
 module ControlFlow.Architecture.Types where
 
 import Data.Map
-import ControlFlow.BasicBlocks.AST
+import Lowering.AST
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 import Utils.Annotations

@@ -1,6 +1,6 @@
 module Generator.CodeGen.Statement where
 
-import ControlFlow.BasicBlocks.AST
+import Lowering.AST
 import Generator.LanguageC.AST
 import Generator.LanguageC.Embedded
 import Semantic.Types

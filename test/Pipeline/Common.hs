@@ -39,7 +39,7 @@ import Generator.CodeGen.Module (runGenSourceFile)
 import Generator.CodeGen.Application.Glue (runGenMainFile)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
 import Generator.LanguageC.Printer (runCPrinter)
-import ControlFlow.BasicBlocks.AST (AnnotatedProgram)
+import Lowering.AST (AnnotatedProgram)
 import qualified Semantic.AST as SAST
 
 import Command.Types
@@ -106,7 +106,7 @@ runFullProjectAppWith ::
   -> Either Failure (TerminaProgArch SemanticAnn, [(QualifiedName, AnnotatedProgram SemanticAnn)])
 runFullProjectAppWith cfg sources = do
   (foldedProject, ordered, progArch) <- runProjectPipeline cfg sources
-  let prjprogs = [ (m, basicBlocksAST . metadata $ foldedProject M.! m) | m <- ordered ]
+  let prjprogs = [ (m, loweredAST . metadata $ foldedProject M.! m) | m <- ordered ]
   pure (progArch, prjprogs)
 
 -- | The full pipeline up to (and including) the architecture checks, shared by
@@ -116,7 +116,7 @@ runFullProjectAppWith cfg sources = do
 runProjectPipeline ::
   TerminaConfig
   -> [(QualifiedName, String)]
-  -> Either Failure (BasicBlocksProject, [QualifiedName], TerminaProgArch SemanticAnn)
+  -> Either Failure (LoweredProject, [QualifiedName], TerminaProgArch SemanticAnn)
 runProjectPipeline cfg sources = do
   let files = M.fromList [ (qname, pack src) | (qname, src) <- sources ]
   parsedProject <- M.fromList <$> mapM parseModule sources
@@ -171,8 +171,8 @@ renderInitFile prjprogs =
 -- | Constant-fold every module in dependency order, threading the constant
 -- environment so a module resolves the constants defined by the modules it
 -- imports. Mirrors @Command.Common.constFolding@ but stays in 'Either'.
-foldProject :: M.Map FilePath Text -> BasicBlocksProject -> [QualifiedName]
-  -> Either Failure (BasicBlocksProject, ProjectConstEnvs)
+foldProject :: M.Map FilePath Text -> LoweredProject -> [QualifiedName]
+  -> Either Failure (LoweredProject, ProjectConstEnvs)
 foldProject files bbProject = go (ConstFoldEnv M.empty TestPlatform) M.empty M.empty
   where
     go _ folded constEnvs [] = Right (folded, constEnvs)
@@ -185,7 +185,7 @@ foldProject files bbProject = go (ConstFoldEnv M.empty TestPlatform) M.empty M.e
 -- | Report a condition that always has the same value, which is what the value
 -- analysis check looks for. Mirrors @Command.Common.valueAnalysisCheck@ but
 -- stays in 'Either'.
-analyseValues :: M.Map FilePath Text -> BasicBlocksProject -> ProjectConstEnvs
+analyseValues :: M.Map FilePath Text -> LoweredProject -> ProjectConstEnvs
   -> [QualifiedName] -> Either Failure ()
 analyseValues files bbProject constEnvs = go M.empty
 
@@ -196,7 +196,7 @@ analyseValues files bbProject constEnvs = go M.empty
       case runValueAnalysisCheck TestPlatform
              (M.findWithDefault M.empty m constEnvs)
              returned
-             (basicBlocksAST . metadata $ bbProject M.! m) of
+             (loweredAST . metadata $ bbProject M.! m) of
         (Just err, _) -> Left (failure files err)
         (Nothing, returned') -> go returned' ms
 
@@ -296,7 +296,7 @@ typeProject cfg files parsedProject =
                    (sourcecode parsedModule) (SemanticData typedProgram)
              in go (M.insert m typedModule typed) newState ms
 
-genProjectArchitecture :: TerminaConfig -> M.Map FilePath Text -> BasicBlocksProject
+genProjectArchitecture :: TerminaConfig -> M.Map FilePath Text -> LoweredProject
   -> [QualifiedName] -> Either Failure (TerminaProgArch SemanticAnn)
 genProjectArchitecture cfg files bbProject = go (initialProg cfg)
 
@@ -304,7 +304,7 @@ genProjectArchitecture cfg files bbProject = go (initialProg cfg)
 
     go tp [] = Right tp
     go tp (m:ms) =
-      case runGenArchitecture tp m (basicBlocksAST . metadata $ bbProject M.! m) of
+      case runGenArchitecture tp m (loweredAST . metadata $ bbProject M.! m) of
         Left err -> Left (failure files err)
         Right tp' -> go tp' ms
 
@@ -320,7 +320,7 @@ runChecks files progArch =
 renderModule :: BasicBlocksModule -> Either Failure Text
 renderModule bbModule =
   case runGenSourceFile configParams TestPlatform (qualifiedName bbModule)
-         (basicBlocksAST . metadata $ bbModule) of
+         (loweredAST . metadata $ bbModule) of
     Left err -> Left (Failure (T.pack (show err)) (T.pack (show err)))
     Right cSourceFile -> Right $ runCPrinter False cSourceFile
 

@@ -5,7 +5,7 @@ import Parser.Parsing
 import Semantic.TypeChecking
 import Semantic.Environment
 import Text.Parsec
-import ControlFlow.BasicBlocks
+import Lowering
 import Configuration.Configuration
 import Generator.Monadic
 import Configuration.Platform
@@ -23,7 +23,7 @@ renderHeader input = case runP (contents topLevel) "test" "" input of
     case runTypeChecking (makeInitialGlobalEnv (Just configParams) TestPlatform []) (typeTerminaModule (S.singleton "test") ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
-        case runGenBBModule tast of
+        case runLowerModule tast of
           Left err -> pack $ "Basic blocks error: " ++ show err
           Right bbAST -> 
             case runGenHeaderFile configParams TestPlatform "test" [] bbAST emptyMonadicTypes of
@@ -38,7 +38,7 @@ renderSource input = case runP (contents topLevel) "test" "" input of
     case runTypeChecking (makeInitialGlobalEnv (Just configParams) TestPlatform []) (typeTerminaModule (S.singleton "test") ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
-        case runGenBBModule tast of
+        case runLowerModule tast of
           Left err -> pack $ "Basic blocks error: " ++ show err
           Right bbAST -> 
             case runGenSourceFile configParams TestPlatform "test" bbAST of

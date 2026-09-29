@@ -131,7 +131,7 @@ loadRTModule rtModelFile = do
 
 typeRTModule :: TerminaProgArch SemanticAnn
   -> WCEPathMap WCEPSemAnn
-  -> BasicBlocksProject
+  -> LoweredProject
   -> WCEPProject
   -> ParsedRTModule -> IO TypedRTModule
 typeRTModule arch trPathMap bbProject pathProject rtModule = do
@@ -195,7 +195,7 @@ genTransPath rtModule pathProject arch config wcepMap wcetMap transaction = do
 
 -- | Load the files containing the transactional worst-case execution paths
 loadWCETModules
-  :: BasicBlocksProject
+  :: LoweredProject
     -> FilePath
   -> IO WCETProject
 loadWCETModules bbProject efpPath = do
@@ -240,7 +240,7 @@ loadWCETModules bbProject efpPath = do
 -- | Type check the transactional worst-case execution paths of the project modules
 typeWCETModules :: TerminaProgArch SemanticAnn
   -> WCEPathMap WCEPSemAnn
-  -> BasicBlocksProject
+  -> LoweredProject
   -> WCETProject
   -> IO (WCETimesMap WCETSemAnn)
 typeWCETModules arch wcepMap bbProject wcetProject =
@@ -267,7 +267,7 @@ typeWCETModules arch wcepMap bbProject wcetProject =
 
 -- | Load the files containing the transactional worst-case execution paths
 loadWCEPathModules
-  :: BasicBlocksProject
+  :: LoweredProject
     -> FilePath
   -> IO WCEPProject
 loadWCEPathModules bbProject efpPath = do
@@ -311,7 +311,7 @@ loadWCEPathModules bbProject efpPath = do
 
 -- | Type check the transactional worst-case execution paths of the project modules
 typeWCEPathModules :: TerminaProgArch SemanticAnn
-  -> BasicBlocksProject
+  -> LoweredProject
   -> WCEPProject
   -> IO (WCEPathMap WCEPSemAnn)
 typeWCEPathModules arch bbProject pathProject =

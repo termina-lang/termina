@@ -10,7 +10,7 @@ import Utils.Annotations
 import Utils.Errors (ErrorMessage(errorIdent))
 import Configuration.Platform
 import Configuration.Configuration
-import ControlFlow.BasicBlocks
+import Lowering
 import qualified ControlFlow.BoxUsage.Errors as BoxUsage
 import qualified ControlFlow.VarUsage.Errors as VarUsage
 import ControlFlow.BoxUsage (runBoxUsageCheck)
@@ -27,7 +27,7 @@ runNegativeTestBoxUsage input = case runP (contents topLevel) "test" "" input of
     let config = defaultConfig "test" TestPlatform in
     case runTypeChecking (makeInitialGlobalEnv (Just config) TestPlatform []) (typeTerminaModule (S.singleton "test") ast) of
       Left err -> error $ "Typing Error: " ++ show err
-      Right (typedProgram, _) -> case runGenBBModule typedProgram of
+      Right (typedProgram, _) -> case runLowerModule typedProgram of
         Left err -> error $ "Basic Blocks Generator Error: " ++ show err
         Right bbProgram -> case runBoxUsageCheck bbProgram of
           Just err -> Just $ getError err
@@ -49,7 +49,7 @@ runNegativeTestVarUsage input = case runP (contents topLevel) "test" "" input of
     let config = defaultConfig "test" TestPlatform in
     case runTypeChecking (makeInitialGlobalEnv (Just config) TestPlatform []) (typeTerminaModule (S.singleton "test") ast) of
       Left err -> error $ "Typing Error: " ++ show err
-      Right (typedProgram, _) -> case runGenBBModule typedProgram of
+      Right (typedProgram, _) -> case runLowerModule typedProgram of
         Left err -> error $ "Basic Blocks Generator Error: " ++ show err
         Right bbProgram -> case runVarUsageCheck bbProgram of
           Just err -> Just $ getError err

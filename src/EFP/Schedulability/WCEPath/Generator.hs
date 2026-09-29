@@ -1,6 +1,6 @@
 module EFP.Schedulability.WCEPath.Generator where
 
-import ControlFlow.BasicBlocks.AST
+import Lowering.AST
 import qualified Semantic.Types as STYPES
 import EFP.Schedulability.WCEPath.AST
 import Utils.Annotations

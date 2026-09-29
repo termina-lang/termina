@@ -4,7 +4,7 @@ module ControlFlow.Architecture.Errors (
     ArchitectureError, Error(..)
 ) where
 
-import ControlFlow.BasicBlocks.AST
+import Lowering.AST
 import Utils.Annotations
 import Utils.Errors
 import Text.Parsec

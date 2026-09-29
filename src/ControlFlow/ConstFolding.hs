@@ -4,8 +4,8 @@ import Semantic.Types
 import Control.Monad.Except
 import ControlFlow.ConstFolding.Errors
 import ControlFlow.ConstFolding.Monad
-import ControlFlow.BasicBlocks.AST
-import ControlFlow.BasicBlocks.Traversal (Rewriter(..), rewriteObject, rewriteExpression)
+import Lowering.AST
+import ControlFlow.Traversal (Rewriter(..), rewriteObject, rewriteExpression)
 import Utils.Annotations
 import qualified Control.Monad.State as ST
 import qualified Data.Map as M

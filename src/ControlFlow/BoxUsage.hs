@@ -25,8 +25,8 @@ import qualified Data.Map.Strict as M
 import qualified Control.Monad.State as ST
 
 -- AST to work with.
-import ControlFlow.BasicBlocks.AST
-import ControlFlow.BasicBlocks.Traversal
+import Lowering.AST
+import ControlFlow.Traversal
 -- We need to know the type of objects.
 import Semantic.Types
 import ControlFlow.BoxUsage.Types

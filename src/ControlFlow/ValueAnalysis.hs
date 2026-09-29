@@ -54,8 +54,8 @@ import Data.Ord (comparing)
 import qualified Data.Set as S
 
 import Configuration.Platform (Platform)
-import ControlFlow.BasicBlocks.AST
-import ControlFlow.BasicBlocks.Traversal
+import Lowering.AST
+import ControlFlow.Traversal
     (Child(..), expressionChildren, simpleBlockChildren, rootIdent)
 import ControlFlow.ConstFolding (evalConstExpression, runConstFolding)
 import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))

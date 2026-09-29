@@ -2,7 +2,7 @@
 
 module ControlFlow.Architecture.Utils where
 
-import ControlFlow.BasicBlocks.AST
+import Lowering.AST
 import ControlFlow.Architecture.Types
 import qualified Data.Map.Strict as M
 import Data.List (group, sort, foldl')

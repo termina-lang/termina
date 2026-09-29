@@ -9,7 +9,7 @@ module ControlFlow.BoxUsage.Monad (
   defArgumentsProc, runBoxUsage, emptyBoxUsageSt
 ) where
 
-import ControlFlow.BasicBlocks.AST 
+import Lowering.AST 
 
 import ControlFlow.BoxUsage.Errors
 import ControlFlow.BoxUsage.Types

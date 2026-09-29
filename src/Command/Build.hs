@@ -145,7 +145,7 @@ monadicTypesMapModules = foldl' monadicTypesMapModule emptyMonadicTypes  . M.ele
 
 genTWCEPFiles ::
   TerminaConfig
-  -> BasicBlocksProject
+  -> LoweredProject
   -> IO ()
 genTWCEPFiles params bbProject = do
   mapM_ printWCEPModule (M.elems bbProject)
@@ -154,7 +154,7 @@ genTWCEPFiles params bbProject = do
 
     printWCEPModule :: BasicBlocksModule -> IO ()
     printWCEPModule bbModule =
-      let bbAST = basicBlocksAST . metadata $ bbModule
+      let bbAST = loweredAST . metadata $ bbModule
           wceps = genTransactionalWCEPS bbAST in
       (unless (null wceps) $ do
         let destinationPath = efpFolder params
@@ -185,7 +185,7 @@ genModules ::
   -- | The map with the option types to generate from defined types 
   -> MonadicTypes
   -- | The project to generate the code from
-  -> BasicBlocksProject -> IO ()
+  -> LoweredProject -> IO ()
 genModules params plt initialMonadicTypes bbProject =
   foldM_ printModule initialMonadicTypes (M.elems bbProject)
 
@@ -233,7 +233,7 @@ genModules params plt initialMonadicTypes bbProject =
     printSource bbModule = do
       let destinationPath = outputFolder params
           sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
-          tAST = basicBlocksAST . metadata $ bbModule
+          tAST = loweredAST . metadata $ bbModule
       case runGenSourceFile params plt (qualifiedName bbModule) tAST of
         Left err -> die. errorMessage $ show err
         Right cSourceFile -> do
@@ -243,7 +243,7 @@ genModules params plt initialMonadicTypes bbProject =
     printHeader :: MonadicTypes -> BasicBlocksModule -> IO MonadicTypes
     printHeader currentMonadicTypes bbModule = do
       let destinationPath = outputFolder params
-          tAST = basicBlocksAST . metadata $ bbModule
+          tAST = loweredAST . metadata $ bbModule
           moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
       case runGenHeaderFile params plt (qualifiedName bbModule) moduleDeps tAST currentMonadicTypes of
         Left err -> die . errorMessage $ show err
@@ -253,7 +253,7 @@ genModules params plt initialMonadicTypes bbProject =
           TIO.writeFile headerFile $ runCPrinter (profile params == Debug) cHeaderFile
           return newMonadicTypes
 
-genInitFile :: TerminaConfig -> Platform -> BasicBlocksProject -> QualifiedName -> IO ()
+genInitFile :: TerminaConfig -> Platform -> LoweredProject -> QualifiedName -> IO ()
 genInitFile params plt bbProject appModName = do
   let appModule = bbProject M.! appModName
   initFileExists <- doesFileExist initFile
@@ -278,7 +278,7 @@ genInitFile params plt bbProject appModName = do
 
     runGenInitFile' :: IO ()
     runGenInitFile' = do
-      let projectModules = M.toList $ basicBlocksAST . metadata <$> bbProject
+      let projectModules = M.toList $ loweredAST . metadata <$> bbProject
       case runGenInitFile params plt initFile projectModules of
         Left err -> die . errorMessage $ show err
         Right cInitFile -> do
@@ -286,7 +286,7 @@ genInitFile params plt bbProject appModName = do
           TIO.writeFile initFile $ runCPrinter False cInitFile
 
 
-genOptionHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> BasicBlocksProject -> QualifiedName -> IO ()
+genOptionHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> LoweredProject -> QualifiedName -> IO ()
 genOptionHeaderFile params plt monadicTypes bbProject appModName = do
   let appModule = bbProject M.! appModName
   optionFileExists <- doesFileExist optionFile
@@ -315,7 +315,7 @@ genOptionHeaderFile params plt monadicTypes bbProject appModName = do
         Left err -> die . errorMessage $ show err
         Right cOptionsFile -> TIO.writeFile optionFile $ runCPrinter (profile params == Debug) cOptionsFile
 
-genStatusHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> BasicBlocksProject -> QualifiedName -> IO ()
+genStatusHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> LoweredProject -> QualifiedName -> IO ()
 genStatusHeaderFile params plt monadicTypes bbProject appModName = do
   let appModule = bbProject M.! appModName
   statusFileExists <- doesFileExist statusFile
@@ -343,7 +343,7 @@ genStatusHeaderFile params plt monadicTypes bbProject appModName = do
       Left err -> die . errorMessage $ show err
       Right cOptionsFile -> TIO.writeFile statusFile $ runCPrinter (profile params == Debug) cOptionsFile
 
-genResultHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> BasicBlocksProject -> QualifiedName -> IO ()
+genResultHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> LoweredProject -> QualifiedName -> IO ()
 genResultHeaderFile params plt monadicTypes bbProject appModName = do
   let appModule = bbProject M.! appModName
   resultFileExists <- doesFileExist resultFile

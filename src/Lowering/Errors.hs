@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-module ControlFlow.BasicBlocks.Errors where
+module Lowering.Errors where
 import Utils.Errors
 import qualified Language.LSP.Protocol.Types as LSP
 import qualified Data.Text as T
@@ -8,10 +8,10 @@ import qualified Data.Text as T
 -- | This type represents the possible errors that can occur during the generation of basic blocks.
 -- In its current form, the only possible error is an internal error, which is used to signal that
 -- an unexpected situation has occurred.
-newtype BBGeneratorError = InternalError String
+newtype LoweringError = InternalError String
     deriving (Show)
 
-instance ErrorMessage BBGeneratorError where
+instance ErrorMessage LoweringError where
 
     errorIdent (InternalError _msg) = "Internal"
 
