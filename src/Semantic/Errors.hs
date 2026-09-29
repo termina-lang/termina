@@ -525,8 +525,8 @@ instance Diagnosable Error where
         diagnostic "SE-068" "assignment of an array expression list initializer to a non-array type"
             ("Invalid use of an array expression list initializer.\n" <> "You are trying to assign an array expression list initializer to an object of type \x1b[31m" <> showText ty <> "\x1b[0m.")
     describe EMonadicVariantInitializerInvalidUse =
-        diagnostic "SE-069" "invalid use of an builtin variant initializer"
-            ("You are trying to use an variant initializer for a builtin type in an invalid context.\n" <> "Variant initializers can only be used to initialize objects.")
+        diagnostic "SE-069" "invalid use of a builtin variant initializer"
+            ("You are trying to use a variant initializer for a builtin type in an invalid context.\n" <> "Variant initializers can only be used to initialize objects.")
     describe (EForLoopLowerBoundTypeMismatch expectedTy actualTy) =
         diagnostic "SE-070" "for loop lower bound type mismatch"
             ("The lower bound of the for loop is expected to be of the type of the iterator \x1b[31m" <> showText expectedTy <> "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
