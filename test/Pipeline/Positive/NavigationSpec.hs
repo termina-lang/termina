@@ -13,7 +13,7 @@ import Test.Hspec
 
 import LSP.Index
 import Utils.Annotations (Location(..))
-import Text.Parsec.Pos (sourceLine, sourceColumn)
+import Text.Parsec.Pos (sourceLine)
 
 -- | A module with a function called from another one, a local, a parameter and
 -- a resource with a method called on it.

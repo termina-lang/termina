@@ -19,7 +19,6 @@ import ControlFlow.VarUsage.Errors hiding (Error)
 import qualified ControlFlow.BoxUsage.Errors as BE
 import qualified ControlFlow.VarUsage.Errors as VE
 import VarUsage.Common
-import Semantic.Environment (builtinParameter)
 
 testVUE001 :: String
 testVUE001 = "function fun0(_data : u32) -> u32 {\n" ++
