@@ -56,7 +56,7 @@ import qualified Data.Set as S
 import Configuration.Platform (Platform)
 import Lowering.AST
 import ControlFlow.Traversal
-    (Child'(..), Child, expressionChildren, simpleBlockChildren, rootIdent)
+    (Child'(..), Child, expressionChildren, rootIdent)
 import ControlFlow.ConstFolding (evalConstExpression, runConstFolding)
 import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
 import ControlFlow.ValueAnalysis.Errors

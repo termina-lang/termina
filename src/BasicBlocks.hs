@@ -11,7 +11,10 @@
 module BasicBlocks where
 
 import Core.AST (Identifier, AccessKind)
+import Core.Tree (Child'(..))
 import Utils.Annotations
+
+import Data.Maybe (maybeToList)
 
 data MatchCase' ty expr obj a = MatchCase
   {
@@ -161,3 +164,25 @@ instance Annotated (Statement' ty expr obj) where
     AssignmentStmt obj expr
   updateAnnotation (SingleExpStmt expr _) =
     SingleExpStmt expr
+
+-- | The children of a basic block that only evaluates expressions, in
+-- evaluation order. The blocks that branch return 'Nothing', since what they
+-- mean to a pass is not the list of expressions they contain.
+simpleBlockChildren :: BasicBlock' ty expr obj a -> Maybe [Child' expr obj a]
+simpleBlockChildren bb = case bb of
+  SendMessage obj expr _ -> Just [ChildObject obj, ChildExpr expr]
+  ProcedureInvoke obj _ args _ -> Just (ChildObject obj : map ChildArg args)
+  SystemCall obj _ args _ -> Just (ChildObject obj : map ChildArg args)
+  AtomicLoad obj expr _ -> Just [ChildObject obj, ChildExpr expr]
+  AtomicStore obj expr _ -> Just [ChildObject obj, ChildExpr expr]
+  AtomicArrayLoad obj index expr _ -> Just [ChildObject obj, ChildExpr index, ChildExpr expr]
+  AtomicArrayStore obj index expr _ -> Just [ChildObject obj, ChildExpr index, ChildExpr expr]
+  AllocBox obj expr _ -> Just [ChildObject obj, ChildExpr expr]
+  FreeBox obj expr _ -> Just [ChildObject obj, ChildExpr expr]
+  ReturnBlock mExpr _ -> Just (map ChildExpr (maybeToList mExpr))
+  ContinueBlock expr _ -> Just [ChildExpr expr]
+  RebootBlock _ -> Just []
+  IfElseBlock {} -> Nothing
+  ForLoopBlock {} -> Nothing
+  MatchBlock {} -> Nothing
+  RegularBlock {} -> Nothing

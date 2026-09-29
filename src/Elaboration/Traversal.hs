@@ -4,7 +4,6 @@ module Elaboration.Traversal (
     Child'(..)
   , Child
   , expressionChildren
-  , simpleBlockChildren
   , childExpressions
   , indexExpressions
   , objectPath
@@ -12,7 +11,6 @@ module Elaboration.Traversal (
 
 import Elaboration.AST
 import Core.Tree
-import ControlFlow.Traversal (simpleBlockChildren)
 import Semantic.Utils (AccessPath, objectPathOf)
 
 -- | A child of a node of the elaborated AST.

@@ -9,9 +9,10 @@
 -- from a type or an address are part of the program text but not of the
 -- computation.
 --
--- What a pass may not delegate here is the control flow. 'simpleBlockChildren'
--- covers the blocks that only evaluate expressions and returns 'Nothing' for the
--- four that branch, which every pass has to interpret for itself.
+-- What a pass may not delegate here is the control flow. 'simpleBlockChildren',
+-- in "BasicBlocks", covers the blocks that only evaluate expressions and returns
+-- 'Nothing' for the four that branch, which every pass has to interpret for
+-- itself.
 --
 -- The reading functions are the ones of "Core.Tree" applied to the lowered
 -- AST. The rewriting side is written for the lowered AST, which is the one the
@@ -23,7 +24,6 @@ module ControlFlow.Traversal (
   , ObjectVisitor
   , Rewriter(..)
   , expressionChildren
-  , simpleBlockChildren
   , childExpressions
   , walkObject
   , rootIdent
@@ -34,10 +34,7 @@ module ControlFlow.Traversal (
 ) where
 
 import Lowering.AST
-import Semantic.AST (semanticTree)
 import Core.Tree
-
-import Data.Maybe (maybeToList)
 
 -- | A child of a node of the lowered AST.
 type Child = Child' Expression Object
@@ -59,28 +56,6 @@ indexExpressions = indexExpressionsOf semanticTree
 
 walkObject :: Monad m => ObjectVisitor m a -> Object a -> m ()
 walkObject = walkObjectOf semanticTree
-
--- | The children of a basic block that only evaluates expressions, in
--- evaluation order. The blocks that branch return 'Nothing', since what they
--- mean to a pass is not the list of expressions they contain.
-simpleBlockChildren :: BasicBlock' ty expr obj a -> Maybe [Child' expr obj a]
-simpleBlockChildren bb = case bb of
-  SendMessage obj expr _ -> Just [ChildObject obj, ChildExpr expr]
-  ProcedureInvoke obj _ args _ -> Just (ChildObject obj : map ChildArg args)
-  SystemCall obj _ args _ -> Just (ChildObject obj : map ChildArg args)
-  AtomicLoad obj expr _ -> Just [ChildObject obj, ChildExpr expr]
-  AtomicStore obj expr _ -> Just [ChildObject obj, ChildExpr expr]
-  AtomicArrayLoad obj index expr _ -> Just [ChildObject obj, ChildExpr index, ChildExpr expr]
-  AtomicArrayStore obj index expr _ -> Just [ChildObject obj, ChildExpr index, ChildExpr expr]
-  AllocBox obj expr _ -> Just [ChildObject obj, ChildExpr expr]
-  FreeBox obj expr _ -> Just [ChildObject obj, ChildExpr expr]
-  ReturnBlock mExpr _ -> Just (map ChildExpr (maybeToList mExpr))
-  ContinueBlock expr _ -> Just [ChildExpr expr]
-  RebootBlock _ -> Just []
-  IfElseBlock {} -> Nothing
-  ForLoopBlock {} -> Nothing
-  MatchBlock {} -> Nothing
-  RegularBlock {} -> Nothing
 
 -- | How to rewrite what a node holds. A pass that produces a new AST instead of
 -- reading the one it walks gives these three functions and gets the rebuilding

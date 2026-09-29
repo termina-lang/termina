@@ -12,7 +12,8 @@ module Lowering.AST (
   EnumVariant,
   Parameter,
   Modifier,
-  Const, TerminaType
+  Const, TerminaType,
+  semanticTree
 ) where
 
 import Core.AST
@@ -27,7 +28,8 @@ import Semantic.AST (
   Expression,
   Object,
   Modifier,
-  Const, TerminaType)
+  Const, TerminaType,
+  semanticTree)
 import Utils.Annotations (QualifiedName)
 
 type MatchCase = MatchCase' TerminaType Expression Object
