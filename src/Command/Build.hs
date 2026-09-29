@@ -432,6 +432,11 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     (bbProject, constEnvs) <- constFolding plt rawBBProject
     when chatty (putStrLn . debugMessage $ "Analysing the values of the project modules")
     valueAnalysisCheck plt constEnvs bbProject
+    -- | Decide the run-time checks
+    when chatty (putStrLn . debugMessage $ "Elaborating the run-time checks")
+    let (elaboratedProject, _checksReport) = elaborateProject bbProject
+    when chatty (putStrLn . debugMessage $ "Side-effect checking project modules")
+    sideEffectCheck plt elaboratedProject
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
     programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram config plt) orderedDependencies
@@ -440,9 +445,6 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     checkResourceUsage bbProject programArchitecture
     checkPoolUsage bbProject programArchitecture
     checkProjectBoxSources bbProject programArchitecture
-    -- | Decide the run-time checks
-    when chatty (putStrLn . debugMessage $ "Elaborating the run-time checks")
-    let (elaboratedProject, _checksReport) = elaborateProject bbProject
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
     genModules config plt monadicTypes elaboratedProject

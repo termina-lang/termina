@@ -46,6 +46,7 @@ import qualified Semantic.AST as SAST
 import Command.Types
 import Command.Utils
     (genBasicBlocks, basicBlockChecks, runCheck, CheckFailure(..),
+     elaborateProject, sideEffectCheckModules,
      getVisibleModules, sortProjectDepsOrLoop, projectDeclaredNames)
 import Modules.Modules (TerminaModuleData(..), ModuleDependency(..))
 import Modules.Utils (buildModuleName)
@@ -131,6 +132,10 @@ runProjectPipeline cfg sources = do
   -- | The constant propagation check follows the folding, which is what gives
   -- it the constants of each module.
   analyseValues files foldedProject constEnvs ordered
+  -- | The side-effect check reads the elaborated AST, which says what the
+  -- generated code checks while it runs.
+  maybe (Right ()) (Left . failure files)
+    (sideEffectCheckModules TestPlatform (fst (elaborateProject foldedProject)))
   progArch <- genProjectArchitecture cfg files foldedProject ordered
   runChecks files progArch
   pure (foldedProject, ordered, progArch)

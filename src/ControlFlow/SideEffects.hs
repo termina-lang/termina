@@ -5,14 +5,12 @@ import ControlFlow.SideEffects.Monad
    runSideEffects, isMutableSelfMethod, getMutableSelfMethods, getEffectful,
    startClass, startCallable, noteEffect, endFunction, endMember, effectfulFunctions)
 import ControlFlow.SideEffects.Errors (SideEffectsError, Error(..), Effect(..))
-import Lowering.AST
-import ControlFlow.Traversal
-  (Child'(..), childExpressions, expressionChildren, indexExpressions)
-import Elaboration.Prover.Guard (IndexBounds, guardedBounds, indexInBounds)
-import Core.Utils (arrayOf)
-import ControlFlow.Dataflow (Transfer'(..), Transfer, walkForward)
+import Elaboration.AST
+import Elaboration.Traversal
+  (Child'(..), childExpressions, expressionChildren, indexExpressions, objectPath)
+import ControlFlow.Dataflow (Transfer'(..), walkForward)
 import Semantic.Types
-import Semantic.Utils (objectPath, mayAlias, AccessPath)
+import Semantic.Utils (mayAlias, AccessPath)
 import Utils.Annotations (Location, getLocation, getAnnotation, annotateError)
 import Configuration.Platform (Platform)
 import Control.Applicative ((<|>))
@@ -49,9 +47,10 @@ callMutations e = case e of
     isMutableRef _                      = False
 
     referencedObject :: Expression SemanticAnn -> Maybe (Object SemanticAnn)
-    referencedObject (ReferenceExpression Mutable obj _)      = Just obj
-    referencedObject (ArraySliceExpression Mutable obj _ _ _) = Just obj
-    referencedObject _                                        = Nothing
+    referencedObject (ReferenceExpression Mutable obj _)     = Just obj
+    referencedObject (CheckedArraySlice Mutable obj _ _ _)   = Just obj
+    referencedObject (UncheckedArraySlice Mutable obj _ _ _) = Just obj
+    referencedObject _                                       = Nothing
 
 -- | Whether an expression subtree mutates state anywhere inside it, which is
 -- what decides whether the order in which two subexpressions are evaluated can
@@ -70,20 +69,18 @@ mutatesState e = not (null (callMutations e)) || any mutatesState (childExpressi
 -- and two reads of it may give different values, which makes where it happens
 -- part of the behaviour of the program.
 --
--- An array access whose index the compiler does not know lowers to a call to
--- the bounds check, which returns the index when it falls inside the array and
--- raises the exception when it does not. An index that is a constant is
--- checked while the program is compiled, and one that the left operand of an
--- enclosing logical operator keeps inside the array ('indexInBounds') cannot
--- fail. The elaboration lowers both to the index alone.
-objectEffect :: IndexBounds -> Object SemanticAnn -> Maybe Effect
-objectEffect bounds obj = case obj of
-  Variable _ ann                   -> location ann
-  ArrayIndexExpression o index ann -> location ann <|> checked o index ann <|> objectEffect bounds o
-  MemberAccess o _ ann             -> location ann <|> objectEffect bounds o
-  DereferenceMemberAccess o _ ann  -> location ann <|> objectEffect bounds o
-  Dereference o ann                -> location ann <|> objectEffect bounds o
-  Unbox o ann                      -> location ann <|> objectEffect bounds o
+-- An array access that the elaboration left checked calls the bounds check,
+-- which returns the index when it falls inside the array and raises the
+-- exception when it does not.
+objectEffect :: Object SemanticAnn -> Maybe Effect
+objectEffect obj = case obj of
+  Variable _ ann                  -> location ann
+  CheckedArrayIndex o _ ann       -> location ann <|> Just (ChecksIndex (getLocation ann)) <|> objectEffect o
+  UncheckedArrayIndex o _ ann     -> location ann <|> objectEffect o
+  MemberAccess o _ ann            -> location ann <|> objectEffect o
+  DereferenceMemberAccess o _ ann -> location ann <|> objectEffect o
+  Dereference o ann               -> location ann <|> objectEffect o
+  Unbox o ann                     -> location ann <|> objectEffect o
 
   where
 
@@ -91,16 +88,6 @@ objectEffect bounds obj = case obj of
     location ann = case getTypeSemAnn ann of
       Just (TFixedLocation _) -> Just (ReadsLocation (getLocation ann))
       _                       -> Nothing
-
-    checked :: Object SemanticAnn -> Expression SemanticAnn -> SemanticAnn -> Maybe Effect
-    checked o index ann = case getTypeSemAnn (getAnnotation index) of
-      Just (TConstSubtype _) -> Nothing
-      _ ->
-        case getTypeSemAnn (getAnnotation o) >>= arrayOf of
-          Just (_, size) ->
-            if indexInBounds bounds size index then Nothing
-            else Just (ChecksIndex (getLocation ann))
-          Nothing -> Just (ChecksIndex (getLocation ann))
 
 -- | What the pass knows about the names an expression may call: the methods of
 -- the class that take @&mut self@, and the functions and members whose body
@@ -136,26 +123,15 @@ immediateObjects = mapMaybe pick . expressionChildren
 -- the two rules that forbid such an effect in a position where it may or may
 -- not happen, the element of an initializer list and the right operand of a
 -- logical operator.
-persistentEffect :: Callees -> IndexBounds -> Expression SemanticAnn -> Maybe Effect
-persistentEffect known bounds e =
+persistentEffect :: Callees -> Expression SemanticAnn -> Maybe Effect
+persistentEffect known e =
       mutation
   <|> receiverMutation
   <|> reachedEffect
-  <|> listToMaybe (mapMaybe (objectEffect bounds) (immediateObjects e))
-  <|> childEffect
+  <|> listToMaybe (mapMaybe objectEffect (immediateObjects e))
+  <|> listToMaybe (mapMaybe (persistentEffect known) (childExpressions e))
 
   where
-
-    -- | The right operand of a logical operator is checked with the bounds
-    -- that its left operand sets.
-    childEffect = case e of
-      BinOp LogicalAnd l r _ ->
-        persistentEffect known bounds l
-          <|> persistentEffect known (bounds ++ guardedBounds True l) r
-      BinOp LogicalOr l r _ ->
-        persistentEffect known bounds l
-          <|> persistentEffect known (bounds ++ guardedBounds False l) r
-      _ -> listToMaybe (mapMaybe (persistentEffect known bounds) (childExpressions e))
 
     mutation = case callMutations e of
       (_ : _) -> Just (MutatesThroughCall (getLocation (getAnnotation e)))
@@ -227,12 +203,12 @@ checkExpression expr = case expr of
     insertMutableReference (objectPath obj) (getLocation ann)
     mapM_ checkExpression (indexExpressions obj)
   ReferenceExpression _ obj _ -> mapM_ checkExpression (indexExpressions obj)
-  ArraySliceExpression Mutable obj lower upper ann -> do
-    insertMutableReference (objectPath obj) (getLocation ann)
-    mapM_ checkExpression (lower : upper : indexExpressions obj)
-  ArraySliceExpression _ obj lower upper _ ->
-    mapM_ checkExpression (lower : upper : indexExpressions obj)
-  BinOp _ left right _ -> do
+  CheckedArraySlice ak obj lower upper ann -> checkSlice ak obj lower upper ann
+  UncheckedArraySlice ak obj lower upper ann -> checkSlice ak obj lower upper ann
+  CheckedBinOp _ left right _ -> do
+    checkExpression left
+    checkExpression right
+  UncheckedBinOp _ left right _ -> do
     checkExpression left
     checkExpression right
   Casting e _ _ -> checkExpression e
@@ -257,6 +233,11 @@ checkExpression expr = case expr of
   IsMonadicVariantExpression {} -> return ()
 
   where
+
+    checkSlice :: AccessKind -> Object SemanticAnn -> Expression SemanticAnn -> Expression SemanticAnn -> SemanticAnn -> SideEffectsMonad ()
+    checkSlice ak obj lower upper ann = do
+      when (ak == Mutable) $ insertMutableReference (objectPath obj) (getLocation ann)
+      mapM_ checkExpression (lower : upper : indexExpressions obj)
 
     checkFieldAssignment :: FieldAssignment' Expression SemanticAnn -> SideEffectsMonad ()
     checkFieldAssignment (FieldValueAssignment _ e _) = checkExpression e
@@ -313,11 +294,11 @@ checkEffectOrdering e = case e of
   MemberFunctionCall _ _ args _      -> checkGroup args
   DerefMemberFunctionCall _ _ args _ -> checkGroup args
   EnumVariantInitializer _ _ args _  -> checkGroup args
-  BinOp LogicalAnd left right _      -> checkLogical ESideEffectInRHSLogicalAnd (guardedBounds True left) left right
-  BinOp LogicalOr  left right _      -> checkLogical ESideEffectInRHSLogicalOr (guardedBounds False left) left right
-  BinOp _ left right _               -> checkGroup [left, right]
+  CheckedBinOp op left right _       -> checkBinOp op left right
+  UncheckedBinOp op left right _     -> checkBinOp op left right
   Casting inner _ _                  -> checkEffectOrdering inner
-  ArraySliceExpression _ _ lower upper _ -> mapM_ checkEffectOrdering [lower, upper]
+  CheckedArraySlice _ _ lower upper _   -> mapM_ checkEffectOrdering [lower, upper]
+  UncheckedArraySlice _ _ lower upper _ -> mapM_ checkEffectOrdering [lower, upper]
   ArrayInitializer inner size _      -> mapM_ checkInitElem [inner, size]
   ArrayExprListInitializer es _      -> mapM_ checkInitElem es
   StructInitializer fields _         -> mapM_ checkInitField fields
@@ -332,26 +313,30 @@ checkEffectOrdering e = case e of
       checkInterference group
       mapM_ checkEffectOrdering group
 
+    checkBinOp :: Op -> Expression SemanticAnn -> Expression SemanticAnn -> SideEffectsMonad ()
+    checkBinOp LogicalAnd left right = checkLogical ESideEffectInRHSLogicalAnd left right
+    checkBinOp LogicalOr left right  = checkLogical ESideEffectInRHSLogicalOr left right
+    checkBinOp _ left right          = checkGroup [left, right]
+
     -- | Reject an effect that outlives the expression in a position where it
     -- may or may not happen, naming what the effect is.
-    rejectIfEffect :: (Effect -> Error) -> IndexBounds -> Expression SemanticAnn -> SideEffectsMonad ()
-    rejectIfEffect err bounds el = do
+    rejectIfEffect :: (Effect -> Error) -> Expression SemanticAnn -> SideEffectsMonad ()
+    rejectIfEffect err el = do
       known <- callees
-      forM_ (persistentEffect known bounds el) $ \effect ->
+      forM_ (persistentEffect known el) $ \effect ->
         throwError $ annotateError (getLocation (getAnnotation el)) (err effect)
 
     -- | The right operand of && / || may be skipped by short-circuit
     -- evaluation, so it must carry no side effect; the left is always evaluated.
-    -- The bounds are the ones the left operand sets.
-    checkLogical :: (Effect -> Error) -> IndexBounds -> Expression SemanticAnn -> Expression SemanticAnn -> SideEffectsMonad ()
-    checkLogical err bounds left right = do
-      rejectIfEffect err bounds right
+    checkLogical :: (Effect -> Error) -> Expression SemanticAnn -> Expression SemanticAnn -> SideEffectsMonad ()
+    checkLogical err left right = do
+      rejectIfEffect err right
       checkEffectOrdering left
       checkEffectOrdering right
 
     -- | An initializer-list element must carry no side effect at all.
     checkInitElem :: Expression SemanticAnn -> SideEffectsMonad ()
-    checkInitElem el = rejectIfEffect ESideEffectInInitializerList [] el >> checkEffectOrdering el
+    checkInitElem el = rejectIfEffect ESideEffectInInitializerList el >> checkEffectOrdering el
 
     checkInitField :: FieldAssignment' Expression SemanticAnn -> SideEffectsMonad ()
     checkInitField (FieldValueAssignment _ el _)   = checkInitElem el
@@ -383,7 +368,7 @@ checkFullExpression e = do
 checkLoopGuard :: Expression SemanticAnn -> SideEffectsMonad ()
 checkLoopGuard e = do
   known <- callees
-  forM_ (persistentEffect known [] e) $ \effect ->
+  forM_ (persistentEffect known e) $ \effect ->
     throwError $ annotateError (getLocation (getAnnotation e)) (ESideEffectInLoopGuard effect)
   checkFullExpression e
 
@@ -392,7 +377,7 @@ checkLoopGuard e = do
 noteEffectOf :: Expression SemanticAnn -> SideEffectsMonad ()
 noteEffectOf e = do
   known <- callees
-  forM_ (persistentEffect known [] e) noteEffect
+  forM_ (persistentEffect known e) noteEffect
 
 -- | Several expressions that together make up one full expression (e.g. the
 -- argument list of a call): they share one aliasing map, and form one sibling
@@ -411,13 +396,13 @@ checkStatement stmt = case stmt of
   Declaration _ _ _ initExpr _ -> mapM_ checkFullExpression initExpr
   -- | Writing through a field declared loc, or through an index that is checked
   -- while the program runs, is an effect of the body as much as reading one.
-  AssignmentStmt lhs rhs _     -> forM_ (objectEffect [] lhs) noteEffect >> checkFullExpression rhs
+  AssignmentStmt lhs rhs _     -> forM_ (objectEffect lhs) noteEffect >> checkFullExpression rhs
   SingleExpStmt e _            -> checkFullExpression e
 
 -- | What each node means to this pass. It learns nothing from a condition and
 -- carries nothing from one statement to the next, so the refinements are empty
 -- and the state of a path is the unit.
-transfer :: Transfer () SideEffectsEnv SideEffectsError
+transfer :: Transfer' TerminaType Expression Object () SideEffectsEnv SideEffectsError
 transfer = Transfer
   {
     onStatement = checkStatement

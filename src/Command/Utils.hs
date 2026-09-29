@@ -139,9 +139,9 @@ boxUsageCheckModule =
 -- to carry an effect from one module to the next, so that a call resolves
 -- against the function it calls even when that one lives in a module this one
 -- imports.
-sideEffectCheckModules :: Platform -> LoweredProject -> Maybe SideEffectsError
-sideEffectCheckModules plt bbProject =
-    case sortProjectDepsOrLoop (M.map importedModules bbProject) of
+sideEffectCheckModules :: Platform -> ElaboratedProject -> Maybe SideEffectsError
+sideEffectCheckModules plt project =
+    case sortProjectDepsOrLoop (M.map importedModules project) of
         -- | The build pipeline orders the modules, and reports a cycle, before
         -- reaching this point.
         Left _ -> Nothing
@@ -151,7 +151,7 @@ sideEffectCheckModules plt bbProject =
 
         check _ [] = Nothing
         check functions (m:ms) =
-            case runSideEffectCheck plt functions (loweredAST . metadata $ bbProject M.! m) of
+            case runSideEffectCheck plt functions (elaboratedAST . metadata $ project M.! m) of
                 (Nothing, functions') -> check functions' ms
                 (Just err, _) -> Just err
 
@@ -264,8 +264,6 @@ basicBlockChecks =
       (const (fmap checkFailure . varUsageCheckModules))
   , Check "Usage checking project modules"
       (const (fmap checkFailure . boxUsageCheckModules))
-  , Check "Side-effect checking project modules"
-      (\plt -> fmap checkFailure . sideEffectCheckModules plt)
     -- | The scope check relies on definite assignment having passed, and a
     -- declaration in too wide a block is the least of the mistakes, so it goes
     -- last.
@@ -275,7 +273,7 @@ basicBlockChecks =
 
 -- | The source of each module of a project, which is what the error printer
 -- quotes from.
-projectSourceFiles :: LoweredProject -> M.Map FilePath T.Text
+projectSourceFiles :: M.Map QualifiedName (TerminaModuleData a) -> M.Map FilePath T.Text
 projectSourceFiles =
   M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) M.empty
 

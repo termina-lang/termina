@@ -30,6 +30,7 @@ import ControlFlow.ConstFolding (runConstFolding, constFoldModule)
 import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
 import ControlFlow.ValueAnalysis (runValueAnalysisCheck)
 import qualified Data.Set as S
+import Control.Monad (forM_)
 import qualified Data.ByteString as BS
 import qualified Data.Text.Encoding as TE
 
@@ -244,6 +245,13 @@ constFolding plt bbProject =
 -- each function gives back from one module to the next, so that a call resolves
 -- against the function it calls even when that one lives in a module this one
 -- imports.
+-- | Checks the side effects of the elaborated project, which is where each
+-- operation says whether it is checked while the program runs.
+sideEffectCheck :: Platform -> ElaboratedProject -> IO ()
+sideEffectCheck plt project =
+  forM_ (sideEffectCheckModules plt project) $ \err ->
+    TIO.putStrLn (toText err (projectSourceFiles project)) >> exitFailure
+
 valueAnalysisCheck :: Platform -> ProjectConstEnvs -> LoweredProject -> IO ()
 valueAnalysisCheck plt constEnvs bbProject =
   case sortProjectDepsOrLoop (M.map importedModules bbProject) of

@@ -5,14 +5,9 @@
 -- operand can change the variable in between, since an effect there is
 -- rejected by the side-effect check.
 --
--- An array access whose index is so bounded inside the array cannot fail. The
--- side-effect check does not count that access as an effect, and the prover
--- discharges its bounds check.
-module Elaboration.Prover.Guard (
-    IndexBound, IndexBounds,
-    guardProver,
-    guardedBounds, indexInBounds
-) where
+-- An array access whose index is so bounded inside the array cannot fail, and
+-- the prover discharges its bounds check.
+module Elaboration.Prover.Guard (guardProver) where
 
 import Lowering.AST
 import Semantic.Types
