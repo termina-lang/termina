@@ -135,7 +135,7 @@ runProjectPipeline cfg sources = do
   -- | The side-effect check reads the elaborated AST, which says what the
   -- generated code checks while it runs.
   maybe (Right ()) (Left . failure files)
-    (sideEffectCheckModules TestPlatform (fst (elaborateProject foldedProject)))
+    (sideEffectCheckModules TestPlatform (fst (elaborateProject TestPlatform foldedProject)))
   progArch <- genProjectArchitecture cfg files foldedProject ordered
   runChecks files progArch
   pure (foldedProject, ordered, progArch)
@@ -170,7 +170,7 @@ renderMainFileWith cfg progArch =
 -- failure into the returned 'Text'.
 renderInitFile :: [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either Text Text
 renderInitFile prjprogs =
-  case runGenInitFile configParams TestPlatform "init" (fmap (fst . elaborateProgram provers) <$> prjprogs) of
+  case runGenInitFile configParams TestPlatform "init" (fmap (fst . elaborateProgram (provers TestPlatform)) <$> prjprogs) of
     Left err -> Left . T.pack $ show err
     Right cFile -> Right $ runCPrinter False cFile
 
@@ -326,7 +326,7 @@ runChecks files progArch =
 renderModule :: BasicBlocksModule -> Either Failure Text
 renderModule bbModule =
   case runGenSourceFile configParams TestPlatform (qualifiedName bbModule)
-         (fst . elaborateProgram provers . loweredAST . metadata $ bbModule) of
+         (fst . elaborateProgram (provers TestPlatform) . loweredAST . metadata $ bbModule) of
     Left err -> Left (Failure (T.pack (show err)) (T.pack (show err)))
     Right cSourceFile -> Right $ runCPrinter False cSourceFile
 

@@ -434,7 +434,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     valueAnalysisCheck plt constEnvs bbProject
     -- | Decide the run-time checks
     when chatty (putStrLn . debugMessage $ "Elaborating the run-time checks")
-    let (elaboratedProject, _checksReport) = elaborateProject bbProject
+    let (elaboratedProject, _checksReport) = elaborateProject plt bbProject
     when chatty (putStrLn . debugMessage $ "Side-effect checking project modules")
     sideEffectCheck plt elaboratedProject
     -- | Obtain the architectural description of the program

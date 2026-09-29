@@ -197,15 +197,15 @@ genBasicBlocksModule typedModule = do
 
 -- | Elaborates each module of a project, deciding the run-time checks of its
 -- operations, with the report of what the provers discharged in each one.
-elaborateProject :: LoweredProject -> (ElaboratedProject, M.Map QualifiedName ElaborationReport)
-elaborateProject bbProject = (fst <$> elaborated, snd <$> elaborated)
+elaborateProject :: Platform -> LoweredProject -> (ElaboratedProject, M.Map QualifiedName ElaborationReport)
+elaborateProject plt bbProject = (fst <$> elaborated, snd <$> elaborated)
 
   where
 
     elaborated = elaborateModule <$> bbProject
 
     elaborateModule bbModule =
-      let (eAST, report) = elaborateProgram provers (loweredAST . metadata $ bbModule) in
+      let (eAST, report) = elaborateProgram (provers plt) (loweredAST . metadata $ bbModule) in
       (bbModule { metadata = ElaboratedData eAST }, report)
 
 basicBlockPathsCheckModules :: LoweredProject -> Maybe PathsCheckError

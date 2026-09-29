@@ -22,6 +22,7 @@ import Elaboration.Prover
 import Elaboration.Prover.Constant (constantProver)
 import Elaboration.Prover.Guard (guardProver)
 import Semantic.Types
+import Configuration.Platform (Platform)
 
 import Control.Monad.Writer
 import qualified Data.Map.Strict as M
@@ -30,9 +31,10 @@ import qualified Data.Map.Strict as M
 -- one of the provers did.
 type ElaborationReport = [(ObligationId, Maybe Evidence)]
 
--- | The provers of a build, in the order they are asked.
-provers :: [Prover]
-provers = [constantProver, guardProver]
+-- | The provers of a build for the given platform, in the order they are
+-- asked.
+provers :: Platform -> [Prover]
+provers plt = [constantProver, guardProver plt]
 
 type ElaborationM = Writer ElaborationReport
 

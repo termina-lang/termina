@@ -88,7 +88,7 @@ typeSingleModule parsedModule = do
 
 printSourceModule :: Bool -> BasicBlocksModule -> IO ()
 printSourceModule debugBuild bbModule = do
-    let tAST = fst . elaborateProgram provers . loweredAST . metadata $ bbModule
+    let tAST = fst . elaborateProgram (provers TestPlatform) . loweredAST . metadata $ bbModule
         config = defaultConfig "test" TestPlatform
     case runGenSourceFile config TestPlatform (qualifiedName bbModule) tAST of
         Left err -> die. errorMessage $ show err
@@ -96,7 +96,7 @@ printSourceModule debugBuild bbModule = do
 
 printHeaderModule :: Bool -> BasicBlocksModule -> IO ()
 printHeaderModule debugBuild bbModule = do
-    let tAST = fst . elaborateProgram provers . loweredAST . metadata $ bbModule
+    let tAST = fst . elaborateProgram (provers TestPlatform) . loweredAST . metadata $ bbModule
         configParams = defaultConfig "test" TestPlatform
         moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
     case runGenHeaderFile configParams TestPlatform (qualifiedName bbModule) moduleDeps tAST emptyMonadicTypes of
