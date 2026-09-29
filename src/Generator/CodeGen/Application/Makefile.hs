@@ -24,7 +24,7 @@ genMakefile params loweredProject =
             MVariable MSimple "PLATFORM" [MFragment . T.unpack . platform $ params],
             MVariable MSimple "TERMINA_OSAL_DIR" [MFragment "/opt/termina-osal"],
             MVariable MSimple "TERMINA_PROFILE"
-                [MFragment (case profile params of { Debug -> "debug"; Release -> "release"; Tracing -> "release" })]
+                [MFragment (case profile params of { Debug -> "debug"; Release -> "release"; Tracing -> "debug" })]
         ],
         MakeBlock [
             MInclude True $ "$(TERMINA_OSAL_DIR)" </> "platform" </> "$(PLATFORM)" </> "platform" <.> "mk"
