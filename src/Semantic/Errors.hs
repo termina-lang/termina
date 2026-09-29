@@ -102,6 +102,8 @@ data Error
   | EBinOpLeftTypeNotInt Op (TerminaType SemanticAnn) -- ^ Binary operation expected integer type on the left
   | EBinOpRightTypeNotInt Op (TerminaType SemanticAnn) -- ^ Binary operation expected integer type on the right
   | EBinOpRightTypeNotPos Op (TerminaType SemanticAnn) -- ^ Binary operation expected positive numeric type on the right
+  | EBinOpExpectedTypeNotPos Op (TerminaType SemanticAnn) -- ^ Shift or bitwise operation expected result type not positive numeric (SE-221)
+  | EBinOpLeftTypeNotPos Op (TerminaType SemanticAnn) -- ^ Shift or bitwise operation expected positive numeric type on the left (SE-222)
   | EBinOpLeftTypeNotEq Op (TerminaType SemanticAnn) -- ^ Binary operation expected equatable type on the left
   | EBinOpRightTypeNotEq Op (TerminaType SemanticAnn) -- ^ Binary operation expected equatable type on the right
   | EAtomicAccessInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for the atomic access interface
@@ -462,6 +464,12 @@ instance Diagnosable Error where
     describe (EBinOpRightTypeNotPos op ty) =
         diagnostic "SE-050" "binary operation expected positive numeric type on the right"
             ("The right operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of positive numeric type.")
+    describe (EBinOpExpectedTypeNotPos op ty) =
+        diagnostic "SE-221" "binary operation expected result type not positive numeric"
+            ("The binary operation \x1b[31m" <> showText op <> "\x1b[0m will result in a positive numeric value but the expected type is \x1b[31m" <> showText ty <> "\x1b[0m.\n" <> "Shifts and bitwise operations only take operands of positive numeric type.")
+    describe (EBinOpLeftTypeNotPos op ty) =
+        diagnostic "SE-222" "binary operation expected positive numeric type on the left"
+            ("The left operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of positive numeric type.\n" <> "Shifts and bitwise operations only take operands of positive numeric type.")
     describe (EBinOpLeftTypeNotEq op ty) =
         diagnostic "SE-051" "binary operation expected equatable type on the left"
             ("The left operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of equatable type.")

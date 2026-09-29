@@ -75,12 +75,12 @@ spec = do
     it "SE-214: rejects modulo (%) on floating-point operands" $
       runNegativeTestTypeCheck testModulo
         `shouldSatisfy` isEBinOpExpectedTypeNotInt Modulo TFloat32
-    it "SE-214: rejects bitwise and (&) on floating-point operands" $
+    it "SE-221: rejects bitwise and (&) on floating-point operands" $
       runNegativeTestTypeCheck testBitwiseAnd
-        `shouldSatisfy` isEBinOpExpectedTypeNotInt BitwiseAnd TFloat32
-    it "SE-214: rejects left shift (<<) on a floating-point operand" $
+        `shouldSatisfy` isEBinOpExpectedTypeNotPos BitwiseAnd TFloat32
+    it "SE-221: rejects left shift (<<) on a floating-point operand" $
       runNegativeTestTypeCheck testShift
-        `shouldSatisfy` isEBinOpExpectedTypeNotInt BitwiseLeftShift TFloat32
+        `shouldSatisfy` isEBinOpExpectedTypeNotPos BitwiseLeftShift TFloat32
     it "SE-051: rejects equality (==) on floating-point operands" $
       runNegativeTestTypeCheck testEquality
         `shouldSatisfy` isEBinOpLeftTypeNotEq RelationalEqual TFloat32
@@ -101,6 +101,10 @@ spec = do
     isEBinOpExpectedTypeNotInt :: Op -> TerminaType SemanticAnn -> Maybe Error -> Bool
     isEBinOpExpectedTypeNotInt op ty = \case
       Just (EBinOpExpectedTypeNotInt op' ty') -> op == op' && ty == ty'
+      _ -> False
+    isEBinOpExpectedTypeNotPos :: Op -> TerminaType SemanticAnn -> Maybe Error -> Bool
+    isEBinOpExpectedTypeNotPos op ty = \case
+      Just (EBinOpExpectedTypeNotPos op' ty') -> op == op' && ty == ty'
       _ -> False
     isEBinOpLeftTypeNotEq :: Op -> TerminaType SemanticAnn -> Maybe Error -> Bool
     isEBinOpLeftTypeNotEq op ty = \case

@@ -254,6 +254,8 @@ titles =
   , ("SE-217", "character literal out of range")
   , ("SE-218", "reference to a packed struct member")
   , ("SE-219", "reserved identifier")
+  , ("SE-221", "binary operation expected result type not positive numeric")
+  , ("SE-222", "binary operation expected positive numeric type on the left")
   ]
 
 spec :: Spec

@@ -1,0 +1,3 @@
+function test0(a : i32, n : u8) -> i32 {
+    return a << n;
+}

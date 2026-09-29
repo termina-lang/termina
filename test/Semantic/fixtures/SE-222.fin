@@ -1,0 +1,4 @@
+function test0(a : i32, b : i32) -> bool {
+    let masked : bool = (a & b) == 0;
+    return masked;
+}

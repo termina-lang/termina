@@ -1108,9 +1108,9 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     RelationalLTE -> sameNumTyBool arithTy
     RelationalGT -> sameNumTyBool arithTy
     RelationalGTE -> sameNumTyBool arithTy
-    BitwiseAnd -> sameIntType
-    BitwiseOr  -> sameIntType
-    BitwiseXor -> sameIntType
+    BitwiseAnd -> samePosType
+    BitwiseOr  -> samePosType
+    BitwiseXor -> samePosType
     LogicalAnd -> sameBoolType
     LogicalOr  -> sameBoolType
 
@@ -1166,10 +1166,17 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     sameArithType = sameNumType arithTy
       EBinOpExpectedTypeNotArith EBinOpLeftTypeNotArith EBinOpRightTypeNotArith
 
-    -- | Specialization for % & | ^ : operands must be integer (intTy).
+    -- | Specialization for % : operands must be integer (intTy).
     sameIntType :: SemanticMonad (SAST.Expression SemanticAnn)
     sameIntType = sameNumType intTy
       EBinOpExpectedTypeNotInt EBinOpLeftTypeNotInt EBinOpRightTypeNotInt
+
+    -- | Specialization for & | ^ : operands must be unsigned integer (posTy),
+    -- since the value of a bitwise operation on a signed operand depends on
+    -- its representation in C.
+    samePosType :: SemanticMonad (SAST.Expression SemanticAnn)
+    samePosType = sameNumType posTy
+      EBinOpExpectedTypeNotPos EBinOpLeftTypeNotPos EBinOpRightTypeNotPos
 
     sameNumType :: (SAST.TerminaType SemanticAnn -> Bool)
       -> (Op -> SAST.TerminaType SemanticAnn -> Error) -- ^ error if the expected result type is invalid
@@ -1201,9 +1208,9 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty)
 
     -- | This function checks that the lhs is equal to the expected type (if any)
-    -- and that that type is numeric. The rhs must be a positive (i.e. unsigned) type.
-    -- This function is used to check the binary expressions bitwise left shift and
-    -- bitwise right shift.
+    -- and that both the lhs and the rhs are positive (i.e. unsigned) types,
+    -- which they need not share. This function is used to check the binary
+    -- expressions bitwise left shift and bitwise right shift.
     leftNumRightPosType :: SemanticMonad (SAST.Expression SemanticAnn)
     leftNumRightPosType = do
       tyre <- typeExpression Nothing typeObj re
@@ -1211,14 +1218,14 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
       unless (posTy tyre_ty) (throwError $ annotateError pann (EBinOpRightTypeNotPos op tyre_ty))
       case expectedType of
         ty@(Just ty'@(TConstSubtype _)) -> do
-          unless (intTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotInt op ty'))
+          unless (posTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotPos op ty'))
           tyle <- catchMismatch (getAnnotation le) (EBinOpExpectedTypeLeft op ty')
             (typeExpression ty typeObj le)
           case tyre_ty of
             TConstSubtype _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty')
             _ -> throwError $ annotateError (getAnnotation re) EExpressionNotConstant
         ty@(Just ty') -> do
-          unless (intTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotInt op ty'))
+          unless (posTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotPos op ty'))
           tyle <- catchMismatch (getAnnotation le) (EBinOpExpectedTypeLeft op ty')
             (typeExpression ty typeObj le)
           tyle_ty <- getExprType tyle
@@ -1228,7 +1235,7 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
         Nothing -> do
           tyle <- typeExpression Nothing typeObj le
           tyle_ty <- getExprType tyle
-          unless (intTy tyle_ty) (throwError $ annotateError pann (EBinOpLeftTypeNotInt op tyle_ty))
+          unless (posTy tyle_ty) (throwError $ annotateError pann (EBinOpLeftTypeNotPos op tyle_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann tyle_ty)
 
     -- | This function checks that the lhs and the rhs are both of the same type and that the
