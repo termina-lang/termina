@@ -147,7 +147,12 @@ stdlibGlobalEnv outBufSize inBufSize =
         TUSize],
       EnumVariant "EDivisionByZero" [
         -- | Address of the offending expression
-        TUSize]
+        TUSize],
+      EnumVariant "ERuntimeFailure" [
+        -- | Operation of the runtime that failed
+        TUInt32,
+        -- | Error code of the operating system
+        TInt32]
       ] [])) Internal),
     -- | SysTime interface
     ("SysTime", LocatedElement (GType (Interface SystemInterface "SysTime" [] [
