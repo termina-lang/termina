@@ -55,6 +55,15 @@ missingReturn =
   "    y = y + 1 : u32;\n" ++
   "}\n"
 
+-- | A signed operation in the right operand of &&, which is the shape of an
+-- effect that is written as an operation: the message says what the generated
+-- code does before it gives the rule.
+checkedOperation :: String
+checkedOperation =
+  "function f(ok : bool, a : i32, b : i32) -> bool {\n" ++
+  "    return ok && a + b > 0 : i32;\n" ++
+  "}\n"
+
 message :: String -> Text
 message src =
   case compileErrorMessage src of
@@ -75,3 +84,6 @@ spec = describe "Errors: the message a user reads" $ do
 
   it "a function with no return statement" $
     goldenMessage "missing_return" (message missingReturn)
+
+  it "an operation checked while the program runs in the right operand of &&" $
+    goldenMessage "checked_operation" (message checkedOperation)

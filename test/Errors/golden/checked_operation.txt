@@ -1,0 +1,8 @@
+[31merror [SEF-005][0m: side effect in the right operand of &&.
+[34m→[0m test:2:18
+  [34m│[0m
+2 [34m│[0m     return ok && [31ma + b[0m[31m > 0 : i32;[0m
+  [34m│[0m                  [31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m[31m^[0m
+  [34m│[0m                  [31m│[0m
+  [34m│[0m                  [31m└[0m  [31mthis operation is checked while the program runs[0m
+The generated code checks the result of this signed operation while the program runs, and the check raises an exception when the result does not fit its type. The right-hand operand of && is evaluated only when the left one is true, so the effect happens or not depending on its value.

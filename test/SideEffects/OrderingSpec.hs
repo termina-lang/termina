@@ -43,6 +43,13 @@ progGuard params body =
     body ++
     "}\n"
 
+-- | A function that takes the given parameters.
+progOperands :: String -> String -> String
+progOperands params body =
+    "function trigger(" ++ params ++ ") -> bool {\n" ++
+    body ++
+    "}\n"
+
 -- | A resource with a field declared @loc@, which lives at a fixed address
 -- the program does not own and which the generated code reaches through a
 -- pointer to volatile.
@@ -229,6 +236,42 @@ spec = do
     it "rejects arr[i] after i < 4 in ||, where the right operand runs when i >= 4" $
       compileErrorCode (progGuard "" "    return i < 4 : usize || arr[i] == 0 : u32;\n")
         `shouldBe` Just (pack "SEF-006")
+
+  -- | Every operation that the generated code checks while it runs calls a
+  -- check that can raise an exception, and a guard that makes the check
+  -- unable to fail leaves the operation unchecked.
+  describe "SEF-005/006: an operation checked while the program runs" $ do
+    it "rejects a signed addition in the right operand of &&" $
+      compileErrorCode (progOperands "ok : bool, a : i32, b : i32" "    return ok && a + b > 0 : i32;\n")
+        `shouldBe` Just (pack "SEF-005")
+    it "accepts an unsigned addition in the right operand of &&" $
+      compileErrorCode (progOperands "ok : bool, a : u32, b : u32" "    return ok && a + b > 0 : u32;\n")
+        `shouldBe` Nothing
+    it "rejects an unsigned division by a variable in the right operand of &&" $
+      compileErrorCode (progOperands "ok : bool, a : u32, b : u32" "    return ok && a / b > 0 : u32;\n")
+        `shouldBe` Just (pack "SEF-005")
+    it "accepts an unsigned division after b != 0 in &&" $
+      compileErrorCode (progOperands "a : u32, b : u32" "    return b != 0 : u32 && a / b > 0 : u32;\n")
+        `shouldBe` Nothing
+    it "accepts an unsigned remainder after b == 0 in ||" $
+      compileErrorCode (progOperands "a : u32, b : u32" "    return b == 0 : u32 || a % b > 0 : u32;\n")
+        `shouldBe` Nothing
+    it "rejects a signed division after b != 0, whose check also covers the quotient" $
+      compileErrorCode (progOperands "a : i32, b : i32" "    return b != 0 : i32 && a / b > 0 : i32;\n")
+        `shouldBe` Just (pack "SEF-005")
+    it "rejects a shift by a variable in the right operand of ||" $
+      compileErrorCode (progOperands "ok : bool, a : u32, s : u32" "    return ok || a << s > 0 : u32;\n")
+        `shouldBe` Just (pack "SEF-006")
+    it "accepts a shift after s < 32 in &&" $
+      compileErrorCode (progOperands "a : u32, s : u32" "    return s < 32 : u32 && a << s > 0 : u32;\n")
+        `shouldBe` Nothing
+    it "rejects a call to a function that does signed arithmetic in the right operand of &&" $
+      compileErrorCode (
+          "function sum(a : i32, b : i32) -> i32 {\n" ++
+          "    return a + b;\n" ++
+          "}\n" ++
+          progOperands "ok : bool, a : i32, b : i32" "    return ok && sum(a, b) > 0 : i32;\n")
+        `shouldBe` Just (pack "SEF-005")
 
   -- | A field declared @loc@ is reached through a pointer to volatile, so the
   -- access is kept where it is written and two reads of it may give different

@@ -4,19 +4,20 @@
 module ControlFlow.SideEffects.Errors where
 
 import Core.AST (Identifier)
+import Elaboration.Obligations (CheckKind(..))
 import Utils.Annotations
 import Utils.Errors
 import Data.Char (toLower)
 import qualified Data.Text as T
 
 -- | What makes an expression carry an effect that outlives it, and where that
--- effect is. Two of the three are written as a read, so the message has to say
--- what the generated code does with them.
+-- effect is. A loc field and a run-time check are written as a read or as an
+-- operation, so the message has to say what the generated code does with them.
 data Effect =
     MutatesThroughCall Location -- ^ A call that takes a mutable reference
   | MutatesReceiver Location -- ^ A call to a method that takes a mutable self
   | ReadsLocation Location -- ^ An access that goes through a field declared loc
-  | ChecksIndex Location -- ^ An array access with an index that is not constant
+  | ChecksAtRunTime CheckKind Location -- ^ An operation that the generated code checks while it runs
   | CallsEffectful Location Identifier Effect -- ^ A call to something whose body carries one
   deriving Show
 
@@ -42,8 +43,16 @@ saysEffect (MutatesReceiver _) =
     "This method takes self mutably, so it writes the state of the class, which outlives the expression. "
 saysEffect (ReadsLocation _) =
     "This access goes through a field declared loc, which lives at a fixed address and which the generated code reaches through a pointer to volatile, so the access is kept where it is written and two reads of it may give different values. "
-saysEffect (ChecksIndex _) =
-    "The index of this array access is not a constant, so the generated code checks it against the size of the array while the program runs, and the check raises an exception when the index falls outside. "
+saysEffect (ChecksAtRunTime IndexInBounds _) =
+    "The generated code checks the index of this array access against the size of the array while the program runs, and the check raises an exception when the index falls outside. "
+saysEffect (ChecksAtRunTime SliceInBounds _) =
+    "The generated code checks the bounds of this slice against the size of the array while the program runs, and the check raises an exception when they fall outside. "
+saysEffect (ChecksAtRunTime ShiftBelowWidth _) =
+    "The generated code checks the amount of this shift against the width of the value while the program runs, and the check raises an exception when the amount is not below it. "
+saysEffect (ChecksAtRunTime NoOverflow _) =
+    "The generated code checks the result of this signed operation while the program runs, and the check raises an exception when the result does not fit its type. "
+saysEffect (ChecksAtRunTime NonZeroDivisor _) =
+    "The generated code checks the divisor of this operation while the program runs, and the check raises an exception when it is zero or, for a signed operation, when the result does not fit its type. "
 saysEffect (CallsEffectful _ name inner) =
     "This call reaches " <> emph (T.pack name) <> ", and " <> untitle (saysEffect inner)
 
@@ -60,7 +69,15 @@ pointsAtEffect :: Effect -> Diagnostic -> Diagnostic
 pointsAtEffect (MutatesThroughCall loc) = relatedTo loc "this call writes through a mutable reference"
 pointsAtEffect (MutatesReceiver loc) = relatedTo loc "this method writes the state of the class"
 pointsAtEffect (ReadsLocation loc) = relatedTo loc "this access goes through a field declared loc"
-pointsAtEffect (ChecksIndex loc) = relatedTo loc "this index is checked while the program runs"
+pointsAtEffect (ChecksAtRunTime kind loc) = relatedTo loc (checkedPart kind <> " is checked while the program runs")
+
+    where
+
+        checkedPart IndexInBounds = "this index"
+        checkedPart SliceInBounds = "this slice"
+        checkedPart ShiftBelowWidth = "this shift amount"
+        checkedPart NoOverflow = "this operation"
+        checkedPart NonZeroDivisor = "this divisor"
 pointsAtEffect (CallsEffectful loc _ inner) =
     pointsAtEffect inner . relatedTo loc "this call reaches the effect"
 

@@ -6,6 +6,7 @@ import ControlFlow.SideEffects.Monad
    startClass, startCallable, noteEffect, endFunction, endMember, effectfulFunctions)
 import ControlFlow.SideEffects.Errors (SideEffectsError, Error(..), Effect(..))
 import Elaboration.AST
+import Elaboration.Obligations (CheckKind(..))
 import Elaboration.Traversal
   (Child'(..), childExpressions, expressionChildren, indexExpressions, objectPath)
 import ControlFlow.Dataflow (Transfer'(..), walkForward)
@@ -55,7 +56,7 @@ callMutations e = case e of
 -- | Whether an expression subtree mutates state anywhere inside it, which is
 -- what decides whether the order in which two subexpressions are evaluated can
 -- change the result. A read is not a mutation, so an access to a loc field and a
--- bounds check, which 'hasPersistentEffect' does count, are left out here: two
+-- run-time check, which 'persistentEffect' does count, are left out here: two
 -- of them among the arguments of a call give the same result in any order.
 mutatesState :: Expression SemanticAnn -> Bool
 mutatesState e = not (null (callMutations e)) || any mutatesState (childExpressions e)
@@ -70,12 +71,12 @@ mutatesState e = not (null (callMutations e)) || any mutatesState (childExpressi
 -- part of the behaviour of the program.
 --
 -- An array access that the elaboration left checked calls the bounds check,
--- which returns the index when it falls inside the array and raises the
+-- which returns the index when it falls inside the array and raises an
 -- exception when it does not.
 objectEffect :: Object SemanticAnn -> Maybe Effect
 objectEffect obj = case obj of
   Variable _ ann                  -> location ann
-  CheckedArrayIndex o _ ann       -> location ann <|> Just (ChecksIndex (getLocation ann)) <|> objectEffect o
+  CheckedArrayIndex o _ ann       -> location ann <|> Just (ChecksAtRunTime IndexInBounds (getLocation ann)) <|> objectEffect o
   UncheckedArrayIndex o _ ann     -> location ann <|> objectEffect o
   MemberAccess o _ ann            -> location ann <|> objectEffect o
   DereferenceMemberAccess o _ ann -> location ann <|> objectEffect o
@@ -119,7 +120,7 @@ immediateObjects = mapMaybe pick . expressionChildren
 
 -- | Whether an expression subtree carries a side effect that outlives it: a
 -- call that mutates through a @&mut@ argument, an access to a field declared @loc@,
--- or a bounds check that can end in the exception path. It is the notion of
+-- or a run-time check that can end in the exception path. It is the notion of
 -- the two rules that forbid such an effect in a position where it may or may
 -- not happen, the element of an initializer list and the right operand of a
 -- logical operator.
@@ -128,10 +129,24 @@ persistentEffect known e =
       mutation
   <|> receiverMutation
   <|> reachedEffect
+  <|> checkedOperation
   <|> listToMaybe (mapMaybe objectEffect (immediateObjects e))
   <|> listToMaybe (mapMaybe (persistentEffect known) (childExpressions e))
 
   where
+
+    -- | A binary operation or a slice that the elaboration left checked calls
+    -- the check of the OSAL, which raises an exception when it fails.
+    checkedOperation = case e of
+      CheckedBinOp op _ _ ann -> Just (ChecksAtRunTime (operatorCheck op) (getLocation ann))
+      CheckedArraySlice _ _ _ _ ann -> Just (ChecksAtRunTime SliceInBounds (getLocation ann))
+      _ -> Nothing
+
+    operatorCheck BitwiseLeftShift = ShiftBelowWidth
+    operatorCheck BitwiseRightShift = ShiftBelowWidth
+    operatorCheck Division = NonZeroDivisor
+    operatorCheck Modulo = NonZeroDivisor
+    operatorCheck _ = NoOverflow
 
     mutation = case callMutations e of
       (_ : _) -> Just (MutatesThroughCall (getLocation (getAnnotation e)))
