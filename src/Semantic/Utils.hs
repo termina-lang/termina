@@ -8,6 +8,7 @@ import qualified Data.Map.Strict as M
 import Utils.Graph
 import qualified Data.Set as S
 import qualified Semantic.AST as SAST
+import Core.Tree (Tree(..), ObjectNode(..))
 
 -- Helper to detect invocations to 'self'
 objIsSelf :: Object a -> Bool
@@ -214,17 +215,17 @@ stepBy (AccessPath root steps) step = AccessPath root (steps ++ [step])
 
 -- | The canonical access path of an object.
 objectPath :: SAST.Object a -> AccessPath
-objectPath (SAST.Variable ident _ann) = AccessPath ident []
-objectPath (SAST.MemberAccess obj mident _ann) =
-  objectPath obj `stepBy` FieldStep mident
-objectPath (SAST.DereferenceMemberAccess obj mident _ann) =
-  objectPath obj `stepBy` DerefStep `stepBy` FieldStep mident
-objectPath (SAST.Dereference obj _ann) =
-  objectPath obj `stepBy` DerefStep
-objectPath (SAST.ArrayIndexExpression obj _expr _ann) =
-  objectPath obj `stepBy` IndexStep
-objectPath (SAST.Unbox obj _ann) =
-  objectPath obj `stepBy` UnboxStep
+objectPath = objectPathOf SAST.semanticTree
+
+-- | The canonical access path of an object of any AST.
+objectPathOf :: Tree expr obj a -> obj a -> AccessPath
+objectPathOf tree obj = case treeNode tree obj of
+  RootNode ident _ -> AccessPath ident []
+  FieldNode inner mident -> objectPathOf tree inner `stepBy` FieldStep mident
+  DerefFieldNode inner mident -> objectPathOf tree inner `stepBy` DerefStep `stepBy` FieldStep mident
+  DerefNode inner -> objectPathOf tree inner `stepBy` DerefStep
+  IndexNode inner _ -> objectPathOf tree inner `stepBy` IndexStep
+  UnboxNode inner -> objectPathOf tree inner `stepBy` UnboxStep
 
 -- | The key under which the move checker records a moved object. A move always
 -- concerns a whole box (boxes cannot be struct fields or array elements), and a

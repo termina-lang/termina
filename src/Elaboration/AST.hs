@@ -14,6 +14,7 @@ module Elaboration.AST (
 ) where
 
 import Core.AST
+import Core.Tree
 import BasicBlocks
 import Semantic.AST (TerminaType)
 import Utils.Annotations
@@ -57,6 +58,50 @@ data Expression a
   -- | An array slice whose bounds are known to fall inside the array.
   | UncheckedArraySlice AccessKind (Object a) (Expression a) (Expression a) a
   deriving (Show, Functor)
+
+-- | How the passes read the expressions and the objects of this AST.
+elaboratedTree :: Tree Expression Object a
+elaboratedTree = Tree children node
+
+  where
+
+    children e = case e of
+      AccessObject obj -> [ChildObject obj]
+      Constant {} -> []
+      CheckedBinOp _ left right _ -> [ChildExpr left, ChildExpr right]
+      UncheckedBinOp _ left right _ -> [ChildExpr left, ChildExpr right]
+      ReferenceExpression ak obj _ -> [ChildReference ak obj]
+      Casting inner _ _ -> [ChildExpr inner]
+      IsEnumVariantExpression obj _ _ _ -> [ChildObject obj]
+      IsMonadicVariantExpression obj _ _ -> [ChildObject obj]
+      CheckedArraySlice ak obj lower upper _ ->
+        [ChildReference ak obj, ChildExpr lower, ChildExpr upper]
+      UncheckedArraySlice ak obj lower upper _ ->
+        [ChildReference ak obj, ChildExpr lower, ChildExpr upper]
+      MemberFunctionCall obj _ args _ -> ChildObject obj : map ChildArg args
+      DerefMemberFunctionCall obj _ args _ -> ChildObject obj : map ChildArg args
+      FunctionCall _ args _ -> map ChildArg args
+      ArrayInitializer inner size _ -> [ChildExpr inner, ChildConstExpr size]
+      ArrayExprListInitializer exprs _ -> map ChildExpr exprs
+      StructInitializer fields _ -> concatMap fieldAssignmentChildren fields
+      EnumVariantInitializer _ _ args _ -> map ChildExpr args
+      MonadicVariantInitializer variant _ -> map ChildExpr (monadicVariantExprs variant)
+      StringInitializer {} -> []
+
+    node obj = case obj of
+      Variable ident ann -> RootNode ident ann
+      CheckedArrayIndex inner index _ -> IndexNode inner index
+      UncheckedArrayIndex inner index _ -> IndexNode inner index
+      MemberAccess inner ident _ -> FieldNode inner ident
+      DereferenceMemberAccess inner ident _ -> DerefFieldNode inner ident
+      Dereference inner _ -> DerefNode inner
+      Unbox inner _ -> UnboxNode inner
+
+-- | The operator and the operands of a binary operation, checked or not.
+binaryOperation :: Expression a -> Maybe (Op, Expression a, Expression a)
+binaryOperation (CheckedBinOp op left right _) = Just (op, left, right)
+binaryOperation (UncheckedBinOp op left right _) = Just (op, left, right)
+binaryOperation _ = Nothing
 
 instance Annotated Object where
   getAnnotation (Variable _ a)                  = a

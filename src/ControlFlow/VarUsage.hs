@@ -26,7 +26,7 @@ import Data.Maybe (listToMaybe, mapMaybe)
 
 import Lowering.AST
 import ControlFlow.Traversal
-    (Child(..), ObjectVisitor(..), expressionChildren, simpleBlockChildren,
+    (Child'(..), Child, ObjectVisitor'(..), expressionChildren, simpleBlockChildren,
      walkObject, rootIdent)
 import ControlFlow.Dataflow
 import ControlFlow.VarUsage.Errors

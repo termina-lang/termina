@@ -18,7 +18,7 @@ import Lowering.AST
 import Semantic.Types
 import Elaboration.Obligations
 import Elaboration.Prover
-import ControlFlow.Traversal (Child(..), expressionChildren)
+import ControlFlow.Traversal (Child'(..), expressionChildren)
 import Core.Utils (arrayOf)
 import Utils.Annotations
 

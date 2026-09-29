@@ -9,6 +9,7 @@ module Semantic.AST
 
 import Utils.Annotations
 import Core.AST
+import Core.Tree
 import Utils.Printer
 import qualified Data.Text as T
 
@@ -116,6 +117,40 @@ instance ShowText (Expression a) where
         showText obj <> " is " <> showText variant
     showText (ArraySliceExpression ak obj lower upper _) = 
          showText ak <> " " <> showText obj <> "[" <> showText lower <> ".." <> showText upper <> "]"
+
+-- | How the passes read the expressions and the objects of this AST.
+semanticTree :: Tree Expression Object a
+semanticTree = Tree children node
+
+  where
+
+    children e = case e of
+      AccessObject obj -> [ChildObject obj]
+      Constant {} -> []
+      BinOp _ left right _ -> [ChildExpr left, ChildExpr right]
+      ReferenceExpression ak obj _ -> [ChildReference ak obj]
+      Casting inner _ _ -> [ChildExpr inner]
+      IsEnumVariantExpression obj _ _ _ -> [ChildObject obj]
+      IsMonadicVariantExpression obj _ _ -> [ChildObject obj]
+      ArraySliceExpression ak obj lower upper _ ->
+        [ChildReference ak obj, ChildExpr lower, ChildExpr upper]
+      MemberFunctionCall obj _ args _ -> ChildObject obj : map ChildArg args
+      DerefMemberFunctionCall obj _ args _ -> ChildObject obj : map ChildArg args
+      FunctionCall _ args _ -> map ChildArg args
+      ArrayInitializer inner size _ -> [ChildExpr inner, ChildConstExpr size]
+      ArrayExprListInitializer exprs _ -> map ChildExpr exprs
+      StructInitializer fields _ -> concatMap fieldAssignmentChildren fields
+      EnumVariantInitializer _ _ args _ -> map ChildExpr args
+      MonadicVariantInitializer variant _ -> map ChildExpr (monadicVariantExprs variant)
+      StringInitializer {} -> []
+
+    node obj = case obj of
+      Variable ident ann -> RootNode ident ann
+      ArrayIndexExpression inner index _ -> IndexNode inner index
+      MemberAccess inner ident _ -> FieldNode inner ident
+      DereferenceMemberAccess inner ident _ -> DerefFieldNode inner ident
+      Dereference inner _ -> DerefNode inner
+      Unbox inner _ -> UnboxNode inner
 
 instance Annotated Object where
   getAnnotation (Variable _ a)                = a

@@ -20,7 +20,7 @@ module Elaboration.Obligations (
 
 import Lowering.AST
 import Semantic.Types
-import ControlFlow.Traversal (Child(..), expressionChildren, simpleBlockChildren)
+import ControlFlow.Traversal (Child'(..), Child, expressionChildren, simpleBlockChildren)
 import Core.Utils (intTy, posTy)
 import Utils.Annotations
 

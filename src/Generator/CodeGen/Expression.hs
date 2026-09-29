@@ -270,10 +270,10 @@ genMemberFunctionAccess obj ident args ann = do
 -- Termina type does not have. Any other expression is returned unchanged.
 castBinOpToOwnType :: Location -> Expression SemanticAnn -> CExpression -> CGenerator CExpression
 castBinOpToOwnType loc expr cExpr =
-    case (binOperator expr, cExpr) of
+    case (binaryOperation expr, cExpr) of
         -- | checkedArithmetic has already brought the result to its type.
         (Just _, CExprCall {}) -> return cExpr
-        (Just op, _) -> castOperation op
+        (Just (op, _, _), _) -> castOperation op
         (Nothing, _) -> return cExpr
 
   where
@@ -287,12 +287,6 @@ castBinOpToOwnType loc expr cExpr =
             castToOwnType loc (dropBitsAbove plt cExpr)
         else
             castToOwnType loc cExpr
-
--- | The operator of a binary operation, checked or not.
-binOperator :: Expression a -> Maybe Op
-binOperator (CheckedBinOp op _ _ _) = Just op
-binOperator (UncheckedBinOp op _ _ _) = Just op
-binOperator _ = Nothing
 
 -- | Whether the product of two operands of this unsigned type can leave the
 -- range of the signed int they are promoted to, which is undefined in C.

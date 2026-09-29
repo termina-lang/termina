@@ -7,7 +7,7 @@ import ControlFlow.SideEffects.Monad
 import ControlFlow.SideEffects.Errors (SideEffectsError, Error(..), Effect(..))
 import Lowering.AST
 import ControlFlow.Traversal
-  (Child(..), childExpressions, expressionChildren, indexExpressions)
+  (Child'(..), childExpressions, expressionChildren, indexExpressions)
 import Elaboration.Prover.Guard (IndexBounds, guardedBounds, indexInBounds)
 import Core.Utils (arrayOf)
 import ControlFlow.Dataflow (Transfer'(..), Transfer, walkForward)
