@@ -128,14 +128,19 @@ termina__app__init_globals :: CExpression
 termina__app__init_globals = "termina__app__init_globals" @:
     CTFunction void []
 
-termina__pool__size :: CExpression
-termina__pool__size = "termina__pool__size" @:
+termina__pool__area_length :: CExpression
+termina__pool__area_length = "termina__pool__area_length" @:
     CTFunction size_t [
         -- | size of type
         size_t,
         -- | number of elements
         size_t
     ]
+
+-- | The element type of the memory area of a pool, whose alignment is the
+-- strictest one of the platform.
+max_align_t :: CType
+max_align_t = typeDef "max_align_t"
 
 termina__periodic_timer__init :: CExpression
 termina__periodic_timer__init = "termina__periodic_timer__init" @:

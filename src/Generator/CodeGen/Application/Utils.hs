@@ -125,11 +125,11 @@ genPoolMemoryArea :: Bool -> TPPool SemanticAnn -> CGenerator CFileItem
 genPoolMemoryArea before (TPPool identifier ts size _ _) = do
     cSize <- genConstExpression size
     cType <- genType noqual ts
-    let poolSize = termina__pool__size @@ [_sizeOfType cType, cSize]
-    if before then 
-        return $ pre_cr $ static_global (var (poolMemoryArea identifier) (CTArray uint8_t poolSize))
+    let areaLength = termina__pool__area_length @@ [_sizeOfType cType, cSize]
+    if before then
+        return $ pre_cr $ static_global (var (poolMemoryArea identifier) (CTArray max_align_t areaLength))
     else
-        return $ static_global (var (poolMemoryArea identifier) (CTArray uint8_t poolSize))
+        return $ static_global (var (poolMemoryArea identifier) (CTArray max_align_t areaLength))
 
 genPoolMemoryAreas :: [TPPool SemanticAnn] -> CGenerator [CFileItem]
 genPoolMemoryAreas [] = return []
