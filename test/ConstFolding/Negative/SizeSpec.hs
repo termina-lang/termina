@@ -126,3 +126,31 @@ spec = do
                 "    return;\n" ++
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CFE-015")
+
+    -- A procedure called through an access port is a block of its own in the
+    -- basic-block AST and not a call expression, so its arguments go through a
+    -- check of their own.
+    it "CFE-015: referenced array size mismatch in a procedure called through a port" $ do
+      let src = "constexpr n : usize = 32;\n" ++
+                "constexpr m : usize = 256;\n" ++
+                "interface IStore {\n" ++
+                "    procedure put(&mut self, buf : &[u8; m]);\n" ++
+                "};\n" ++
+                "resource class CStore provides IStore {\n" ++
+                "    last : u8;\n" ++
+                "    procedure put(&mut self, buf : &[u8; m]) {\n" ++
+                "        self->last = self->last + buf[0];\n" ++
+                "        return;\n" ++
+                "    }\n" ++
+                "};\n" ++
+                "task class CTask {\n" ++
+                "    timer_port : sink TimeVal triggers tick;\n" ++
+                "    store : access IStore;\n" ++
+                "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+                "        let small : [u8; n] = [0 : u8; n];\n" ++
+                "        let ret : Status<i32> = Success;\n" ++
+                "        self->store.put(&small);\n" ++
+                "        return ret;\n" ++
+                "    }\n" ++
+                "};"
+      compileErrorCode src `shouldBe` Just (pack "CFE-015")

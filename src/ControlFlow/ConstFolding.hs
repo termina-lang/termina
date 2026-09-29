@@ -309,31 +309,19 @@ foldExpression (Casting expr ty ann) = do
 foldExpression (FunctionCall ident args ann) = do
   ann' <- foldAnnotation ann
   args' <- mapM foldExpression args
-  case ann' of
-    (SemanticAnn (ETy (AppType params _ty)) exprLoc) ->
-      zipWithM_ (\param arg -> case param of
-        Parameter _ paramTy _ -> checkType exprLoc paramTy arg) params args'
-    _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
+  checkCallArgs ann' args'
   return $ FunctionCall ident args' ann'
 foldExpression (MemberFunctionCall obj ident args ann) = do
   ann' <- foldAnnotation ann
   obj' <- foldObject obj
   args' <- mapM foldExpression args
-  case ann' of
-    (SemanticAnn (ETy (AppType params _ty)) exprLoc) ->
-      zipWithM_ (\param arg -> case param of
-        Parameter _ paramTy _ -> checkType exprLoc paramTy arg) params args'
-    _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
+  checkCallArgs ann' args'
   return $ MemberFunctionCall obj' ident args' ann'
 foldExpression (DerefMemberFunctionCall obj ident args ann) = do
   ann' <- foldAnnotation ann
   obj' <- foldObject obj
   args' <- mapM foldExpression args
-  case ann' of
-    (SemanticAnn (ETy (AppType params _ty)) exprLoc) ->
-      zipWithM_ (\param arg -> case param of
-        Parameter _ paramTy _ -> checkType exprLoc paramTy arg) params args'
-    _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
+  checkCallArgs ann' args'
   return $ DerefMemberFunctionCall obj' ident args' ann'
 foldExpression (ArraySliceExpression ak obj lower upper ann) = do
   ann' <- foldAnnotation ann
@@ -539,6 +527,7 @@ foldBasicBlock (ProcedureInvoke obj procName exprs ann) = do
   ann' <- foldAnnotation ann
   obj' <- foldObject obj
   exprs' <- mapM foldExpression exprs
+  checkCallArgs ann' exprs'
   return $ ProcedureInvoke obj' procName exprs' ann'
 foldBasicBlock (AtomicLoad obj expr ann) = do
   ann' <- foldAnnotation ann
@@ -614,7 +603,18 @@ foldBasicBlock (SystemCall obj ident exprs ann) = do
   ann' <- foldAnnotation ann
   obj' <- foldObject obj
   exprs' <- mapM foldExpression exprs
+  checkCallArgs ann' exprs'
   return $ SystemCall obj' ident exprs' ann'
+
+-- | Check the arguments of a call against the parameters its annotation
+-- carries. A call to a function or a member is an expression; a procedure
+-- called through an access port, including the system port, is a block of its
+-- own, so both foldExpression and foldBasicBlock call this.
+checkCallArgs :: SemanticAnn -> [Expression SemanticAnn] -> ConstFoldMonad ()
+checkCallArgs (SemanticAnn (ETy (AppType params _ty)) exprLoc) args =
+  zipWithM_ (\param arg -> case param of
+    Parameter _ paramTy _ -> checkType exprLoc paramTy arg) params args
+checkCallArgs _ _ = throwError $ annotateError Internal EInvalidConstantEvaluation
 
 foldBasicBlocks :: Block SemanticAnn -> ConstFoldMonad (Block SemanticAnn)
 foldBasicBlocks (Block body ann) = do
