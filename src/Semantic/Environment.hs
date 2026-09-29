@@ -93,10 +93,18 @@ stdlibGlobalEnv outBufSize inBufSize =
         TUSize, 
         -- | Error code returned by the action
         TInt32],
-      -- | Message queue full
-      EnumVariant "EMsgQueueFull" [
+      -- | Error sending a message to a message queue
+      EnumVariant "EMsgQueueSendError" [
         -- | ID of the message queue
-        TUSize],
+        TUSize,
+        -- | Error code
+        TInt32],
+      -- | Error receiving a message from a message queue
+      EnumVariant "EMsgQueueRecvError" [
+        -- | ID of the message queue
+        TUSize,
+        -- | Error code
+        TInt32],
       EnumVariant "EArrayIndexOutOfBounds" [
         -- | Address of the offending expression
         TUSize,
@@ -126,6 +134,19 @@ stdlibGlobalEnv outBufSize inBufSize =
         -- | Lower index
         TUSize,
         -- | Upper index
+        TUSize],
+      EnumVariant "EShiftAmountOutOfBounds" [
+        -- | Address of the offending expression
+        TUSize,
+        -- | Bit width of the shifted type
+        TUSize,
+        -- | Offending shift amount
+        TUSize],
+      EnumVariant "EArithmeticOverflow" [
+        -- | Address of the offending expression
+        TUSize],
+      EnumVariant "EDivisionByZero" [
+        -- | Address of the offending expression
         TUSize]
       ] [])) Internal),
     -- | SysTime interface
