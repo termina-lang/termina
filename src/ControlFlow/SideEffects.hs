@@ -8,7 +8,7 @@ import ControlFlow.SideEffects.Errors (SideEffectsError, Error(..), Effect(..))
 import Lowering.AST
 import ControlFlow.Traversal
   (Child(..), childExpressions, expressionChildren, indexExpressions)
-import ControlFlow.Dataflow (Transfer(..), walkForward)
+import ControlFlow.Dataflow (Transfer'(..), Transfer, walkForward)
 import Semantic.Types
 import Semantic.Utils (objectPath, mayAlias, AccessPath)
 import Utils.Annotations (Location, getLocation, getAnnotation, annotateError)

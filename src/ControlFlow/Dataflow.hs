@@ -13,11 +13,15 @@
 -- flow of the language is written here once: an @if@ with no @else@ leaves a
 -- path that does nothing, the cases of a @match@ with no default are exhaustive,
 -- and what the body of a loop assigns does not hold after it.
+--
+-- The walk is generic in the types, the expressions and the objects of the
+-- blocks, so it serves both the lowered and the elaborated AST.
 module ControlFlow.Dataflow (
     Lattice(..)
   , DFState(..)
   , DataflowM
-  , Transfer(..)
+  , Transfer'(..)
+  , Transfer
   , getPath
   , putPath
   , modifyPath
@@ -30,7 +34,8 @@ module ControlFlow.Dataflow (
   , runDataflow
 ) where
 
-import Lowering.AST
+import BasicBlocks
+import Lowering.AST (Identifier, TerminaType, Expression, Object)
 import Semantic.Types (SemanticAnn)
 
 import Control.Monad.Except
@@ -105,43 +110,46 @@ fixpoint body = getPath >>= go
       if known' == known then putPath known' else go known'
 
 -- | What a node means to the pass.
-data Transfer p g e = Transfer
+data Transfer' ty expr obj p g e = Transfer
   {
     -- | A statement of a regular block.
-    onStatement :: Statement SemanticAnn -> DataflowM p g e ()
+    onStatement :: Statement' ty expr obj SemanticAnn -> DataflowM p g e ()
     -- | A block that only evaluates expressions, which the pass reads through
     -- 'ControlFlow.Traversal.simpleBlockChildren'.
-  , onSimpleBlock :: BasicBlock SemanticAnn -> DataflowM p g e ()
+  , onSimpleBlock :: BasicBlock' ty expr obj SemanticAnn -> DataflowM p g e ()
     -- | An expression evaluated in a control position without deciding a path,
     -- such as the bounds of a loop or the object a @match@ inspects.
-  , onExpression :: Expression SemanticAnn -> DataflowM p g e ()
+  , onExpression :: expr SemanticAnn -> DataflowM p g e ()
     -- | An expression whose value decides which path is taken.
-  , onCondition :: Expression SemanticAnn -> DataflowM p g e ()
+  , onCondition :: expr SemanticAnn -> DataflowM p g e ()
     -- | The guard of a loop, which decides a path like any other condition but
     -- is evaluated only while the iterator stays within its range: the
     -- generated @for@ tests the range first and the guard after it. A pass
     -- that does not care where the guard sits leaves this at 'onCondition'.
-  , onLoopGuard :: Expression SemanticAnn -> DataflowM p g e ()
+  , onLoopGuard :: expr SemanticAnn -> DataflowM p g e ()
     -- | Entering a case of a @match@, which binds the variables of its variant
     -- and says which variant the object it discriminates on holds.
   , onCaseEntry ::
-      Expression SemanticAnn -> MatchCase SemanticAnn -> DataflowM p g e ()
+      expr SemanticAnn -> MatchCase' ty expr obj SemanticAnn -> DataflowM p g e ()
     -- | Entering a loop, which declares an iterator of the given type that
     -- runs from the first of the two bounds up to but not including the
     -- second, one value per turn.
   , onLoopEntry ::
-      Identifier -> TerminaType SemanticAnn
-      -> Expression SemanticAnn -> Expression SemanticAnn
+      Identifier -> ty SemanticAnn
+      -> expr SemanticAnn -> expr SemanticAnn
       -> DataflowM p g e ()
     -- | What is known inside the branch a condition guards, and inside the ones
     -- it does not. A pass that learns nothing from a condition leaves both at
     -- @pure ()@.
-  , refineTrue :: Expression SemanticAnn -> DataflowM p g e ()
-  , refineFalse :: Expression SemanticAnn -> DataflowM p g e ()
+  , refineTrue :: expr SemanticAnn -> DataflowM p g e ()
+  , refineFalse :: expr SemanticAnn -> DataflowM p g e ()
   }
 
+-- | What a node of the lowered AST means to the pass.
+type Transfer = Transfer' TerminaType Expression Object
+
 -- | Walks a block forwards.
-walkForward :: Lattice p => Transfer p g e -> Block SemanticAnn -> DataflowM p g e ()
+walkForward :: Lattice p => Transfer' ty expr obj p g e -> Block' ty expr obj SemanticAnn -> DataflowM p g e ()
 walkForward transfer = walkBlock
 
   where
