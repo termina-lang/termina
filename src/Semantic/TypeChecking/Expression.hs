@@ -584,7 +584,24 @@ typeLHSObject = typeObject getLHSVarTy
 typeGlobalObject = typeObject getGlobalVarTy
 ----------------------------------------
 
-typeModifier :: Location 
+-- | Types the modifiers of a declaration, none of which may appear twice.
+typeModifiers :: Location
+  -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
+  -> [Modifier ParserAnn]
+  -> SemanticMonad [SAST.Modifier SemanticAnn]
+typeModifiers loc typeObj mods = do
+  checkDuplicated [] mods
+  mapM (typeModifier loc typeObj) mods
+
+  where
+
+    checkDuplicated :: [Identifier] -> [Modifier ParserAnn] -> SemanticMonad ()
+    checkDuplicated _ [] = return ()
+    checkDuplicated seen (Modifier ident _ : rest)
+      | ident `elem` seen = throwError $ annotateError loc (EDuplicatedModifier ident)
+      | otherwise = checkDuplicated (ident : seen) rest
+
+typeModifier :: Location
   -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -> Modifier ParserAnn 
   -> SemanticMonad (SAST.Modifier SemanticAnn)

@@ -1,6 +1,7 @@
 module ConstFolding.Negative.ConstEvalSpec (spec) where
 
 import Pipeline.Common (compileErrorCode)
+import Architecture.Negative.CodeSpec (timerTaskClass, periodicEmitter)
 
 import Test.Hspec
 import Data.Text (pack)
@@ -81,3 +82,18 @@ spec = do
                 "    return y;\n" ++
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CFE-017")
+
+    it "CFE-018: task priority reserved for the runtime" $ do
+      let src = timerTaskClass
+             ++ periodicEmitter "timer" 1
+             ++ "#[priority(0)]\n"
+             ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
+      compileErrorCode src `shouldBe` Just (pack "CFE-018")
+
+    it "CFE-018: task priority out of range after folding a constant" $ do
+      let src = "constexpr base : u32 = 250 : u32;\n"
+             ++ timerTaskClass
+             ++ periodicEmitter "timer" 1
+             ++ "#[priority(base + 5 : u32)]\n"
+             ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
+      compileErrorCode src `shouldBe` Just (pack "CFE-018")

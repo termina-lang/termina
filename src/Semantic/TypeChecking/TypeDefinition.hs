@@ -96,7 +96,7 @@ typeTypeDefinition ann (Struct ident fs_ts mds_ts) = do
   -- Check field names are unique
   checkUniqueNames ann EStructDefNotUniqueField (Data.List.map fieldIdentifier fs_ty)
   -- Type the modifiers
-  mds_ty <- mapM (typeModifier ann typeGlobalObject) mds_ts
+  mds_ty <- typeModifiers ann typeGlobalObject mds_ts
   -- If everything is fine, return same struct
   return (SAST.Struct ident fs_ty mds_ty)
 typeTypeDefinition ann (Enum ident evs_ts mds_ts) = do
@@ -107,7 +107,7 @@ typeTypeDefinition ann (Enum ident evs_ts mds_ts) = do
   -- Check names are unique
   checkUniqueNames ann EEnumDefNotUniqueVariant (Data.List.map variantIdentifier evs_ty)
   -- Type the modifiers
-  mds_ty <- mapM (typeModifier ann typeGlobalObject) mds_ts
+  mds_ty <- typeModifiers ann typeGlobalObject mds_ts
   -- If everything is fine, return the same definition.
   return (Enum ident evs_ty mds_ty)
 typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts) = do
@@ -124,7 +124,7 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
   -- Check that the name of the procedures is not repeated in the extended interfaces
   checkNoDuplicatedExtendedProcedures extends
   -- Type the modifiers
-  mds_ty <- mapM (typeModifier ann typeGlobalObject) mds_ts
+  mds_ty <- typeModifiers ann typeGlobalObject mds_ts
   -- If everything is fine, return the same definition.
   return (Interface RegularInterface ident extends procedures mds_ty)
 
@@ -137,7 +137,7 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
             typedParam <- typeProcedureParameter annIP param
             insertLocalImmutObj pann paramId (paramType typedParam)
             return typedParam)
-      mds_ty' <- mapM (typeModifier ann typeGlobalObject) mds_ts'
+      mds_ty' <- typeModifiers ann typeGlobalObject mds_ts'
       return $ InterfaceProcedure ak procId ps_ty mds_ty' (buildExpAnn annIP TUnit)
     
     -- | Checks that the procedures incorporated from the extended interfaces
@@ -271,7 +271,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
 
     -- Map from ClassNames to their definition (usefull after sorting by name and dep)
     let nameClassMap = M.fromList (map (\e -> (className e, e)) elements)
-    mds_ty <- mapM (typeModifier ann typeGlobalObject) mds_ts
+    mds_ty <- typeModifiers ann typeGlobalObject mds_ts
     -- Sort and see if there is a loop
     topSortOrder <- case topSort dependencies of
             -- Tell the user a loop is in the room

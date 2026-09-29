@@ -34,6 +34,7 @@ data Error =
     | EChannelWithoutTarget Identifier -- ^ Channel without target (AE-006)
     | EUnusedResource Identifier -- ^ Unused resource (AE-007)
     | EUnusedPool Identifier -- ^ Unused pool (AE-008)
+    | EDuplicatedTaskPriority Identifier Integer Identifier Location -- ^ Two tasks with the same priority (AE-009)
     deriving Show
 
 type ArchitectureError = AnnotatedError Error Location
@@ -81,6 +82,13 @@ instance Diagnosable Error where
             ("Pool " <> emph (T.pack poolId) <>
                 " is not being used by any element. " <>
                 "All pools must be connected to at least one access port.")
+    describe (EDuplicatedTaskPriority task priority prevTask prevPos) =
+        relatedTo prevPos "the other task" $
+            diagnostic "AE-009" "duplicated task priority"
+                ("Task " <> emph (T.pack task) <> " has priority " <>
+                    emph (T.pack (show priority)) <> ", the same as task " <>
+                    emph (T.pack prevTask) <> ". " <>
+                    "No two tasks may share a priority.")
     -- | Everything else is a broken invariant of the compiler, which has no code
     -- of its own.
     describe _ = diagnosticWithoutDetail "Internal" "internal error"

@@ -270,6 +270,8 @@ data Error
   | EReferenceToPackedMember Identifier -- ^ Reference to a member reached through a packed struct, on a strict-alignment target (SE-218)
   | EReservedIdentifier Identifier ReservedBy -- ^ Identifier that C keeps for itself (SE-219)
   | EEmitterOnlyForHandler Identifier Identifier HandlerOnlyBecause -- ^ Emitter that only a handler may attend, connected to something else (SE-220)
+  | EMissingTaskPriority Identifier -- ^ Task declared without a priority (SE-223)
+  | EDuplicatedModifier Identifier -- ^ Modifier that appears more than once on the same declaration (SE-224)
   deriving Show
 
 -- | Why an emitter takes a handler and not a task.
@@ -1025,6 +1027,12 @@ instance Diagnosable Error where
                 "The initialization sequence dispatches this event before it creates the tasks."
             ReportsOnTheFatalPath ->
                 "This emitter reports a failure that the system cannot recover from, and the system\nreboots once its action has run, so a task attending it would never run."
+    describe (EMissingTaskPriority task) =
+        diagnostic "SE-223" "missing task priority"
+            ("The task \x1b[31m" <> T.pack task <> "\x1b[0m has no priority.\n" <> "Every task must set its priority with the #[priority(N)] modifier, and no two tasks may share one.")
+    describe (EDuplicatedModifier modifier) =
+        diagnostic "SE-224" "duplicated modifier"
+            ("The modifier \x1b[31m" <> T.pack modifier <> "\x1b[0m appears more than once on this declaration.")
 
     -- | The two clauses below pick their detail with a case, which the script
     -- that moved the rest of this table does not read, so they were moved by

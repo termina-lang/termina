@@ -442,6 +442,12 @@ shiftWidth plt TUSize = usizeWidth plt
 shiftWidth plt (TConstSubtype ty) = shiftWidth plt ty
 shiftWidth _ _ = error "shiftWidth: not an integer type"
 
+-- | Range of the priority of a task, the same on every target. A lower number
+-- is a higher priority.
+minTaskPriority, maxTaskPriority :: Integer
+minTaskPriority = 1
+maxTaskPriority = 254
+
 getTypeIdentifier :: TypeDef' ty expr blk a -> Identifier
 getTypeIdentifier (Struct ident _ _)        = ident
 getTypeIdentifier (Enum ident _ _)          = ident

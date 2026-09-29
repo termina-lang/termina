@@ -437,15 +437,16 @@ getPeriodicTimersToTasks progArchitecture = foldl (\acc emitter ->
         _ -> acc
     ) [] (getConnectedEmitters progArchitecture)
 
--- | Returns the value of the "priority" modifier, if present in the list of modifiers.
--- If not, it returns 255, which is the default value for the priority (the lowest).
+-- | Returns the value of the "priority" modifier. The type checker rejects a
+-- task without one (SE-223) and the constant folding leaves its value as a
+-- literal.
 getPriority :: TPTask a -> TInteger
 getPriority = getPriority' . taskModifiers
 
   where
 
     getPriority' :: [Modifier a] -> TInteger
-    getPriority' [] = TInteger 255 DecRepr
+    getPriority' [] = error "Internal error: task without a priority modifier"
     getPriority' ((Modifier "priority" (Just (Constant (I priority _) _))) : _) = priority
     getPriority' ((Modifier "priority" _ ) : _) = error "Internal error: invalid priority modifier value"
     getPriority' (_ : modifiers) = getPriority' modifiers

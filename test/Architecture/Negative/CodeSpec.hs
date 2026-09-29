@@ -120,6 +120,16 @@ spec = do
              ++ "task t2 : TimerTask = { ticks = 0, timer_port <- timer };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-001")
 
+    it "AE-009: two tasks with the same priority" $ do
+      let src = timerTaskClass
+             ++ periodicEmitter "timer1" 1
+             ++ periodicEmitter "timer2" 2
+             ++ "#[priority(10)]\n"
+             ++ "task t1 : TimerTask = { ticks = 0, timer_port <- timer1 };\n"
+             ++ "#[priority(10)]\n"
+             ++ "task t2 : TimerTask = { ticks = 0, timer_port <- timer2 };\n"
+      compileErrorCode src `shouldBe` Just (pack "AE-009")
+
     it "AE-002: same channel connected to two in ports" $ do
       let src =
             "task class ConsumerTask {\n" ++

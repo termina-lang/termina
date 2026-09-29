@@ -694,7 +694,13 @@ foldGlobal (Task ident ty mInitExpr mods ann) = do
   ann' <- foldAnnotation ann
   ty' <- foldType glbLoc ty
   mInitExpr' <- mapM foldExpression mInitExpr
-  return $ Task ident ty' mInitExpr' mods ann'
+  mods' <- mapM foldModifier mods
+  forM_ mods' $ \case
+    Modifier "priority" (Just (Constant (I (TInteger priority _) _) _)) ->
+      unless (minTaskPriority <= priority && priority <= maxTaskPriority) $
+        throwError $ annotateError glbLoc (ETaskPriorityOutOfRange ident priority)
+    _ -> return ()
+  return $ Task ident ty' mInitExpr' mods' ann'
 foldGlobal (Handler ident ty mInitExpr mods ann) = do
   let glbLoc = getLocation ann
   ann' <- foldAnnotation ann
@@ -729,6 +735,15 @@ foldGlobal (Emitter ident ty mInitExpr mods ann) = do
   mInitExpr' <- mapM foldExpression mInitExpr
   return $ Emitter ident ty' mInitExpr' mods ann'
 foldGlobal g = return g -- This should not happen
+
+-- | Replaces the argument of a modifier by the value it folds to, so the
+-- architecture reads a literal whether the source wrote a literal, a constant
+-- or an expression of constants.
+foldModifier :: Modifier SemanticAnn -> ConstFoldMonad (Modifier SemanticAnn)
+foldModifier (Modifier ident (Just expr)) = do
+  value <- evalConstExpression expr
+  return $ Modifier ident (Just (Constant value (getAnnotation expr)))
+foldModifier modifier = return modifier
 
 foldElement :: AnnASTElement SemanticAnn -> ConstFoldMonad (AnnASTElement SemanticAnn)
 foldElement (GlobalDeclaration g) =

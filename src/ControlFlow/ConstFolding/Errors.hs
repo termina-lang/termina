@@ -9,6 +9,7 @@ import Utils.Errors
 import qualified Data.Text as T
 import Semantic.Types
 import Utils.Printer
+import Core.Utils (minTaskPriority, maxTaskPriority)
 
 
 data Error =
@@ -48,6 +49,7 @@ data Error =
   | EReferencedArraySizeMismatch Integer Integer -- ^ Referenced array size mismatch
   | EShiftAmountOutOfBounds Integer Integer -- ^ Shift amount out of bounds (width, amount)
   | EInvariantComparison Integer (TerminaType SemanticAnn) Bool -- ^ Comparison against a constant with a fixed result
+  | ETaskPriorityOutOfRange Identifier Integer -- ^ Task priority out of range (task, priority)
   deriving Show
 
 type ConstFoldError = AnnotatedError Error Location
@@ -119,6 +121,13 @@ instance Diagnosable Error where
             ("The comparison against " <> emph (T.pack (show value)) <>
                 " always evaluates to " <> emph (if result then "true" else "false") <>
                 " for any value of type " <> emph (showText ty) <> ".")
+    describe (ETaskPriorityOutOfRange task priority) =
+        diagnostic "CFE-018" "task priority out of range"
+            ("The priority of the task " <> emph (T.pack task) <> " is " <>
+                emph (T.pack (show priority)) <> ", but it must be between " <>
+                emph (T.pack (show minTaskPriority)) <> " and " <>
+                emph (T.pack (show maxTaskPriority)) <> ".\n" <>
+                "Priority 0 is reserved for the runtime and 255 for the idle task.")
     -- | Everything else is a broken invariant of the compiler, which has no code
     -- of its own.
     describe _ = diagnosticWithoutDetail "Internal" "internal error"

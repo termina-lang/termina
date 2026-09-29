@@ -321,6 +321,7 @@ runChecks files progArch =
               , runCheckChannelConnections progArch
               , runCheckResourceUsage progArch
               , runCheckPoolUsage progArch
+              , runCheckTaskPriorities progArch
               , runCheckBoxSources progArch ]
 
 renderModule :: BasicBlocksModule -> Either Failure Text

@@ -184,6 +184,17 @@ checkResourceUsage bbProject progArchitecture =
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
+checkTaskPriorities :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
+checkTaskPriorities bbProject progArchitecture =
+  let result = runCheckTaskPriorities progArchitecture in
+  case result of
+    Left err ->
+      let sourceFilesMap =
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
+                M.empty bbProject in
+      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+    Right _ -> return ()
+
 checkPoolUsage :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
 checkPoolUsage bbProject progArchitecture =
   let result = runCheckPoolUsage progArchitecture in

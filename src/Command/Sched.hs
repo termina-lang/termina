@@ -728,6 +728,7 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
     checkChannelConnections bbProject programArchitecture
     checkResourceUsage bbProject programArchitecture
     checkPoolUsage bbProject programArchitecture
+    checkTaskPriorities bbProject programArchitecture
     checkProjectBoxSources bbProject programArchitecture
     -- | Load the transactional worst-case execution paths
     when chatty (putStrLn . debugMessage $ "Loading transactional worst-case execution paths")

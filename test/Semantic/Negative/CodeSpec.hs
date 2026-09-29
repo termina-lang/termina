@@ -256,6 +256,8 @@ titles =
   , ("SE-219", "reserved identifier")
   , ("SE-221", "binary operation expected result type not positive numeric")
   , ("SE-222", "binary operation expected positive numeric type on the left")
+  , ("SE-223", "missing task priority")
+  , ("SE-224", "duplicated modifier")
   ]
 
 spec :: Spec

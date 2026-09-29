@@ -7,6 +7,7 @@ import Control.Monad.Reader
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.Utils
 import Semantic.Types
+import Core.AST (TInteger(..))
 import qualified Data.Map.Strict as M
 import Utils.Annotations
 
@@ -32,6 +33,17 @@ checkPoolUsage = do
     tp <- ask
     mapM_ (\(TPPool poolId _ _ _ ann) ->
         when (poolId `M.notMember` resourceSources tp) (throwError $ annotateError (getLocation ann) (EUnusedPool poolId))) . M.elems . pools $ tp
+
+checkTaskPriorities :: ConnectionsCheckMonad ()
+checkTaskPriorities = do
+    tp <- ask
+    foldM_ (\seen tsk -> do
+        let TInteger priority _ = getPriority tsk
+            loc = getLocation (taskAnns tsk)
+        case M.lookup priority seen of
+            Just (prevTask, prevLoc) ->
+                throwError $ annotateError loc (EDuplicatedTaskPriority (taskName tsk) priority prevTask prevLoc)
+            Nothing -> return $ M.insert priority (taskName tsk, loc) seen) M.empty . M.elems . tasks $ tp
 
 checkResourceUsage :: ConnectionsCheckMonad ()
 checkResourceUsage = do
