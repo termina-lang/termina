@@ -147,8 +147,8 @@ genTWCEPFiles ::
   TerminaConfig
   -> LoweredProject
   -> IO ()
-genTWCEPFiles params bbProject = do
-  mapM_ printWCEPModule (M.elems bbProject)
+genTWCEPFiles params loweredProject = do
+  mapM_ printWCEPModule (M.elems loweredProject)
 
   where
 
@@ -186,8 +186,8 @@ genModules ::
   -> MonadicTypes
   -- | The project to generate the code from
   -> ElaboratedProject -> IO ()
-genModules params plt initialMonadicTypes bbProject =
-  foldM_ printModule initialMonadicTypes (M.elems bbProject)
+genModules params plt initialMonadicTypes loweredProject =
+  foldM_ printModule initialMonadicTypes (M.elems loweredProject)
 
   where
 
@@ -204,7 +204,7 @@ genModules params plt initialMonadicTypes bbProject =
       if sourceFileExists
         then do
           sourceFileTime <- getModificationTime sourceFile
-          depChanged <- changedDependendencies bbProject sourceFileTime (visibleModules bbModule)
+          depChanged <- changedDependendencies loweredProject sourceFileTime (visibleModules bbModule)
           if sourceFileTime > modificationTime bbModule &&
              sourceFileTime > exeModificationTime &&
              sourceFileTime > terminaYamlModificationTime &&
@@ -218,7 +218,7 @@ genModules params plt initialMonadicTypes bbProject =
       if headerFileExists
         then do
           headerFileTime <- getModificationTime headerFile
-          depChanged <- changedDependendencies bbProject headerFileTime (visibleModules bbModule)
+          depChanged <- changedDependendencies loweredProject headerFileTime (visibleModules bbModule)
           if headerFileTime > modificationTime bbModule &&
              headerFileTime > exeModificationTime &&
              headerFileTime > terminaYamlModificationTime &&
@@ -254,15 +254,15 @@ genModules params plt initialMonadicTypes bbProject =
           return newMonadicTypes
 
 genInitFile :: TerminaConfig -> Platform -> ElaboratedProject -> QualifiedName -> IO ()
-genInitFile params plt bbProject appModName = do
-  let appModule = bbProject M.! appModName
+genInitFile params plt loweredProject appModName = do
+  let appModule = loweredProject M.! appModName
   initFileExists <- doesFileExist initFile
   if initFileExists then do
     initFileTime <- getModificationTime initFile
     exePath <- getExecutablePath
     exeModificationTime <- getModificationTime exePath
     terminaYamlModificationTime <- getModificationTime "termina.yaml"
-    depChanged <- changedDependendencies bbProject initFileTime (visibleModules appModule)
+    depChanged <- changedDependendencies loweredProject initFileTime (visibleModules appModule)
     unless (initFileTime > modificationTime appModule &&
       initFileTime > exeModificationTime &&
       initFileTime > terminaYamlModificationTime &&
@@ -278,7 +278,7 @@ genInitFile params plt bbProject appModName = do
 
     runGenInitFile' :: IO ()
     runGenInitFile' = do
-      let projectModules = M.toList $ elaboratedAST . metadata <$> bbProject
+      let projectModules = M.toList $ elaboratedAST . metadata <$> loweredProject
       case runGenInitFile params plt initFile projectModules of
         Left err -> die . errorMessage $ show err
         Right cInitFile -> do
@@ -287,15 +287,15 @@ genInitFile params plt bbProject appModName = do
 
 
 genOptionHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> LoweredProject -> QualifiedName -> IO ()
-genOptionHeaderFile params plt monadicTypes bbProject appModName = do
-  let appModule = bbProject M.! appModName
+genOptionHeaderFile params plt monadicTypes loweredProject appModName = do
+  let appModule = loweredProject M.! appModName
   optionFileExists <- doesFileExist optionFile
   if optionFileExists then do
     optionFileTime <- getModificationTime optionFile
     exePath <- getExecutablePath
     exeModificationTime <- getModificationTime exePath
     terminaYamlModificationTime <- getModificationTime "termina.yaml"
-    depChanged <- changedDependendencies bbProject optionFileTime (visibleModules appModule)
+    depChanged <- changedDependendencies loweredProject optionFileTime (visibleModules appModule)
     unless (optionFileTime > modificationTime appModule &&
       optionFileTime > exeModificationTime &&
       optionFileTime > terminaYamlModificationTime &&
@@ -316,15 +316,15 @@ genOptionHeaderFile params plt monadicTypes bbProject appModName = do
         Right cOptionsFile -> TIO.writeFile optionFile $ runCPrinter (profile params == Debug) cOptionsFile
 
 genStatusHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> LoweredProject -> QualifiedName -> IO ()
-genStatusHeaderFile params plt monadicTypes bbProject appModName = do
-  let appModule = bbProject M.! appModName
+genStatusHeaderFile params plt monadicTypes loweredProject appModName = do
+  let appModule = loweredProject M.! appModName
   statusFileExists <- doesFileExist statusFile
   if statusFileExists then do
     statusFileTime <- getModificationTime statusFile
     exePath <- getExecutablePath
     exeModificationTime <- getModificationTime exePath
     terminaYamlModificationTime <- getModificationTime "termina.yaml"
-    depChanged <- changedDependendencies bbProject statusFileTime (visibleModules appModule)
+    depChanged <- changedDependendencies loweredProject statusFileTime (visibleModules appModule)
     unless (statusFileTime > modificationTime appModule &&
       statusFileTime > exeModificationTime &&
       statusFileTime > terminaYamlModificationTime &&
@@ -344,15 +344,15 @@ genStatusHeaderFile params plt monadicTypes bbProject appModName = do
       Right cOptionsFile -> TIO.writeFile statusFile $ runCPrinter (profile params == Debug) cOptionsFile
 
 genResultHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> LoweredProject -> QualifiedName -> IO ()
-genResultHeaderFile params plt monadicTypes bbProject appModName = do
-  let appModule = bbProject M.! appModName
+genResultHeaderFile params plt monadicTypes loweredProject appModName = do
+  let appModule = loweredProject M.! appModName
   resultFileExists <- doesFileExist resultFile
   if resultFileExists then do
     resultFileTime <- getModificationTime resultFile
     exePath <- getExecutablePath
     exeModificationTime <- getModificationTime exePath
     terminaYamlModificationTime <- getModificationTime "termina.yaml"
-    depChanged <- changedDependendencies bbProject resultFileTime (visibleModules appModule)
+    depChanged <- changedDependendencies loweredProject resultFileTime (visibleModules appModule)
     unless (resultFileTime > modificationTime appModule &&
       resultFileTime > exeModificationTime &&
       resultFileTime > terminaYamlModificationTime &&
@@ -420,55 +420,55 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     when chatty (putStrLn . debugMessage $ "Searching for option types")
     let monadicTypes = monadicTypesMapModules typedProject
     -- | Obtain the basic blocks AST of the program
-    when chatty (putStrLn . debugMessage $ "Obtaining the basic blocks")
-    rawBBProject <-
+    when chatty (putStrLn . debugMessage $ "Lowering the project modules")
+    rawLoweredProject <-
       either
         (\err ->
           TIO.putStrLn (toText err M.empty) >> exitFailure)
         return
-        $ genBasicBlocks typedProject
-    runBasicBlockChecks chatty plt rawBBProject
+        $ lowerProject typedProject
+    runLoweredChecks chatty plt rawLoweredProject
     when chatty (putStrLn . debugMessage $ "Performing constant folding")
-    (bbProject, constEnvs) <- constFolding plt rawBBProject
+    (loweredProject, constEnvs) <- constFolding plt rawLoweredProject
     when chatty (putStrLn . debugMessage $ "Analysing the values of the project modules")
-    valueAnalysisCheck plt constEnvs bbProject
+    valueAnalysisCheck plt constEnvs loweredProject
     -- | Decide the run-time checks
     when chatty (putStrLn . debugMessage $ "Elaborating the run-time checks")
-    let (elaboratedProject, _checksReport) = elaborateProject plt bbProject
+    let (elaboratedProject, _checksReport) = elaborateProject plt loweredProject
     when chatty (putStrLn . debugMessage $ "Side-effect checking project modules")
     sideEffectCheck plt elaboratedProject
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
-    programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram config plt) orderedDependencies
-    checkEmitterConnections bbProject programArchitecture
-    checkChannelConnections bbProject programArchitecture
-    checkResourceUsage bbProject programArchitecture
-    checkPoolUsage bbProject programArchitecture
-    checkTaskPriorities bbProject programArchitecture
-    checkProjectBoxSources bbProject programArchitecture
+    programArchitecture <- genArchitecture loweredProject (getPlatformInitialProgram config plt) orderedDependencies
+    checkEmitterConnections loweredProject programArchitecture
+    checkChannelConnections loweredProject programArchitecture
+    checkResourceUsage loweredProject programArchitecture
+    checkPoolUsage loweredProject programArchitecture
+    checkTaskPriorities loweredProject programArchitecture
+    checkProjectBoxSources loweredProject programArchitecture
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
     genModules config plt monadicTypes elaboratedProject
     genInitFile config plt elaboratedProject (qualifiedName appModule)
-    genPlatformCode config plt bbProject (qualifiedName appModule) programArchitecture
+    genPlatformCode config plt loweredProject (qualifiedName appModule) programArchitecture
     unless (S.null (S.filter (\case {
         TStruct _ -> False;
         TEnum _ -> False;
         _ -> True;
-        }) . optionTypes $ monadicTypes)) $ genOptionHeaderFile config plt monadicTypes bbProject (qualifiedName appModule)
+        }) . optionTypes $ monadicTypes)) $ genOptionHeaderFile config plt monadicTypes loweredProject (qualifiedName appModule)
     unless (S.null (S.filter (\case {
         TStruct _ -> False;
         TEnum _ -> False;
         _ -> True;
-        }) . statusTypes $ monadicTypes)) $ genStatusHeaderFile config plt monadicTypes bbProject (qualifiedName appModule)
+        }) . statusTypes $ monadicTypes)) $ genStatusHeaderFile config plt monadicTypes loweredProject (qualifiedName appModule)
     unless (S.null (S.unions . M.elems . M.filterWithKey (\k _ -> case k of {
         TStruct _ -> False;
         TEnum _ -> False;
         _ -> True;
-        }) . resultTypes $ monadicTypes)) $ genResultHeaderFile config plt monadicTypes bbProject (qualifiedName appModule)
+        }) . resultTypes $ monadicTypes)) $ genResultHeaderFile config plt monadicTypes loweredProject (qualifiedName appModule)
     when genTransactionalWCEPs $
       when chatty (putStrLn . debugMessage $ "Generating transactional worst-case execution paths") >>
-      genTWCEPFiles config bbProject
+      genTWCEPFiles config loweredProject
     case genCmpDiag of
       Nothing -> return ()
       Just param ->

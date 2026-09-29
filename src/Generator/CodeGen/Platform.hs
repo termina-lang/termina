@@ -29,15 +29,15 @@ import System.IO.Error
 
 genPlatformCode :: TerminaConfig -> Platform -> LoweredProject -> QualifiedName -> TerminaProgArch SemanticAnn -> IO ()
 genPlatformCode _ TestPlatform _ _ _ = return ()
-genPlatformCode params plt bbProject appModName progArchitecture = do
-  let appModule = bbProject M.! appModName
+genPlatformCode params plt loweredProject appModName progArchitecture = do
+  let appModule = loweredProject M.! appModName
   exePath <- getExecutablePath
   exeModificationTime <- getModificationTime exePath
   terminaYamlModificationTime <- getModificationTime "termina.yaml"
   mainFileExists <- doesFileExist mainFile
   if mainFileExists then do
     mainFileTime <- getModificationTime mainFile
-    depChanged <- changedDependendencies bbProject mainFileTime (visibleModules appModule)
+    depChanged <- changedDependendencies loweredProject mainFileTime (visibleModules appModule)
     unless (mainFileTime > modificationTime appModule &&
       mainFileTime > exeModificationTime &&
       mainFileTime > terminaYamlModificationTime &&
@@ -74,12 +74,12 @@ genPlatformCode params plt bbProject appModName progArchitecture = do
     None -> return ()
     Make -> do
       let makefilePath = destinationPath </> "Makefile"
-          makefile = genMakefile params bbProject
+          makefile = genMakefile params loweredProject
       makefileExists <- doesFileExist makefilePath
       if makefileExists
         then do
           makefileTime <- getModificationTime makefilePath
-          depChanged <- changedDependendencies bbProject makefileTime (visibleModules appModule)
+          depChanged <- changedDependendencies loweredProject makefileTime (visibleModules appModule)
           unless (makefileTime > modificationTime appModule &&
                   makefileTime > exeModificationTime &&
                   makefileTime > terminaYamlModificationTime &&

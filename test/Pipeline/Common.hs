@@ -45,7 +45,7 @@ import qualified Semantic.AST as SAST
 
 import Command.Types
 import Command.Utils
-    (genBasicBlocks, basicBlockChecks, runCheck, CheckFailure(..),
+    (lowerProject, loweredChecks, runCheck, CheckFailure(..),
      elaborateProject, sideEffectCheckModules,
      getVisibleModules, sortProjectDepsOrLoop, projectDeclaredNames)
 import Modules.Modules (TerminaModuleData(..), ModuleDependency(..))
@@ -124,11 +124,11 @@ runProjectPipeline cfg sources = do
   parsedProject <- M.fromList <$> mapM parseModule sources
   ordered <- orderModules parsedProject
   typedProject <- typeProject cfg files parsedProject ordered
-  bbProject <- stage files (genBasicBlocks typedProject)
-  mapM_ (\check -> noCheckError files (runCheck check TestPlatform bbProject)) basicBlockChecks
+  loweredProject <- stage files (lowerProject typedProject)
+  mapM_ (\check -> noCheckError files (runCheck check TestPlatform loweredProject)) loweredChecks
   -- | Constant folding runs before architecture so the architecture pass and
   -- the code generator see every type (array sizes) already folded to literals.
-  (foldedProject, constEnvs) <- foldProject files bbProject ordered
+  (foldedProject, constEnvs) <- foldProject files loweredProject ordered
   -- | The constant propagation check follows the folding, which is what gives
   -- it the constants of each module.
   analyseValues files foldedProject constEnvs ordered
@@ -179,11 +179,11 @@ renderInitFile prjprogs =
 -- imports. Mirrors @Command.Common.constFolding@ but stays in 'Either'.
 foldProject :: M.Map FilePath Text -> LoweredProject -> [QualifiedName]
   -> Either Failure (LoweredProject, ProjectConstEnvs)
-foldProject files bbProject = go (ConstFoldEnv M.empty TestPlatform) M.empty M.empty
+foldProject files loweredProject = go (ConstFoldEnv M.empty TestPlatform) M.empty M.empty
   where
     go _ folded constEnvs [] = Right (folded, constEnvs)
     go env folded constEnvs (m:ms) =
-      case runConstFolding env (constFoldModule (bbProject M.! m)) of
+      case runConstFolding env (constFoldModule (loweredProject M.! m)) of
         Left err -> Left (failure files err)
         Right (foldedModule, env') ->
           go env' (M.insert m foldedModule folded) (M.insert m (constEnv env') constEnvs) ms
@@ -193,7 +193,7 @@ foldProject files bbProject = go (ConstFoldEnv M.empty TestPlatform) M.empty M.e
 -- stays in 'Either'.
 analyseValues :: M.Map FilePath Text -> LoweredProject -> ProjectConstEnvs
   -> [QualifiedName] -> Either Failure ()
-analyseValues files bbProject constEnvs = go M.empty
+analyseValues files loweredProject constEnvs = go M.empty
 
   where
 
@@ -202,7 +202,7 @@ analyseValues files bbProject constEnvs = go M.empty
       case runValueAnalysisCheck TestPlatform
              (M.findWithDefault M.empty m constEnvs)
              returned
-             (loweredAST . metadata $ bbProject M.! m) of
+             (loweredAST . metadata $ loweredProject M.! m) of
         (Just err, _) -> Left (failure files err)
         (Nothing, returned') -> go returned' ms
 
@@ -304,13 +304,13 @@ typeProject cfg files parsedProject =
 
 genProjectArchitecture :: TerminaConfig -> M.Map FilePath Text -> LoweredProject
   -> [QualifiedName] -> Either Failure (TerminaProgArch SemanticAnn)
-genProjectArchitecture cfg files bbProject = go (initialProg cfg)
+genProjectArchitecture cfg files loweredProject = go (initialProg cfg)
 
   where
 
     go tp [] = Right tp
     go tp (m:ms) =
-      case runGenArchitecture tp m (loweredAST . metadata $ bbProject M.! m) of
+      case runGenArchitecture tp m (loweredAST . metadata $ loweredProject M.! m) of
         Left err -> Left (failure files err)
         Right tp' -> go tp' ms
 

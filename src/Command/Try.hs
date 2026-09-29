@@ -110,8 +110,8 @@ tryCommand (TryCmdArgs targetFile noUsageChecking printHeader debugBuild) = do
     terminaModule <- loadSingleModule targetFile
     -- | Type check the module
     typedModule <- typeSingleModule terminaModule
-    -- | Generate basic blocks
-    case genBasicBlocksModule typedModule of
+    -- | Lower the module
+    case lowerTypedModule typedModule of
         Left err -> 
             let sourceFilesMap = M.fromList [(fullPath typedModule, sourcecode typedModule)] in
             TIO.putStrLn (toText err sourceFilesMap) >> exitFailure

@@ -11,7 +11,7 @@ import qualified Data.Set as S
 
 
 genMakefile :: TerminaConfig -> LoweredProject -> Makefile
-genMakefile params bbProject =
+genMakefile params loweredProject =
     Makefile [
         MakeBlock [
             MVariable MSimple "R" [MFragment "$(shell pwd)"]
@@ -97,4 +97,4 @@ genMakefile params bbProject =
 
     where
 
-        sourceFolders = foldr (S.insert . takeDirectory) S.empty $ M.keys bbProject
+        sourceFolders = foldr (S.insert . takeDirectory) S.empty $ M.keys loweredProject

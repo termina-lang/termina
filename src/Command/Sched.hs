@@ -134,7 +134,7 @@ typeRTModule :: TerminaProgArch SemanticAnn
   -> LoweredProject
   -> WCEPProject
   -> ParsedRTModule -> IO TypedRTModule
-typeRTModule arch trPathMap bbProject pathProject rtModule = do
+typeRTModule arch trPathMap loweredProject pathProject rtModule = do
   let result = runRTTypeChecking arch trPathMap (parsedRTAST . metadata $ rtModule)
   case result of
     (Left err) ->
@@ -144,7 +144,7 @@ typeRTModule arch trPathMap bbProject pathProject rtModule = do
       let fileMap = M.singleton (fullPath rtModule) (sourcecode rtModule)
           sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                fileMap bbProject
+                fileMap loweredProject
           pathFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 sourceFilesMap pathProject in
@@ -198,8 +198,8 @@ loadWCETModules
   :: LoweredProject
     -> FilePath
   -> IO WCETProject
-loadWCETModules bbProject efpPath = do
-  foldM loadWCETModules' M.empty (M.elems bbProject)
+loadWCETModules loweredProject efpPath = do
+  foldM loadWCETModules' M.empty (M.elems loweredProject)
 
   where
 
@@ -243,7 +243,7 @@ typeWCETModules :: TerminaProgArch SemanticAnn
   -> LoweredProject
   -> WCETProject
   -> IO (WCETimesMap WCETSemAnn)
-typeWCETModules arch wcepMap bbProject wcetProject =
+typeWCETModules arch wcepMap loweredProject wcetProject =
   foldM typeWCETModules' M.empty (M.elems wcetProject)
 
   where
@@ -258,7 +258,7 @@ typeWCETModules arch wcepMap bbProject wcetProject =
           -- path of the source file and as element the text of the source file.
           let sourceFilesMap =
                 M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                    M.empty bbProject
+                    M.empty loweredProject
               pathFilesMap =
                 M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                     sourceFilesMap wcetProject in
@@ -270,8 +270,8 @@ loadWCEPathModules
   :: LoweredProject
     -> FilePath
   -> IO WCEPProject
-loadWCEPathModules bbProject efpPath = do
-  foldM loadWCEPathModules' M.empty (M.elems bbProject)
+loadWCEPathModules loweredProject efpPath = do
+  foldM loadWCEPathModules' M.empty (M.elems loweredProject)
 
   where
 
@@ -314,7 +314,7 @@ typeWCEPathModules :: TerminaProgArch SemanticAnn
   -> LoweredProject
   -> WCEPProject
   -> IO (WCEPathMap WCEPSemAnn)
-typeWCEPathModules arch bbProject pathProject =
+typeWCEPathModules arch loweredProject pathProject =
   foldM typeWCEPathModules' M.empty (M.elems pathProject)
 
   where
@@ -329,7 +329,7 @@ typeWCEPathModules arch bbProject pathProject =
           -- path of the source file and as element the text of the source file.
           let sourceFilesMap =
                 M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                    M.empty bbProject
+                    M.empty loweredProject
               pathFilesMap =
                 M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                     sourceFilesMap pathProject in
@@ -707,42 +707,42 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
     let initialGlobalEnv = makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)
     (typedProject, _finalGlobalEnv) <- typeModules parsedProject initialGlobalEnv orderedDependencies
     -- | Obtain the basic blocks AST of the program
-    when chatty (putStrLn . debugMessage $ "Obtaining the basic blocks")
-    rawBBProject <-
+    when chatty (putStrLn . debugMessage $ "Lowering the project modules")
+    rawLoweredProject <-
       either
         (\err ->
           TIO.putStrLn (toText err M.empty) >> exitFailure)
         return
-        $ genBasicBlocks typedProject
-    runBasicBlockChecks chatty plt rawBBProject
+        $ lowerProject typedProject
+    runLoweredChecks chatty plt rawLoweredProject
     when chatty (putStrLn . debugMessage $ "Performing constant folding")
-    (bbProject, constEnvs) <- constFolding plt rawBBProject
+    (loweredProject, constEnvs) <- constFolding plt rawLoweredProject
     when chatty (putStrLn . debugMessage $ "Analysing the values of the project modules")
-    valueAnalysisCheck plt constEnvs bbProject
+    valueAnalysisCheck plt constEnvs loweredProject
     when chatty (putStrLn . debugMessage $ "Side-effect checking project modules")
-    sideEffectCheck plt (fst (elaborateProject plt bbProject))
+    sideEffectCheck plt (fst (elaborateProject plt loweredProject))
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
-    programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram config plt) orderedDependencies
-    checkEmitterConnections bbProject programArchitecture
-    checkChannelConnections bbProject programArchitecture
-    checkResourceUsage bbProject programArchitecture
-    checkPoolUsage bbProject programArchitecture
-    checkTaskPriorities bbProject programArchitecture
-    checkProjectBoxSources bbProject programArchitecture
+    programArchitecture <- genArchitecture loweredProject (getPlatformInitialProgram config plt) orderedDependencies
+    checkEmitterConnections loweredProject programArchitecture
+    checkChannelConnections loweredProject programArchitecture
+    checkResourceUsage loweredProject programArchitecture
+    checkPoolUsage loweredProject programArchitecture
+    checkTaskPriorities loweredProject programArchitecture
+    checkProjectBoxSources loweredProject programArchitecture
     -- | Load the transactional worst-case execution paths
     when chatty (putStrLn . debugMessage $ "Loading transactional worst-case execution paths")
-    pathProject <- loadWCEPathModules bbProject (efpFolder config)
-    wcepMap <- typeWCEPathModules programArchitecture bbProject pathProject
+    pathProject <- loadWCEPathModules loweredProject (efpFolder config)
+    wcepMap <- typeWCEPathModules programArchitecture loweredProject pathProject
     when chatty (putStrLn . debugMessage $ "Transactional worst-case execution paths type checked successfully")
     -- | Load the transactional worst-case execution times
     when chatty (putStrLn . debugMessage $ "Loading transactional worst-case execution times")
-    wcetProject <- loadWCETModules bbProject (efpFolder config)
-    wcetMap <- typeWCETModules programArchitecture wcepMap bbProject wcetProject
+    wcetProject <- loadWCETModules loweredProject (efpFolder config)
+    wcetMap <- typeWCETModules programArchitecture wcepMap loweredProject wcetProject
     when chatty (putStrLn . debugMessage $ "Transactional worst-case execution times type checked successfully")
     when chatty (putStrLn . debugMessage $ "Loading RT model")
     rtModule <- loadRTModule rtModelFile
-    typedRTModule <- typeRTModule programArchitecture wcepMap bbProject pathProject rtModule
+    typedRTModule <- typeRTModule programArchitecture wcepMap loweredProject pathProject rtModule
     when chatty (putStrLn . debugMessage $ "RT model type checked successfully")
     when chatty (putStrLn . debugMessage $ "Flattening RT model transactions")
     (flatTrMap, sitMap) <- flattenRTModule programArchitecture wcepMap typedRTModule

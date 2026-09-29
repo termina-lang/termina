@@ -130,7 +130,7 @@ typeModules parsedProject initialState =
           typeModules' (M.insert m typedModule typedProject) newState ms
 
 genArchitecture :: LoweredProject -> TerminaProgArch SemanticAnn -> [QualifiedName] -> IO (TerminaProgArch SemanticAnn)
-genArchitecture bbProject initialTerminaProgram orderedDependencies = do
+genArchitecture loweredProject initialTerminaProgram orderedDependencies = do
   genArchitecture' initialTerminaProgram orderedDependencies
 
   where
@@ -138,7 +138,7 @@ genArchitecture bbProject initialTerminaProgram orderedDependencies = do
     genArchitecture' :: TerminaProgArch SemanticAnn -> [QualifiedName] -> IO (TerminaProgArch SemanticAnn)
     genArchitecture' tp [] = pure tp
     genArchitecture' tp (m:ms) = do
-      let typedModule = loweredAST . metadata $ bbProject M.! m
+      let typedModule = loweredAST . metadata $ loweredProject M.! m
       let result = runGenArchitecture tp m typedModule
       case result of
         Left err ->
@@ -147,67 +147,67 @@ genArchitecture bbProject initialTerminaProgram orderedDependencies = do
           -- path of the source file and as element the text of the source file.
           let sourceFilesMap =
                 M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                    M.empty bbProject in
+                    M.empty loweredProject in
           TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
         Right tp' -> genArchitecture' tp' ms
 
 checkEmitterConnections :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
-checkEmitterConnections bbProject progArchitecture =
+checkEmitterConnections loweredProject progArchitecture =
   let result = runCheckEmitterConnections progArchitecture in
   case result of
     Left err ->
       let sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty bbProject in
+                M.empty loweredProject in
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
 checkChannelConnections :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
-checkChannelConnections bbProject progArchitecture =
+checkChannelConnections loweredProject progArchitecture =
   let result = runCheckChannelConnections progArchitecture in
   case result of
     Left err ->
       let sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty bbProject in
+                M.empty loweredProject in
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
 checkResourceUsage :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
-checkResourceUsage bbProject progArchitecture =
+checkResourceUsage loweredProject progArchitecture =
   let result = runCheckResourceUsage progArchitecture in
   case result of
     Left err ->
       let sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty bbProject in
+                M.empty loweredProject in
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
 checkTaskPriorities :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
-checkTaskPriorities bbProject progArchitecture =
+checkTaskPriorities loweredProject progArchitecture =
   let result = runCheckTaskPriorities progArchitecture in
   case result of
     Left err ->
       let sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty bbProject in
+                M.empty loweredProject in
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
 checkPoolUsage :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
-checkPoolUsage bbProject progArchitecture =
+checkPoolUsage loweredProject progArchitecture =
   let result = runCheckPoolUsage progArchitecture in
   case result of
     Left err ->
       let sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty bbProject in
+                M.empty loweredProject in
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
 checkProjectBoxSources :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
-checkProjectBoxSources bbProject progArchitecture =
+checkProjectBoxSources loweredProject progArchitecture =
   let result = runCheckBoxSources progArchitecture in
   case result of
     Left err ->
@@ -216,16 +216,16 @@ checkProjectBoxSources bbProject progArchitecture =
       -- path of the source file and as element the text of the source file.
       let sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty bbProject in
+                M.empty loweredProject in
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
 constFolding :: Platform -> LoweredProject -> IO (LoweredProject, ProjectConstEnvs)
-constFolding plt bbProject =
+constFolding plt loweredProject =
   -- | Fold the modules in dependency order, threading the constant environment
   -- from one module to the next so that a module can resolve the constants
   -- defined by the modules it imports.
-  case sortProjectDepsOrLoop (M.map importedModules bbProject) of
+  case sortProjectDepsOrLoop (M.map importedModules loweredProject) of
     -- | The build pipeline orders the modules (and reports dependency cycles)
     -- before reaching this point, so a cycle here would be an internal error.
     Left _ -> die . errorMessage $ "Dependency cycle detected during constant folding"
@@ -238,11 +238,11 @@ constFolding plt bbProject =
       -> IO (LoweredProject, ProjectConstEnvs)
     foldModules _ foldedProject constEnvs [] = return (foldedProject, constEnvs)
     foldModules env foldedProject constEnvs (m:ms) =
-      case runConstFolding env (constFoldModule (bbProject M.! m)) of
+      case runConstFolding env (constFoldModule (loweredProject M.! m)) of
         Left err ->
           let sourceFilesMap =
                 M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                    M.empty bbProject in
+                    M.empty loweredProject in
           TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
         Right (foldedModule, env') ->
           foldModules env' (M.insert m foldedModule foldedProject)
@@ -264,8 +264,8 @@ sideEffectCheck plt project =
     TIO.putStrLn (toText err (projectSourceFiles project)) >> exitFailure
 
 valueAnalysisCheck :: Platform -> ProjectConstEnvs -> LoweredProject -> IO ()
-valueAnalysisCheck plt constEnvs bbProject =
-  case sortProjectDepsOrLoop (M.map importedModules bbProject) of
+valueAnalysisCheck plt constEnvs loweredProject =
+  case sortProjectDepsOrLoop (M.map importedModules loweredProject) of
     -- | The build pipeline orders the modules (and reports dependency cycles)
     -- before reaching this point, so a cycle here would be an internal error.
     Left _ -> die . errorMessage $ "Dependency cycle detected during the value analysis"
@@ -278,7 +278,7 @@ valueAnalysisCheck plt constEnvs bbProject =
       case runValueAnalysisCheck plt
              (M.findWithDefault M.empty m constEnvs)
              returned
-             (loweredAST . metadata $ bbProject M.! m) of
+             (loweredAST . metadata $ loweredProject M.! m) of
         (Just err, _) ->
-          TIO.putStrLn (toText err (projectSourceFiles bbProject)) >> exitFailure
+          TIO.putStrLn (toText err (projectSourceFiles loweredProject)) >> exitFailure
         (Nothing, returned') -> checkModules returned' ms

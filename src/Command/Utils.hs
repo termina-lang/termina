@@ -84,13 +84,13 @@ projectDeclaredNames = M.unions . fmap (declaredNames . parsedAST . metadata) . 
 
 changedDependendencies :: M.Map QualifiedName (TerminaModuleData a) -> UTCTime -> [QualifiedName] -> IO Bool
 changedDependendencies _ _ [] = return False
-changedDependendencies bbProject t (x:xs) = do
-  let dep = bbProject M.! x
+changedDependendencies loweredProject t (x:xs) = do
+  let dep = loweredProject M.! x
       depModTime = modificationTime dep
   if depModTime > t then 
     return True
   else
-    changedDependendencies bbProject t xs
+    changedDependendencies loweredProject t xs
 
 getModuleImports :: Maybe FilePath -> PAST.TerminaModule ParserAnn -> IO (Either ParsingErrors [ModuleDependency])
 getModuleImports (Just srcPath) m =
@@ -178,11 +178,11 @@ varScopeCheckModule :: BasicBlocksModule -> Maybe VarScopeError
 varScopeCheckModule =
     runVarScopeCheck . loweredAST . metadata
 
-genBasicBlocks :: TypedProject -> Either LoweringError LoweredProject
-genBasicBlocks = mapM genBasicBlocksModule
+lowerProject :: TypedProject -> Either LoweringError LoweredProject
+lowerProject = mapM lowerTypedModule
 
-genBasicBlocksModule :: TypedModule -> Either LoweringError BasicBlocksModule
-genBasicBlocksModule typedModule = do
+lowerTypedModule :: TypedModule -> Either LoweringError BasicBlocksModule
+lowerTypedModule typedModule = do
     let result = runLowerModule . typedAST . metadata $ typedModule
     case result of
         Left err -> Left err
@@ -198,11 +198,11 @@ genBasicBlocksModule typedModule = do
 -- | Elaborates each module of a project, deciding the run-time checks of its
 -- operations, with the report of what the provers discharged in each one.
 elaborateProject :: Platform -> LoweredProject -> (ElaboratedProject, M.Map QualifiedName ElaborationReport)
-elaborateProject plt bbProject = (fst <$> elaborated, snd <$> elaborated)
+elaborateProject plt loweredProject = (fst <$> elaborated, snd <$> elaborated)
 
   where
 
-    elaborated = elaborateModule <$> bbProject
+    elaborated = elaborateModule <$> loweredProject
 
     elaborateModule bbModule =
       let (eAST, report) = elaborateProgram (provers plt) (loweredAST . metadata $ bbModule) in
@@ -255,8 +255,8 @@ data Check = Check
 -- | The checks the basic-block AST goes through, in the order they run. Reading
 -- an object that no path has assigned is a more basic mistake than assigning a
 -- value that nobody reads, so the usage check goes before the linearity one.
-basicBlockChecks :: [Check]
-basicBlockChecks =
+loweredChecks :: [Check]
+loweredChecks =
   [
     Check "Checking basic block paths"
       (const (fmap checkFailure . basicBlockPathsCheckModules))
@@ -278,17 +278,17 @@ projectSourceFiles =
   M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) M.empty
 
 -- | Runs every check over the basic-block AST, stopping at the first error.
-runBasicBlockChecks :: Bool -> Platform -> LoweredProject -> IO ()
-runBasicBlockChecks chatty plt bbProject = mapM_ runOne basicBlockChecks
+runLoweredChecks :: Bool -> Platform -> LoweredProject -> IO ()
+runLoweredChecks chatty plt loweredProject = mapM_ runOne loweredChecks
 
   where
 
-    sourceFilesMap = projectSourceFiles bbProject
+    sourceFilesMap = projectSourceFiles loweredProject
 
     runOne :: Check -> IO ()
     runOne check = do
       when chatty (putStrLn . debugMessage $ checkMessage check)
-      case runCheck check plt bbProject of
+      case runCheck check plt loweredProject of
         Nothing -> return ()
         Just failure -> TIO.putStrLn (failureMessage failure sourceFilesMap) >> exitFailure
 
