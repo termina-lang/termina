@@ -27,6 +27,18 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CFE-006")
 
+    it "CFE-006: division of a variable by a constant zero" $ do
+      let src = "function f(a : i32) -> i32 {\n" ++
+                "    return a / 0 : i32;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "CFE-006")
+
+    it "CFE-006: remainder of a variable by a constant zero" $ do
+      let src = "function f(a : u32) -> u32 {\n" ++
+                "    return a % 0 : u32;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "CFE-006")
+
     it "CFE-008: for loop with zero iterations" $ do
       let src = "function f() {\n" ++
                 "    for i : usize in 3 : usize .. 3 : usize {\n" ++

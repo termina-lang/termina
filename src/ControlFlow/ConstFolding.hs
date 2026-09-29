@@ -281,6 +281,11 @@ foldExpression e@(BinOp op lhs rhs ann) = do
       case (op, rhs') of
         (BitwiseLeftShift, Constant (I (TInteger k _) _) _)  -> checkShiftAmount k
         (BitwiseRightShift, Constant (I (TInteger k _) _) _) -> checkShiftAmount k
+        -- | A constant divisor of zero is rejected whatever the dividend.
+        (Division, Constant (I (TInteger 0 _) _) _) ->
+          throwError $ annotateError (getLocation ann) EConstDivisionByZero
+        (Modulo, Constant (I (TInteger 0 _) _) _) ->
+          throwError $ annotateError (getLocation ann) EConstDivisionByZero
         _ -> return ()
       return $ BinOp op lhs' rhs' ann'
   where
