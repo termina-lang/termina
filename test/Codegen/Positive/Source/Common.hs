@@ -1,5 +1,6 @@
 module Codegen.Positive.Source.Common where
 
+import Elaboration (provers, elaborateProgram)
 import Data.Text hiding (empty)
 import Parser.Parsing
 import Semantic.TypeChecking
@@ -26,7 +27,7 @@ renderHeader input = case runP (contents topLevel) "test" "" input of
         case runLowerModule tast of
           Left err -> pack $ "Basic blocks error: " ++ show err
           Right bbAST -> 
-            case runGenHeaderFile configParams TestPlatform "test" [] bbAST emptyMonadicTypes of
+            case runGenHeaderFile configParams TestPlatform "test" [] (fst (elaborateProgram provers bbAST)) emptyMonadicTypes of
               Left err -> pack $ show err
               Right (cHeaderFile, _) -> runCPrinter False cHeaderFile
 
@@ -41,7 +42,7 @@ renderSource input = case runP (contents topLevel) "test" "" input of
         case runLowerModule tast of
           Left err -> pack $ "Basic blocks error: " ++ show err
           Right bbAST -> 
-            case runGenSourceFile configParams TestPlatform "test" bbAST of
+            case runGenSourceFile configParams TestPlatform "test" (fst (elaborateProgram provers bbAST)) of
               Left err -> pack $ show err
               Right cSourceFile -> runCPrinter False cSourceFile
 

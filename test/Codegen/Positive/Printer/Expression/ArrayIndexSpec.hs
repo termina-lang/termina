@@ -40,7 +40,7 @@ boxArray0IndexConstant = AccessObject (ArrayIndexExpression (Unbox boxArray0 arr
 boxArray0IndexVar0 = AccessObject (ArrayIndexExpression (Unbox boxArray0 arrayObjAnn) (AccessObject var0) (objSemAnn Mutable TUInt32))
 
 array1IndexFirstDym :: Object SemanticAnn
-array1IndexFirstDym = ArrayIndexExpression array1 usizeIndex3 (arrayObjSemAnn Mutable TInt64 (buildConstExprTUSize 5))
+array1IndexFirstDym = ArrayIndexExpression array1 usizeIndex3 (located 1 (arrayObjSemAnn Mutable TInt64 (buildConstExprTUSize 5)))
 
 array1IndexExpression :: Expression SemanticAnn
 array1IndexExpression = AccessObject (ArrayIndexExpression array1IndexFirstDym usizeIndex4 (objSemAnn Mutable TInt64))

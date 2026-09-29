@@ -123,7 +123,7 @@ genVariantsForTaskPorts tpClass@(TPClass classId _ _ _ _ _ _ _ _ _ _ _ _) =
 
 genPoolMemoryArea :: Bool -> TPPool SemanticAnn -> CGenerator CFileItem
 genPoolMemoryArea before (TPPool identifier ts size _ _) = do
-    cSize <- genExpression size
+    cSize <- genConstExpression size
     cType <- genType noqual ts
     let poolSize = termina__pool__size @@ [_sizeOfType cType, cSize]
     if before then 
@@ -154,7 +154,7 @@ genAtomicDeclarations (obj : objs) = do
 genAtomicArrayDeclaration :: Bool -> TPAtomicArray SemanticAnn -> CGenerator CFileItem
 genAtomicArrayDeclaration before (TPAtomicArray identifier ts size _ _) = do
     let declStmt = internalAnn (CDeclarationAnn before)
-    cSize <- genExpression size
+    cSize <- genConstExpression size
     cType <- genType atomic ts
     return $ CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec (CTArray cType cSize)) (Just identifier) Nothing)) declStmt
 

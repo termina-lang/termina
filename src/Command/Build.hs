@@ -185,13 +185,13 @@ genModules ::
   -- | The map with the option types to generate from defined types 
   -> MonadicTypes
   -- | The project to generate the code from
-  -> LoweredProject -> IO ()
+  -> ElaboratedProject -> IO ()
 genModules params plt initialMonadicTypes bbProject =
   foldM_ printModule initialMonadicTypes (M.elems bbProject)
 
   where
 
-    printModule :: MonadicTypes -> BasicBlocksModule -> IO MonadicTypes
+    printModule :: MonadicTypes -> ElaboratedModule -> IO MonadicTypes
     printModule currentMonadicTypes bbModule = do
       let destinationPath = outputFolder params
           sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
@@ -229,21 +229,21 @@ genModules params plt initialMonadicTypes bbProject =
         else do
           printHeader currentMonadicTypes bbModule
 
-    printSource :: BasicBlocksModule -> IO ()
+    printSource :: ElaboratedModule -> IO ()
     printSource bbModule = do
       let destinationPath = outputFolder params
           sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
-          tAST = loweredAST . metadata $ bbModule
+          tAST = elaboratedAST . metadata $ bbModule
       case runGenSourceFile params plt (qualifiedName bbModule) tAST of
         Left err -> die. errorMessage $ show err
         Right cSourceFile -> do
           createDirectoryIfMissing True (takeDirectory sourceFile)
           TIO.writeFile sourceFile $ runCPrinter (profile params == Debug) cSourceFile
 
-    printHeader :: MonadicTypes -> BasicBlocksModule -> IO MonadicTypes
+    printHeader :: MonadicTypes -> ElaboratedModule -> IO MonadicTypes
     printHeader currentMonadicTypes bbModule = do
       let destinationPath = outputFolder params
-          tAST = loweredAST . metadata $ bbModule
+          tAST = elaboratedAST . metadata $ bbModule
           moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
       case runGenHeaderFile params plt (qualifiedName bbModule) moduleDeps tAST currentMonadicTypes of
         Left err -> die . errorMessage $ show err
@@ -253,7 +253,7 @@ genModules params plt initialMonadicTypes bbProject =
           TIO.writeFile headerFile $ runCPrinter (profile params == Debug) cHeaderFile
           return newMonadicTypes
 
-genInitFile :: TerminaConfig -> Platform -> LoweredProject -> QualifiedName -> IO ()
+genInitFile :: TerminaConfig -> Platform -> ElaboratedProject -> QualifiedName -> IO ()
 genInitFile params plt bbProject appModName = do
   let appModule = bbProject M.! appModName
   initFileExists <- doesFileExist initFile
@@ -278,7 +278,7 @@ genInitFile params plt bbProject appModName = do
 
     runGenInitFile' :: IO ()
     runGenInitFile' = do
-      let projectModules = M.toList $ loweredAST . metadata <$> bbProject
+      let projectModules = M.toList $ elaboratedAST . metadata <$> bbProject
       case runGenInitFile params plt initFile projectModules of
         Left err -> die . errorMessage $ show err
         Right cInitFile -> do
@@ -440,10 +440,13 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     checkResourceUsage bbProject programArchitecture
     checkPoolUsage bbProject programArchitecture
     checkProjectBoxSources bbProject programArchitecture
+    -- | Decide the run-time checks
+    when chatty (putStrLn . debugMessage $ "Elaborating the run-time checks")
+    let (elaboratedProject, _checksReport) = elaborateProject bbProject
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
-    genModules config plt monadicTypes bbProject
-    genInitFile config plt bbProject (qualifiedName appModule)
+    genModules config plt monadicTypes elaboratedProject
+    genInitFile config plt elaboratedProject (qualifiedName appModule)
     genPlatformCode config plt bbProject (qualifiedName appModule) programArchitecture
     unless (S.null (S.filter (\case {
         TStruct _ -> False;

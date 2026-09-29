@@ -7,6 +7,7 @@ import qualified Data.Map.Strict as M
 import qualified Parser.AST as PAST
 import qualified Semantic.AST as SAST
 import qualified Lowering.AST as CFAST
+import qualified Elaboration.AST as EAST
 import qualified EFP.Schedulability.WCEPath.AST as TPAST
 
 import qualified Parser.Types as PTYPES
@@ -32,6 +33,10 @@ newtype BasicBlocksData = BasicBlockData {
   loweredAST :: CFAST.AnnotatedProgram STYPES.SemanticAnn
 } deriving (Show)
 
+newtype ElaboratedData = ElaboratedData {
+  elaboratedAST :: EAST.AnnotatedProgram STYPES.SemanticAnn
+} deriving (Show)
+
 newtype TransPathData = TransPathData {
   transPathAST :: [TPAST.WCEPath SCHEDTYPES.ParserAnn]
 } deriving (Show)
@@ -51,6 +56,7 @@ newtype SemanticRTData = SemanticRTData {
 type ParsedModule = TerminaModuleData ParsingData
 type TypedModule = TerminaModuleData SemanticData
 type BasicBlocksModule = TerminaModuleData BasicBlocksData
+type ElaboratedModule = TerminaModuleData ElaboratedData
 type TransPathModule = TerminaModuleData TransPathData
 type WCETModule = TerminaModuleData WCETData
 type ParsedRTModule = TerminaModuleData ParsingRTData
@@ -59,6 +65,7 @@ type TypedRTModule = TerminaModuleData SemanticRTData
 type ParsedProject = M.Map QualifiedName ParsedModule
 type TypedProject = M.Map QualifiedName TypedModule
 type LoweredProject = M.Map QualifiedName BasicBlocksModule
+type ElaboratedProject = M.Map QualifiedName ElaboratedModule
 type WCEPProject = M.Map QualifiedName TransPathModule
 type WCETProject = M.Map QualifiedName WCETModule
 

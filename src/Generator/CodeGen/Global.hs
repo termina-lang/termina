@@ -2,7 +2,7 @@
 
 module Generator.CodeGen.Global where
 
-import Lowering.AST
+import Elaboration.AST
 import Generator.LanguageC.AST
 import Semantic.Types
 import Control.Monad.Except

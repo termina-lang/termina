@@ -97,7 +97,7 @@ genConfigFile mName config progArchitecture = do
 
         genMessagesForQueue :: OSALMsgQueue -> CGenerator [String]
         genMessagesForQueue (OSALTaskMsgQueue _ _ size) = do
-            cSize <- genExpression size
+            cSize <- genConstExpression size
             let cSizeOf = _sizeOfType termina__event_t
                 ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
                 ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
@@ -111,7 +111,7 @@ genConfigFile mName config progArchitecture = do
         -- assigning memory for the message buffer.
         genMessagesForQueue (OSALChannelMsgQueue _ TUnit _ _ _) = return []
         genMessagesForQueue (OSALChannelMsgQueue _ ty size _ _) = do
-            cSize <- genExpression size
+            cSize <- genConstExpression size
             cTy <- genType noqual ty
             let cSizeOf = _sizeOfType cTy
                 ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
@@ -123,7 +123,7 @@ genConfigFile mName config progArchitecture = do
                     "    ) "
                 ]
         genMessagesForQueue (OSALSinkPortMsgQueue _ _ _ ty size) = do
-            cSize <- genExpression size
+            cSize <- genConstExpression size
             cTy <- genType noqual ty
             let cSizeOf = _sizeOfType cTy
                 ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)

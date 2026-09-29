@@ -1,6 +1,6 @@
 module Generator.CodeGen.Statement where
 
-import Lowering.AST
+import Elaboration.AST
 import Generator.LanguageC.AST
 import Generator.LanguageC.Embedded
 import Semantic.Types
@@ -309,7 +309,7 @@ genArrayAssign loc before level cObj expr = do
         genExprAssign lvl lhsCObj rhsCExpr ts ann = do
             case ts of
                 (TArray ts' arraySize) -> do
-                    cSize <- genExpression arraySize
+                    cSize <- genConstExpression arraySize
                     let iterator = terminafy $ "i" ++ show lvl
                         cIteratorExpr = iterator @: size_t |>> getLocation ann
                         exprCAnn = buildGenericAnn ann

@@ -1,6 +1,10 @@
 module Codegen.Positive.Printer.Common where
 
+import qualified Lowering.AST as L
+import qualified Elaboration.AST as E
+import Elaboration (provers, elaborateProgram, elaborateBody, elaborateExpression)
 import Utils.Annotations
+import Text.Parsec.Pos (newPos)
 import Semantic.Types
 import Control.Monad.State
 import Control.Monad.Reader
@@ -33,6 +37,12 @@ simpleTySemAnn ts = SemanticAnn (ETy (SimpleType ts)) Internal
 
 matchCaseSemAnn :: [TerminaType SemanticAnn] -> SemanticAnn
 matchCaseSemAnn ts = SemanticAnn (STy (MatchCaseStmtType ts)) Internal
+
+-- | Gives an annotation a position of its own in the source. Two operations
+-- of the same kind in one expression are told apart by their positions.
+located :: Int -> SemanticAnn -> SemanticAnn
+located row (SemanticAnn e _) =
+  SemanticAnn e (Position "test" (newPos "test" row 1) (newPos "test" row 2))
 
 buildConstExprTUSize :: Integer -> Expression SemanticAnn
 buildConstExprTUSize i = Constant (I (TInteger i DecRepr) Nothing) (buildExpAnn Internal TUSize)
@@ -181,7 +191,7 @@ funSemAnn params ts = SemanticAnn (ETy (AppType params ts)) Internal
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
   let config = defaultConfig "test" TestPlatform in
-  case runState (runExceptT (genExpression expr)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
+  case runState (runExceptT (genExpression (elaborateExpression provers expr))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
     (Left err, _) -> pack $ show err
     (Right cExpr, _) -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
@@ -191,7 +201,7 @@ renderStatement stmt =
     Left err -> pack $ show err
     Right bBlocks ->
       let config = defaultConfig "test" TestPlatform in
-      case runState (runExceptT (Prelude.concat <$> traverse genBlocks bBlocks)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
+      case runState (runExceptT (Prelude.concat <$> traverse genBlocks (E.blockBody (elaborateBody provers (L.Block bBlocks stmtSemAnn))))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
         (Left err, _) -> pack $ show err
         (Right cStmts, _) -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
@@ -201,7 +211,7 @@ renderTypeDefinitionDecl monTypes decl =
     Left err -> pack $ show err
     Right bbDecl ->
       let config = defaultConfig "test" TestPlatform in
-      case runState (runExceptT (genTypeDefinitionDecl bbDecl)) (CGeneratorEnv "test" S.empty monTypes config TestPlatform False) of
+      case runState (runExceptT (genTypeDefinitionDecl (elaborateElement bbDecl))) (CGeneratorEnv "test" S.empty monTypes config TestPlatform False) of
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
@@ -211,7 +221,7 @@ renderFunctionDecl monTypes decl =
     Left err -> pack $ show err
     Right bbAST -> 
       let config = defaultConfig "test" TestPlatform in
-      case runState (runExceptT (genFunctionDecl bbAST)) (CGeneratorEnv "test" S.empty monTypes config TestPlatform False) of
+      case runState (runExceptT (genFunctionDecl (elaborateElement bbAST))) (CGeneratorEnv "test" S.empty monTypes config TestPlatform False) of
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False) 
 
@@ -221,6 +231,9 @@ renderFunction func =
     Left err -> pack $ show err
     Right bbAST -> 
       let config = defaultConfig "test" TestPlatform in
-      case runState (runExceptT (genFunction bbAST)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
+      case runState (runExceptT (genFunction (elaborateElement bbAST))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
+-- | Elaborates a single lowered element with the provers of a build.
+elaborateElement :: L.AnnASTElement SemanticAnn -> E.AnnASTElement SemanticAnn
+elaborateElement element' = Prelude.head (fst (elaborateProgram provers [element']))

@@ -17,6 +17,7 @@ module Pipeline.Common
   , Failure(..)
   ) where
 
+import Elaboration (provers, elaborateProgram)
 import Data.Text (Text, pack)
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
@@ -164,7 +165,7 @@ renderMainFileWith cfg progArch =
 -- failure into the returned 'Text'.
 renderInitFile :: [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either Text Text
 renderInitFile prjprogs =
-  case runGenInitFile configParams TestPlatform "init" prjprogs of
+  case runGenInitFile configParams TestPlatform "init" (fmap (fst . elaborateProgram provers) <$> prjprogs) of
     Left err -> Left . T.pack $ show err
     Right cFile -> Right $ runCPrinter False cFile
 
@@ -320,7 +321,7 @@ runChecks files progArch =
 renderModule :: BasicBlocksModule -> Either Failure Text
 renderModule bbModule =
   case runGenSourceFile configParams TestPlatform (qualifiedName bbModule)
-         (loweredAST . metadata $ bbModule) of
+         (fst . elaborateProgram provers . loweredAST . metadata $ bbModule) of
     Left err -> Left (Failure (T.pack (show err)) (T.pack (show err)))
     Right cSourceFile -> Right $ runCPrinter False cSourceFile
 

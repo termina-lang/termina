@@ -35,6 +35,14 @@ progBool body =
     body ++
     "}\n"
 
+-- | A function that takes an array of four elements and an index, followed by
+-- the given parameters.
+progGuard :: String -> String -> String
+progGuard params body =
+    "function trigger(arr : &[u32; 4], i : usize" ++ params ++ ") -> bool {\n" ++
+    body ++
+    "}\n"
+
 -- | A resource with a field declared @loc@, which lives at a fixed address
 -- the program does not own and which the generated code reaches through a
 -- pointer to volatile.
@@ -189,6 +197,38 @@ spec = do
         \    var flag : bool = true;\n\
         \    return (arr[i] == 0 : u32) && flag;\n")
         `shouldBe` Nothing
+
+  -- | A comparison in the left operand bounds the index in the right one, and
+  -- an index bounded inside the array cannot fail its check.
+  describe "SEF-005/006: an index the left operand keeps inside the array" $ do
+    it "accepts arr[i] after i < 4 in &&" $
+      compileErrorCode (progGuard "" "    return i < 4 : usize && arr[i] == 0 : u32;\n")
+        `shouldBe` Nothing
+    it "accepts arr[i] after i <= 3 in &&" $
+      compileErrorCode (progGuard "" "    return i <= 3 : usize && arr[i] == 0 : u32;\n")
+        `shouldBe` Nothing
+    it "accepts arr[i] after 4 > i in &&" $
+      compileErrorCode (progGuard "" "    return 4 : usize > i && arr[i] == 0 : u32;\n")
+        `shouldBe` Nothing
+    it "accepts arr[i] after i >= 4 in ||" $
+      compileErrorCode (progGuard "" "    return i >= 4 : usize || arr[i] == 0 : u32;\n")
+        `shouldBe` Nothing
+    it "accepts arr[i] in a nested && that bounds it" $
+      compileErrorCode (progGuard ", flag : bool"
+        "    return flag && (i < 4 : usize && arr[i] == 0 : u32);\n")
+        `shouldBe` Nothing
+    it "rejects arr[i] after a bound above the size" $
+      compileErrorCode (progGuard "" "    return i < 5 : usize && arr[i] == 0 : u32;\n")
+        `shouldBe` Just (pack "SEF-005")
+    it "rejects arr[i] after i <= 4" $
+      compileErrorCode (progGuard "" "    return i <= 4 : usize && arr[i] == 0 : u32;\n")
+        `shouldBe` Just (pack "SEF-005")
+    it "rejects arr[i] after a bound on another variable" $
+      compileErrorCode (progGuard ", j : usize" "    return j < 4 : usize && arr[i] == 0 : u32;\n")
+        `shouldBe` Just (pack "SEF-005")
+    it "rejects arr[i] after i < 4 in ||, where the right operand runs when i >= 4" $
+      compileErrorCode (progGuard "" "    return i < 4 : usize || arr[i] == 0 : u32;\n")
+        `shouldBe` Just (pack "SEF-006")
 
   -- | A field declared @loc@ is reached through a pointer to volatile, so the
   -- access is kept where it is written and two reads of it may give different

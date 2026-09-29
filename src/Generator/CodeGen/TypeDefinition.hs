@@ -2,7 +2,7 @@
 
 module Generator.CodeGen.TypeDefinition where
 
-import Lowering.AST
+import Elaboration.AST
 import Generator.LanguageC.AST
 import Semantic.Types
 import Control.Monad.Except
@@ -50,7 +50,7 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface Regular
 
     where
 
-        genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
+        genInterfaceProcedureField :: InterfaceMember' TerminaType expr SemanticAnn -> CGenerator CDeclaration
         genInterfaceProcedureField (InterfaceProcedure _ak procedure params _modifiers _) = do
             cParams <- mapM genCParameter params
             let cEventParam = CParameter eventParam (_const . ptr $ _const termina__event_t)
@@ -68,7 +68,7 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface SystemI
 
     where
 
-        genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
+        genInterfaceProcedureField :: InterfaceMember' TerminaType expr SemanticAnn -> CGenerator CDeclaration
         genInterfaceProcedureField (InterfaceProcedure _ak procedure params _modifiers _) = do
             cParams <- mapM genCParameter params
             let cEventParam = CParameter eventParam (_const . ptr $ _const termina__event_t)

@@ -331,7 +331,7 @@ genInitMessageQueues queues = do
         genOSALMsgQueueInit :: OSALMsgQueue -> CGenerator [[CCompoundBlockItem]]
         genOSALMsgQueueInit mq@(OSALTaskMsgQueue _ _ size) = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
-            cSize <- genExpression size
+            cSize <- genConstExpression size
             return [[
                     pre_cr $ termina__msg_queue__init @@ [
                         msgQueueId @: termina__id_t,
@@ -344,7 +344,7 @@ genInitMessageQueues queues = do
         genOSALMsgQueueInit (OSALChannelMsgQueue _ TUnit _ _ _) = return []
         genOSALMsgQueueInit mq@(OSALChannelMsgQueue _ ty size _ _) = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
-            cSize <- genExpression size
+            cSize <- genConstExpression size
             cTs <- genType noqual ty
             return [[
                             pre_cr $ termina__msg_queue__init @@ [
@@ -356,7 +356,7 @@ genInitMessageQueues queues = do
                 ]]
         genOSALMsgQueueInit mq@(OSALSinkPortMsgQueue _ _ _ ty size) = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
-            cSize <- genExpression size
+            cSize <- genConstExpression size
             cTs <- genType noqual ty
             return [[
                             pre_cr $ termina__msg_queue__init @@ [

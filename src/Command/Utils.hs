@@ -29,6 +29,7 @@ import ControlFlow.BoxUsage.Errors (BoxUsageError)
 import ControlFlow.VarUsage.Errors (VarUsageError)
 import ControlFlow.VarScope.Errors (VarScopeError)
 import Lowering.Errors (LoweringError)
+import Elaboration (ElaborationReport, provers, elaborateProgram)
 import Parser.Errors
 import Control.Monad.IO.Class
 import Data.Functor ((<&>))
@@ -81,7 +82,7 @@ getVisibleModules prevModsMap importedMods =
 projectDeclaredNames :: ParsedProject -> DeclaredEnv
 projectDeclaredNames = M.unions . fmap (declaredNames . parsedAST . metadata) . M.elems
 
-changedDependendencies :: LoweredProject -> UTCTime -> [QualifiedName] -> IO Bool
+changedDependendencies :: M.Map QualifiedName (TerminaModuleData a) -> UTCTime -> [QualifiedName] -> IO Bool
 changedDependendencies _ _ [] = return False
 changedDependendencies bbProject t (x:xs) = do
   let dep = bbProject M.! x
@@ -193,6 +194,19 @@ genBasicBlocksModule typedModule = do
             (visibleModules typedModule)
             (sourcecode typedModule)
             (BasicBlockData bbAST)
+
+-- | Elaborates each module of a project, deciding the run-time checks of its
+-- operations, with the report of what the provers discharged in each one.
+elaborateProject :: LoweredProject -> (ElaboratedProject, M.Map QualifiedName ElaborationReport)
+elaborateProject bbProject = (fst <$> elaborated, snd <$> elaborated)
+
+  where
+
+    elaborated = elaborateModule <$> bbProject
+
+    elaborateModule bbModule =
+      let (eAST, report) = elaborateProgram provers (loweredAST . metadata $ bbModule) in
+      (bbModule { metadata = ElaboratedData eAST }, report)
 
 basicBlockPathsCheckModules :: LoweredProject -> Maybe PathsCheckError
 basicBlockPathsCheckModules = check . M.elems

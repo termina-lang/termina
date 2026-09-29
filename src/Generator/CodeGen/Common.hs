@@ -2,7 +2,7 @@
 
 module Generator.CodeGen.Common where
 
-import Lowering.AST
+import Elaboration.AST
 import Semantic.Types
 import Control.Monad.Except
 import Generator.LanguageC.AST
@@ -253,7 +253,8 @@ statusFailureTag = statusType <::> statusFailureVariant
 -- function will throw an error.
 getObjType :: (MonadError CGeneratorError m) => Object SemanticAnn -> m (TerminaType SemanticAnn)
 getObjType (Variable _ (SemanticAnn (ETy (ObjectType _ ts)) _))                  = return ts
-getObjType (ArrayIndexExpression _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))    = return ts
+getObjType (CheckedArrayIndex _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))       = return ts
+getObjType (UncheckedArrayIndex _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))     = return ts
 getObjType (MemberAccess _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))            = return ts
 getObjType (MemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ _ ts)) _))     = return ts 
 getObjType (Dereference _ (SemanticAnn (ETy (ObjectType _ ts)) _))               = return ts
@@ -266,7 +267,8 @@ getExprType :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m (Te
 getExprType (AccessObject obj) = getObjType obj
 getExprType (Constant _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (MonadicVariantInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
-getExprType (BinOp _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (CheckedBinOp _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (UncheckedBinOp _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (ReferenceExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (Casting _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (FunctionCall _ _ (SemanticAnn (ETy (AppType _ ts)) _)) = return ts
@@ -277,7 +279,8 @@ getExprType (EnumVariantInitializer _ _ _ (SemanticAnn (ETy (SimpleType ts)) _))
 getExprType (ArrayInitializer _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (ArrayExprListInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (StringInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
-getExprType (ArraySliceExpression _ _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (CheckedArraySlice _ _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (UncheckedArraySlice _ _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (IsEnumVariantExpression _ _ _  (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (IsMonadicVariantExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann

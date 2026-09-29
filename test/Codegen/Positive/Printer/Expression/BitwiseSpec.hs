@@ -31,7 +31,7 @@ constantLeftShiftVar1 :: Expression SemanticAnn
 constantLeftShiftVar1 = BinOp BitwiseLeftShift constUInt8 unboxVar1 uint16ExprSemAnn
 
 var0LeftShiftVar1 :: Expression SemanticAnn
-var0LeftShiftVar1 = BinOp BitwiseLeftShift var0 unboxVar1 uint16ExprSemAnn
+var0LeftShiftVar1 = BinOp BitwiseLeftShift var0 unboxVar1 (located 1 uint16ExprSemAnn)
 
 var0LeftShiftVar1LeftShiftConstant :: Expression SemanticAnn
 var0LeftShiftVar1LeftShiftConstant = BinOp BitwiseLeftShift var0LeftShiftVar1 constUInt8 uint16ExprSemAnn

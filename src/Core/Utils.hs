@@ -109,6 +109,14 @@ declTy (TResult _ _) = True
 declTy (TStatus _) = True
 declTy _           = False 
 
+-- | The element type and the size of the array that an object of this type
+-- holds, directly, through a reference or at a fixed location.
+arrayOf :: TerminaType' expr a -> Maybe (TerminaType' expr a, expr a)
+arrayOf (TArray ty size) = Just (ty, size)
+arrayOf (TReference _ (TArray ty size)) = Just (ty, size)
+arrayOf (TFixedLocation (TArray ty size)) = Just (ty, size)
+arrayOf _ = Nothing
+
 arrayTy :: TerminaType' expr a -> Bool
 arrayTy TUInt8           = True
 arrayTy TUInt16          = True
