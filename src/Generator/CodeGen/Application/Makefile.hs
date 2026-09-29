@@ -33,8 +33,11 @@ genMakefile params bbProject =
             MVariable MSimple "TARGET_DIR_NAME" [MFragment "$R/bin"],
             MVariable MSimple "TARGET" [MFragment "$(TARGET_DIR_NAME)/$(PROJECT_NAME)"]
         ],
+        -- The headers of the project are reached through -iquote and not -I,
+        -- since every file that includes one of them, generated or of the OSAL,
+        -- does it between quotes. 
         MakeBlock [
-            MVariable MAppend "INCLUDE_DIRS" [MFragment "$R/include"]
+            MVariable MAppend "PROJECT_INCLUDE_DIRS" [MFragment "$R/include"]
         ],
         MakeBlock $ 
             MVariable MAppend "SRCS" [MFunction "wildcard" [MFragment "$R/*.c"]] :
@@ -48,6 +51,7 @@ genMakefile params bbProject =
             MVariable MAppend "OBJS" [MFunction "patsubst" [MFragment "%.c", MFragment "%.o", MFunction "patsubst" [MFragment "$R/%", MFragment "$(TARGET_DIR_NAME)/%", MFragment "$(SRCS)"]]]
         ],
         MakeBlock [
+            MVariable MAppend "CPPFLAGS" [MFunction "patsubst" [MFragment "%", MFragment "-iquote %", MFragment "$(PROJECT_INCLUDE_DIRS)"]],
             MVariable MAppend "CPPFLAGS" [MFunction "patsubst" [MFragment "%", MFragment "-I %", MFragment "$(INCLUDE_DIRS)"]]
         ],
         MakeBlock [
