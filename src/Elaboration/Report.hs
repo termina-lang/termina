@@ -14,6 +14,7 @@ module Elaboration.Report (
 import Elaboration (ElaborationReport)
 import Elaboration.Obligations (CheckKind(..))
 import Elaboration.Prover (Evidence(..))
+import Modules.Utils (qualifiedToModuleName)
 import Utils.Annotations (Location(..), QualifiedName)
 
 import Data.Aeson (Value, object, (.=))
@@ -51,7 +52,7 @@ checksReport reports files =
 
     moduleValue :: (QualifiedName, ElaborationReport) -> Value
     moduleValue (name, report) = object
-      [ "module" .= T.pack name
+      [ "module" .= T.pack (qualifiedToModuleName name)
       , "file" .= fmap T.pack (M.lookup name files)
       , "obligations" .= map obligationValue (sortOn fst report)
       ]
