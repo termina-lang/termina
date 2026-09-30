@@ -452,6 +452,14 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "VAE-003")
 
+    it "VAE-003: divisor that a narrowing conversion makes zero" $ do
+      let src = "function f(x : u32) -> u32 {\n" ++
+                "    let wide : u16 = 256 : u16;\n" ++
+                "    let narrow : u8 = wide as u8;\n" ++
+                "    return x / (narrow as u32);\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-003")
+
     it "VAE-003: signed addition whose result never fits its type" $ do
       let src = "function f(a : i8) -> i8 {\n" ++
                 "    var r : i8 = 0;\n" ++

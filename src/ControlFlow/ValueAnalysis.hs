@@ -1241,15 +1241,32 @@ valuesIn global locals expr =
         Casting inner ty _ -> do
           values <- valuesIn global locals inner >>= integersOf
           range@(tlo, thi) <- intRange (platform global) ty
-          -- | A conversion does not raise, so a value that the target type
-          -- cannot hold gives any value of it.
+          -- | A conversion does not raise. C converts a value that an unsigned
+          -- type cannot hold modulo its range, and leaves to the implementation
+          -- what a signed type gives, which is then any value of it.
           let (lo, hi) = ends values
           if tlo <= lo && hi <= thi
             then fitted range (lo, hi) values
-            else Just (Interval tlo thi)
+            else if tlo >= 0
+              then wrapped range values
+              else Just (Interval tlo thi)
         _ -> Nothing
 
   where
+
+    -- | The values modulo the range of an unsigned type. An interval that
+    -- crosses a multiple of the modulus gives every value of the type.
+    wrapped range@(_, thi) values =
+      let modulus = thi + 1 in
+      case values of
+        Listed vs ->
+          let vs' = S.map (`mod` modulus) vs in
+          fitted range (S.findMin vs', S.findMax vs') (Listed vs')
+        Spanning l h ->
+          if l `div` modulus == h `div` modulus
+            then fitted range (l `mod` modulus, h `mod` modulus)
+                   (Spanning (l `mod` modulus) (h `mod` modulus))
+            else Just (Interval 0 thi)
 
     wholeOf = M.lookup []
 

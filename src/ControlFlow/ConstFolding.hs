@@ -35,11 +35,14 @@ evalConstExpression expr@(BinOp op lhs rhs ann) = do
   plt <- ST.gets targetPlatform
   case (lhs', rhs') of
     (c1, c2) -> evalBinOp plt (getLocation ann) op c1 c2 ty
-evalConstExpression (Casting expr' ty _) = do
+evalConstExpression (Casting expr' ty ann) = do
   constExpr <- evalConstExpression expr'
+  plt <- ST.gets targetPlatform
   case constExpr of
-    (I constValue _) -> do
-      return $ I constValue (Just ty)
+    (I constValue@(TInteger i _) _) ->
+      if intTy ty && not (memberIntCons plt i ty)
+        then throwError $ annotateError (getLocation ann) (EConstIntegerOverflow i ty)
+        else return $ I constValue (Just ty)
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
 evalConstExpression _ = throwError $ annotateError Internal ENotConstant
 

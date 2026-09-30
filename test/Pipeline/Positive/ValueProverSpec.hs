@@ -4,6 +4,7 @@ import Pipeline.Common
 import Golden
 
 import Test.Hspec
+import Data.Text (isInfixOf, pack)
 
 -- | An index, a divisor and a shift kept in range by the left operand of @&&@
 -- or @||@, against a literal and against the constant that sizes the array.
@@ -69,6 +70,16 @@ valueShapes =
     "    return r;\n" ++
     "}\n"
 
+-- | A divisor that a conversion to a narrower type gives, from a value that the
+-- narrower type cannot hold.
+narrowedDivisor :: String
+narrowedDivisor =
+    "function ratio(x : u32) -> u32 {\n" ++
+    "    let wide : u16 = 257 : u16;\n" ++
+    "    let narrow : u8 = wide as u8;\n" ++
+    "    return x / (narrow as u32);\n" ++
+    "}\n"
+
 spec :: Spec
 spec = do
   describe "Value prover" $ do
@@ -78,3 +89,5 @@ spec = do
       goldenC "value_prover_guards" (runFullBuild guardedShapes)
     it "Discharges the checks that the values of the path show" $
       goldenJSON "value_prover" (runChecksReport valueShapes)
+    it "Discharges the check of a divisor that a narrowing conversion keeps away from zero" $
+      runFullBuild narrowedDivisor `shouldNotSatisfy` isInfixOf (pack "termina__check__divisor")
