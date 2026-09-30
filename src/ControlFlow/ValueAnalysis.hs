@@ -508,14 +508,13 @@ holdsBy global locals kind operation =
       (tlo, thi) <- intRange plt ty
       leftValues <- integersIn global locals left
       rightValues <- integersIn global locals right
-      case op of
-        -- | The only quotient that overflows is the minimum of the type
-        -- divided by minus one.
-        _ | op `elem` [Division, Modulo] ->
-          if not (holdsValue (-1) rightValues) || not (holdsValue tlo leftValues)
-            then Just "the operands never divide the minimum of the type by -1"
-            else Nothing
-        _ -> do
+      -- | The only quotient that overflows is the minimum of the type divided
+      -- by minus one.
+      if op `elem` [Division, Modulo]
+        then if not (holdsValue (-1) rightValues) || not (holdsValue tlo leftValues)
+          then Just "the operands never divide the minimum of the type by -1"
+          else Nothing
+        else do
           (lo, hi) <- ends <$> exactResults (shiftWidth plt ty) op leftValues rightValues
           if tlo <= lo && hi <= thi then Just ("the result stays between " ++ between lo hi) else Nothing
     _ -> Nothing
@@ -559,10 +558,13 @@ failsBy global locals kind operation =
       case op of
         -- | The only quotient that overflows is the minimum of the type
         -- divided by minus one, and its result is one past the maximum.
-        _ | op `elem` [Division, Modulo] ->
+        Division ->
           if ends leftValues == (tlo, tlo) && ends rightValues == (-1, -1)
             then Just (ResultOutside (thi + 1) (thi + 1))
             else Nothing
+        -- | The runtime gives 0 for the remainder of the minimum of the type
+        -- by minus one, so a remainder never overflows.
+        Modulo -> Nothing
         _ -> do
           results <- exactResults (shiftWidth plt ty) op leftValues rightValues
           if outside tlo thi results then Just (uncurry ResultOutside (ends results)) else Nothing

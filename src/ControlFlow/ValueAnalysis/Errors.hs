@@ -162,23 +162,26 @@ instance Diagnosable Error where
 
       where
 
-        saysFailure (IndexOutside lo hi size)
-            | said lo hi = "The index always falls outside an array of "
-                <> emph (number size) <> " elements."
-            | otherwise = "The index " <> isRange lo hi <> ", outside an array of "
-                <> emph (number size) <> " elements."
-        saysFailure (AmountOutside lo hi width)
-            | said lo hi = "The shift amount is never below the width of "
-                <> emph (number width) <> " bits of the value shifted."
-            | otherwise = "The shift amount " <> isRange lo hi <> ", not below the width of "
-                <> emph (number width) <> " bits of the value shifted."
+        saysFailure (IndexOutside lo hi size) =
+            if said lo hi
+                then "The index always falls outside an array of "
+                    <> emph (number size) <> " elements."
+                else "The index " <> isRange lo hi <> ", outside an array of "
+                    <> emph (number size) <> " elements."
+        saysFailure (AmountOutside lo hi width) =
+            if said lo hi
+                then "The shift amount is never below the width of "
+                    <> emph (number width) <> " bits of the value shifted."
+                else "The shift amount " <> isRange lo hi <> ", not below the width of "
+                    <> emph (number width) <> " bits of the value shifted."
         saysFailure DivisorZero = "The divisor is " <> emph "0" <> "."
         saysFailure (ResultOutside lo hi) =
             "The result " <> isRange lo hi <> ", outside the range of its type."
 
-        isRange lo hi
-            | lo == hi = "is " <> emph (number lo)
-            | otherwise = "is between " <> emph (number lo) <> " and " <> emph (number hi)
+        isRange lo hi =
+            if lo == hi
+                then "is " <> emph (number lo)
+                else "is between " <> emph (number lo) <> " and " <> emph (number hi)
 
         -- | Whether one of the reasons already gives the quantity these values,
         -- which is the case when the operand is a variable read outright.

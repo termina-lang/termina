@@ -98,9 +98,10 @@ instance FromJSON TerminaConfig where
 
     where
 
-      tickLength ticks
-        | ticks > 0 && 1000000 `mod` ticks == 0 = return ticks
-        | otherwise = fail "microseconds-per-tick must divide 1000000 exactly"
+      tickLength ticks =
+        if ticks > 0 && 1000000 `mod` ticks == 0
+          then return ticks
+          else fail "microseconds-per-tick must divide 1000000 exactly"
 
   parseJSON _ = fail "Expected configuration object"
 

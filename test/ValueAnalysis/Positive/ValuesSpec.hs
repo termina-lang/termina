@@ -348,6 +348,14 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Nothing
 
+    -- | The runtime gives 0 for the remainder of the minimum by -1.
+    it "accepts the remainder of the minimum of the type by -1" $ do
+      let src = "function f() -> i8 {\n" ++
+                "    let a : i8 = -128 : i8;\n" ++
+                "    return a % -1 : i8;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
+
     it "accepts a signed addition only some of whose results overflow" $ do
       let src = "function f(a : i8) -> i8 {\n" ++
                 "    var r : i8 = 0;\n" ++
