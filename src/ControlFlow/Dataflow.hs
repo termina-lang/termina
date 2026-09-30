@@ -46,6 +46,12 @@ import qualified Control.Monad.State as ST
 -- loop.
 class Eq p => Lattice p where
   joinPath :: p -> p -> p
+  -- | The join at the head of a loop, of the state before a turn with the
+  -- state the turn leaves. A lattice whose chains are short can use the join
+  -- itself; one whose chains are long has to jump ahead here so that the walk
+  -- of the loop ends.
+  widenPath :: p -> p -> p
+  widenPath = joinPath
 
 -- | A pass that carries nothing from one node to the next has no state of its
 -- own along a path, and the walk of its branches costs nothing.
@@ -106,7 +112,7 @@ fixpoint body = getPath >>= go
     go known = do
       putPath known
       out <- branch body
-      let known' = joinPath known out
+      let known' = widenPath known out
       if known' == known then putPath known' else go known'
 
 -- | What a node means to the pass.

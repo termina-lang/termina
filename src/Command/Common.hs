@@ -263,22 +263,24 @@ sideEffectCheck plt project =
   forM_ (sideEffectCheckModules plt project) $ \err ->
     TIO.putStrLn (toText err (projectSourceFiles project)) >> exitFailure
 
-valueAnalysisCheck :: Platform -> ProjectConstEnvs -> LoweredProject -> IO ()
+-- | Returns, for each module, the run-time checks that the values of their
+-- operands show to hold, which the elaboration hands to the value prover.
+valueAnalysisCheck :: Platform -> ProjectConstEnvs -> LoweredProject -> IO ProjectValueEvidence
 valueAnalysisCheck plt constEnvs loweredProject =
   case sortProjectDepsOrLoop (M.map importedModules loweredProject) of
     -- | The build pipeline orders the modules (and reports dependency cycles)
     -- before reaching this point, so a cycle here would be an internal error.
     Left _ -> die . errorMessage $ "Dependency cycle detected during the value analysis"
-    Right orderedDependencies -> checkModules M.empty orderedDependencies
+    Right orderedDependencies -> checkModules M.empty M.empty orderedDependencies
 
   where
 
-    checkModules _ [] = return ()
-    checkModules returned (m:ms) =
+    checkModules _ evidence [] = return evidence
+    checkModules returned evidence (m:ms) =
       case runValueAnalysisCheck plt
              (M.findWithDefault M.empty m constEnvs)
              returned
              (loweredAST . metadata $ loweredProject M.! m) of
-        (Just err, _) ->
+        (Just err, _, _) ->
           TIO.putStrLn (toText err (projectSourceFiles loweredProject)) >> exitFailure
-        (Nothing, returned') -> checkModules returned' ms
+        (Nothing, returned', proven) -> checkModules returned' (M.insert m proven evidence) ms

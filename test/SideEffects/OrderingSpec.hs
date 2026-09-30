@@ -180,14 +180,14 @@ spec = do
     it "rejects an array access with a variable index in the right operand of &&" $
       compileErrorCode (progBool
         "    var arr : [u32; 4] = {0 : u32, 0 : u32, 0 : u32, 0 : u32};\n\
-        \    var i : usize = 0 : usize;\n\
+        \    var i : usize = arr[1 : usize] as usize;\n\
         \    var flag : bool = true;\n\
         \    return flag && (arr[i] == 0 : u32);\n")
         `shouldBe` Just (pack "SEF-005")
     it "rejects an array access with a variable index in the right operand of ||" $
       compileErrorCode (progBool
         "    var arr : [u32; 4] = {0 : u32, 0 : u32, 0 : u32, 0 : u32};\n\
-        \    var i : usize = 0 : usize;\n\
+        \    var i : usize = arr[1 : usize] as usize;\n\
         \    var flag : bool = true;\n\
         \    return flag || (arr[i] == 0 : u32);\n")
         `shouldBe` Just (pack "SEF-006")

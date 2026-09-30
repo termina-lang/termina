@@ -30,6 +30,7 @@ import ControlFlow.VarUsage.Errors (VarUsageError)
 import ControlFlow.VarScope.Errors (VarScopeError)
 import Lowering.Errors (LoweringError)
 import Elaboration (ElaborationReport, provers, elaborateProgram)
+import Elaboration.Prover.Value (valueProver)
 import Parser.Errors
 import Control.Monad.IO.Class
 import Data.Functor ((<&>))
@@ -196,16 +197,18 @@ lowerTypedModule typedModule = do
             (BasicBlockData bbAST)
 
 -- | Elaborates each module of a project, deciding the run-time checks of its
--- operations, with the report of what the provers discharged in each one.
-elaborateProject :: Platform -> LoweredProject -> (ElaboratedProject, M.Map QualifiedName ElaborationReport)
-elaborateProject plt loweredProject = (fst <$> elaborated, snd <$> elaborated)
+-- operations, with the report of what the provers discharged in each one. The
+-- value prover of a module reads what the value analysis showed of it.
+elaborateProject :: Platform -> ProjectValueEvidence -> LoweredProject -> (ElaboratedProject, M.Map QualifiedName ElaborationReport)
+elaborateProject plt evidence loweredProject = (fst <$> elaborated, snd <$> elaborated)
 
   where
 
-    elaborated = elaborateModule <$> loweredProject
+    elaborated = M.mapWithKey elaborateModule loweredProject
 
-    elaborateModule bbModule =
-      let (eAST, report) = elaborateProgram (provers plt) (loweredAST . metadata $ bbModule) in
+    elaborateModule moduleName bbModule =
+      let moduleProvers = provers plt ++ [valueProver (M.findWithDefault M.empty moduleName evidence)]
+          (eAST, report) = elaborateProgram moduleProvers (loweredAST . metadata $ bbModule) in
       (bbModule { metadata = ElaboratedData eAST }, report)
 
 basicBlockPathsCheckModules :: LoweredProject -> Maybe PathsCheckError

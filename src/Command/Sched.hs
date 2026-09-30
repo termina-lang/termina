@@ -718,9 +718,9 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
     when chatty (putStrLn . debugMessage $ "Performing constant folding")
     (loweredProject, constEnvs) <- constFolding plt rawLoweredProject
     when chatty (putStrLn . debugMessage $ "Analysing the values of the project modules")
-    valueAnalysisCheck plt constEnvs loweredProject
+    valueEvidence <- valueAnalysisCheck plt constEnvs loweredProject
     when chatty (putStrLn . debugMessage $ "Side-effect checking project modules")
-    sideEffectCheck plt (fst (elaborateProject plt loweredProject))
+    sideEffectCheck plt (fst (elaborateProject plt valueEvidence loweredProject))
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
     programArchitecture <- genArchitecture loweredProject (getPlatformInitialProgram config plt) orderedDependencies

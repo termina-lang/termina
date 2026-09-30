@@ -15,6 +15,8 @@ import qualified Semantic.Types as STYPES
 
 import Modules.Modules
 import Utils.Annotations
+import Elaboration.Obligations (ObligationId)
+import Elaboration.Prover (Evidence)
 import qualified EFP.Schedulability.WCET.AST as WTAST
 import qualified EFP.Schedulability.Core.Types as SCHEDTYPES
 import qualified EFP.Schedulability.RT.Parser.AST as RTPAST
@@ -76,3 +78,7 @@ type ProjectDependencies = M.Map QualifiedName [ModuleDependency]
 -- constant folding is what builds them, and the constant propagation check is
 -- what reads them back.
 type ProjectConstEnvs = M.Map QualifiedName (M.Map SAST.Identifier (SAST.Const STYPES.SemanticAnn))
+
+-- | The run-time checks of each module that the value analysis shows to hold,
+-- with the reason, which the elaboration hands to the value prover.
+type ProjectValueEvidence = M.Map QualifiedName (M.Map ObligationId Evidence)

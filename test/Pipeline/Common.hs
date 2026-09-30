@@ -2,6 +2,7 @@ module Pipeline.Common
   ( runFullBuild
   , runFullProjectBuild
   , runChecksReport
+  , runProverDischarges
   , runFullProjectApp
   , runFullProjectAppWith
   , runTypedModule
@@ -18,8 +19,11 @@ module Pipeline.Common
   , Failure(..)
   ) where
 
-import Elaboration (provers, elaborateProgram)
+import Elaboration (ElaborationReport, provers, elaborateProgram)
 import Elaboration.Report (checksReport)
+import Elaboration.Obligations (ObligationId)
+import Elaboration.Prover.Guard (guardProver)
+import Elaboration.Prover.Value (valueProver)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text.Encoding as TE
 import Data.Text (Text, pack)
@@ -89,8 +93,8 @@ runFullProjectBuild = runFullProjectBuildWith configParams
 runFullProjectBuildWith :: TerminaConfig -> [(QualifiedName, String)]
   -> Either Failure (M.Map QualifiedName Text)
 runFullProjectBuildWith cfg sources = do
-  (foldedProject, _, _) <- runProjectPipeline cfg sources
-  mapM renderModule foldedProject
+  result <- runProjectPipeline cfg sources
+  mapM (renderModule cfg) (elaboratedModules result)
 
 -- | The report of the run-time checks that @termina build@ writes to
 -- @output/checks.json@, for a single module named @test@.
@@ -98,9 +102,19 @@ runChecksReport :: String -> Text
 runChecksReport input =
   case runProjectPipeline configParams [("test", input)] of
     Left err -> failMessage err
-    Right (foldedProject, _, _) ->
-      let reports = snd (elaborateProject TestPlatform foldedProject)
-      in TE.decodeUtf8 . BL.toStrict $ checksReport reports (fullPath <$> foldedProject)
+    Right result ->
+      TE.decodeUtf8 . BL.toStrict $
+        checksReport (checksReports result) (fullPath <$> foldedModules result)
+
+-- | The checks of a single module named @test@ that the guard prover and the
+-- value prover each discharge on their own, in that order.
+runProverDischarges :: String -> Either Failure (S.Set ObligationId, S.Set ObligationId)
+runProverDischarges input = do
+  result <- runProjectPipeline configParams [("test", input)]
+  let program = loweredAST . metadata $ foldedModules result M.! "test"
+      evidence = M.findWithDefault M.empty "test" (valueEvidence result)
+      discharged ps = S.fromList [ oid | (oid, Just _) <- snd (elaborateProgram ps program) ]
+  pure (discharged [guardProver TestPlatform], discharged [valueProver evidence])
 
 -- | Drives the same full pipeline as 'runFullProjectBuild' but stops before
 -- per-module source rendering, returning the whole-program architecture and
@@ -121,18 +135,28 @@ runFullProjectAppWith ::
   -> [(QualifiedName, String)]
   -> Either Failure (TerminaProgArch SemanticAnn, [(QualifiedName, AnnotatedProgram SemanticAnn)])
 runFullProjectAppWith cfg sources = do
-  (foldedProject, ordered, progArch) <- runProjectPipeline cfg sources
-  let prjprogs = [ (m, loweredAST . metadata $ foldedProject M.! m) | m <- ordered ]
-  pure (progArch, prjprogs)
+  result <- runProjectPipeline cfg sources
+  let prjprogs = [ (m, loweredAST . metadata $ foldedModules result M.! m) | m <- moduleOrder result ]
+  pure (programArch result, prjprogs)
+
+-- | What the pipeline leaves for the specs to render or inspect.
+data PipelineResult = PipelineResult
+  {
+    foldedModules :: LoweredProject
+  , moduleOrder :: [QualifiedName]
+  , programArch :: TerminaProgArch SemanticAnn
+  , elaboratedModules :: ElaboratedProject
+  , checksReports :: M.Map QualifiedName ElaborationReport
+  , valueEvidence :: ProjectValueEvidence
+  }
 
 -- | The full pipeline up to (and including) the architecture checks, shared by
 -- 'runFullProjectBuild' (which renders each source module) and
--- 'runFullProjectApp' (which renders the application glue). Returns the
--- constant-folded project, the dependency order, and the program architecture.
+-- 'runFullProjectApp' (which renders the application glue).
 runProjectPipeline ::
   TerminaConfig
   -> [(QualifiedName, String)]
-  -> Either Failure (LoweredProject, [QualifiedName], TerminaProgArch SemanticAnn)
+  -> Either Failure PipelineResult
 runProjectPipeline cfg sources = do
   let files = M.fromList [ (qname, pack src) | (qname, src) <- sources ]
   parsedProject <- M.fromList <$> mapM parseModule sources
@@ -145,14 +169,15 @@ runProjectPipeline cfg sources = do
   (foldedProject, constEnvs) <- foldProject files loweredProject ordered
   -- | The constant propagation check follows the folding, which is what gives
   -- it the constants of each module.
-  analyseValues files foldedProject constEnvs ordered
+  evidence <- analyseValues files foldedProject constEnvs ordered
   -- | The side-effect check reads the elaborated AST, which says what the
   -- generated code checks while it runs.
+  let (elaborated, reports) = elaborateProject TestPlatform evidence foldedProject
   maybe (Right ()) (Left . failure files)
-    (sideEffectCheckModules TestPlatform (fst (elaborateProject TestPlatform foldedProject)))
+    (sideEffectCheckModules TestPlatform elaborated)
   progArch <- genProjectArchitecture cfg files foldedProject ordered
   runChecks files progArch
-  pure (foldedProject, ordered, progArch)
+  pure (PipelineResult foldedProject ordered progArch elaborated reports evidence)
 
 -- | The typed AST of one module of a project, which is the stage the language
 -- server keeps and the one its index is built from. The stages after it, basic
@@ -206,19 +231,19 @@ foldProject files loweredProject = go (ConstFoldEnv M.empty TestPlatform) M.empt
 -- analysis check looks for. Mirrors @Command.Common.valueAnalysisCheck@ but
 -- stays in 'Either'.
 analyseValues :: M.Map FilePath Text -> LoweredProject -> ProjectConstEnvs
-  -> [QualifiedName] -> Either Failure ()
-analyseValues files loweredProject constEnvs = go M.empty
+  -> [QualifiedName] -> Either Failure ProjectValueEvidence
+analyseValues files loweredProject constEnvs = go M.empty M.empty
 
   where
 
-    go _ [] = Right ()
-    go returned (m:ms) =
+    go _ evidence [] = Right evidence
+    go returned evidence (m:ms) =
       case runValueAnalysisCheck TestPlatform
              (M.findWithDefault M.empty m constEnvs)
              returned
              (loweredAST . metadata $ loweredProject M.! m) of
-        (Just err, _) -> Left (failure files err)
-        (Nothing, returned') -> go returned' ms
+        (Just err, _, _) -> Left (failure files err)
+        (Nothing, returned', proven) -> go returned' (M.insert m proven evidence) ms
 
 -- | The error code (@errorIdent@: \"SE-042\", \"BE-001\", \"AE-007\",
 -- \"CF-…\") raised by the first failing pipeline stage for a single-module
@@ -338,10 +363,10 @@ runChecks files progArch =
               , runCheckTaskPriorities progArch
               , runCheckBoxSources progArch ]
 
-renderModule :: BasicBlocksModule -> Either Failure Text
-renderModule bbModule =
-  case runGenSourceFile configParams TestPlatform (qualifiedName bbModule)
-         (fst . elaborateProgram (provers TestPlatform) . loweredAST . metadata $ bbModule) of
+renderModule :: TerminaConfig -> ElaboratedModule -> Either Failure Text
+renderModule cfg eModule =
+  case runGenSourceFile cfg TestPlatform (qualifiedName eModule)
+         (elaboratedAST . metadata $ eModule) of
     Left err -> Left (Failure (T.pack (show err)) (T.pack (show err)))
     Right cSourceFile -> Right $ runCPrinter False cSourceFile
 

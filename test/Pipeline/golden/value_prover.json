@@ -1,0 +1,71 @@
+{
+    "summary": {
+        "obligations": 4,
+        "discharged": 4,
+        "checked": 0
+    },
+    "modules": [
+        {
+            "module": "test",
+            "file": "test",
+            "obligations": [
+                {
+                    "start": {
+                        "line": 6,
+                        "column": 40
+                    },
+                    "end": {
+                        "line": 6,
+                        "column": 54
+                    },
+                    "property": "shift-below-width",
+                    "status": "discharged",
+                    "prover": "value",
+                    "reason": "the amount stays between 23 and 26"
+                },
+                {
+                    "start": {
+                        "line": 8,
+                        "column": 20
+                    },
+                    "end": {
+                        "line": 8,
+                        "column": 34
+                    },
+                    "property": "shift-below-width",
+                    "status": "discharged",
+                    "prover": "value",
+                    "reason": "the amount stays between 23 and 26"
+                },
+                {
+                    "start": {
+                        "line": 17,
+                        "column": 25
+                    },
+                    "end": {
+                        "line": 17,
+                        "column": 31
+                    },
+                    "property": "index-in-bounds",
+                    "status": "discharged",
+                    "prover": "value",
+                    "reason": "the index stays between 0 and 7"
+                },
+                {
+                    "start": {
+                        "line": 25,
+                        "column": 13
+                    },
+                    "end": {
+                        "line": 25,
+                        "column": 27
+                    },
+                    "property": "no-overflow",
+                    "status": "discharged",
+                    "prover": "value",
+                    "reason": "the result stays between 901 and 1099"
+                }
+            ]
+        }
+    ]
+}

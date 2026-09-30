@@ -51,6 +51,7 @@ import Control.Monad (unless)
 import Data.List (isPrefixOf, nub)
 import Data.Maybe (listToMaybe, mapMaybe)
 import Data.Ord (comparing)
+import Data.Bits ((.&.), (.|.), xor)
 import qualified Data.Set as S
 
 import Configuration.Platform (Platform)
@@ -61,8 +62,11 @@ import ControlFlow.ConstFolding (evalConstExpression, runConstFolding)
 import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
 import ControlFlow.ValueAnalysis.Errors
 import ControlFlow.Dataflow
-import Core.Utils (intRange)
-import Semantic.Types (SemanticAnn, getObjectSAnns)
+import Core.Utils (arrayOf, intRange, intTy, shiftWidth)
+import Elaboration.Obligations
+    (CheckKind(..), Obligation(..), ObligationId, Operation(..), expressionChecks, objectChecks)
+import Elaboration.Prover (Evidence(..))
+import Semantic.Types (SemanticAnn, getObjectSAnns, getTypeSemAnn)
 import Utils.Annotations
 
 -- | How many values a set may hold before it gives way to the interval of the
@@ -182,6 +186,24 @@ instance Lattice ValueAnalysisPath where
         return (Known (typeRange x) values
                   (S.union (valueOrigins x) (valueOrigins y)))
 
+  -- | An interval that a turn of a loop grows, which an arithmetic operation
+  -- can do by a step per turn, goes to the interval of the type at once, so
+  -- that the chain of a variable keeps the height of three. A set grows at
+  -- most up to 'valueLimit' values and is left to the join.
+  widenPath before after =
+    ValueAnalysisPath (M.mapMaybe id (M.intersectionWith widen (known before) (known after)))
+
+    where
+
+      widen x y = do
+        values <- joinValues (typeRange x) (varValues x) (varValues y)
+        let widened = case values of
+              Interval {} | values /= varValues x -> wholeType (typeRange x)
+              _ -> Just values
+        values' <- widened
+        return (Known (typeRange x) values'
+                  (S.union (valueOrigins x) (valueOrigins y)))
+
 -- | Two sets whose union stays under the limit join exactly. Past the limit
 -- the union gives way to the interval of the type, and so does a join in which
 -- an interval takes part and neither side contains the other; a variable whose
@@ -248,7 +270,12 @@ data ValueAnalysisGlobal = ValueAnalysisGlobal
     observed :: M.Map Location (Met, ValueAnalysisPath),
     -- | What each function and member walked so far gives back, including
     -- those of the modules this one imports.
-    returnedValues :: ReturnedValues
+    returnedValues :: ReturnedValues,
+    -- | For each run-time check the walk has met, the evidence that the values
+    -- of its operands make it hold, or nothing once one visit could not show
+    -- it. A loop meets a check once per turn and the check holds only if it
+    -- holds on every one of them.
+    proofs :: M.Map ObligationId (Maybe Evidence)
   }
 
 type ValueAnalysisMonad = DataflowM ValueAnalysisPath ValueAnalysisGlobal ValueAnalysisError
@@ -382,11 +409,123 @@ escapesIn (ChildConstExpr _) = return ()
 -- a branch does not put back, so a record outlives the branch that made it.
 observeCondition :: Expression SemanticAnn -> ValueAnalysisMonad ()
 observeCondition cond = do
+  recordExpression cond
   noteEscapes cond
   locals <- getPath
   let loc = getLocation . getAnnotation $ cond
   modifyGlobal (\g ->
     g { observed = M.insert loc (MetCondition cond, locals) (observed g) })
+
+-- | Takes down, for each run-time check of an expression, whether the values
+-- of the path show that it holds. The right operand of @&&@ runs only when the
+-- left one is true, and that of @||@ only when it is false, so it is taken
+-- down with the path refined by the left operand. The effects the side-effect
+-- check rejects in a right operand could otherwise change the variables in
+-- between.
+recordExpression :: Expression SemanticAnn -> ValueAnalysisMonad ()
+recordExpression expr = do
+  mapM_ recordObligation (expressionChecks expr)
+  case expr of
+    BinOp LogicalAnd left right _ -> do
+      recordExpression left
+      refinedBy True left (recordExpression right)
+    BinOp LogicalOr left right _ -> do
+      recordExpression left
+      refinedBy False left (recordExpression right)
+    _ -> mapM_ recordChild (expressionChildren expr)
+
+  where
+
+    refinedBy :: Bool -> Expression SemanticAnn -> ValueAnalysisMonad () -> ValueAnalysisMonad ()
+    refinedBy holds cond m = do
+      entry <- getPath
+      refine holds cond
+      m
+      putPath entry
+
+recordChild :: Child SemanticAnn -> ValueAnalysisMonad ()
+recordChild (ChildExpr expr) = recordExpression expr
+recordChild (ChildArg expr) = recordExpression expr
+recordChild (ChildConstExpr expr) = recordExpression expr
+recordChild (ChildObject obj) = recordObject obj
+recordChild (ChildReference _ obj) = recordObject obj
+
+recordObject :: Object SemanticAnn -> ValueAnalysisMonad ()
+recordObject obj = do
+  mapM_ recordObligation (objectChecks obj)
+  case obj of
+    ArrayIndexExpression inner index _ -> recordObject inner >> recordExpression index
+    MemberAccess inner _ _ -> recordObject inner
+    DereferenceMemberAccess inner _ _ -> recordObject inner
+    Dereference inner _ -> recordObject inner
+    Unbox inner _ -> recordObject inner
+    Variable {} -> return ()
+
+-- | Whether the values of the path show that one check holds. A check that one
+-- visit cannot show stays unshown, whatever the other visits say.
+recordObligation :: Obligation -> ValueAnalysisMonad ()
+recordObligation (Obligation oid@(_, kind) operation) = do
+  global <- getGlobal
+  locals <- getPath
+  let shown = Evidence "value" <$> holdsBy global locals kind operation
+  modifyGlobal (\g -> g { proofs = M.insertWith both oid shown (proofs g) })
+
+  where
+
+    both (Just _) earlier@(Just _) = earlier
+    both _ _ = Nothing
+
+-- | Why a check holds, when the values its operands may take are all ones for
+-- which it does.
+holdsBy ::
+  ValueAnalysisGlobal -> ValueAnalysisPath -> CheckKind -> Operation -> Maybe String
+holdsBy global locals kind operation =
+  case (kind, operation) of
+    (IndexInBounds, IndexOperation obj index) -> do
+      size <- getTypeSemAnn (getAnnotation obj) >>= arrayOf >>= integerOfSize . snd
+      (lo, hi) <- ends <$> integersIn index
+      if lo >= 0 && hi < size then Just ("the index stays between " ++ between lo hi) else Nothing
+    (ShiftBelowWidth, BinaryOperation _ left right) -> do
+      width <- operandType left >>= \ty -> if intTy ty then Just (shiftWidth plt ty) else Nothing
+      (lo, hi) <- ends <$> integersIn right
+      if lo >= 0 && hi < width then Just ("the amount stays between " ++ between lo hi) else Nothing
+    (NonZeroDivisor, BinaryOperation _ _ right) -> do
+      values <- integersIn right
+      if excludesZero values then Just ("the divisor stays between " ++ uncurry between (ends values)) else Nothing
+    (NoOverflow, BinaryOperation op left right) -> do
+      ty <- operandType left
+      (tlo, thi) <- intRange plt ty
+      leftValues <- integersIn left
+      rightValues <- integersIn right
+      case op of
+        -- | The only quotient that overflows is the minimum of the type
+        -- divided by minus one.
+        _ | op `elem` [Division, Modulo] ->
+          if not (holdsValue (-1) rightValues) || not (holdsValue tlo leftValues)
+            then Just "the operands never divide the minimum of the type by -1"
+            else Nothing
+        _ -> do
+          (lo, hi) <- ends <$> exactResults (shiftWidth plt ty) op leftValues rightValues
+          if tlo <= lo && hi <= thi then Just ("the result stays between " ++ between lo hi) else Nothing
+    _ -> Nothing
+
+  where
+
+    plt = platform global
+
+    integersIn expr = valuesIn global locals expr >>= integersOf
+
+    operandType expr = getTypeSemAnn (getAnnotation expr)
+
+    integerOfSize size = evaluate plt (moduleConsts global) locals size >>= integerOfConst
+
+    between lo hi = show lo ++ " and " ++ show hi
+
+    excludesZero (Listed values) = S.notMember 0 values
+    excludesZero (Spanning lo hi) = lo > 0 || hi < 0
+
+    holdsValue v (Listed values) = S.member v values
+    holdsValue v (Spanning lo hi) = lo <= v && v <= hi
 
 -- | A bound a branch puts on a variable, both ends included.
 data Bound = AtLeast Integer | AtMost Integer
@@ -431,7 +570,12 @@ without value (Discrete values) =
   if S.notMember value values || S.size values == 1
     then Nothing
     else Just (Discrete (S.delete value values))
-without _ (Interval _ _) = Nothing
+-- | An interval loses a value only at one of its ends.
+without value (Interval lo hi) =
+  case integerOf value of
+    Just v | v == lo && lo < hi -> Just (Interval (lo + 1) hi)
+           | v == hi && lo < hi -> Just (Interval lo (hi - 1))
+    _ -> Nothing
 
 -- | The bound a comparison of a variable against a value puts on the variable,
 -- on the side of the branch that takes it and on the side that does not. The
@@ -539,14 +683,18 @@ refineExclusion loc left right = do
     against _ _ = return ()
 
 -- | Takes a value out of what the path holds for a variable. A variable the
--- path says nothing about stays that way: the values it does not hold are of
--- no use without the ones it does.
+-- path says nothing about starts from the interval its declared type allows,
+-- which loses the value when it is one of its ends: an unsigned variable that
+-- is not zero is at least one.
 ruleOut ::
   Location -> Object SemanticAnn -> Cell -> Value -> ValueAnalysisMonad ()
 ruleOut loc obj cell value = do
   current <- M.lookup cell . known <$> getPath
   range <- rangeOfVariable obj
-  case current >>= excluded of
+  let start = case current of
+        Just entry -> Just entry
+        Nothing -> (\(lo, hi) -> Known range (Interval lo hi) S.empty) <$> range
+  case start >>= excluded of
     Nothing -> return ()
     Just values -> setValues cell range (Refined loc) (Just values)
 
@@ -696,6 +844,7 @@ bindCell cell range origin expr = do
 
 checkStatement :: Statement SemanticAnn -> ValueAnalysisMonad ()
 checkStatement (Declaration ident _ ty mInitExpr ann) = do
+  mapM_ recordExpression mInitExpr
   mapM_ noteEscapes mInitExpr
   range <- rangeOfType ty
   let cell = Cell ident []
@@ -704,6 +853,8 @@ checkStatement (Declaration ident _ ty mInitExpr ann) = do
     Nothing -> setValues cell range origin Nothing
     Just initExpr -> bindCell cell range origin initExpr
 checkStatement (AssignmentStmt obj expr ann) = do
+  recordObject obj
+  recordExpression expr
   noteEscapes expr
   case cellOf obj of
     -- | The cell takes the values of the expression, and so do the fields
@@ -715,7 +866,7 @@ checkStatement (AssignmentStmt obj expr ann) = do
     -- into an element of an array. What it reaches is not known, so what was
     -- known of the object it starts from no longer holds.
     Nothing -> forget (rootIdent obj)
-checkStatement (SingleExpStmt expr _) = noteEscapes expr
+checkStatement (SingleExpStmt expr _) = recordExpression expr >> noteEscapes expr
 
 
 -- | What each node means to this pass. Only the expressions that decide a path
@@ -727,8 +878,10 @@ transfer :: Transfer ValueAnalysisPath ValueAnalysisGlobal ValueAnalysisError
 transfer = Transfer
   {
     onStatement = checkStatement
-  , onSimpleBlock = mapM_ (mapM_ escapesIn) . simpleBlockChildren
-  , onExpression = noteEscapes
+  , onSimpleBlock = \block -> do
+      mapM_ (mapM_ recordChild) (simpleBlockChildren block)
+      mapM_ (mapM_ escapesIn) (simpleBlockChildren block)
+  , onExpression = \expr -> recordExpression expr >> noteEscapes expr
   , onCondition = observeCondition
   , onLoopGuard = observeCondition
   , onCaseEntry = enterCase
@@ -1010,11 +1163,123 @@ valuesIn global locals expr =
         FunctionCall {} -> returnedBy global locals expr >>= wholeOf
         MemberFunctionCall {} -> returnedBy global locals expr >>= wholeOf
         DerefMemberFunctionCall {} -> returnedBy global locals expr >>= wholeOf
+        BinOp op left right ann -> do
+          leftValues <- valuesIn global locals left >>= integersOf
+          rightValues <- valuesIn global locals right >>= integersOf
+          range <- getTypeSemAnn ann >>= intRange (platform global)
+          width <- getTypeSemAnn (getAnnotation left) >>= widthOf
+          arithmetic range width op leftValues rightValues
+        Casting inner ty _ -> do
+          values <- valuesIn global locals inner >>= integersOf
+          range@(tlo, thi) <- intRange (platform global) ty
+          -- | A conversion does not raise, so a value that the target type
+          -- cannot hold gives any value of it.
+          let (lo, hi) = ends values
+          if tlo <= lo && hi <= thi
+            then fitted range (lo, hi) values
+            else Just (Interval tlo thi)
         _ -> Nothing
 
   where
 
     wholeOf = M.lookup []
+
+    widthOf ty = if intTy ty then Just (shiftWidth (platform global) ty) else Nothing
+
+-- | The most values that 'arithmetic' works out one pair at a time before it
+-- falls back on the ends of its operands.
+pairLimit :: Int
+pairLimit = 64
+
+-- | What an arithmetic operation on two integer operands may give, in a type
+-- with the given range, where the width is that of the left operand, which is
+-- what bounds the amount of a shift.
+--
+-- Two short lists are worked out pair by pair, and otherwise the result is
+-- bounded from the ends of the operands. A pair the operation would not
+-- complete, a division by zero or a shift by the width or more, raises an
+-- exception and gives nothing, so it is left out. A result outside the range
+-- of an unsigned type wraps, and one outside the range of a signed type
+-- raises, so the first gives the whole type and the second is cut to it.
+arithmetic ::
+  (Integer, Integer) -> Integer -> Op -> Integers -> Integers -> Maybe Values
+arithmetic range width op left right = do
+  results <- exactResults width op left right
+  fitted range (ends results) results
+
+-- | What an operation on two integer operands may give before it is fitted to
+-- a type, which is what says whether a signed operation overflows.
+exactResults :: Integer -> Op -> Integers -> Integers -> Maybe Integers
+exactResults width op left right =
+  case (left, right) of
+    (Listed ls, Listed rs) | S.size ls * S.size rs <= pairLimit ->
+      let results = S.fromList [ r | a <- S.toList ls, b <- S.toList rs, Just r <- [pairwiseOp a b] ]
+      in if S.null results then Nothing else Just (Listed results)
+    _ -> uncurry Spanning <$> fromOperandEnds (ends left) (ends right)
+
+  where
+
+    pairwiseOp :: Integer -> Integer -> Maybe Integer
+    pairwiseOp a b = case op of
+      Addition -> Just (a + b)
+      Subtraction -> Just (a - b)
+      Multiplication -> Just (a * b)
+      Division -> if b == 0 then Nothing else Just (a `quot` b)
+      Modulo -> if b == 0 then Nothing else Just (a `rem` b)
+      BitwiseAnd | a >= 0 && b >= 0 -> Just (a .&. b)
+      BitwiseOr | a >= 0 && b >= 0 -> Just (a .|. b)
+      BitwiseXor | a >= 0 && b >= 0 -> Just (a `xor` b)
+      BitwiseLeftShift | a >= 0 && 0 <= b && b < width -> Just (a * 2 ^ b)
+      BitwiseRightShift | a >= 0 && 0 <= b && b < width -> Just (a `div` 2 ^ b)
+      _ -> Nothing
+
+    fromOperandEnds (a, b) (c, d) = case op of
+      Addition -> Just (a + c, b + d)
+      Subtraction -> Just (a - d, b - c)
+      Multiplication -> corners (*)
+      -- | A divisor that does not take zero keeps the sign it has, and a
+      -- quotient that truncates is then monotonic in each operand, so its
+      -- extremes are at the corners.
+      Division | c > 0 || d < 0 -> corners quot
+      -- | A remainder takes the sign of the dividend and stays below the
+      -- divisor in magnitude.
+      Modulo | a >= 0 && (c > 0 || d < 0) ->
+        Just (0, min b (max (abs c) (abs d) - 1))
+      BitwiseAnd | a >= 0 && c >= 0 -> Just (0, min b d)
+      BitwiseOr | a >= 0 && c >= 0 -> Just (0, allOnes (max b d))
+      BitwiseXor | a >= 0 && c >= 0 -> Just (0, allOnes (max b d))
+      BitwiseLeftShift | a >= 0 && c >= 0 && d < width -> Just (a * 2 ^ c, b * 2 ^ d)
+      BitwiseRightShift | a >= 0 && c >= 0 && d < width -> Just (a `div` 2 ^ d, b `div` 2 ^ c)
+      _ -> Nothing
+
+      where
+
+        corners f =
+          let values = [f x y | x <- [a, b], y <- [c, d]]
+          in Just (minimum values, maximum values)
+
+    -- | The smallest number with all its bits set that is not below the given
+    -- one.
+    allOnes n = until (>= n) (\m -> 2 * m + 1) 0
+
+-- | The values of a result whose ends are given, in a type with the given
+-- range. Within the range they are kept, as a list while it is short enough and
+-- as an interval otherwise; outside it, an unsigned type wraps and gives every
+-- value of the type, and a signed type raises, so only the part inside is
+-- reached, and nothing when no part is.
+fitted :: (Integer, Integer) -> (Integer, Integer) -> Integers -> Maybe Values
+fitted (tlo, thi) (lo, hi) values
+  | tlo <= lo && hi <= thi = Just (asValues values)
+  | tlo >= 0 = Just (Interval tlo thi)
+  | max lo tlo <= min hi thi = Just (Interval (max lo tlo) (min hi thi))
+  | otherwise = Nothing
+
+  where
+
+    asValues (Listed vs) | S.size vs <= valueLimit =
+      Discrete (S.map (\v -> Scalar (I (TInteger v DecRepr) Nothing)) vs)
+    asValues (Listed vs) = Interval (S.findMin vs) (S.findMax vs)
+    asValues (Spanning l h) = Interval l h
 
 -- | What an expression says about the cells under the object it gives: the
 -- fields of the summary of a call, the fields a struct written out assigns,
@@ -1155,9 +1420,9 @@ runValueAnalysisCheck ::
   -> M.Map Identifier (Const SemanticAnn)
   -> ReturnedValues
   -> AnnotatedProgram SemanticAnn
-  -> (Maybe ValueAnalysisError, ReturnedValues)
+  -> (Maybe ValueAnalysisError, ReturnedValues, M.Map ObligationId Evidence)
 runValueAnalysisCheck plt consts imported program =
-  (listToMaybe (findings final), returnedValues final)
+  (listToMaybe (findings final), returnedValues final, M.mapMaybe id (proofs final))
 
   where
 
@@ -1166,7 +1431,7 @@ runValueAnalysisCheck plt consts imported program =
     -- and the diagnostic reads it once.
     final = foldl walk start program
 
-    start = ValueAnalysisGlobal consts plt M.empty imported
+    start = ValueAnalysisGlobal consts plt M.empty imported M.empty
 
     walk global astElement =
       globalState . snd $
