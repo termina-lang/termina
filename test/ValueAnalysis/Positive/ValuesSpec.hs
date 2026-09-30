@@ -277,6 +277,32 @@ spec = do
 
     -- | The two values the paths leave decide the comparison in opposite ways,
     -- which is the case the abstract evaluator has to leave alone.
+    it "accepts a condition that only part of an interval from an addition decides" $ do
+      let src = "function f(x : u8) -> u8 {\n" ++
+                "    var r : u8 = 0 : u8;\n" ++
+                "    if (x > 5 : u8 && x < 10 : u8) {\n" ++
+                "        let y : u8 = x + 17 : u8;\n" ++
+                "        if (y > 25 : u8) {\n" ++
+                "            r = 1 : u8;\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    return r;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
+
+    it "accepts a condition on an unsigned addition that may wrap" $ do
+      let src = "function f(x : u8) -> u8 {\n" ++
+                "    var r : u8 = 0 : u8;\n" ++
+                "    if (x > 5 : u8) {\n" ++
+                "        let y : u8 = x + 250 : u8;\n" ++
+                "        if (y < 10 : u8) {\n" ++
+                "            r = 1 : u8;\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    return r;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
+
     it "accepts a comparison only some of the values a variable may hold decide" $ do
       let src = "function f(flag : bool) -> u32 {\n" ++
                 "    var x : u32 = 0 : u32;\n" ++
