@@ -23,8 +23,9 @@ getPlatform = do
 getProcessingResources :: MASTGenMonad (M.Map Identifier MASTProcessingResource)
 getProcessingResources = do
     plt <- getPlatform
+    tick <- gets (microsecondsPerTick . configParams)
     case plt of
-        RTEMS5LEON3NEXYSA7 -> return RTEMS5LEON3NEXYSA7.getProcessingResources
+        RTEMS5LEON3NEXYSA7 -> return $ RTEMS5LEON3NEXYSA7.getProcessingResources (fromIntegral tick / 1.0e6)
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 
 getSchedulers :: MASTGenMonad (M.Map Identifier MASTScheduler)

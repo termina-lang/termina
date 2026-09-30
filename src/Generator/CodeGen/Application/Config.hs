@@ -75,7 +75,7 @@ genConfigFile mName config progArchitecture = do
             pre_cr $ _define "TERMINA__APP_CONFIG__MESSAGE_QUEUES" (Just [show (length msgQueues)])
         ] ++ messageBufferMemory ++
         [
-            pre_cr $ _define "TERMINA__TIME__MICROSECONDS_PER_TICK" (Just [show (10000 :: Integer)]),
+            pre_cr $ _define "TERMINA__TIME__MICROSECONDS_PER_TICK" (Just [show (microsecondsPerTick config) ++ "U"]),
             -- | The size of the table the runtime indexes by interrupt vector,
             -- a property of the target. It travelled as a -D of each
             -- platform.mk until 2026-09-23, which kept the value in two places

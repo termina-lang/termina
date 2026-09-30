@@ -97,3 +97,26 @@ spec = do
              ++ "#[priority(base + 5 : u32)]\n"
              ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
       compileErrorCode src `shouldBe` Just (pack "CFE-018")
+
+    -- | The tick is 10000 microseconds unless the project says otherwise.
+    it "CFE-019: timer period that is not a whole number of ticks" $ do
+      let src = timerTaskClass
+             ++ "emitter timer : PeriodicTimer = { period = {tv_sec = 0, tv_usec = 15000} };\n"
+             ++ "#[priority(1)]\n"
+             ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
+      compileErrorCode src `shouldBe` Just (pack "CFE-019")
+
+    it "CFE-019: timer period of zero" $ do
+      let src = timerTaskClass
+             ++ "emitter timer : PeriodicTimer = { period = {tv_sec = 0, tv_usec = 0} };\n"
+             ++ "#[priority(1)]\n"
+             ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
+      compileErrorCode src `shouldBe` Just (pack "CFE-019")
+
+    it "CFE-019: timer period off the tick after folding a constant" $ do
+      let src = "constexpr half_tick : u32 = 5000 : u32;\n"
+             ++ timerTaskClass
+             ++ "emitter timer : PeriodicTimer = { period = {tv_sec = 1, tv_usec = half_tick} };\n"
+             ++ "#[priority(1)]\n"
+             ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
+      compileErrorCode src `shouldBe` Just (pack "CFE-019")

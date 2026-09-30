@@ -442,7 +442,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
         $ lowerProject typedProject
     runLoweredChecks chatty plt rawLoweredProject
     when chatty (putStrLn . debugMessage $ "Performing constant folding")
-    (loweredProject, constEnvs) <- constFolding plt rawLoweredProject
+    (loweredProject, constEnvs) <- constFolding config plt rawLoweredProject
     when chatty (putStrLn . debugMessage $ "Analysing the values of the project modules")
     valueEvidence <- valueAnalysisCheck plt constEnvs loweredProject
     -- | Decide the run-time checks

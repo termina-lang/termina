@@ -55,6 +55,7 @@ import Data.Ord (comparing)
 import Data.Bits ((.&.), (.|.), xor)
 import qualified Data.Set as S
 
+import Configuration.Configuration (defaultMicrosecondsPerTick)
 import Configuration.Platform (Platform)
 import Lowering.AST
 import ControlFlow.Traversal
@@ -319,10 +320,13 @@ evaluate plt consts locals expr =
   where
 
     -- | The folding evaluator reads plain names, so only what the path knows
-    -- of a whole variable reaches it; a field answers through 'valuesIn'.
+    -- of a whole variable reaches it; a field answers through 'valuesIn'. The
+    -- tick only matters to the period of a timer, which an expression never
+    -- reaches.
     env = ConstFoldEnv
       (M.union (M.mapMaybe singleValue (variables locals)) consts)
       plt
+      defaultMicrosecondsPerTick
 
     variables path =
       M.fromList [ (ident, entry)

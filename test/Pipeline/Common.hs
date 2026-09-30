@@ -203,7 +203,7 @@ renderInitFile prjprogs =
 -- imports. Mirrors @Command.Common.constFolding@ but stays in 'Either'.
 foldProject :: M.Map FilePath Text -> LoweredProject -> [QualifiedName]
   -> Either Failure (LoweredProject, ProjectConstEnvs)
-foldProject files loweredProject = go (ConstFoldEnv M.empty TestPlatform) M.empty M.empty
+foldProject files loweredProject = go (ConstFoldEnv M.empty TestPlatform (microsecondsPerTick configParams)) M.empty M.empty
   where
     go _ folded constEnvs [] = Right (folded, constEnvs)
     go env folded constEnvs (m:ms) =

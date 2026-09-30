@@ -10,8 +10,10 @@ import qualified Data.Map.Strict as M
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.Utils
 
-getProcessingResources :: M.Map Identifier MASTProcessingResource
-getProcessingResources = M.fromList [
+-- | The processor, whose system timer ticks at the interval the project
+-- configures, in seconds.
+getProcessingResources :: Double -> M.Map Identifier MASTProcessingResource
+getProcessingResources tickInterval = M.fromList [
     ("cpu0", MASTRegularProcessor
         { prName = "cpu0"
         , prSpeedFactor = 1.0
@@ -20,7 +22,7 @@ getProcessingResources = M.fromList [
         , prMinInterruptPriority = 1
         , prSytemTimer = MASTTicker
             1.0E-5 -- Worst overhead
-            0.01  -- Tick interval
+            tickInterval
         })
     ]
 

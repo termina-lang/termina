@@ -716,7 +716,7 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
         $ lowerProject typedProject
     runLoweredChecks chatty plt rawLoweredProject
     when chatty (putStrLn . debugMessage $ "Performing constant folding")
-    (loweredProject, constEnvs) <- constFolding plt rawLoweredProject
+    (loweredProject, constEnvs) <- constFolding config plt rawLoweredProject
     when chatty (putStrLn . debugMessage $ "Analysing the values of the project modules")
     valueEvidence <- valueAnalysisCheck plt constEnvs loweredProject
     when chatty (putStrLn . debugMessage $ "Side-effect checking project modules")

@@ -14,7 +14,7 @@ import Parser.Parsing (contents, topLevel)
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import Semantic.Environment (makeInitialGlobalEnv)
 import Configuration.Platform (Platform(TestPlatform))
-import Configuration.Configuration (defaultConfig)
+import Configuration.Configuration (defaultConfig, defaultMicrosecondsPerTick)
 import Generator.Environment (getPlatformInitialGlobalEnv)
 import Lowering (runLowerModule)
 import ControlFlow.ConstFolding (runConstFolding, constFoldModule)
@@ -35,7 +35,7 @@ constFoldError input = case runP (contents topLevel) "test" "" input of
         Left err -> error $ "Basic Blocks error: " ++ show err
         Right bb ->
           let bbModule = TerminaModuleData "test" "test" dummyTime [] [] (pack input) (BasicBlockData bb)
-          in either Just (const Nothing) (runConstFolding (ConstFoldEnv M.empty TestPlatform) (constFoldModule bbModule))
+          in either Just (const Nothing) (runConstFolding (ConstFoldEnv M.empty TestPlatform defaultMicrosecondsPerTick) (constFoldModule bbModule))
 
 dummyTime :: UTCTime
 dummyTime = UTCTime (fromGregorian 1997 8 29) (secondsToDiffTime 0)

@@ -50,6 +50,8 @@ data Error =
   | EShiftAmountOutOfBounds Integer Integer -- ^ Shift amount out of bounds (width, amount)
   | EInvariantComparison Integer (TerminaType SemanticAnn) Bool -- ^ Comparison against a constant with a fixed result
   | ETaskPriorityOutOfRange Identifier Integer -- ^ Task priority out of range (task, priority)
+  | ETimerPeriodNotInTicks Identifier Integer Integer -- ^ Period of a periodic timer that is not a whole number of ticks (timer, period and tick in microseconds)
+  | EInvalidTimerPeriod -- ^ Initializer of a periodic timer without a constant period (internal)
   deriving Show
 
 type ConstFoldError = AnnotatedError Error Location
@@ -128,6 +130,12 @@ instance Diagnosable Error where
                 emph (T.pack (show minTaskPriority)) <> " and " <>
                 emph (T.pack (show maxTaskPriority)) <> ".\n" <>
                 "Priority 0 is reserved for the runtime and 255 for the idle task.")
+    describe (ETimerPeriodNotInTicks timer period tick) =
+        diagnostic "CFE-019" "timer period not a whole number of ticks"
+            ("The period of the periodic timer " <> emph (T.pack timer) <> " is " <>
+                emph (T.pack (show period)) <> " microseconds, but it must be a " <>
+                "positive multiple of the tick of " <>
+                emph (T.pack (show tick)) <> " microseconds.")
     -- | Everything else is a broken invariant of the compiler, which has no code
     -- of its own.
     describe _ = diagnosticWithoutDetail "Internal" "internal error"

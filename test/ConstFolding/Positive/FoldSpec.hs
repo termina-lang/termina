@@ -3,6 +3,7 @@
 module ConstFolding.Positive.FoldSpec (spec) where
 
 import Pipeline.Common (compileErrorCode)
+import Architecture.Negative.CodeSpec (timerTaskClass)
 
 import Test.Hspec
 
@@ -65,4 +66,15 @@ spec = describe "ConstFolding: well-formed constants compile cleanly" $
     , ("accepts a slice whose length matches the expected size", matchingSlice)
     , ("accepts a for loop with a positive iteration count", positiveLoop)
     , ("accepts comparisons against constants inside the type range", comparisonsInRange)
+    , ("accepts a timer period of a whole number of ticks", periodInTicks)
     ]
+
+-- | A period of 1.02 s, which the tick of 10000 microseconds divides, written
+-- with a constant for the microseconds.
+periodInTicks :: String
+periodInTicks =
+  "constexpr two_ticks : u32 = 20000 : u32;\n" ++
+  timerTaskClass ++
+  "emitter timer : PeriodicTimer = { period = {tv_sec = 1, tv_usec = two_ticks} };\n" ++
+  "#[priority(1)]\n" ++
+  "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"

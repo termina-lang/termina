@@ -11,6 +11,9 @@ data ConstFoldEnv = ConstFoldEnv
   {
     constEnv :: M.Map Identifier (Const SemanticAnn)
   , targetPlatform :: Platform
+    -- | Length of the tick in microseconds, which the period of a periodic
+    -- timer has to be a multiple of.
+  , tickMicroseconds :: Integer
   }
 
 type ConstFoldMonad = ExceptT ConstFoldError (ST.State ConstFoldEnv)

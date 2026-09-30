@@ -733,7 +733,28 @@ foldGlobal (Emitter ident ty mInitExpr mods ann) = do
   ann' <- foldAnnotation ann
   ty' <- foldType glbLoc ty
   mInitExpr' <- mapM foldExpression mInitExpr
+  case (ty', mInitExpr') of
+    (TGlobal EmitterClass "PeriodicTimer",
+     Just (StructInitializer [FieldValueAssignment "period" (StructInitializer fields _) _] _)) -> do
+      seconds <- periodField "tv_sec" fields
+      microseconds <- periodField "tv_usec" fields
+      tick <- ST.gets tickMicroseconds
+      let period = seconds * 1000000 + microseconds
+      unless (period > 0 && period `mod` tick == 0) $
+        throwError $ annotateError glbLoc (ETimerPeriodNotInTicks ident period tick)
+    _ -> return ()
   return $ Emitter ident ty' mInitExpr' mods ann'
+
+  where
+
+    -- | The value of a field of the period, which the type checker requires
+    -- to be a constant expression of type u32.
+    periodField name fields =
+      case [expr | FieldValueAssignment field expr _ <- fields, field == name] of
+        [expr] -> evalConstExpression expr >>= \case
+          I (TInteger value _) _ -> return value
+          _ -> throwError $ annotateError Internal EInvalidTimerPeriod
+        _ -> throwError $ annotateError Internal EInvalidTimerPeriod
 foldGlobal g = return g -- This should not happen
 
 -- | Replaces the argument of a modifier by the value it folds to, so the

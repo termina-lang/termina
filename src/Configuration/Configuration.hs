@@ -7,6 +7,7 @@ module Configuration.Configuration (
     defaultConfig,
     defaultSysPrintOutputBufferSize,
     defaultSysReadInputBufferSize,
+    defaultMicrosecondsPerTick,
     appFolder,
     appFilename
 ) where
@@ -21,6 +22,12 @@ data ProjectProfile = Debug | Release deriving (Eq, Show)
 defaultSysPrintOutputBufferSize, defaultSysReadInputBufferSize :: Integer
 defaultSysPrintOutputBufferSize = 256
 defaultSysReadInputBufferSize = 256
+
+-- | Length of the tick of the system clock in microseconds. The runtime
+-- derives the ticks per second as 1000000 divided by it, so it has to divide
+-- 1000000 exactly.
+defaultMicrosecondsPerTick :: Integer
+defaultMicrosecondsPerTick = 10000
 
 -- | Folder that holds the application module and name of the module itself.
 -- They are fixed and not configurable: the application module is always
@@ -64,6 +71,7 @@ data TerminaConfig =
     enableSystemPort :: !Bool,
     sysPrintOutputBufferSize :: !Integer,
     sysReadInputBufferSize :: !Integer,
+    microsecondsPerTick :: !Integer,
     enableSystemExcept :: !Bool,
     builder :: !ProjectBuilder,
     platformFlags :: !PlatformFlags
@@ -83,9 +91,17 @@ instance FromJSON TerminaConfig where
     o .:?  "enable-system-port" .!= False <*>
     o .:?  "sys-print-output-buffer-size" .!= defaultSysPrintOutputBufferSize <*>
     o .:?  "sys-read-input-buffer-size"  .!= defaultSysReadInputBufferSize <*>
+    (o .:?  "microseconds-per-tick" .!= defaultMicrosecondsPerTick >>= tickLength) <*>
     o .:?  "enable-system-except" .!= False <*>
     o .:   "builder" <*>
     o .:?  "platform-flags" .!= defaultPlatformFlags
+
+    where
+
+      tickLength ticks
+        | ticks > 0 && 1000000 `mod` ticks == 0 = return ticks
+        | otherwise = fail "microseconds-per-tick must divide 1000000 exactly"
+
   parseJSON _ = fail "Expected configuration object"
 
 instance ToJSON TerminaConfig where
@@ -101,6 +117,7 @@ instance ToJSON TerminaConfig where
             prjEnableSystemPort
             prjSysPrintOutputBufferSize
             prjSysReadInputBufferSize
+            prjMicrosecondsPerTick
             prjEnableSystemExcept
             prjBuilder
             prjPlatformFlags
@@ -119,6 +136,7 @@ instance ToJSON TerminaConfig where
             <> if prjEnableSystemPort then ["enable-system-port" .= prjEnableSystemPort] else []
             <> if prjSysPrintOutputBufferSize /= defaultSysPrintOutputBufferSize then ["sys-print-output-buffer-size" .= prjSysPrintOutputBufferSize] else []
             <> if prjSysReadInputBufferSize  /= defaultSysReadInputBufferSize then ["sys-read-input-buffer-size"  .= prjSysReadInputBufferSize]  else []
+            <> if prjMicrosecondsPerTick /= defaultMicrosecondsPerTick then ["microseconds-per-tick" .= prjMicrosecondsPerTick] else []
             <> if prjEnableSystemExcept then ["enable-system-except" .= prjEnableSystemExcept] else []
             <> if prjBuilder /= None then ["builder" .= prjBuilder] else []
             -- We only serialize the platform flags corresponding to the selected platform
@@ -139,6 +157,7 @@ defaultConfig projectName plt = TerminaConfig {
     enableSystemPort = False,
     sysPrintOutputBufferSize = defaultSysPrintOutputBufferSize,
     sysReadInputBufferSize = defaultSysReadInputBufferSize,
+    microsecondsPerTick = defaultMicrosecondsPerTick,
     enableSystemExcept = False,
     builder = Make,
     platformFlags = defaultPlatformFlags
