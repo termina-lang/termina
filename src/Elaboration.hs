@@ -20,9 +20,7 @@ import Elaboration.AST
 import Elaboration.Obligations
 import Elaboration.Prover
 import Elaboration.Prover.Constant (constantProver)
-import Elaboration.Prover.Guard (guardProver)
 import Semantic.Types
-import Configuration.Platform (Platform)
 
 import Control.Monad.Writer
 import qualified Data.Map.Strict as M
@@ -31,10 +29,10 @@ import qualified Data.Map.Strict as M
 -- one of the provers did.
 type ElaborationReport = [(ObligationId, Maybe Evidence)]
 
--- | The provers of a build for the given platform, in the order they are
--- asked.
-provers :: Platform -> [Prover]
-provers plt = [constantProver, guardProver plt]
+-- | The provers that need nothing but the program. The value prover reads what
+-- the value analysis found, so the build adds it for each module.
+provers :: [Prover]
+provers = [constantProver]
 
 type ElaborationM = Writer ElaborationReport
 

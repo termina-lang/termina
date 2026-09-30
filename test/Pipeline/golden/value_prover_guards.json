@@ -1,0 +1,99 @@
+{
+    "summary": {
+        "obligations": 6,
+        "discharged": 6,
+        "checked": 0
+    },
+    "modules": [
+        {
+            "module": "test",
+            "file": "test",
+            "obligations": [
+                {
+                    "start": {
+                        "line": 4,
+                        "column": 29
+                    },
+                    "end": {
+                        "line": 4,
+                        "column": 36
+                    },
+                    "property": "index-in-bounds",
+                    "status": "discharged",
+                    "prover": "value",
+                    "reason": "the index stays between 0 and 3"
+                },
+                {
+                    "start": {
+                        "line": 8,
+                        "column": 24
+                    },
+                    "end": {
+                        "line": 8,
+                        "column": 31
+                    },
+                    "property": "index-in-bounds",
+                    "status": "discharged",
+                    "prover": "value",
+                    "reason": "the index stays between 0 and 3"
+                },
+                {
+                    "start": {
+                        "line": 12,
+                        "column": 30
+                    },
+                    "end": {
+                        "line": 12,
+                        "column": 37
+                    },
+                    "property": "index-in-bounds",
+                    "status": "discharged",
+                    "prover": "value",
+                    "reason": "the index stays between 0 and 3"
+                },
+                {
+                    "start": {
+                        "line": 16,
+                        "column": 28
+                    },
+                    "end": {
+                        "line": 16,
+                        "column": 33
+                    },
+                    "property": "non-zero-divisor",
+                    "status": "discharged",
+                    "prover": "value",
+                    "reason": "the divisor stays between 1 and 4294967295"
+                },
+                {
+                    "start": {
+                        "line": 20,
+                        "column": 28
+                    },
+                    "end": {
+                        "line": 20,
+                        "column": 33
+                    },
+                    "property": "non-zero-divisor",
+                    "status": "discharged",
+                    "prover": "value",
+                    "reason": "the divisor stays between 1 and 4294967295"
+                },
+                {
+                    "start": {
+                        "line": 24,
+                        "column": 28
+                    },
+                    "end": {
+                        "line": 24,
+                        "column": 34
+                    },
+                    "property": "shift-below-width",
+                    "status": "discharged",
+                    "prover": "value",
+                    "reason": "the amount stays between 0 and 31"
+                }
+            ]
+        }
+    ]
+}

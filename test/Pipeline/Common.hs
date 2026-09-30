@@ -2,7 +2,6 @@ module Pipeline.Common
   ( runFullBuild
   , runFullProjectBuild
   , runChecksReport
-  , runProverDischarges
   , runFullProjectApp
   , runFullProjectAppWith
   , runTypedModule
@@ -21,9 +20,6 @@ module Pipeline.Common
 
 import Elaboration (ElaborationReport, provers, elaborateProgram)
 import Elaboration.Report (checksReport)
-import Elaboration.Obligations (ObligationId)
-import Elaboration.Prover.Guard (guardProver)
-import Elaboration.Prover.Value (valueProver)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text.Encoding as TE
 import Data.Text (Text, pack)
@@ -106,16 +102,6 @@ runChecksReport input =
       TE.decodeUtf8 . BL.toStrict $
         checksReport (checksReports result) (fullPath <$> foldedModules result)
 
--- | The checks of a single module named @test@ that the guard prover and the
--- value prover each discharge on their own, in that order.
-runProverDischarges :: String -> Either Failure (S.Set ObligationId, S.Set ObligationId)
-runProverDischarges input = do
-  result <- runProjectPipeline configParams [("test", input)]
-  let program = loweredAST . metadata $ foldedModules result M.! "test"
-      evidence = M.findWithDefault M.empty "test" (valueEvidence result)
-      discharged ps = S.fromList [ oid | (oid, Just _) <- snd (elaborateProgram ps program) ]
-  pure (discharged [guardProver TestPlatform], discharged [valueProver evidence])
-
 -- | Drives the same full pipeline as 'runFullProjectBuild' but stops before
 -- per-module source rendering, returning the whole-program architecture and
 -- the per-module basic-block programs in dependency order. The application
@@ -147,7 +133,6 @@ data PipelineResult = PipelineResult
   , programArch :: TerminaProgArch SemanticAnn
   , elaboratedModules :: ElaboratedProject
   , checksReports :: M.Map QualifiedName ElaborationReport
-  , valueEvidence :: ProjectValueEvidence
   }
 
 -- | The full pipeline up to (and including) the architecture checks, shared by
@@ -172,12 +157,12 @@ runProjectPipeline cfg sources = do
   evidence <- analyseValues files foldedProject constEnvs ordered
   -- | The side-effect check reads the elaborated AST, which says what the
   -- generated code checks while it runs.
-  let (elaborated, reports) = elaborateProject TestPlatform evidence foldedProject
+  let (elaborated, reports) = elaborateProject evidence foldedProject
   maybe (Right ()) (Left . failure files)
     (sideEffectCheckModules TestPlatform elaborated)
   progArch <- genProjectArchitecture cfg files foldedProject ordered
   runChecks files progArch
-  pure (PipelineResult foldedProject ordered progArch elaborated reports evidence)
+  pure (PipelineResult foldedProject ordered progArch elaborated reports)
 
 -- | The typed AST of one module of a project, which is the stage the language
 -- server keeps and the one its index is built from. The stages after it, basic
@@ -209,7 +194,7 @@ renderMainFileWith cfg progArch =
 -- failure into the returned 'Text'.
 renderInitFile :: [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either Text Text
 renderInitFile prjprogs =
-  case runGenInitFile configParams TestPlatform "init" (fmap (fst . elaborateProgram (provers TestPlatform)) <$> prjprogs) of
+  case runGenInitFile configParams TestPlatform "init" (fmap (fst . elaborateProgram provers) <$> prjprogs) of
     Left err -> Left . T.pack $ show err
     Right cFile -> Right $ runCPrinter False cFile
 

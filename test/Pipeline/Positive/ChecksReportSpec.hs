@@ -6,7 +6,7 @@ import Golden
 import Test.Hspec
 
 -- | One obligation of each kind of outcome: an index discharged by the
--- constant prover and one by the guard prover, an index, a divisor and a signed
+-- constant prover and one kept in range by the left operand of @&&@, an index, a divisor and a signed
 -- addition that keep their checks, and a shift by a constant.
 testChecks :: String
 testChecks =

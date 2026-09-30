@@ -34,8 +34,8 @@
                     },
                     "property": "index-in-bounds",
                     "status": "discharged",
-                    "prover": "guard",
-                    "reason": "a guard keeps the index inside the array"
+                    "prover": "value",
+                    "reason": "the index stays between 0 and 3"
                 },
                 {
                     "start": {

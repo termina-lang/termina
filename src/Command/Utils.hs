@@ -199,15 +199,15 @@ lowerTypedModule typedModule = do
 -- | Elaborates each module of a project, deciding the run-time checks of its
 -- operations, with the report of what the provers discharged in each one. The
 -- value prover of a module reads what the value analysis showed of it.
-elaborateProject :: Platform -> ProjectValueEvidence -> LoweredProject -> (ElaboratedProject, M.Map QualifiedName ElaborationReport)
-elaborateProject plt evidence loweredProject = (fst <$> elaborated, snd <$> elaborated)
+elaborateProject :: ProjectValueEvidence -> LoweredProject -> (ElaboratedProject, M.Map QualifiedName ElaborationReport)
+elaborateProject evidence loweredProject = (fst <$> elaborated, snd <$> elaborated)
 
   where
 
     elaborated = M.mapWithKey elaborateModule loweredProject
 
     elaborateModule moduleName bbModule =
-      let moduleProvers = provers plt ++ [valueProver (M.findWithDefault M.empty moduleName evidence)]
+      let moduleProvers = provers ++ [valueProver (M.findWithDefault M.empty moduleName evidence)]
           (eAST, report) = elaborateProgram moduleProvers (loweredAST . metadata $ bbModule) in
       (bbModule { metadata = ElaboratedData eAST }, report)
 

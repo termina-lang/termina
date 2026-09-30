@@ -3,13 +3,10 @@ module Pipeline.Positive.ValueProverSpec (spec) where
 import Pipeline.Common
 import Golden
 
-import qualified Data.Set as S
-import Data.Text (unpack)
 import Test.Hspec
 
--- | Every shape the guard prover discharges: an index, a divisor and a shift
--- kept in range by the left operand of @&&@ or @||@, against a literal and
--- against the constant that sizes the array.
+-- | An index, a divisor and a shift kept in range by the left operand of @&&@
+-- or @||@, against a literal and against the constant that sizes the array.
 guardedShapes :: String
 guardedShapes =
     "constexpr SIZE : usize = 4;\n" ++
@@ -75,11 +72,9 @@ valueShapes =
 spec :: Spec
 spec = do
   describe "Value prover" $ do
-    it "Discharges every check the guard prover discharges" $
-      case runProverDischarges guardedShapes of
-        Left err -> expectationFailure (unpack (failMessage err))
-        Right (byGuard, byValue) -> do
-          byGuard `shouldNotBe` S.empty
-          S.difference byGuard byValue `shouldBe` S.empty
+    it "Discharges the checks that a logical operator guards" $
+      goldenJSON "value_prover_guards" (runChecksReport guardedShapes)
+    it "Leaves the guarded checks out of the generated code" $
+      goldenC "value_prover_guards" (runFullBuild guardedShapes)
     it "Discharges the checks that the values of the path show" $
       goldenJSON "value_prover" (runChecksReport valueShapes)
