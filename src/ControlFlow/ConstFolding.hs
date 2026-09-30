@@ -326,6 +326,20 @@ foldObject obj = rewriteObject folding obj
 
 
 foldExpression :: Expression SemanticAnn -> ConstFoldMonad (Expression SemanticAnn)
+-- | A constant that holds an integer or a boolean, read by its name or as a
+-- field or an element of an aggregate constant, is folded into its value, so
+-- the generated code does not read it from memory.
+foldExpression (AccessObject obj) = do
+  obj' <- foldObject obj
+  ty <- getObjType obj'
+  case ty of
+    TConstSubtype scalar ->
+      if intTy scalar || boolTy scalar
+        then do
+          value <- evalConstObject obj'
+          return $ Constant value (buildExpAnn (getLocation (getAnnotation obj')) ty)
+        else return $ AccessObject obj'
+    _ -> return $ AccessObject obj'
 -- | Two constant operands are folded into the constant they produce.
 foldExpression e@(BinOp op (Constant lConst@(I {}) _) (Constant rConst@(I {}) _) ann) = do
   ann' <- foldAnnotation ann

@@ -111,7 +111,7 @@ copiedFloat =
   "const G : f32 = F;\n"
 
 -- | Loop bounds read from a field or an element of a constant, and from the
--- name of a scalar constant, which the generated code keeps as they are.
+-- name of a scalar constant, which the generated code writes as literals.
 constantPathBounds :: String
 constantPathBounds =
   "struct Config {\n" ++
@@ -133,10 +133,10 @@ constantPathBounds =
 
 spec :: Spec
 spec = do
-  it "keeps an element of a constant in a loop bound" $
-    runFullBuild constantPathBounds `shouldSatisfy` isInfixOf (pack "for (size_t j = 0U; j < A[1U];")
-  it "keeps a field and the name of a constant in a loop bound" $
-    runFullBuild constantPathBounds `shouldSatisfy` isInfixOf (pack "for (size_t k = CFG.len; k < N;")
+  it "writes an element of a constant in a loop bound as a literal" $
+    runFullBuild constantPathBounds `shouldSatisfy` isInfixOf (pack "for (size_t j = 0U; j < 8U;")
+  it "writes a field and the name of a constant in a loop bound as literals" $
+    runFullBuild constantPathBounds `shouldSatisfy` isInfixOf (pack "for (size_t k = 4U; k < 6U;")
   it "writes a floating-point constant that copies another as a literal" $
     runFullBuild copiedFloat `shouldSatisfy` isInfixOf (pack "const float32_t G = 1.5f;")
   describe "writes aggregate constants as initializers of literals" $
