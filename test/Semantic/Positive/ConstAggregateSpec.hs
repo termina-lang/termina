@@ -77,6 +77,19 @@ spec = do
         "}")
         `shouldBe` Nothing
 
+    it "Takes the cast of a constant as a constant expression" $
+      compileErrorCode (
+        "const W : u8 = 3 : u8;\n" ++
+        "function g() -> usize {\n" ++
+        "    var buffer : [u8; W as usize] = [0 : u8; W as usize];\n" ++
+        "    var r : usize = buffer[0] as usize;\n" ++
+        "    for j : usize in 0 : usize .. W as usize {\n" ++
+        "        r = r + j;\n" ++
+        "    }\n" ++
+        "    return r;\n" ++
+        "}")
+        `shouldBe` Nothing
+
     it "Rejects an element of a constant array read with a variable index as a loop bound" $
       compileErrorCode (
         "const A : [usize; 4] = {5 : usize, 6 : usize, 7 : usize, 8 : usize};\n" ++

@@ -1128,17 +1128,19 @@ typeExpression Nothing typeObj (Constant c@Null pann) = do
   return $ SAST.Constant typed_c (buildExpAnn pann TUnit)
 typeExpression expectedType typeObj (Casting e nts pann) = do
   nty <- typeTypeSpecifier pann typeObj nts
-  mapM_ (flip (sameTyOrError pann) nty) expectedType
   -- | Casting Expressions.
   typed_exp <- typeExpression Nothing typeObj e
   type_exp <- getExprType typed_exp
-  if casteableTys type_exp nty
-  then 
-    case (nty, type_exp) of 
-      (TConstSubtype _, TConstSubtype _) -> return (SAST.Casting typed_exp nty (buildExpAnn pann nty))
-      (_, TConstSubtype _) -> return (SAST.Casting typed_exp nty (buildExpAnn pann (TConstSubtype nty)))
-      (_, _) -> return (SAST.Casting typed_exp nty (buildExpAnn pann nty))
-  else throwError (annotateError pann $ ENotCasteable type_exp nty)
+  unless (casteableTys type_exp nty) (throwError (annotateError pann $ ENotCasteable type_exp nty))
+  -- | The cast of a constant is a constant, so the expected type is checked
+  -- against the type of the result and not against the type written.
+  let result_ty =
+        case (nty, type_exp) of
+          (TConstSubtype _, TConstSubtype _) -> nty
+          (_, TConstSubtype _) -> TConstSubtype nty
+          (_, _) -> nty
+  mapM_ (flip (sameTyOrError pann) result_ty) expectedType
+  return (SAST.Casting typed_exp nty (buildExpAnn pann result_ty))
 typeExpression expectedType typeObj (BinOp op le re pann) = do
 
   case op of
