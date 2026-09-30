@@ -158,9 +158,7 @@ instance Diagnosable Error where
     describe (EFailingCheck failure reasons) =
         withReasons reasons $
             diagnostic "VAE-003" "operation that always fails"
-                (saysReasons reasons <> saysFailure failure
-                    <> " The check the generated code makes raises an exception"
-                    <> " every time this operation runs.")
+                (saysReasons reasons <> saysFailure failure)
 
       where
 
