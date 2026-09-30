@@ -12,9 +12,7 @@ import Control.Monad.Except
 import qualified Control.Monad.State as ST
 import EFP.Schedulability.WCET.Errors
 import EFP.Schedulability.WCET.AST
-import qualified Data.Set as S
 import Control.Monad
-import Utils.Monad
 import Configuration.Platform
 import ControlFlow.Architecture.Utils
 import EFP.Schedulability.Core.Types
@@ -30,23 +28,10 @@ data TransPathState = TransPathState
         progArch :: TerminaProgArch SemanticAnn
         , transPathMap :: WCEPathMap WCEPSemAnn 
         , globalConsts :: TPGlobalConstsEnv
-        , localConsts :: S.Set Identifier
         , transWCETs :: WCETimesMap WCETSemAnn
     } deriving Show
 
 type TransPathMonad = ExceptT WCEPathErrors (ST.State TransPathState)
-
--- | Insert immutable object (variable) in local scope.
-insertConstParameter :: Location -> Identifier -> TransPathMonad ()
-insertConstParameter loc ident = do
-  prev <- ST.gets (M.lookup ident . globalConsts)
-  case prev of
-    Just prevLoc -> throwError $ annotateError loc $ EConstVarAlreadyDefined (ident, prevLoc)
-    Nothing -> do
-        prevParam <- ST.gets (S.member ident . localConsts)
-        when prevParam $
-            throwError $ annotateError loc $ EConstParamAlreadyDefined ident
-        ST.modify (\s -> s{localConsts = S.insert ident (localConsts s)})
 
 getTPClass :: Location -> Identifier -> TransPathMonad (TPClass SemanticAnn)
 getTPClass loc classId = do
@@ -70,10 +55,8 @@ typeConstExpression (ConstDouble d ann) =
     return $ ConstDouble d (WCETExprTy TConstDouble (getLocation ann))
 typeConstExpression (ConstObject ident ann) = do
     isGlobalConst <- ST.gets (M.member ident . globalConsts)
-    unless isGlobalConst $ do
-        isLocalConst <- ST.gets (S.member ident . localConsts)
-        unless isLocalConst $
-            throwError . annotateError (getLocation ann) $ EUnknownVariable ident
+    unless isGlobalConst $
+        throwError . annotateError (getLocation ann) $ EUnknownVariable ident
     -- | For now, all constants are of integer type: Termina does not support other constant types yet.
     return $ ConstObject ident (WCETExprTy TConstInt (getLocation ann))
 typeConstExpression (ConstBinOp op left right ann) = do
@@ -87,7 +70,7 @@ typeConstExpression (ConstBinOp op left right ann) = do
         _ -> throwError . annotateError Internal $ EInvalidConstExpressionOperandTypes
 
 typeWCET :: Identifier -> TransactionalWCET ParserAnn -> TransPathMonad (TransactionalWCET WCETSemAnn)
-typeWCET plt (TransactionalWCET classId functionId pathName constParams wcet ann) = do
+typeWCET plt (TransactionalWCET classId functionId pathName wcet ann) = do
     tpClass <- getTPClass (getLocation ann) classId
     let clsLoc = getLocation . classAnns $ tpClass
     if sameSource clsLoc (getLocation ann) then
@@ -96,7 +79,7 @@ typeWCET plt (TransactionalWCET classId functionId pathName constParams wcet ann
         throwError . annotateError (getLocation ann) $ EClassPathMismatch classId (clsLoc, getLocation ann)
     case M.lookup functionId (classMemberFunctions tpClass) of
         Nothing -> throwError . annotateError (getLocation ann) $ EUnknownMemberFunction functionId (classIdentifier tpClass, getLocation . classAnns $ tpClass)
-        Just (TPFunction _ params _ _ fann) -> do
+        Just _ -> do
             trPaths <- ST.gets transPathMap
             case M.lookup (classId, functionId) trPaths of
                 Nothing -> throwError . annotateError (getLocation ann) $ EUnknownTransactionalPath functionId classId pathName
@@ -113,17 +96,10 @@ typeWCET plt (TransactionalWCET classId functionId pathName constParams wcet ann
             -- | Check that there is no other worst-case execution time defined for the same path and platform
             case M.lookup pathName functionWCETs of
                 Nothing -> return ()
-                Just (TransactionalWCET _ _ _ _ _ ann') ->
+                Just (TransactionalWCET _ _ _ _ ann') ->
                     throwError . annotateError (getLocation ann) $ EDuplicatedWCETAssignment pathName plt (classId, functionId, getLocation ann')
-            let funcConstParams = [name | Parameter name (TConstSubtype _) _ <- params]
-            if length funcConstParams /= length constParams then
-                throwError . annotateError (getLocation ann) $ 
-                    EConstParamsNumMismatch classId functionId (toInteger (length funcConstParams)) (toInteger (length constParams)) (getLocation fann)
-            else do
-                tyWCET <- localScope $ 
-                    mapM_ (insertConstParameter (getLocation ann)) constParams >>
-                    typeConstExpression wcet
-                return $ TransactionalWCET classId functionId pathName constParams tyWCET (WCETTy (getLocation ann))
+            tyWCET <- typeConstExpression wcet
+            return $ TransactionalWCET classId functionId pathName tyWCET (WCETTy (getLocation ann))
 
 typeWCETPlatformAssignment :: WCETPlatformAssignment ParserAnn -> TransPathMonad ()
 typeWCETPlatformAssignment (WCETPlatformAssignment plt wcets ann) = do
@@ -135,7 +111,7 @@ typeWCETPlatformAssignment (WCETPlatformAssignment plt wcets ann) = do
 
     where 
 
-    insertPathWCET path@(TransactionalWCET classId functionId pathName _ _ _) =
+    insertPathWCET path@(TransactionalWCET classId functionId pathName _ _) =
         ST.modify $ \s ->
             let newPath = M.singleton (classId, functionId)
                     (M.singleton pathName path) in
@@ -149,7 +125,7 @@ runWCETTypeChecking :: TerminaProgArch SemanticAnn
     -> Either WCEPathErrors (WCETimesMap WCETSemAnn)
 runWCETTypeChecking arch trPathMap prevMap wcetPltAssig =
     let gConsts = getLocation . constantAnn <$> globalConstants arch
-        initialState = TransPathState arch trPathMap gConsts S.empty prevMap in
+        initialState = TransPathState arch trPathMap gConsts prevMap in
     case ST.runState (runExceptT (mapM_ typeWCETPlatformAssignment wcetPltAssig)) initialState of
         (Left err, _) -> Left err
         (_, st) -> Right (transWCETs st)

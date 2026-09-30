@@ -86,11 +86,8 @@ evalConstExpression ::
     ConstExpression a -> TRPGenMonad (ConstExpression TRPSemAnn)
 evalConstExpression (ConstInt val _) = return $ ConstInt val (TRPExprTy TConstInt)
 evalConstExpression (ConstDouble val _) = return $ ConstDouble val (TRPExprTy TConstDouble)
-evalConstExpression (ConstObject ident _ann) = do
-    env <- gets localConstEnv
-    case M.lookup ident env of
-        Just val -> return val
-        Nothing -> throwError . annotateError Internal $ EUnknownConstant ident
+evalConstExpression (ConstObject ident _ann) =
+    throwError . annotateError Internal $ EUnknownConstant ident
 evalConstExpression (ConstBinOp op left right _ann) = do
     -- | Evaluate left and right expressions first
     left' <- evalConstExpression left

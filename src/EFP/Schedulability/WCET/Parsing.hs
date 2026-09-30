@@ -170,10 +170,9 @@ transactionalWCETParser = do
     elementName <- identifierParser
     _ <- reservedOp "::"
     memberFunction <- identifierParser
-    constParams <- parens (sepBy identifierParser comma)
     _ <- reservedOp "="
     wcet <- constExpressionParser
-    TransactionalWCET clsName elementName memberFunction constParams wcet . Position current startPos <$> getPosition
+    TransactionalWCET clsName elementName memberFunction wcet . Position current startPos <$> getPosition
 
 platformAssignmentParser :: WCETParser (WCETPlatformAssignment ParserAnn)
 platformAssignmentParser = do

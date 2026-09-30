@@ -11,8 +11,6 @@ import EFP.Schedulability.TransPath.Types
 import Configuration.Configuration
 import EFP.Schedulability.WCET.Types
 
-type TRPGenEnvironment = M.Map Identifier (ConstExpression TRPSemAnn)
-
 data TRPGenState = TRPGenState
     {
         progArch :: TerminaProgArch SemanticAnn
@@ -20,19 +18,10 @@ data TRPGenState = TRPGenState
         , resourceLockingMap :: ResourceLockingMap
         , transPaths :: WCEPathMap WCEPSemAnn
         , transWCETs :: WCETimesMap WCETSemAnn
-        , localConstEnv :: TRPGenEnvironment
         , operationMap :: TRPOperationMap TRPSemAnn
     } deriving Show
 
-type TRPGenMonad = ExceptT TRPGenErrors (ST.State TRPGenState) 
-
-localInputScope :: TRPGenMonad a -> TRPGenMonad a
-localInputScope comp = do
-  prevst <- ST.get
-  res <- comp
-  currst <- ST.get
-  ST.put (currst { localConstEnv = localConstEnv prevst })
-  return res
+type TRPGenMonad = ExceptT TRPGenErrors (ST.State TRPGenState)
 
 newActivityMap :: TRPGenMonad ()
 newActivityMap = do

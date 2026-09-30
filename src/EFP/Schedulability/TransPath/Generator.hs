@@ -152,7 +152,7 @@ getWCETForPath loc platformId componentClass memberName pathId = do
                 Just pathWCETs -> do
                     case M.lookup pathId pathWCETs of
                         Nothing -> throwError . annotateError loc $ ENoWCETForPath componentClass memberName pathId platformId
-                        Just (TransactionalWCET _ _ _ _params expr _) -> do
+                        Just (TransactionalWCET _ _ _ expr _) -> do
                             evalExpr <- evalConstExpression expr
                             case evalExpr of
                                 ConstInt (TInteger val _) _ -> return (fromIntegral val)
@@ -178,14 +178,13 @@ genPaths componentName (WCEPathMemberFunctionCall memberName pos ann) = do
     case M.lookup (componentClass, memberName) transPathsMap of
         Just pathsMap -> do
             concat <$> forM (M.elems pathsMap) (\(WCEPath _ _ pathId innerBlocks _) -> do
-                localInputScope $ do
-                    -- | Obtain the worst-case execution time for the path
-                    wcet <- getWCETForPath (getLocation ann) platformId componentClass memberName pathId
-                    paths <- genTPaths componentName [(wcet, [])] innerBlocks
-                    mapM (\(wcet', blocks) -> do
-                        lockSet <- foldlM getResourceLockSet S.empty blocks
-                        let act = TRPResourceOperation componentName memberName pathId (reverse blocks) wcet' (TRPOperationTy lockSet)
-                        return (wcet', TPBlockMemberFunctionCall act pos TRPBlockTy)) paths)
+                -- | Obtain the worst-case execution time for the path
+                wcet <- getWCETForPath (getLocation ann) platformId componentClass memberName pathId
+                paths <- genTPaths componentName [(wcet, [])] innerBlocks
+                mapM (\(wcet', blocks) -> do
+                    lockSet <- foldlM getResourceLockSet S.empty blocks
+                    let act = TRPResourceOperation componentName memberName pathId (reverse blocks) wcet' (TRPOperationTy lockSet)
+                    return (wcet', TPBlockMemberFunctionCall act pos TRPBlockTy)) paths)
         Nothing -> throwError . annotateError (getLocation ann) $ ENoPathsFound componentClass memberName
 genPaths componentName (WCEPProcedureInvoke portName procedureName pos ann) = do
     resLockMap <- gets resourceLockingMap
@@ -201,17 +200,16 @@ genPaths componentName (WCEPProcedureInvoke portName procedureName pos ann) = do
     case M.lookup (componentClass, procedureName) transPathsMap of
         Just pathsMap -> do
             concat <$> forM (M.elems pathsMap) (\(WCEPath _ _ pathId innerBlocks _) -> do
-                localInputScope $ do
-                    -- | Obtain the worst-case execution time for the path
-                    wcet <- getWCETForPath (getLocation ann) platformId componentClass procedureName pathId
-                    paths <- genTPaths targetComponent [(wcet, [])] innerBlocks
-                    mapM (\(wcet', blocks) -> do
-                        let initialLockSet = if isLocked then
-                                S.singleton (targetComponent, procedureName, pathId)
-                            else S.empty
-                        lockSet <- foldlM getResourceLockSet initialLockSet blocks
-                        let act = TRPResourceOperation targetComponent procedureName pathId (reverse blocks) wcet' (TRPOperationTy lockSet)
-                        return (wcet', TPBlockProcedureInvoke act pos TRPBlockTy)) paths)
+                -- | Obtain the worst-case execution time for the path
+                wcet <- getWCETForPath (getLocation ann) platformId componentClass procedureName pathId
+                paths <- genTPaths targetComponent [(wcet, [])] innerBlocks
+                mapM (\(wcet', blocks) -> do
+                    let initialLockSet = if isLocked then
+                            S.singleton (targetComponent, procedureName, pathId)
+                        else S.empty
+                    lockSet <- foldlM getResourceLockSet initialLockSet blocks
+                    let act = TRPResourceOperation targetComponent procedureName pathId (reverse blocks) wcet' (TRPOperationTy lockSet)
+                    return (wcet', TPBlockProcedureInvoke act pos TRPBlockTy)) paths)
         Nothing -> throwError . annotateError (getLocation ann) $ ENoPathsFound componentClass procedureName
 genPaths componentName (WCEPathCondIf innerBlocks pos _ann) = do
     innerPaths <- genTPaths componentName [(0, [])] innerBlocks
@@ -291,7 +289,7 @@ genTPActivitiesFromAction (RTTransStepAction stepName componentName actionName p
         Just pathsMap ->
             case M.lookup pathName pathsMap of
                 Just (WCEPath _ _ _ innerBlocks _) -> do
-                    operations <- localInputScope $ do
+                    operations <- do
                         -- | Obtain the worst-case execution time for the path
                         wcet <- getWCETForPath (getLocation ann) platformId componentClass actionName pathName
                         paths <- genTPaths componentName [(wcet, [])] innerBlocks
@@ -321,7 +319,7 @@ runTransPathGenerator :: TerminaProgArch SemanticAnn
     -> RTElement RTSemAnn
     -> Either TRPGenErrors (TransactionPath TRPSemAnn)
 runTransPathGenerator arch config wcepMap wcetMap (RTTransaction _ initialStep@(RTTransStepAction stepName _ _ _ _ _) _) =
-    let initialState = TRPGenState arch config (genResourceLockings arch) wcepMap wcetMap M.empty M.empty in
+    let initialState = TRPGenState arch config (genResourceLockings arch) wcepMap wcetMap M.empty in
     case ST.runState (runExceptT (genTPActivitiesFromAction initialStep)) initialState of
         (Left err, _) -> Left err
         (_, st) -> Right $ SimpleTransactionPath stepName (operationMap st) TRPTransactionsPathTy
@@ -336,7 +334,7 @@ runTransPathGenerator arch config wcepMap wcetMap (RTTransaction _ (RTTransStepC
         generateBranches [] = Right []
         generateBranches ((condExpr, initialStep@(RTTransStepAction stepName _ _ _ _ _)) : xs) = do
             rest <- generateBranches xs
-            let initialState = TRPGenState arch config (genResourceLockings arch) wcepMap wcetMap M.empty M.empty
+            let initialState = TRPGenState arch config (genResourceLockings arch) wcepMap wcetMap M.empty
             case ST.runState (runExceptT (genTPActivitiesFromAction initialStep)) initialState of
                 (Left err, _) -> Left err
                 (Right _, st) -> Right $ (condExpr, stepName, operationMap st) : rest

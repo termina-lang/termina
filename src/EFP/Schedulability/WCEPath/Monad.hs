@@ -5,7 +5,6 @@ import EFP.Schedulability.WCEPath.AST
 import Utils.Annotations
 import ControlFlow.Architecture.Types
 import Semantic.Types
-import qualified Data.Set as S
 import EFP.Schedulability.WCEPath.Types
 import Control.Monad.Except
 import EFP.Schedulability.WCEPath.Errors
@@ -18,7 +17,6 @@ data TransPathState = TransPathState
     {
         progArch :: TerminaProgArch SemanticAnn
         , globalConsts :: TPGlobalConstsEnv
-        , localConsts :: S.Set Identifier
         , transPaths :: WCEPathMap WCEPSemAnn
     } deriving Show
 

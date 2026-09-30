@@ -93,7 +93,7 @@ families =
   , Family "Worst-case times (WTE)" "WTE"
       "src/EFP/Schedulability/WCET/Errors.hs" [] []
       [ "WTE-001", "WTE-002", "WTE-003", "WTE-004", "WTE-005", "WTE-006"
-      , "WTE-007", "WTE-008", "WTE-009", "WTE-010", "WTE-011" ]
+      , "WTE-007", "WTE-008" ]
   , Family "Real-time model (RTE)" "RTE"
       "src/EFP/Schedulability/RT/Errors.hs" [] []
       [ "RTE-" ++ pad n | n <- [1 .. 44 :: Int] ]

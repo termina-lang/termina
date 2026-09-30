@@ -11,7 +11,6 @@ import Control.Monad.Except
 import qualified Control.Monad.State as ST
 import EFP.Schedulability.WCEPath.Errors
 import EFP.Schedulability.WCEPath.AST
-import qualified Data.Set as S
 import Control.Monad
 import ControlFlow.Architecture.Utils
 import EFP.Schedulability.Core.Types
@@ -40,10 +39,8 @@ typeConstExpression (ConstDouble d ann) =
     return $ ConstDouble d (WCEPExprTy TConstDouble (getLocation ann))
 typeConstExpression (ConstObject ident ann) = do
     isGlobalConst <- ST.gets (M.member ident . globalConsts)
-    unless isGlobalConst $ do
-        isLocalConst <- ST.gets (S.member ident . localConsts)
-        unless isLocalConst $
-            throwError . annotateError (getLocation ann) $ EUnknownVariable ident
+    unless isGlobalConst $
+        throwError . annotateError (getLocation ann) $ EUnknownVariable ident
     -- | For now, all constants are of integer type: Termina does not support other constant types yet.
     return $ ConstObject ident (WCEPExprTy TConstInt (getLocation ann))
 typeConstExpression (ConstBinOp op left right ann) = do
@@ -149,7 +146,7 @@ runWCEPathTypeChecking :: TerminaProgArch SemanticAnn
     -> Either WCEPathErrors (WCEPathMap WCEPSemAnn)
 runWCEPathTypeChecking arch prevMap paths =
     let gConsts = getLocation . constantAnn <$> globalConstants arch
-        initialState = TransPathState arch gConsts S.empty prevMap in
+        initialState = TransPathState arch gConsts prevMap in
     case ST.runState (runExceptT (typeTransPaths paths)) initialState of
         (Left err, _) -> Left err
         (_, st) -> Right (transPaths st)

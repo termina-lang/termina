@@ -17,7 +17,6 @@ data Error
     | EUnknownComponent Identifier -- ^ Unknown component referenced in transactional step (internal)
     | EUnknownAction -- ^ Unknown action referenced in transactional step (internal)
     | EInvalidForLoop -- ^ Invalid for-loop structure in transactional step (internal)
-    | EInvalidArgumentPassing -- ^ Invalid argument passing to transactional step (internal)
     | EUnknownAccessPort Identifier Identifier -- ^ Unknown access port referenced in worst-case execution path (internal)
     | EInvalidWCETExpression -- ^ Invalid worst-case execution time expression (internal)
     | EConstExpressionDivisionByZero -- ^ Division by zero in constant expression (internal)

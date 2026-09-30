@@ -9,7 +9,6 @@ data TransactionalWCET a
         Identifier -- ^ class name
         Identifier -- ^ action/procedure name
         Identifier -- ^ path name
-        [Identifier] -- ^ constant parameters
         (ConstExpression a) -- ^ WCET expression
         a -- ^ annotation
     deriving Show
