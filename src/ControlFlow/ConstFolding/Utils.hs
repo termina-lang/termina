@@ -128,12 +128,15 @@ evalBinOp plt loc Multiplication (I (TInteger lhs lhsRepr) _) (I (TInteger rhs r
     return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
   else
     throwError $ annotateError loc (EConstIntegerOverflow result ty)
-evalBinOp _ loc Division (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
+evalBinOp plt loc Division (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
   if rhs == 0 then
     throwError $ annotateError loc EConstDivisionByZero
   else
-  let result = lhs `div` rhs in
-  return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
+  let result = lhs `quot` rhs in
+  if memberIntCons plt result ty then
+    return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
+  else
+    throwError $ annotateError loc (EConstIntegerOverflow result ty)
 evalBinOp plt loc Addition (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
   let result = lhs + rhs in
   if memberIntCons plt result ty then
@@ -150,7 +153,7 @@ evalBinOp _ loc Modulo (I (TInteger lhs repr) _) (I (TInteger rhs _) _) ty =
   if rhs == 0 then
     throwError $ annotateError loc EConstDivisionByZero
   else
-  let result = lhs `mod` rhs in
+  let result = lhs `rem` rhs in
   return $ I (TInteger result repr) (Just ty)
 evalBinOp plt loc BitwiseLeftShift (I (TInteger lhs repr) _) (I (TInteger rhs _) _) ty =
   if rhs >= shiftWidth plt ty then

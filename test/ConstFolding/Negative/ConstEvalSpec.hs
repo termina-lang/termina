@@ -40,6 +40,18 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CFE-006")
 
+    it "CFE-006: divisor that a truncated quotient makes zero" $ do
+      let src = "function f() -> i32 {\n" ++
+                "    return 10 : i32 / (-7 : i32 / 2 : i32 + 3 : i32);\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "CFE-006")
+
+    it "CFE-004: constant quotient of the minimum of the type by -1" $ do
+      let src = "function f() -> i8 {\n" ++
+                "    return -128 : i8 / -1 : i8;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "CFE-004")
+
     it "CFE-008: for loop with zero iterations" $ do
       let src = "function f() {\n" ++
                 "    for i : usize in 3 : usize .. 3 : usize {\n" ++

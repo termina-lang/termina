@@ -444,6 +444,14 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "VAE-003")
 
+    it "VAE-003: divisor that a truncated quotient makes zero" $ do
+      let src = "function f() -> i32 {\n" ++
+                "    var x : i32 = -7;\n" ++
+                "    let q : i32 = x / 2 : i32;\n" ++
+                "    return 10 : i32 / (q + 3 : i32);\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-003")
+
     it "VAE-003: signed addition whose result never fits its type" $ do
       let src = "function f(a : i8) -> i8 {\n" ++
                 "    var r : i8 = 0;\n" ++
