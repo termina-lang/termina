@@ -571,8 +571,6 @@ foldBasicBlock (ForLoopBlock iter ty from_expr to_expr mWhile body_stmt ann) = d
   let stmtLoc = getLocation ann
   ann' <- foldAnnotation ann
   ty' <- foldType stmtLoc ty
-  from_expr' <- foldExpression from_expr
-  to_expr' <- foldExpression to_expr
   body_stmt' <- foldBasicBlocks body_stmt
   mWhile' <- mapM foldExpression mWhile
   fromValue <- evalConstExpression from_expr
@@ -584,6 +582,9 @@ foldBasicBlock (ForLoopBlock iter ty from_expr to_expr mWhile body_stmt ann) = d
       else when (lhs > rhs)
         (throwError $ annotateError stmtLoc (EForLoopStatementNegativeIterations lhs rhs))
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
+  -- | The bounds are written as the values they fold to.
+  let from_expr' = Constant fromValue (buildExpAnn (getLocation (getAnnotation from_expr)) ty')
+      to_expr' = Constant toValue (buildExpAnn (getLocation (getAnnotation to_expr)) ty')
   return $ ForLoopBlock iter ty' from_expr' to_expr' mWhile' body_stmt' ann'
 foldBasicBlock (MatchBlock expr cases mDefaultCase ann) = do
   expr' <- foldExpression expr
