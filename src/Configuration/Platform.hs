@@ -69,6 +69,15 @@ maxIdentifierLength RTEMS5LEON3NEXYSA7    = Nothing
 maxIdentifierLength FreeRTOS10STM32L432XX = Nothing
 maxIdentifierLength TestPlatform          = Nothing
 
+-- | The longest period, in ticks, that a periodic timer may have on a platform,
+-- or @Nothing@ when the runtime keeps the next expiry as a @TimeVal@ and the
+-- type of the period is the only bound.
+maxTimerPeriodTicks :: Platform -> Maybe Integer
+maxTimerPeriodTicks POSIXGCC              = Nothing
+maxTimerPeriodTicks RTEMS5LEON3NEXYSA7    = Just 0xFFFFFFFF
+maxTimerPeriodTicks FreeRTOS10STM32L432XX = Just 0xFFFFFFFF
+maxTimerPeriodTicks TestPlatform          = Just 0xFFFFFFFF
+
 data PlatformFlags = PlatformFlags {
     rtems5_leon3_nexysa7        :: RTEMS5LEON3NEXYSA7Flags,
     posix_gcc                :: POSIXGCCFlags,

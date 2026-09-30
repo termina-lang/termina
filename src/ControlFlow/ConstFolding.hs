@@ -11,6 +11,7 @@ import qualified Control.Monad.State as ST
 import qualified Data.Map as M
 import ControlFlow.ConstFolding.Utils
 import Control.Monad
+import Configuration.Platform (maxTimerPeriodTicks)
 import Core.Utils
 import Command.Types
 import Modules.Modules
@@ -739,9 +740,13 @@ foldGlobal (Emitter ident ty mInitExpr mods ann) = do
       seconds <- periodField "tv_sec" fields
       microseconds <- periodField "tv_usec" fields
       tick <- ST.gets tickMicroseconds
+      plt <- ST.gets targetPlatform
       let period = seconds * 1000000 + microseconds
       unless (period > 0 && period `mod` tick == 0) $
         throwError $ annotateError glbLoc (ETimerPeriodNotInTicks ident period tick)
+      forM_ (maxTimerPeriodTicks plt) $ \maxTicks ->
+        when (period `div` tick > maxTicks) $
+          throwError $ annotateError glbLoc (ETimerPeriodTooLong ident (period `div` tick) maxTicks)
     _ -> return ()
   return $ Emitter ident ty' mInitExpr' mods ann'
 

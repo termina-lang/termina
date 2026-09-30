@@ -113,6 +113,15 @@ spec = do
              ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
       compileErrorCode src `shouldBe` Just (pack "CFE-019")
 
+    -- | 50000000 s are 5000000000 ticks of 10000 microseconds, above the
+    -- 32-bit count the test platform admits.
+    it "CFE-020: timer period longer than the platform admits" $ do
+      let src = timerTaskClass
+             ++ "emitter timer : PeriodicTimer = { period = {tv_sec = 50000000, tv_usec = 0} };\n"
+             ++ "#[priority(1)]\n"
+             ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
+      compileErrorCode src `shouldBe` Just (pack "CFE-020")
+
     it "CFE-019: timer period off the tick after folding a constant" $ do
       let src = "constexpr half_tick : u32 = 5000 : u32;\n"
              ++ timerTaskClass

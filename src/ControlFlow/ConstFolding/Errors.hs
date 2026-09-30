@@ -51,6 +51,7 @@ data Error =
   | EInvariantComparison Integer (TerminaType SemanticAnn) Bool -- ^ Comparison against a constant with a fixed result
   | ETaskPriorityOutOfRange Identifier Integer -- ^ Task priority out of range (task, priority)
   | ETimerPeriodNotInTicks Identifier Integer Integer -- ^ Period of a periodic timer that is not a whole number of ticks (timer, period and tick in microseconds)
+  | ETimerPeriodTooLong Identifier Integer Integer -- ^ Period of a periodic timer longer than the platform admits (timer, period and maximum in ticks)
   | EInvalidTimerPeriod -- ^ Initializer of a periodic timer without a constant period (internal)
   deriving Show
 
@@ -136,6 +137,11 @@ instance Diagnosable Error where
                 emph (T.pack (show period)) <> " microseconds, but it must be a " <>
                 "positive multiple of the tick of " <>
                 emph (T.pack (show tick)) <> " microseconds.")
+    describe (ETimerPeriodTooLong timer ticks maxTicks) =
+        diagnostic "CFE-020" "timer period too long for the platform"
+            ("The period of the periodic timer " <> emph (T.pack timer) <> " is " <>
+                emph (T.pack (show ticks)) <> " ticks, but the platform admits at most " <>
+                emph (T.pack (show maxTicks)) <> ".")
     -- | Everything else is a broken invariant of the compiler, which has no code
     -- of its own.
     describe _ = diagnosticWithoutDetail "Internal" "internal error"
