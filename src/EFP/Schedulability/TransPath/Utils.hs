@@ -11,6 +11,7 @@ import EFP.Schedulability.TransPath.Errors
 import Data.Foldable
 import qualified Data.Set as S
 import ControlFlow.Architecture.Types
+import qualified Semantic.AST as SAST
 
 evalBinOp ::
     Op
@@ -86,8 +87,14 @@ evalConstExpression ::
     ConstExpression a -> TRPGenMonad (ConstExpression TRPSemAnn)
 evalConstExpression (ConstInt val _) = return $ ConstInt val (TRPExprTy TConstInt)
 evalConstExpression (ConstDouble val _) = return $ ConstDouble val (TRPExprTy TConstDouble)
-evalConstExpression (ConstObject ident _ann) =
-    throwError . annotateError Internal $ EUnknownConstant ident
+evalConstExpression (ConstObject ident _ann) = do
+    -- | The only names a constant expression can use are global constants,
+    -- whose value the constant folding has left as a literal
+    glbMap <- gets (globalConstants . progArch)
+    case M.lookup ident glbMap of
+        Just (TPGlobalConstant _ _ (SAST.Constant (SAST.I val _) _) _) ->
+            return $ ConstInt val (TRPExprTy TConstInt)
+        _ -> throwError . annotateError Internal $ EUnknownConstant ident
 evalConstExpression (ConstBinOp op left right _ann) = do
     -- | Evaluate left and right expressions first
     left' <- evalConstExpression left
