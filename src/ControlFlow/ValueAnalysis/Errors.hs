@@ -56,6 +56,20 @@ data Reason = Reason
   }
   deriving Show
 
+-- | Why the run-time check of an operation fails every time the operation
+-- runs, with the values the pass gives the quantity the check tests, both ends
+-- included.
+data Failure =
+    -- | The index of an array access, and the size of the array.
+    IndexOutside Integer Integer Integer
+    -- | The amount of a shift, and the width of the value shifted.
+  | AmountOutside Integer Integer Integer
+    -- | The divisor of a division or a remainder, which is zero.
+  | DivisorZero
+    -- | The result of a signed operation, which the type cannot hold.
+  | ResultOutside Integer Integer
+  deriving Show
+
 data Error =
     -- | Condition with the same value on every evaluation, with what the pass
     -- knows of each name it reads (VAE-001)
@@ -63,6 +77,9 @@ data Error =
     -- | Case of a match the object it discriminates on can never hold, with
     -- the name of the variant and what the pass knows of that object (VAE-002)
   | EUnreachableCase Identifier [Reason]
+    -- | Operation whose run-time check fails every time it runs, with what
+    -- the pass knows of each name it reads (VAE-003)
+  | EFailingCheck Failure [Reason]
   deriving Show
 
 type ValueAnalysisError = AnnotatedError Error Location
@@ -137,6 +154,43 @@ instance Diagnosable Error where
                     <> " never holds " <> emph (T.pack variant)
                     <> " where the match is reached, so the body of this case"
                     <> " never runs.")
+
+    describe (EFailingCheck failure reasons) =
+        withReasons reasons $
+            diagnostic "VAE-003" "operation that always fails"
+                (saysReasons reasons <> saysFailure failure
+                    <> " The check the generated code makes raises an exception"
+                    <> " every time this operation runs.")
+
+      where
+
+        saysFailure (IndexOutside lo hi size)
+            | said lo hi = "The index always falls outside an array of "
+                <> emph (number size) <> " elements."
+            | otherwise = "The index " <> isRange lo hi <> ", outside an array of "
+                <> emph (number size) <> " elements."
+        saysFailure (AmountOutside lo hi width)
+            | said lo hi = "The shift amount is never below the width of "
+                <> emph (number width) <> " bits of the value shifted."
+            | otherwise = "The shift amount " <> isRange lo hi <> ", not below the width of "
+                <> emph (number width) <> " bits of the value shifted."
+        saysFailure DivisorZero = "The divisor is " <> emph "0" <> "."
+        saysFailure (ResultOutside lo hi) =
+            "The result " <> isRange lo hi <> ", outside the range of its type."
+
+        isRange lo hi
+            | lo == hi = "is " <> emph (number lo)
+            | otherwise = "is between " <> emph (number lo) <> " and " <> emph (number hi)
+
+        -- | Whether one of the reasons already gives the quantity these values,
+        -- which is the case when the operand is a variable read outright.
+        said lo hi = any (gives lo hi . reasonHolds) reasons
+
+        gives lo hi (Between lo' hi') = lo == lo' && hi == hi'
+        gives lo hi (OneValue (I (TInteger v _) _)) = lo == hi && v == lo
+        gives _ _ _ = False
+
+        number = T.pack . show
 
 instance ErrorMessage ValueAnalysisError where
 

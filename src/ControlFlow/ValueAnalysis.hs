@@ -48,7 +48,8 @@ module ControlFlow.ValueAnalysis
 
 import qualified Data.Map.Strict as M
 import Control.Monad (unless)
-import Data.List (isPrefixOf, nub)
+import Data.Function (on)
+import Data.List (isPrefixOf, nub, nubBy, sortOn)
 import Data.Maybe (listToMaybe, mapMaybe)
 import Data.Ord (comparing)
 import Data.Bits ((.&.), (.|.), xor)
@@ -276,6 +277,11 @@ data ValueAnalysisGlobal = ValueAnalysisGlobal
     -- it. A loop meets a check once per turn and the check holds only if it
     -- holds on every one of them.
     proofs :: M.Map ObligationId (Maybe Evidence)
+    -- | For each run-time check the walk has met, the operation and the state
+    -- of the path there, which the diagnostic reads to tell whether the check
+    -- fails every time. A loop overwrites it on every turn, as it does
+    -- 'observed', so what is left is the settled state.
+  , met :: M.Map ObligationId (Operation, ValueAnalysisPath)
   }
 
 type ValueAnalysisMonad = DataflowM ValueAnalysisPath ValueAnalysisGlobal ValueAnalysisError
@@ -468,7 +474,8 @@ recordObligation (Obligation oid@(_, kind) operation) = do
   global <- getGlobal
   locals <- getPath
   let shown = Evidence "value" <$> holdsBy global locals kind operation
-  modifyGlobal (\g -> g { proofs = M.insertWith both oid shown (proofs g) })
+  modifyGlobal (\g -> g { proofs = M.insertWith both oid shown (proofs g)
+                        , met = M.insert oid (operation, locals) (met g) })
 
   where
 
@@ -482,21 +489,21 @@ holdsBy ::
 holdsBy global locals kind operation =
   case (kind, operation) of
     (IndexInBounds, IndexOperation obj index) -> do
-      size <- getTypeSemAnn (getAnnotation obj) >>= arrayOf >>= integerOfSize . snd
-      (lo, hi) <- ends <$> integersIn index
+      size <- arraySize global locals obj
+      (lo, hi) <- ends <$> integersIn global locals index
       if lo >= 0 && hi < size then Just ("the index stays between " ++ between lo hi) else Nothing
     (ShiftBelowWidth, BinaryOperation _ left right) -> do
-      width <- operandType left >>= \ty -> if intTy ty then Just (shiftWidth plt ty) else Nothing
-      (lo, hi) <- ends <$> integersIn right
+      width <- shiftBound plt left
+      (lo, hi) <- ends <$> integersIn global locals right
       if lo >= 0 && hi < width then Just ("the amount stays between " ++ between lo hi) else Nothing
     (NonZeroDivisor, BinaryOperation _ _ right) -> do
-      values <- integersIn right
+      values <- integersIn global locals right
       if excludesZero values then Just ("the divisor stays between " ++ uncurry between (ends values)) else Nothing
     (NoOverflow, BinaryOperation op left right) -> do
-      ty <- operandType left
+      ty <- getTypeSemAnn (getAnnotation left)
       (tlo, thi) <- intRange plt ty
-      leftValues <- integersIn left
-      rightValues <- integersIn right
+      leftValues <- integersIn global locals left
+      rightValues <- integersIn global locals right
       case op of
         -- | The only quotient that overflows is the minimum of the type
         -- divided by minus one.
@@ -513,12 +520,6 @@ holdsBy global locals kind operation =
 
     plt = platform global
 
-    integersIn expr = valuesIn global locals expr >>= integersOf
-
-    operandType expr = getTypeSemAnn (getAnnotation expr)
-
-    integerOfSize size = evaluate plt (moduleConsts global) locals size >>= integerOfConst
-
     between lo hi = show lo ++ " and " ++ show hi
 
     excludesZero (Listed values) = S.notMember 0 values
@@ -526,6 +527,70 @@ holdsBy global locals kind operation =
 
     holdsValue v (Listed values) = S.member v values
     holdsValue v (Spanning lo hi) = lo <= v && v <= hi
+
+-- | Why a check fails every time, when the values its operands may take are
+-- all ones for which it does. The values of the path cover every value the
+-- operands take at run time, so a check that none of them passes raises its
+-- exception on every execution that reaches the operation.
+failsBy ::
+  ValueAnalysisGlobal -> ValueAnalysisPath -> CheckKind -> Operation -> Maybe Failure
+failsBy global locals kind operation =
+  case (kind, operation) of
+    (IndexInBounds, IndexOperation obj index) -> do
+      size <- arraySize global locals obj
+      values <- integersIn global locals index
+      if outside 0 (size - 1) values then Just (uncurry IndexOutside (ends values) size) else Nothing
+    (ShiftBelowWidth, BinaryOperation _ left right) -> do
+      width <- shiftBound plt left
+      values <- integersIn global locals right
+      if outside 0 (width - 1) values then Just (uncurry AmountOutside (ends values) width) else Nothing
+    (NonZeroDivisor, BinaryOperation _ _ right) -> do
+      values <- integersIn global locals right
+      if ends values == (0, 0) then Just DivisorZero else Nothing
+    (NoOverflow, BinaryOperation op left right) -> do
+      ty <- getTypeSemAnn (getAnnotation left)
+      (tlo, thi) <- intRange plt ty
+      leftValues <- integersIn global locals left
+      rightValues <- integersIn global locals right
+      case op of
+        -- | The only quotient that overflows is the minimum of the type
+        -- divided by minus one, and its result is one past the maximum.
+        _ | op `elem` [Division, Modulo] ->
+          if ends leftValues == (tlo, tlo) && ends rightValues == (-1, -1)
+            then Just (ResultOutside (thi + 1) (thi + 1))
+            else Nothing
+        _ -> do
+          results <- exactResults (shiftWidth plt ty) op leftValues rightValues
+          if outside tlo thi results then Just (uncurry ResultOutside (ends results)) else Nothing
+    _ -> Nothing
+
+  where
+
+    plt = platform global
+
+    -- | Whether every value falls outside the range, both ends included. An
+    -- empty set says nothing, since no execution reaches the operation with it.
+    outside lo' hi' (Listed values) =
+      not (S.null values) && all (\v -> v < lo' || v > hi') (S.toList values)
+    outside lo' hi' (Spanning lo hi) = hi < lo' || lo > hi'
+
+-- | The values an operand may take, as integers.
+integersIn :: ValueAnalysisGlobal -> ValueAnalysisPath -> Expression SemanticAnn -> Maybe Integers
+integersIn global locals expr = valuesIn global locals expr >>= integersOf
+
+-- | The number of elements of the array an access indexes.
+arraySize :: ValueAnalysisGlobal -> ValueAnalysisPath -> Object SemanticAnn -> Maybe Integer
+arraySize global locals obj =
+  getTypeSemAnn (getAnnotation obj) >>= arrayOf >>= size . snd
+
+  where
+
+    size s = evaluate (platform global) (moduleConsts global) locals s >>= integerOfConst
+
+-- | The width that the amount of a shift of an integer must stay below.
+shiftBound :: Platform -> Expression SemanticAnn -> Maybe Integer
+shiftBound plt left =
+  getTypeSemAnn (getAnnotation left) >>= \ty -> if intTy ty then Just (shiftWidth plt ty) else Nothing
 
 -- | A bound a branch puts on a variable, both ends included.
 data Bound = AtLeast Integer | AtMost Integer
@@ -1378,12 +1443,31 @@ reasonsFor global locals cond =
               names -> OneOfVariants names
 
 -- | The diagnostic: of the places the walk recorded, the conditions whose
--- value the state at them determines and the cases the state rules out, in the
--- order the source has them, which is the order of their positions.
+-- value the state at them determines, the cases the state rules out and the
+-- run-time checks that fail every time, in the order the source has them,
+-- which is the order of their positions.
 findings :: ValueAnalysisGlobal -> [ValueAnalysisError]
-findings global = mapMaybe finding (M.toAscList (observed global))
+findings global =
+  map snd . sortOn fst $
+    mapMaybe (\entry@(loc, _) -> (,) loc <$> finding entry) (M.toList (observed global))
+    ++ mapMaybe failing (M.toList (met global))
 
   where
+
+    failing ((loc, kind), (operation, locals)) = do
+      failure <- failsBy global locals kind operation
+      return (loc, annotateError loc (EFailingCheck failure (reasonsOf locals kind operation)))
+
+    -- | The names of the quantity the check tests: the index, the amount, the
+    -- divisor, or both operands for the result of an operation.
+    reasonsOf locals kind operation =
+      case (kind, operation) of
+        (IndexInBounds, IndexOperation _ index) -> reasonsFor global locals index
+        (NoOverflow, BinaryOperation _ left right) ->
+          nubBy ((==) `on` reasonName)
+            (reasonsFor global locals left ++ reasonsFor global locals right)
+        (_, BinaryOperation _ _ right) -> reasonsFor global locals right
+        _ -> []
 
     finding (loc, (MetCondition cond, locals)) =
       case verdict locals cond of
@@ -1431,7 +1515,7 @@ runValueAnalysisCheck plt consts imported program =
     -- and the diagnostic reads it once.
     final = foldl walk start program
 
-    start = ValueAnalysisGlobal consts plt M.empty imported M.empty
+    start = ValueAnalysisGlobal consts plt M.empty imported M.empty M.empty
 
     walk global astElement =
       globalState . snd $

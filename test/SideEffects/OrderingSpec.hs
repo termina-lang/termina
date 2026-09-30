@@ -233,8 +233,8 @@ spec = do
     it "rejects arr[i] after a bound on another variable" $
       compileErrorCode (progGuard ", j : usize" "    return j < 4 : usize && arr[i] == 0 : u32;\n")
         `shouldBe` Just (pack "SEF-005")
-    it "rejects arr[i] after i < 4 in ||, where the right operand runs when i >= 4" $
-      compileErrorCode (progGuard "" "    return i < 4 : usize || arr[i] == 0 : u32;\n")
+    it "rejects arr[i] after i < 2 in ||, where the right operand runs when i >= 2" $
+      compileErrorCode (progGuard "" "    return i < 2 : usize || arr[i] == 0 : u32;\n")
         `shouldBe` Just (pack "SEF-006")
 
   -- | Every operation that the generated code checks while it runs calls a

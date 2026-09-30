@@ -1,7 +1,8 @@
 -- | Value analysis negative tests: a condition whose value is the same every
 -- time it is evaluated (VAE-001), whichever of the four sources the value
 -- comes from. The last case pins which finding a body with more than one of
--- them reports, since the user resolves them one at a time.
+-- them reports, since the user resolves them one at a time. Then an operation
+-- whose run-time check fails every time it runs (VAE-003).
 module ValueAnalysis.Negative.CodeSpec (spec) where
 
 import Pipeline.Common (compileErrorCode, compileErrorMessage)
@@ -362,9 +363,6 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
-    -- | Two invariant conditions in the same body: the one the source reaches
-    -- first is the one reported, so the message names line 5 and the value it
-    -- evaluates to there. The second one, on line 8, waits its turn.
     it "VAE-001: condition decided by an addition to a guarded variable" $ do
       let src = "function f(x : u8) -> u8 {\n" ++
                 "    var r : u8 = 0 : u8;\n" ++
@@ -391,6 +389,9 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
+    -- | Two invariant conditions in the same body: the one the source reaches
+    -- first is the one reported, so the message names line 5 and the value it
+    -- evaluates to there. The second one, on line 8, waits its turn.
     it "VAE-001: the first of two findings is the one reported" $ do
       let src = "function f() -> u32 {\n" ++
                 "    var x : u32 = 0 : u32;\n" ++
@@ -407,3 +408,64 @@ spec = do
       let message = compileErrorMessage src
       fmap (pack "test:5:9" `isInfixOf`) message `shouldBe` Just True
       fmap (pack "yes takes that value here" `isInfixOf`) message `shouldBe` Just True
+
+  -- | An operation whose run-time check none of the values of the path passes,
+  -- one per property the value analysis reasons about.
+  describe "ValueAnalysis: operations that always fail" $ do
+
+    it "VAE-003: shift by an amount that never falls below the width" $ do
+      let src = "function f(led : u8) -> u32 {\n" ++
+                "    var mask : u32 = 0;\n" ++
+                "    if led > 5 : u8 && led < 10 : u8 {\n" ++
+                "        let bit : u8 = led + 37 : u8;\n" ++
+                "        mask = 1 : u32 << bit;\n" ++
+                "    }\n" ++
+                "    return mask;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-003")
+
+    it "VAE-003: access by an index that never falls inside the array" $ do
+      let src = "function f(buf : &[u32; 4], i : usize) -> u32 {\n" ++
+                "    var r : u32 = 0;\n" ++
+                "    if i > 5 : usize {\n" ++
+                "        r = buf[i];\n" ++
+                "    }\n" ++
+                "    return r;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-003")
+
+    it "VAE-003: division by a divisor that is always zero" $ do
+      let src = "function f(x : u32, y : u32) -> u32 {\n" ++
+                "    var r : u32 = 0;\n" ++
+                "    if y == 0 : u32 {\n" ++
+                "        r = x / y;\n" ++
+                "    }\n" ++
+                "    return r;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-003")
+
+    it "VAE-003: signed addition whose result never fits its type" $ do
+      let src = "function f(a : i8) -> i8 {\n" ++
+                "    var r : i8 = 0;\n" ++
+                "    if a > 100 : i8 {\n" ++
+                "        r = a + 100 : i8;\n" ++
+                "    }\n" ++
+                "    return r;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-003")
+
+    -- | The amount is the variable itself, so the message leaves its values to
+    -- the reason and does not repeat them.
+    it "VAE-003: the message says what the variable holds once" $ do
+      let src = "function f(led : u8) -> u32 {\n" ++
+                "    var mask : u32 = 0;\n" ++
+                "    if led > 5 : u8 && led < 10 : u8 {\n" ++
+                "        let bit : u8 = led + 37 : u8;\n" ++
+                "        mask = 1 : u32 << bit;\n" ++
+                "    }\n" ++
+                "    return mask;\n" ++
+                "}"
+      let message = compileErrorMessage src
+      fmap (pack "test:5:16" `isInfixOf`) message `shouldBe` Just True
+      fmap (pack "bit takes that value here" `isInfixOf`) message `shouldBe` Just True
+      fmap (pack "never below the width" `isInfixOf`) message `shouldBe` Just True

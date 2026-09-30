@@ -275,8 +275,6 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Nothing
 
-    -- | The two values the paths leave decide the comparison in opposite ways,
-    -- which is the case the abstract evaluator has to leave alone.
     it "accepts a condition that only part of an interval from an addition decides" $ do
       let src = "function f(x : u8) -> u8 {\n" ++
                 "    var r : u8 = 0 : u8;\n" ++
@@ -303,6 +301,8 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Nothing
 
+    -- | The two values the paths leave decide the comparison in opposite ways,
+    -- which is the case the abstract evaluator has to leave alone.
     it "accepts a comparison only some of the values a variable may hold decide" $ do
       let src = "function f(flag : bool) -> u32 {\n" ++
                 "    var x : u32 = 0 : u32;\n" ++
@@ -314,5 +314,46 @@ spec = do
                 "        y = 1 : u32;\n" ++
                 "    }\n" ++
                 "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
+
+  -- | An operation whose check some of the values of the path pass and others
+  -- fail keeps its check and raises no error (VAE-003 needs all of them to
+  -- fail), and so does one on which the path says nothing.
+  describe "ValueAnalysis: operations that may pass their check" $ do
+
+    it "accepts a shift by an amount only some of whose values reach the width" $ do
+      let src = "function f(s : u32) -> u32 {\n" ++
+                "    var mask : u32 = 0;\n" ++
+                "    if s > 20 : u32 && s < 40 : u32 {\n" ++
+                "        mask = 1 : u32 << s;\n" ++
+                "    }\n" ++
+                "    return mask;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
+
+    it "accepts an access by a loop index that runs past the array" $ do
+      let src = "function f(buf : &[u32; 4]) -> u32 {\n" ++
+                "    var total : u32 = 0;\n" ++
+                "    for i : usize in 0 .. 8 {\n" ++
+                "        total = total + buf[i];\n" ++
+                "    }\n" ++
+                "    return total;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
+
+    it "accepts a division by a divisor the path says nothing about" $ do
+      let src = "function f(x : u32, y : u32) -> u32 {\n" ++
+                "    return x / y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Nothing
+
+    it "accepts a signed addition only some of whose results overflow" $ do
+      let src = "function f(a : i8) -> i8 {\n" ++
+                "    var r : i8 = 0;\n" ++
+                "    if a > 0 : i8 {\n" ++
+                "        r = a + 100 : i8;\n" ++
+                "    }\n" ++
+                "    return r;\n" ++
                 "}"
       compileErrorCode src `shouldBe` Nothing
