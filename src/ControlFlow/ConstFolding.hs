@@ -715,7 +715,7 @@ foldGlobal (Const identifier ty expr mods ann) = do
   let glbLoc = getLocation ann
   ann' <- foldAnnotation ann
   ty' <- foldType glbLoc ty
-  expr' <- foldExpression expr
+  expr' <- foldConstInitializer ty' expr
   -- | Record scalar constants in the environment so that later elements (and
   -- later modules, since the environment is threaded across them) can resolve
   -- references to them. Aggregate constants (arrays, structs) have no scalar
@@ -764,6 +764,29 @@ foldGlobal (Emitter ident ty mInitExpr mods ann) = do
           _ -> throwError $ annotateError Internal EInvalidTimerPeriod
         _ -> throwError $ annotateError Internal EInvalidTimerPeriod
 foldGlobal g = return g -- This should not happen
+
+-- | The initializer of a global constant, worked out down to each scalar it
+-- holds, since C only admits a constant expression as the initializer of an
+-- object with static storage. An integer or a boolean is computed here, with
+-- the checks of its operations; a floating-point value or a character is left
+-- to the C compiler.
+foldConstInitializer :: TerminaType SemanticAnn -> Expression SemanticAnn -> ConstFoldMonad (Expression SemanticAnn)
+foldConstInitializer (TConstSubtype ty) expr = foldConstInitializer ty expr
+foldConstInitializer (TArray elemTy _) (ArrayInitializer value size ann) = do
+  ann' <- foldAnnotation ann
+  value' <- foldConstInitializer elemTy value
+  size' <- foldExpression size
+  return $ ArrayInitializer value' size' ann'
+foldConstInitializer (TArray elemTy _) (ArrayExprListInitializer exprs ann) = do
+  ann' <- foldAnnotation ann
+  exprs' <- mapM (foldConstInitializer elemTy) exprs
+  return $ ArrayExprListInitializer exprs' ann'
+foldConstInitializer ty expr =
+  if intTy ty || boolTy ty
+    then do
+      value <- evalConstExpression expr
+      return $ Constant value (buildExpAnn (getLocation (getAnnotation expr)) ty)
+    else foldExpression expr
 
 -- | Replaces the argument of a modifier by the value it folds to, so the
 -- architecture reads a literal whether the source wrote a literal, a constant

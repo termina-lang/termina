@@ -2,7 +2,8 @@
 -- the program compiles cleanly (no error from any pipeline stage).
 module ConstFolding.Positive.FoldSpec (spec) where
 
-import Pipeline.Common (compileErrorCode)
+import Pipeline.Common (compileErrorCode, runFullBuild)
+import Data.Text (isInfixOf, pack)
 import Architecture.Negative.CodeSpec (timerTaskClass)
 
 import Test.Hspec
@@ -58,9 +59,27 @@ comparisonsInRange =
   "    return y;\n" ++
   "}"
 
+-- | A global constant computed from another, which C only admits as the
+-- initializer of a static object once it is a literal.
+derivedConstant :: String
+derivedConstant =
+  "const K : i8 = 1 : i8;\n" ++
+  "const L : i8 = K * 100 : i8;\n"
+
+-- | The same, for the elements of a constant array.
+derivedArray :: String
+derivedArray =
+  "const K : i8 = 2 : i8;\n" ++
+  "const A : [i8; 2] = {K * 10 : i8, 1 : i8};\n"
+
 spec :: Spec
-spec = describe "ConstFolding: well-formed constants compile cleanly" $
-  mapM_ (\(name, src) -> it name $ compileErrorCode src `shouldBe` Nothing)
+spec = do
+  it "writes a global constant computed from another as a literal" $
+    runFullBuild derivedConstant `shouldSatisfy` isInfixOf (pack "const int8_t L = 100L;")
+  it "writes the elements of a constant array computed from a constant as literals" $
+    runFullBuild derivedArray `shouldSatisfy` isInfixOf (pack "const int8_t A[2U] = { 20L, 1L };")
+  describe "ConstFolding: well-formed constants compile cleanly" $
+    mapM_ (\(name, src) -> it name $ compileErrorCode src `shouldBe` Nothing)
     [ ("accepts a constexpr-sized array with a matching initializer", matchingArraySize)
     , ("accepts a constant arithmetic expression that folds in range", foldsArithmetic)
     , ("accepts a slice whose length matches the expected size", matchingSlice)

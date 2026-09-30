@@ -52,6 +52,26 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CFE-004")
 
+    it "CFE-004: global constant whose initializer overflows" $ do
+      let src = "const K : i8 = 2 : i8;\n" ++
+                "const L : i8 = K * 100 : i8;\n"
+      compileErrorCode src `shouldBe` Just (pack "CFE-004")
+
+    it "CFE-004: element of a constant array that overflows" $ do
+      let src = "const K : i8 = 2 : i8;\n" ++
+                "const A : [i8; 2] = {K * 100 : i8, 1 : i8};\n"
+      compileErrorCode src `shouldBe` Just (pack "CFE-004")
+
+    it "CFE-004: fill value of a constant array that overflows" $ do
+      let src = "const K : i8 = 2 : i8;\n" ++
+                "const A : [i8; 3] = [K * 100 : i8; 3];\n"
+      compileErrorCode src `shouldBe` Just (pack "CFE-004")
+
+    it "CFE-006: global constant whose initializer divides by zero" $ do
+      let src = "const K : u32 = 0 : u32;\n" ++
+                "const L : u32 = 10 : u32 / K;\n"
+      compileErrorCode src `shouldBe` Just (pack "CFE-006")
+
     it "CFE-008: for loop with zero iterations" $ do
       let src = "function f() {\n" ++
                 "    for i : usize in 3 : usize .. 3 : usize {\n" ++
