@@ -128,7 +128,8 @@ typeStatement _retTy (SingleExpStmt expr anns) = do
   return $ SAST.SingleExpStmt typed_expr (buildStmtAnn anns)
 typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
   typed_matchE <- typeExpression Nothing typeRHSObject matchE
-  type_matchE <- getExprType typed_matchE
+  -- | A constant is matched on as a value of its type.
+  type_matchE <- withoutConst <$> getExprType typed_matchE
   -- Check for duplicate cases
   checkCaseDuplicates cases
   mTypedDefCase <- case mDefaultCase of

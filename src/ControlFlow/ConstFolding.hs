@@ -16,13 +16,54 @@ import Core.Utils
 import Command.Types
 import Modules.Modules
 
-evalConstObject :: Object SemanticAnn -> ConstFoldMonad (Const SemanticAnn)
-evalConstObject (Variable ident _) = do
+-- | The folded initializer of a constant object: a named constant, or a field
+-- or an element of one, reached down through the initializers. A name that
+-- holds a value gives it as a literal of the type of the object.
+constInitializerOf :: Object SemanticAnn -> ConstFoldMonad (Expression SemanticAnn)
+constInitializerOf obj@(Variable ident ann) = do
   globalEnv <- ST.gets constEnv
   case M.lookup ident globalEnv of
-    Just expr -> return expr
+    Just (ConstValue value) -> do
+      ty <- getObjType obj
+      return $ Constant value (buildExpAnn (getLocation ann) ty)
+    Just (ConstInitializer initializer) -> return initializer
     Nothing -> throwError $ annotateError Internal (EUnknownIdentifier ident)
-evalConstObject _ = throwError $ annotateError Internal ENotConstant
+constInitializerOf (MemberAccess obj field _) = do
+  initializer <- constInitializerOf obj
+  case initializer of
+    StructInitializer fields _ ->
+      case [expr | FieldValueAssignment name expr _ <- fields, name == field] of
+        [expr] -> return expr
+        _ -> throwError $ annotateError Internal ENotConstant
+    _ -> throwError $ annotateError Internal ENotConstant
+constInitializerOf (ArrayIndexExpression obj index ann) = do
+  initializer <- constInitializerOf obj
+  indexValue <- evalConstExpression index
+  case (initializer, indexValue) of
+    (ArrayExprListInitializer elements _, I (TInteger i _) _) -> do
+      inBounds (toInteger (length elements)) i
+      return $ elements !! fromInteger i
+    (ArrayInitializer value size _, I (TInteger i _) _) -> do
+      sizeValue <- evalConstExpression size
+      case sizeValue of
+        I (TInteger n _) _ -> inBounds n i >> return value
+        _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
+    _ -> throwError $ annotateError Internal ENotConstant
+
+  where
+
+    inBounds :: Integer -> Integer -> ConstFoldMonad ()
+    inBounds size i =
+      unless (0 <= i && i < size) $
+        throwError $ annotateError (getLocation ann) (EArrayIndexOutOfBounds size i)
+constInitializerOf _ = throwError $ annotateError Internal ENotConstant
+
+evalConstObject :: Object SemanticAnn -> ConstFoldMonad (Const SemanticAnn)
+evalConstObject obj = do
+  initializer <- constInitializerOf obj
+  case initializer of
+    Constant value _ -> return value
+    _ -> throwError $ annotateError Internal ENotConstant
 
 evalConstExpression :: Expression SemanticAnn -> ConstFoldMonad (Const SemanticAnn)
 evalConstExpression (AccessObject obj) = do
@@ -44,6 +85,26 @@ evalConstExpression (Casting expr' ty ann) = do
         then throwError $ annotateError (getLocation ann) (EConstIntegerOverflow i ty)
         else return $ I constValue (Just ty)
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
+evalConstExpression (IsEnumVariantExpression obj _ variant _) = do
+  initializer <- constInitializerOf obj
+  case initializer of
+    EnumVariantInitializer _ held _ _ -> return $ B (held == variant)
+    _ -> throwError $ annotateError Internal ENotConstant
+evalConstExpression (IsMonadicVariantExpression obj label _) = do
+  initializer <- constInitializerOf obj
+  case initializer of
+    MonadicVariantInitializer held _ -> return $ B (holds label held)
+    _ -> throwError $ annotateError Internal ENotConstant
+
+  where
+
+    holds NoneLabel None = True
+    holds SomeLabel (Some _) = True
+    holds OkLabel (Ok _) = True
+    holds ErrorLabel (Error _) = True
+    holds SuccessLabel Success = True
+    holds FailureLabel (Failure _) = True
+    holds _ _ = False
 evalConstExpression _ = throwError $ annotateError Internal ENotConstant
 
 -- | Evaluates a type. This basically only applies to arrays. The function
@@ -61,6 +122,7 @@ foldType loc (TFixedLocation (TArray ty arraySize)) = do
   arraySizeValue <- evalConstExpression arraySize
   ty' <- foldType loc ty
   return (TFixedLocation (TArray ty' (Constant arraySizeValue (buildExpAnn loc TUSize))))
+foldType loc (TConstSubtype ty) = TConstSubtype <$> foldType loc ty
 foldType _ ty = return ty
 
 foldParam :: Location -> Parameter SemanticAnn -> ConstFoldMonad (Parameter SemanticAnn)
@@ -168,6 +230,7 @@ getArraySizeValue (TArray _ arraySize) = do
   case arraySize of
     Constant (I (TInteger lhs _) _) _ -> return lhs
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
+getArraySizeValue (TConstSubtype ty) = getArraySizeValue ty
 getArraySizeValue _ = throwError $ annotateError Internal EInvalidConstantEvaluation
 
 -- | This function checks the initialization expression of an array against its type.
@@ -248,7 +311,7 @@ foldObject (ArrayIndexExpression obj index ann) = do
   index' <- foldExpression index
   objType <- getObjType obj'
   indexExprType <- getExprType index'
-  case (objType, indexExprType) of
+  case (withoutConst objType, indexExprType) of
     (array@(TArray {}), TConstSubtype _) -> do
       arraySizeValue <- getArraySizeValue array
       exprValue <- evalConstExpression index'
@@ -716,15 +779,17 @@ foldGlobal (Const identifier ty expr mods ann) = do
   ann' <- foldAnnotation ann
   ty' <- foldType glbLoc ty
   expr' <- foldConstInitializer ty' expr
-  -- | Record scalar constants in the environment so that later elements (and
+  -- | Record the constant in the environment so that later elements (and
   -- later modules, since the environment is threaded across them) can resolve
-  -- references to them. Aggregate constants (arrays, structs) have no scalar
-  -- 'Const' representation and are never folded into a value, so they are not
-  -- recorded; a reference to one keeps accessing the emitted object.
-  case expr' of
-    Constant constValue _ ->
-      ST.modify $ \st -> st { constEnv = M.insert identifier constValue (constEnv st) }
-    _ -> return ()
+  -- references to it.
+  let scalar = withoutConst ty'
+      entry = case expr' of
+        Constant value _ ->
+          if intTy scalar || boolTy scalar
+            then ConstValue value
+            else ConstInitializer expr'
+        _ -> ConstInitializer expr'
+  ST.modify $ \st -> st { constEnv = M.insert identifier entry (constEnv st) }
   return $ Const identifier ty' expr' mods ann'
 foldGlobal (Channel ident ty mInitExpr mods ann) = do
   let glbLoc = getLocation ann
@@ -769,7 +834,8 @@ foldGlobal g = return g -- This should not happen
 -- holds, since C only admits a constant expression as the initializer of an
 -- object with static storage. An integer or a boolean is computed here, with
 -- the checks of its operations; a floating-point value or a character is left
--- to the C compiler.
+-- to the C compiler. A reference to another constant is replaced by its value
+-- or by its folded initializer.
 foldConstInitializer :: TerminaType SemanticAnn -> Expression SemanticAnn -> ConstFoldMonad (Expression SemanticAnn)
 foldConstInitializer (TConstSubtype ty) expr = foldConstInitializer ty expr
 foldConstInitializer (TArray elemTy _) (ArrayInitializer value size ann) = do
@@ -781,12 +847,47 @@ foldConstInitializer (TArray elemTy _) (ArrayExprListInitializer exprs ann) = do
   ann' <- foldAnnotation ann
   exprs' <- mapM (foldConstInitializer elemTy) exprs
   return $ ArrayExprListInitializer exprs' ann'
+foldConstInitializer _ (StructInitializer fields ann) = do
+  ann' <- foldAnnotation ann
+  fields' <- forM fields $ \case
+    FieldValueAssignment ident expr fieldAnn -> do
+      fieldAnn' <- foldAnnotation fieldAnn
+      expr' <- foldConstComponent expr
+      return $ FieldValueAssignment ident expr' fieldAnn'
+    field -> return field
+  return $ StructInitializer fields' ann'
+foldConstInitializer _ (EnumVariantInitializer enum variant args ann) = do
+  ann' <- foldAnnotation ann
+  args' <- mapM foldConstComponent args
+  return $ EnumVariantInitializer enum variant args' ann'
+foldConstInitializer _ (MonadicVariantInitializer variant ann) = do
+  ann' <- foldAnnotation ann
+  variant' <- case variant of
+    Some expr -> Some <$> foldConstComponent expr
+    Ok expr -> Ok <$> foldConstComponent expr
+    Error expr -> Error <$> foldConstComponent expr
+    Failure expr -> Failure <$> foldConstComponent expr
+    None -> return None
+    Success -> return Success
+  return $ MonadicVariantInitializer variant' ann'
 foldConstInitializer ty expr =
   if intTy ty || boolTy ty
     then do
       value <- evalConstExpression expr
       return $ Constant value (buildExpAnn (getLocation (getAnnotation expr)) ty)
-    else foldExpression expr
+    else foldExpression expr >>= substituteConstants
+
+-- | A component of an aggregate constant initializer, folded with its own type.
+foldConstComponent :: Expression SemanticAnn -> ConstFoldMonad (Expression SemanticAnn)
+foldConstComponent expr = do
+  ty <- getExprType expr
+  foldConstInitializer ty expr
+
+-- | Replaces every reference to a constant in an expression by its value or by
+-- its folded initializer.
+substituteConstants :: Expression SemanticAnn -> ConstFoldMonad (Expression SemanticAnn)
+substituteConstants (AccessObject obj) = constInitializerOf obj
+substituteConstants expr = rewriteExpression (Rewriter substituteConstants return return) expr
 
 -- | Replaces the argument of a modifier by the value it folds to, so the
 -- architecture reads a literal whether the source wrote a literal, a constant

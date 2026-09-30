@@ -61,7 +61,7 @@ import Lowering.AST
 import ControlFlow.Traversal
     (Child'(..), Child, expressionChildren, rootIdent)
 import ControlFlow.ConstFolding (evalConstExpression, runConstFolding)
-import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
+import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..), ConstEntry(..), constValueOf)
 import ControlFlow.ValueAnalysis.Errors
 import ControlFlow.Dataflow
 import Core.Utils (arrayOf, intRange, intTy, shiftWidth)
@@ -262,7 +262,7 @@ data ValueAnalysisGlobal = ValueAnalysisGlobal
   {
     -- | The constants the module sees, as the folding left them. They are what
     -- makes this pass answer for the case a condition is constant outright.
-    moduleConsts :: M.Map Identifier (Const SemanticAnn),
+    moduleConsts :: M.Map Identifier ConstEntry,
     platform :: Platform,
     -- | Every place the walk has met that decides a path, with the state of
     -- the path where it met it, under its position. A loop meets the same
@@ -308,7 +308,7 @@ singleValue entry = case varValues entry of
 -- diagnostic evaluates the recorded conditions once the walk is over.
 evaluate ::
   Platform
-  -> M.Map Identifier (Const SemanticAnn)
+  -> M.Map Identifier ConstEntry
   -> ValueAnalysisPath
   -> Expression SemanticAnn
   -> Maybe (Const SemanticAnn)
@@ -324,7 +324,7 @@ evaluate plt consts locals expr =
     -- tick only matters to the period of a timer, which an expression never
     -- reaches.
     env = ConstFoldEnv
-      (M.union (M.mapMaybe singleValue (variables locals)) consts)
+      (M.union (M.map ConstValue (M.mapMaybe singleValue (variables locals))) consts)
       plt
       defaultMicrosecondsPerTick
 
@@ -1452,7 +1452,7 @@ reasonsFor global locals cond =
           case cell of
             Cell ident [] ->
               (\value -> Reason ident (OneValue value) [])
-                <$> M.lookup ident (moduleConsts global)
+                <$> (M.lookup ident (moduleConsts global) >>= constValueOf)
             _ -> Nothing
 
     holdsOf entry = case varValues entry of
@@ -1524,7 +1524,7 @@ findings global =
 -- the order of the source is already a topological order of the call graph.
 runValueAnalysisCheck ::
   Platform
-  -> M.Map Identifier (Const SemanticAnn)
+  -> M.Map Identifier ConstEntry
   -> ReturnedValues
   -> AnnotatedProgram SemanticAnn
   -> (Maybe ValueAnalysisError, ReturnedValues, M.Map ObligationId Evidence)

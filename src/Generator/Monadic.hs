@@ -178,6 +178,15 @@ mapMonadicTypes (TypeDefinition typeDef _) =
 mapMonadicTypes (GlobalDeclaration (Resource _ (TMsgQueue ts _) _ _ _)) =
   -- | Get the monadic types types from the message queue type
   insertMonadicType (TOption ts)
+mapMonadicTypes (GlobalDeclaration (Const _ ts _ _ _)) =
+  -- | Get the monadic type of a constant or of the elements of a constant array
+  insertMonadicType (elementsOf ts)
+
+  where
+
+    elementsOf (TConstSubtype ty) = elementsOf ty
+    elementsOf (TArray ty _) = elementsOf ty
+    elementsOf ty = ty
 mapMonadicTypes _ = return ()
 
 mapMonadicTypesAnnotatedProgram ::

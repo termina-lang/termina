@@ -72,8 +72,82 @@ derivedArray =
   "const K : i8 = 2 : i8;\n" ++
   "const A : [i8; 2] = {K * 10 : i8, 1 : i8};\n"
 
+-- | Aggregate constants: a struct, an enumeration and an option computed from
+-- a constant, an array of structs that names another constant, and a copy of
+-- another constant.
+aggregateConstants :: String
+aggregateConstants =
+  "struct Point {\n" ++
+  "    x : u32;\n" ++
+  "    y : u32;\n" ++
+  "};\n" ++
+  "enum Mode {\n" ++
+  "    Off,\n" ++
+  "    On(u8, Point)\n" ++
+  "};\n" ++
+  "const K : u32 = 3 : u32;\n" ++
+  "const P : Point = {x = K * 2 : u32, y = 1 : u32};\n" ++
+  "const M : Mode = Mode::On(K as u8 + 1 : u8, {x = 0 : u32, y = K});\n" ++
+  "const O : Option<u32> = Some(K + 1 : u32);\n" ++
+  "const PS : [Point; 2] = {P, {x = 4 : u32, y = 5 : u32}};\n" ++
+  "const Q : Point = P;\n" ++
+  "function f() -> u32 {\n" ++
+  "    var r : u32 = P.x + Q.y;\n" ++
+  "    match M {\n" ++
+  "        case On(n, p) => {\n" ++
+  "            r = r + p.y + n as u32;\n" ++
+  "        }\n" ++
+  "        case Off => {\n" ++
+  "        }\n" ++
+  "    }\n" ++
+  "    return r + PS[1].x;\n" ++
+  "}"
+
+-- | A floating-point constant that copies another, which the folding leaves to
+-- the C compiler but has to name by its value.
+copiedFloat :: String
+copiedFloat =
+  "const F : f32 = 1.5 : f32;\n" ++
+  "const G : f32 = F;\n"
+
+-- | Loop bounds read from a field or an element of a constant, and from the
+-- name of a scalar constant, which the generated code keeps as they are.
+constantPathBounds :: String
+constantPathBounds =
+  "struct Config {\n" ++
+  "    len : usize;\n" ++
+  "};\n" ++
+  "const CFG : Config = {len = 4 : usize};\n" ++
+  "const A : [usize; 2] = {5 : usize, CFG.len * 2 : usize};\n" ++
+  "const N : usize = 6 : usize;\n" ++
+  "function f() -> usize {\n" ++
+  "    var r : usize = 0 : usize;\n" ++
+  "    for j : usize in 0 : usize .. A[1] {\n" ++
+  "        r = r + j;\n" ++
+  "    }\n" ++
+  "    for k : usize in CFG.len .. N {\n" ++
+  "        r = r + k;\n" ++
+  "    }\n" ++
+  "    return r;\n" ++
+  "}"
+
 spec :: Spec
 spec = do
+  it "keeps an element of a constant in a loop bound" $
+    runFullBuild constantPathBounds `shouldSatisfy` isInfixOf (pack "for (size_t j = 0U; j < A[1U];")
+  it "keeps a field and the name of a constant in a loop bound" $
+    runFullBuild constantPathBounds `shouldSatisfy` isInfixOf (pack "for (size_t k = CFG.len; k < N;")
+  it "writes a floating-point constant that copies another as a literal" $
+    runFullBuild copiedFloat `shouldSatisfy` isInfixOf (pack "const float32_t G = 1.5f;")
+  describe "writes aggregate constants as initializers of literals" $
+    mapM_ (\(name, line) -> it name $
+      runFullBuild aggregateConstants `shouldSatisfy` isInfixOf (pack line))
+    [ ("a struct", "const Point P = { .x = 6U, .y = 1U };")
+    , ("an enumeration", "const Mode M = { ._variant = Mode__On, .On = { ._0 = 4U, ._1 = { .x = 0U,")
+    , ("an option", "const Option__u32 O = { ._variant = Option__Some, .Some = { ._0 = 4U } };")
+    , ("an array of structs that names another constant", "const Point PS[2U] = { { .x = 6U, .y = 1U }, { .x = 4U, .y = 5U } };")
+    , ("a copy of another constant", "const Point Q = { .x = 6U, .y = 1U };")
+    ]
   it "writes a global constant computed from another as a literal" $
     runFullBuild derivedConstant `shouldSatisfy` isInfixOf (pack "const int8_t L = 100L;")
   it "writes the elements of a constant array computed from a constant as literals" $

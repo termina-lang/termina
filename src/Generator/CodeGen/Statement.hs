@@ -10,6 +10,7 @@ import Generator.CodeGen.Common
 import Generator.CodeGen.Expression
 import Utils.Annotations
 import Generator.CodeGen.Types
+import Core.Utils (withoutConst)
 
 genAtomicStore :: Location -> Bool -> CObject -> Expression SemanticAnn -> CGenerator CCompoundBlockItem
 genAtomicStore loc before' cObj expr = do
@@ -632,7 +633,7 @@ genBlocks (ForLoopBlock iterator iteratorTS initValue endValue breakCond body an
             (iterator @: cIteratorType @= (cIteratorExpr @+ dec 1 @: cIteratorType) @: cIteratorType)
             (trail_cr . block $ cBody)) |>> getLocation ann]
 genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
-    exprType <- getExprType expr
+    exprType <- withoutConst <$> getExprType expr
     (casePrefix, structName, genParamsStructName) <-
         case exprType of
             -- | If the expression is an enumeration, the case identifier must 

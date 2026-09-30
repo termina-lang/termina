@@ -6,6 +6,13 @@ import EFP.Schedulability.WCEPath.AST
 import Utils.Annotations
 import Text.Parsec.Pos
 import EFP.Schedulability.Core.Types
+import ControlFlow.ConstFolding (evalConstExpression, runConstFolding)
+import ControlFlow.ConstFolding.Monad (ConstFoldEnv)
+import Control.Monad.Reader
+
+-- | The generation of the worst-case paths of a module reads the constants
+-- the module sees, which work out the bounds of its loops.
+type WCEPathGen = Reader ConstFoldEnv
 
 
 mergeLocations :: BlockPosition -> BlockPosition -> BlockPosition
@@ -29,14 +36,13 @@ mergePath (WCEPRegularBlock newLoc _) (WCEPRegularBlock pathLoc _ : rest) =
     in (WCEPRegularBlock mergedLoc Generated : rest)
 mergePath newPath paths' = newPath : paths'
 
-genConstExpression :: Expression STYPES.SemanticAnn -> ConstExpression GeneratorAnn
-genConstExpression (AccessObject (Variable ident _)) =
-    ConstObject ident Generated
-genConstExpression (Constant (I tInt _) _) =
-    ConstInt tInt Generated
-genConstExpression (BinOp op left right _) =
-    ConstBinOp op (genConstExpression left) (genConstExpression right) Generated
-genConstExpression _ = error "Unsupported constant expression in ConstExpression generation"
+-- | A loop bound, written as the value the constant folding works out for it.
+genConstExpression :: Expression STYPES.SemanticAnn -> WCEPathGen (ConstExpression GeneratorAnn)
+genConstExpression expr = do
+    env <- ask
+    case runConstFolding env (evalConstExpression expr) of
+        Right (I tInt _, _) -> return $ ConstInt tInt Generated
+        _ -> error "Unsupported constant expression in ConstExpression generation"
 
 genExpressionPath :: Expression STYPES.SemanticAnn -> [WCEPathBlock GeneratorAnn] -> [WCEPathBlock GeneratorAnn]
 genExpressionPath (MemberFunctionCall _obj ident _args ann) acc =
@@ -99,69 +105,68 @@ uniqueRegularBlocks (WCEPRegularBlock loc ann : xs) =
     WCEPRegularBlock loc ann : filter (\case WCEPRegularBlock _ _ -> False; _ -> True) xs
 uniqueRegularBlocks (x : xs) = x : uniqueRegularBlocks xs
 
-genPaths :: BasicBlock STYPES.SemanticAnn -> [WCEPathBlock GeneratorAnn]
+genPaths :: BasicBlock STYPES.SemanticAnn -> WCEPathGen [WCEPathBlock GeneratorAnn]
 genPaths (RegularBlock stmts) =
-    genRegularBlockPath [] stmts
+    return $ genRegularBlockPath [] stmts
 
-genPaths (IfElseBlock ifBlk elifs mElse ann) =
-    let ifPaths = 
-            let paths = genWCEPaths [] (blockBody . condIfBody $ ifBlk) in
-            map (\p -> 
+genPaths (IfElseBlock ifBlk elifs mElse ann) = do
+    ifPaths <-
+        map (\p ->
+            case p of
+                [WCEPRegularBlock {}] ->
+                    WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
+                _ ->  WCEPathCondIf (reverse p) (loc2BlockPos . getLocation . condIfAnnotation $ ifBlk) Generated)
+            <$> genWCEPaths [] (blockBody . condIfBody $ ifBlk)
+    elifPaths <- concat <$> mapM (
+        \(CondElseIf _ elifBlk ann') ->
+            map (\p ->
                 case p of
-                    [WCEPRegularBlock {}] -> 
+                    [WCEPRegularBlock {}] ->
                         WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
-                    _ ->  WCEPathCondIf (reverse p) (loc2BlockPos . getLocation . condIfAnnotation $ ifBlk) Generated) paths
-        elifPaths = concatMap (
-            \(CondElseIf _ elifBlk ann') ->
-                let paths = genWCEPaths [] (blockBody elifBlk) in
-                map (\p -> 
-                    case p of
-                        [WCEPRegularBlock {}] -> 
-                            WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
-                        _ -> WCEPathCondElseIf (reverse p) (loc2BlockPos . getLocation $ ann') Generated) paths
-            ) elifs
-        elsePaths = case mElse of
-            Just elseBlk -> 
-                let paths = genWCEPaths [] (blockBody . condElseBody $ elseBlk) in
-                    map (\p -> 
-                        case p of
-                            [WCEPRegularBlock {}] -> 
-                                WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
-                            _ ->
-                                WCEPathCondElse (reverse p) (loc2BlockPos . getLocation . condElseAnnotation $ elseBlk) Generated) paths
-            Nothing -> []
-    in
-        uniqueRegularBlocks (ifPaths ++ elifPaths ++ elsePaths)
-    
-genPaths (ForLoopBlock _ _ lower upper _ blk ann) =
-    let paths = genWCEPaths [] (blockBody blk)
-        loopPaths =
+                    _ -> WCEPathCondElseIf (reverse p) (loc2BlockPos . getLocation $ ann') Generated)
+                <$> genWCEPaths [] (blockBody elifBlk)
+        ) elifs
+    elsePaths <- case mElse of
+        Just elseBlk ->
+            map (\p ->
+                case p of
+                    [WCEPRegularBlock {}] ->
+                        WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
+                    _ ->
+                        WCEPathCondElse (reverse p) (loc2BlockPos . getLocation . condElseAnnotation $ elseBlk) Generated)
+                <$> genWCEPaths [] (blockBody . condElseBody $ elseBlk)
+        Nothing -> return []
+    return $ uniqueRegularBlocks (ifPaths ++ elifPaths ++ elsePaths)
+
+genPaths (ForLoopBlock _ _ lower upper _ blk ann) = do
+    paths <- genWCEPaths [] (blockBody blk)
+    lower' <- genConstExpression lower
+    upper' <- genConstExpression upper
+    let loopPaths =
             map (\p -> case p of
                     [WCEPRegularBlock {}] -> WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
-                    _ -> WCEPathForLoop (genConstExpression lower) (genConstExpression upper) (reverse p) 
+                    _ -> WCEPathForLoop lower' upper' (reverse p)
                             (loc2BlockPos . getLocation $ ann) Generated) paths
-    in
-        uniqueRegularBlocks loopPaths
-    
-genPaths (MatchBlock _ cases mDefaultCase ann) =
-    let casePaths = map (
-            \(MatchCase _ _ caseBlk ann') ->
-                let paths = genWCEPaths [] (blockBody caseBlk) in
-                map (\p -> case p of
-                    [WCEPRegularBlock {}] -> WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
-                    _ ->
-                        WCEPathMatchCase (reverse p) (loc2BlockPos . getLocation $ ann') Generated) paths
-            ) cases
-        defaultPaths = case mDefaultCase of
-            Just (DefaultCase defBlk ann') ->
-                let paths = genWCEPaths [] (blockBody defBlk) in
-                [map (\p -> case p of
-                    [WCEPRegularBlock {}] -> WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
-                    _ ->
-                        WCEPathMatchCase (reverse p) (loc2BlockPos . getLocation $ ann') Generated) paths]
-            Nothing -> []
-    in
-        uniqueRegularBlocks (concat casePaths ++ concat defaultPaths)
+    return $ uniqueRegularBlocks loopPaths
+
+genPaths (MatchBlock _ cases mDefaultCase ann) = do
+    casePaths <- mapM (
+        \(MatchCase _ _ caseBlk ann') ->
+            map (\p -> case p of
+                [WCEPRegularBlock {}] -> WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
+                _ ->
+                    WCEPathMatchCase (reverse p) (loc2BlockPos . getLocation $ ann') Generated)
+                <$> genWCEPaths [] (blockBody caseBlk)
+        ) cases
+    defaultPaths <- case mDefaultCase of
+        Just (DefaultCase defBlk ann') ->
+            (\paths -> [map (\p -> case p of
+                [WCEPRegularBlock {}] -> WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
+                _ ->
+                    WCEPathMatchCase (reverse p) (loc2BlockPos . getLocation $ ann') Generated) paths])
+                <$> genWCEPaths [] (blockBody defBlk)
+        Nothing -> return []
+    return $ uniqueRegularBlocks (concat casePaths ++ concat defaultPaths)
 
 genPaths (SendMessage obj _ ann) =
     let outPt = case obj of
@@ -169,87 +174,85 @@ genPaths (SendMessage obj _ ann) =
             (DereferenceMemberAccess _ portId _) -> portId
             _ -> error "Unexpected object in SendMessage block when generating WCE paths"
     in
-        [WCEPSendMessage outPt (loc2BlockPos . getLocation $ ann) Generated]
+        return [WCEPSendMessage outPt (loc2BlockPos . getLocation $ ann) Generated]
 genPaths (ProcedureInvoke obj procId _args ann) =
     let outPt = case obj of
             (MemberAccess _ portId _) -> portId
             (DereferenceMemberAccess _ portId _) -> portId
             _ -> error "Unexpected object in ProcedureInvoke block when generating WCE paths"
     in
-        [WCEPProcedureInvoke outPt procId (loc2BlockPos . getLocation $ ann) Generated]
+        return [WCEPProcedureInvoke outPt procId (loc2BlockPos . getLocation $ ann) Generated]
 genPaths (AtomicLoad _obj _expr ann) =
-    [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
+    return [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
 genPaths (AtomicStore _obj _expr ann) =
-    [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
+    return [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
 genPaths (AtomicArrayLoad _obj _index _expr ann) =
-    [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
+    return [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
 genPaths (AtomicArrayStore _obj _index _expr ann) =
-    [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
+    return [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
 genPaths (AllocBox obj _args ann) =
     let outPt = case obj of
             (MemberAccess _ portId _) -> portId
             (DereferenceMemberAccess _ portId _) -> portId
             _ -> error "Unexpected object in AllocBox block when generating WCE paths"
     in
-        [WCEPAllocBox outPt (loc2BlockPos . getLocation $ ann) Generated]
+        return [WCEPAllocBox outPt (loc2BlockPos . getLocation $ ann) Generated]
 genPaths (FreeBox obj _args ann) =
     let outPt = case obj of
             (MemberAccess _ portId _) -> portId
             (DereferenceMemberAccess _ portId _) -> portId
             _ -> error "Unexpected object in FreeBox block when generating WCE paths"
     in
-        [WCEPFreeBox outPt (loc2BlockPos . getLocation $ ann) Generated]
+        return [WCEPFreeBox outPt (loc2BlockPos . getLocation $ ann) Generated]
 genPaths (ReturnBlock _ ann) =
-    [WCEPReturn (loc2BlockPos . getLocation $ ann) Generated]
+    return [WCEPReturn (loc2BlockPos . getLocation $ ann) Generated]
 genPaths (ContinueBlock expr ann) =
     case expr of
         (MemberFunctionCall _obj ident _args _) ->
-            [WCEPContinue ident (loc2BlockPos . getLocation $ ann) Generated]
+            return [WCEPContinue ident (loc2BlockPos . getLocation $ ann) Generated]
         (DerefMemberFunctionCall _obj ident _args _) ->
-            [WCEPContinue ident (loc2BlockPos . getLocation $ ann) Generated]
+            return [WCEPContinue ident (loc2BlockPos . getLocation $ ann) Generated]
         _ -> error "Unexpected expression in Continue block when generating WCE paths"
 genPaths (RebootBlock ann) =
-    [WCEPReboot (loc2BlockPos . getLocation $ ann) Generated]
-genPaths (SystemCall _obj syscallId _args ann) = do
-    [WCEPSystemCall syscallId (loc2BlockPos . getLocation $ ann) Generated]
+    return [WCEPReboot (loc2BlockPos . getLocation $ ann) Generated]
+genPaths (SystemCall _obj syscallId _args ann) =
+    return [WCEPSystemCall syscallId (loc2BlockPos . getLocation $ ann) Generated]
 
 
-genWCEPaths :: [[WCEPathBlock GeneratorAnn]] -> [BasicBlock STYPES.SemanticAnn] -> [[WCEPathBlock GeneratorAnn]]
-genWCEPaths paths [] = paths
-genWCEPaths paths (blk : xs) =
-    let newPaths = genPaths blk
-        appendedPaths = if null paths then [[p] | p <- newPaths] else
+genWCEPaths :: [[WCEPathBlock GeneratorAnn]] -> [BasicBlock STYPES.SemanticAnn] -> WCEPathGen [[WCEPathBlock GeneratorAnn]]
+genWCEPaths paths [] = return paths
+genWCEPaths paths (blk : xs) = do
+    newPaths <- genPaths blk
+    let appendedPaths = if null paths then [[p] | p <- newPaths] else
             concatMap (\prevPath -> map (`mergePath` prevPath) newPaths) paths
-    in
     genWCEPaths appendedPaths xs
 
-genClassMemberWCEPs :: Identifier -> ClassMember STYPES.SemanticAnn -> [WCEPath GeneratorAnn]
+genClassMemberWCEPs :: Identifier -> ClassMember STYPES.SemanticAnn -> WCEPathGen [WCEPath GeneratorAnn]
 genClassMemberWCEPs className (ClassMethod _ak ident _params _mrty blk _) =
-    let wcePaths = genWCEPaths [] (blockBody blk) in
-    zipWith (\pathName path -> 
-        WCEPath className ident pathName path Generated) 
-        ["path" ++ show idx | idx <- [(0 :: Integer) ..]] (reverse <$> wcePaths)
+    genMemberWCEPs className ident blk
 genClassMemberWCEPs className (ClassProcedure _ak ident _params blk _) =
-    let wcePaths = genWCEPaths [] (blockBody blk) in
-    zipWith (\pathName path -> 
-        WCEPath className ident pathName path Generated) 
-        ["path" ++ show idx | idx <- [(0 :: Integer) ..]] (reverse <$> wcePaths)
+    genMemberWCEPs className ident blk
 genClassMemberWCEPs className (ClassAction _ak ident _param _mrty blk _) =
-    let wcePaths = genWCEPaths [] (blockBody blk) in
-    zipWith (\pathName path -> 
-        WCEPath className ident pathName path Generated) 
-        ["path" ++ show idx | idx <- [(0 :: Integer) ..]] (reverse <$> wcePaths)
+    genMemberWCEPs className ident blk
 genClassMemberWCEPs className (ClassViewer ident _params _mrty blk _) =
-    let wcePaths = genWCEPaths [] (blockBody blk) in
-    zipWith (\pathName path -> 
-        WCEPath className ident pathName path Generated) 
-        ["path" ++ show idx | idx <- [(0 :: Integer) ..]] (reverse <$> wcePaths)
-genClassMemberWCEPs _ _ = []
+    genMemberWCEPs className ident blk
+genClassMemberWCEPs _ _ = return []
 
-genTransactionalWCEPS :: AnnotatedProgram STYPES.SemanticAnn -> [WCEPath GeneratorAnn]
-genTransactionalWCEPS (TypeDefinition (Class _kind ident members _ _) _ : xs) =
-    let classWCEPs = concatMap (genClassMemberWCEPs ident) members
-    in
-        classWCEPs ++ genTransactionalWCEPS xs
-genTransactionalWCEPS (_ : xs) = genTransactionalWCEPS xs
-genTransactionalWCEPS [] = []
+-- | The paths of the body of a member, named in the order they are generated.
+genMemberWCEPs :: Identifier -> Identifier -> Block STYPES.SemanticAnn -> WCEPathGen [WCEPath GeneratorAnn]
+genMemberWCEPs className ident blk = do
+    wcePaths <- genWCEPaths [] (blockBody blk)
+    return $ zipWith (\pathName path ->
+        WCEPath className ident pathName path Generated)
+        ["path" ++ show idx | idx <- [(0 :: Integer) ..]] (reverse <$> wcePaths)
+
+-- | The worst-case paths of the members of the classes of a module, which
+-- takes the constants the module sees to work out the bounds of its loops.
+genTransactionalWCEPS :: ConstFoldEnv -> AnnotatedProgram STYPES.SemanticAnn -> [WCEPath GeneratorAnn]
+genTransactionalWCEPS env program = runReader (concat <$> mapM genElement program) env
+
+  where
+
+    genElement (TypeDefinition (Class _kind ident members _ _) _) =
+        concat <$> mapM (genClassMemberWCEPs ident) members
+    genElement _ = return []

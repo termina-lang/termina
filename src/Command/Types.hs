@@ -17,6 +17,7 @@ import Modules.Modules
 import Utils.Annotations
 import Elaboration.Obligations (ObligationId)
 import Elaboration.Prover (Evidence)
+import ControlFlow.ConstFolding.Monad (ConstEntry)
 import qualified EFP.Schedulability.WCET.AST as WTAST
 import qualified EFP.Schedulability.Core.Types as SCHEDTYPES
 import qualified EFP.Schedulability.RT.Parser.AST as RTPAST
@@ -73,11 +74,10 @@ type WCETProject = M.Map QualifiedName WCETModule
 
 type ProjectDependencies = M.Map QualifiedName [ModuleDependency]
 
--- | The scalar constants each module of a project sees once it has been
--- folded, which is its own plus those of the modules folded before it. The
--- constant folding is what builds them, and the constant propagation check is
--- what reads them back.
-type ProjectConstEnvs = M.Map QualifiedName (M.Map SAST.Identifier (SAST.Const STYPES.SemanticAnn))
+-- | The constants each module of a project sees once it has been folded, which
+-- is its own plus those of the modules folded before it. The constant folding
+-- is what builds them, and the value analysis is what reads them back.
+type ProjectConstEnvs = M.Map QualifiedName (M.Map SAST.Identifier ConstEntry)
 
 -- | The run-time checks of each module that the value analysis shows to hold,
 -- with the reason, which the elaboration hands to the value prover.

@@ -899,7 +899,8 @@ instance Diagnosable Error where
             ("Invalid use of a string initializer.\n" <> "You are trying to assign a string initializer to an object of type \x1b[31m" <> showText ty <> "\x1b[0m.")
     describe (EInvalidConstType ty) =
         diagnostic "SE-181" "invalid type for constant"
-            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a constant.\n" <> "Only numeric types, boolean and character types are valid for constants.")
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a constant.\n" <>
+             "A constant holds a number, a boolean or a character, or an array, a struct, an enumeration, an option, a status or a result built from them.")
     describe (EInvalidAccessToConstExpr ident) =
         diagnostic "SE-182" "invalid access to a constant expression"
             ("Constant expression \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be accessed in this context.\n")

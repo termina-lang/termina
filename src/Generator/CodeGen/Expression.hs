@@ -12,7 +12,7 @@ import Control.Monad.State (gets)
 import Generator.CodeGen.Common
 import Utils.Annotations
 import Generator.LanguageC.Embedded
-import Core.Utils (shiftWidth, arrayOf)
+import Core.Utils (shiftWidth, arrayOf, withoutConst)
 import Configuration.Platform (Platform, intWidth)
 
 
@@ -66,15 +66,15 @@ genType qual (TArray ts' s) = do
     return (CTArray ts arraySize)
 -- | Option types
 genType _qual (TOption (TBoxSubtype _)) = return (CTTypeDef optionBox noqual)
-genType _qual (TOption ts) = do
+genType qual (TOption ts) = do
     optName <- genOptionStructName ts
-    return (CTTypeDef optName noqual)
-genType _qual (TResult tyOk tyError) = do
+    return (CTTypeDef optName qual)
+genType qual (TResult tyOk tyError) = do
     resultName <- genResultStructName tyOk tyError
-    return (CTTypeDef resultName noqual)
-genType _qual (TStatus ts) = do
+    return (CTTypeDef resultName qual)
+genType qual (TStatus ts) = do
     optName <- genStatusStructName ts
-    return (CTTypeDef optName noqual)
+    return (CTTypeDef optName qual)
 -- Non-primitive types:
 -- | Box subtype
 genType _qual (TBoxSubtype _) = return (CTTypeDef boxStruct noqual)
@@ -552,7 +552,7 @@ genExpression (IsMonadicVariantExpression obj this_variant ann) = do
             ErrorLabel -> resultErrorTag @: enumFieldType |>> getLocation ann
     return $ leftExpr @== rightExpr |>> getLocation ann
 genExpression (UncheckedArraySlice _ak obj lower _upper ann) = do
-    objType <- getObjType obj
+    objType <- withoutConst <$> getObjType obj
     cLower <- genExpression lower
     cObj <- genObject obj
     case objType of
@@ -561,7 +561,7 @@ genExpression (UncheckedArraySlice _ak obj lower _upper ann) = do
             return $ addrOf (cObj @$$ cLower @: cType) |>> getLocation ann
         ty -> throwError $ InternalError $ "Unsupported object. Not a reference to an array: " ++ show ty
 genExpression expr@(CheckedArraySlice _ak obj lower upper ann) = do
-    objType <- getObjType obj
+    objType <- withoutConst <$> getObjType obj
     expectedType <- getExprType expr
     cLower <- genExpression lower
     cObj <- genObject obj

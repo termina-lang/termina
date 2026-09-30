@@ -376,6 +376,23 @@ getMemberField loc obj_ty ident =
       }
     ty -> throwError $ annotateError loc (EMemberAccessInvalidType ty)
 
+-- | Scope of the object whose field is accessed: a local object, or a global
+-- constant, which the given scope reads or rejects as it would the constant
+-- itself.
+memberRootTy ::
+  (ParserAnn -> Identifier -> SemanticMonad (AccessKind, SAST.TerminaType SemanticAnn))
+  -> ParserAnn -> Identifier -> SemanticMonad (AccessKind, SAST.TerminaType SemanticAnn)
+memberRootTy getVarTy loc ident =
+  catchError (getLHSVarTy loc ident) (\err -> case getError err of
+    EConstantIsReadOnly _ -> getVarTy loc ident
+    _ -> throwError err)
+
+-- | The type of a tested object without its constant mark, and the type of
+-- the test, which is a constant when the object is.
+testedTy :: (AccessKind, SAST.TerminaType SemanticAnn) -> (SAST.TerminaType SemanticAnn, SAST.TerminaType SemanticAnn)
+testedTy (_, TConstSubtype ty) = (ty, TConstSubtype TBool)
+testedTy (_, ty) = (ty, TBool)
+
 typeObject ::
   -- | Scope of variables. It returns its access kind (mutable or immutable) and its type
   (ParserAnn -> Identifier -> SemanticMonad (AccessKind, SAST.TerminaType SemanticAnn))
@@ -398,21 +415,34 @@ typeObject getVarTy (ArrayIndexExpression obj idx ann) = do
     TFixedLocation (TArray ty_elems _vexp) -> do
         idx_typed  <- catchMismatch (getAnnotation idx) EArrayIndexNotUSize (typeExpression (Just TUSize) typeRHSObject idx)
         checkObjectNotMoved ann $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann obj_ak ty_elems
+    -- | An element of a constant array read with a constant index is itself a
+    -- constant.
+    TConstSubtype (TArray ty_elems _vexp) -> do
+        idx_typed  <- catchMismatch (getAnnotation idx) EArrayIndexNotUSize (typeExpression (Just TUSize) typeRHSObject idx)
+        idx_ty <- getExprType idx_typed
+        let elem_ty = case idx_ty of
+              TConstSubtype _ -> TConstSubtype ty_elems
+              _ -> ty_elems
+        checkObjectNotMoved ann $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann obj_ak elem_ty
     ty -> throwError $ annotateError ann (EInvalidArrayIndexing ty)
-typeObject _ (MemberAccess obj ident ann) = do
+typeObject getVarTy (MemberAccess obj ident ann) = do
   -- | Attention on deck!
-  -- This is a temporary solution pending confirmation that it works in all cases. 
+  -- This is a temporary solution pending confirmation that it works in all cases.
   -- Problem: you cannot access the fields of a global object, you can only access
   -- the procedures in the case of shared resources. To avoid accessing the fields
   -- of a global object, we have adopted the following solution: when accessing the
-  -- field of an object, only the local objects are available, not the global ones. 
+  -- field of an object, only the local objects are available, not the global ones.
   -- This way, only the fields of objects that are in the local environment of the
-  -- function can be accessed.
-  typed_obj' <- typeObject getLHSVarTy obj
+  -- function can be accessed. The exception are global constants, which the
+  -- scope of the access decides whether the field can be read or written.
+  typed_obj' <- typeObject (memberRootTy getVarTy) obj
   (obj_ak', obj_ty') <- getObjType typed_obj'
   let (typed_obj, obj_ak, obj_ty) =
         maybe (typed_obj', obj_ak', obj_ty') (unBox typed_obj', Mutable, ) (isBox obj_ty')
-  ft <- getMemberField ann obj_ty ident
+  -- | A field of a constant is itself a constant.
+  ft <- case obj_ty of
+    TConstSubtype ty -> (\(fty, fann) -> (TConstSubtype fty, fann)) <$> getMemberField ann ty ident
+    _ -> getMemberField ann obj_ty ident
   case ft of
     (fty@(TAccessPort (TInterface _ _)), SemanticAnn (FTy (AccessPortField members)) _) ->
       checkObjectNotMoved ann $ SAST.MemberAccess typed_obj ident $ buildExpAnnAccessPortObj ann obj_ak members fty
@@ -1319,7 +1349,7 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
       (obj_ak, obj_ty) <- getObjType typed_obj
       typed_lower <- catchMismatch (getAnnotation lower) EArraySliceLowerBoundNotUSize (typeExpression (Just TUSize) typeRHSObject lower)
       typed_upper <- catchMismatch (getAnnotation upper) EArraySliceUpperBoundNotUSize (typeExpression (Just TUSize) typeRHSObject upper)
-      case obj_ty of
+      case withoutConst obj_ty of
         TArray ty _ -> do
           checkReferenceAccessKind obj_ak
           case expectedType of
@@ -1408,7 +1438,7 @@ typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann)
     ty -> throwError $ annotateError ann $ EDereferenceInvalidType ty
 typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_id pann) = do
   obj_typed <- typeObj obj
-  (_, obj_ty) <- getObjType obj_typed
+  (obj_ty, test_ty) <- testedTy <$> getObjType obj_typed
   LocatedElement lhs_ty _ <- case obj_ty of
     TEnum lhs_id -> do
       unless (lhs_id == id_ty) (throwError $ annotateError pann (EIsVariantEnumTypeMismatch lhs_id id_ty))
@@ -1418,8 +1448,8 @@ typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_i
     Enum lhs_enum ty_vs _mods ->
       case Data.List.find ((variant_id ==) . variantIdentifier) ty_vs of
         Just (EnumVariant {}) -> do
-          mapM_ (flip (sameTyOrError pann) TBool) expectedType
-          return $ SAST.IsEnumVariantExpression obj_typed id_ty variant_id (buildExpAnn pann TBool)
+          mapM_ (flip (sameTyOrError pann) test_ty) expectedType
+          return $ SAST.IsEnumVariantExpression obj_typed id_ty variant_id (buildExpAnn pann test_ty)
         Nothing -> throwError $ annotateError pann (EEnumVariantNotFound lhs_enum variant_id)
     _ -> throwError $ annotateError Internal EExpectedEnumType
 typeExpression expectedType typeObj (IsMonadicVariantExpression obj variant_id pann) = do
@@ -1436,31 +1466,31 @@ typeExpression expectedType typeObj (IsMonadicVariantExpression obj variant_id p
     typeOptionVariant :: SemanticMonad (SAST.Expression SemanticAnn)
     typeOptionVariant = do
       obj_typed <- typeObj obj
-      (_, obj_ty) <- getObjType obj_typed
+      (obj_ty, test_ty) <- testedTy <$> getObjType obj_typed
       case obj_ty of
         (TOption {}) -> do
-          mapM_ (flip (sameTyOrError pann) TBool) expectedType
-          return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann TBool)
+          mapM_ (flip (sameTyOrError pann) test_ty) expectedType
+          return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann test_ty)
         _ -> throwError $ annotateError pann (EIsOptionVariantInvalidType obj_ty)
 
     typeStatusVariant :: SemanticMonad (SAST.Expression SemanticAnn)
     typeStatusVariant = do
       obj_typed <- typeObj obj
-      (_, obj_ty) <- getObjType obj_typed
+      (obj_ty, test_ty) <- testedTy <$> getObjType obj_typed
       case obj_ty of
         (TStatus {}) -> do
-          mapM_ (flip (sameTyOrError pann) TBool) expectedType
-          return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann TBool)
+          mapM_ (flip (sameTyOrError pann) test_ty) expectedType
+          return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann test_ty)
         _ -> throwError $ annotateError pann (EIsStatusVariantInvalidType obj_ty)
 
     typeResultVariant :: SemanticMonad (SAST.Expression SemanticAnn)
     typeResultVariant = do
       obj_typed <- typeObj obj
-      (_, obj_ty) <- getObjType obj_typed
+      (obj_ty, test_ty) <- testedTy <$> getObjType obj_typed
       case obj_ty of
         (TResult {}) -> do
-          mapM_ (flip (sameTyOrError pann) TBool) expectedType
-          return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann TBool)
+          mapM_ (flip (sameTyOrError pann) test_ty) expectedType
+          return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann test_ty)
         _ -> throwError $ annotateError pann (EIsResultVariantInvalidType obj_ty)
 
 typeExpression _ _ (StructInitializer _ _ pann) = throwError $ annotateError pann EStructInitializerInvalidUse

@@ -40,6 +40,7 @@ import System.Environment
 import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
 import EFP.Schedulability.WCEPath.Printer
 import Command.Common
+import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.PlantUML
 import Extras.PlantUML.Printer
@@ -148,9 +149,11 @@ monadicTypesMapModules = foldl' monadicTypesMapModule emptyMonadicTypes  . M.ele
 
 genTWCEPFiles ::
   TerminaConfig
+  -> Platform
+  -> ProjectConstEnvs
   -> LoweredProject
   -> IO ()
-genTWCEPFiles params loweredProject = do
+genTWCEPFiles params plt constEnvs loweredProject = do
   mapM_ printWCEPModule (M.elems loweredProject)
 
   where
@@ -158,7 +161,9 @@ genTWCEPFiles params loweredProject = do
     printWCEPModule :: BasicBlocksModule -> IO ()
     printWCEPModule bbModule =
       let bbAST = loweredAST . metadata $ bbModule
-          wceps = genTransactionalWCEPS bbAST in
+          consts = M.findWithDefault M.empty (qualifiedName bbModule) constEnvs
+          env = ConstFoldEnv consts plt (microsecondsPerTick params)
+          wceps = genTransactionalWCEPS env bbAST in
       (unless (null wceps) $ do
         let destinationPath = efpFolder params
             twcepFile = destinationPath </> qualifiedName bbModule <.> "twcep"
@@ -482,7 +487,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
         }) . resultTypes $ monadicTypes)) $ genResultHeaderFile config plt monadicTypes loweredProject (qualifiedName appModule)
     when genTransactionalWCEPs $
       when chatty (putStrLn . debugMessage $ "Generating transactional worst-case execution paths") >>
-      genTWCEPFiles config loweredProject
+      genTWCEPFiles config plt constEnvs loweredProject
     case genCmpDiag of
       Nothing -> return ()
       Just param ->

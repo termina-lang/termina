@@ -115,7 +115,13 @@ arrayOf :: TerminaType' expr a -> Maybe (TerminaType' expr a, expr a)
 arrayOf (TArray ty size) = Just (ty, size)
 arrayOf (TReference _ (TArray ty size)) = Just (ty, size)
 arrayOf (TFixedLocation (TArray ty size)) = Just (ty, size)
+arrayOf (TConstSubtype ty) = arrayOf ty
 arrayOf _ = Nothing
+
+-- | The type without its constant mark.
+withoutConst :: TerminaType' expr a -> TerminaType' expr a
+withoutConst (TConstSubtype ty) = ty
+withoutConst ty = ty
 
 arrayTy :: TerminaType' expr a -> Bool
 arrayTy TUInt8           = True
@@ -251,6 +257,13 @@ portTy _                 = False
 fieldTy :: TerminaType' expr a -> Bool
 fieldTy = arrayTy
 
+-- | Type that a global constant may hold: a scalar, or an array, a struct, an
+-- enumeration, an option, a status or a result built from them. Their fields
+-- and parameters are field types, so none of them holds a box, a reference or
+-- a port.
+globalConstTy :: TerminaType' expr a -> Bool
+globalConstTy = arrayTy
+
 locTy :: TerminaType' expr a -> Bool
 locTy = fieldTy
 
@@ -343,14 +356,6 @@ constTy TChar            = True
 constTy TFloat32         = True
 constTy TFloat64         = True
 constTy _                = False
-
--- | Type that a global `const` may hold: either a scalar constant type
--- (constTy) or an array of such, recursively. Unlike constTy (which also
--- gates constant parameters, restricted to scalars), arrays are allowed here
--- because a const array is emitted as a C initializer list.
-globalConstTy :: TerminaType' expr a -> Bool
-globalConstTy (TArray ty _) = globalConstTy ty
-globalConstTy ty            = constTy ty
 
 -- | Predicate definining when a |TerminaType| is numeric.
 intTy :: TerminaType' expr a -> Bool
