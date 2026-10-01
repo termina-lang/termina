@@ -131,8 +131,18 @@ constantPathBounds =
   "    return r;\n" ++
   "}"
 
+-- | A parameter that refers to an array sized with a constant.
+constantSizedParameter :: String
+constantSizedParameter =
+  "const N : usize = 4;\n" ++
+  "function first(a : &[u8; N]) -> u8 {\n" ++
+  "    return (*a)[0];\n" ++
+  "}"
+
 spec :: Spec
 spec = do
+  it "writes the size of an array behind a reference parameter as a literal" $
+    runFullBuild constantSizedParameter `shouldSatisfy` isInfixOf (pack "uint8_t first(const uint8_t a[4U])")
   it "writes an element of a constant in a loop bound as a literal" $
     runFullBuild constantPathBounds `shouldSatisfy` isInfixOf (pack "for (size_t j = 0U; j < 8U;")
   it "writes a field and the name of a constant in a loop bound as literals" $

@@ -123,6 +123,7 @@ foldType loc (TFixedLocation (TArray ty arraySize)) = do
   ty' <- foldType loc ty
   return (TFixedLocation (TArray ty' (Constant arraySizeValue (buildExpAnn loc TUSize))))
 foldType loc (TConstSubtype ty) = TConstSubtype <$> foldType loc ty
+foldType loc (TReference ak ty) = TReference ak <$> foldType loc ty
 foldType _ ty = return ty
 
 foldParam :: Location -> Parameter SemanticAnn -> ConstFoldMonad (Parameter SemanticAnn)
