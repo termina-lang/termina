@@ -42,8 +42,8 @@ data Error =
   | EArraySliceOutOfBounds Integer Integer -- ^ Array slice out of bounds
   | EArraySliceNegativeRange Integer Integer -- ^ Array slice negative range
   | EArraySliceInvalidRange Integer Integer Integer -- ^ Array slice invalid range
-  | EArrayIndexOutOfBounds Integer Integer -- ^ Array index out of bounds
-  | EAtomicArrayIndexOutOfBounds Integer Integer -- ^ Array index out of bounds
+  | EArrayIndexOutOfBounds Integer Integer -- ^ Array index out of bounds (size, index)
+  | EAtomicArrayIndexOutOfBounds Integer Integer -- ^ Atomic array index out of bounds (size, index)
   | EReferencedArraySizeMismatch Integer Integer -- ^ Referenced array size mismatch
   | EShiftAmountOutOfBounds Integer Integer -- ^ Shift amount out of bounds (width, amount)
   | ETaskPriorityOutOfRange Identifier Integer -- ^ Task priority out of range (task, priority)
@@ -95,11 +95,11 @@ instance Diagnosable Error where
     describe (EArrayIndexOutOfBounds size index) =
         diagnostic "CFE-010" "array index out of bounds"
             ("The array index is out of bounds. The index " <> emph (T.pack (show index)) <>
-                " is greater than the size of the array " <> emph (T.pack (show size)) <> ".")
-    describe (EAtomicArrayIndexOutOfBounds index size) =
+                " is greater than or equal to the size of the array " <> emph (T.pack (show size)) <> ".")
+    describe (EAtomicArrayIndexOutOfBounds size index) =
         diagnostic "CFE-011" "atomic array index out of bounds"
             ("The atomic array index is out of bounds. The index " <> emph (T.pack (show index)) <>
-                " is greater than the size of the atomic array " <> emph (T.pack (show size)) <> ".")
+                " is greater than or equal to the size of the atomic array " <> emph (T.pack (show size)) <> ".")
     describe (EReferencedArraySizeMismatch expectedSize actualSize) =
         diagnostic "CFE-012" "referenced array size mismatch"
             ("The referenced array size is " <> emph (T.pack (show actualSize)) <>

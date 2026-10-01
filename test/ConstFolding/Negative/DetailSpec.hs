@@ -26,8 +26,24 @@ sliceOutOfBounds =
   "    return;\n" ++
   "}"
 
+-- CFE-011: storing at index 10 of an atomic array of 8 elements.
+atomicIndexOutOfBounds :: String
+atomicIndexOutOfBounds =
+  "interface IPool {\n    procedure touch(&mut self);\n};\n" ++
+  "resource class CPool provides IPool {\n" ++
+  "    pool : access AtomicArrayAccess<u32; 8>;\n" ++
+  "    procedure touch(&mut self) {\n" ++
+  "        self->pool.store_index(10, 0);\n" ++
+  "        return;\n" ++
+  "    }\n" ++
+  "};\n"
+
 spec :: Spec
 spec = describe "ConstFolding: error detail (carried value)" $ do
+  it "CFE-011 carries the size of the atomic array and the index, in that order" $
+    constFoldError atomicIndexOutOfBounds `shouldSatisfy` \case
+      Just (AnnotatedError (EAtomicArrayIndexOutOfBounds size index) _) -> size == 8 && index == 10
+      _ -> False
   it "CFE-004 carries the overflowing constant" $
     constFoldError overflow `shouldSatisfy` \case
       Just (AnnotatedError (EConstIntegerOverflow 256 _) _) -> True
