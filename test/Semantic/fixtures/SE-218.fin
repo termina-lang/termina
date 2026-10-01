@@ -1,16 +1,9 @@
-#[packed]
-struct Packet {
-    header : u32;
-    flags : u8;
-};
+// malloc names a function of the standard library of C, so the generated code
+// would declare an object over a name that belongs to the implementation.
+function allocate_one() -> u32 {
 
-function write_u32(value : &mut u32) {
-    *value = 1 : u32;
-    return;
-}
+    var malloc : u32 = 0;
 
-function trigger() {
-    var pkt : Packet = {header = 0 : u32, flags = 0 : u8};
-    write_u32(&mut pkt.header);
-    return;
+    return malloc;
+
 }

@@ -146,12 +146,12 @@ spec = do
 
     it "Rejects a const option of a box" $
       compileErrorCode "const O : Option<box u32> = None;\n"
-        `shouldBe` Just (pack "SE-181")
+        `shouldBe` Just (pack "SE-180")
 
     it "Rejects a const status of a box" $
       compileErrorCode "const S : Status<box u32> = Success;\n"
-        `shouldBe` Just (pack "SE-184")
+        `shouldBe` Just (pack "SE-183")
 
     it "Rejects a const result of a box" $
       compileErrorCode "const R : Result<box u32; i32> = Ok(1 : u32);\n"
-        `shouldBe` Just (pack "SE-183")
+        `shouldBe` Just (pack "SE-182")

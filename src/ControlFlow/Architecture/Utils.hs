@@ -438,7 +438,7 @@ getPeriodicTimersToTasks progArchitecture = foldl (\acc emitter ->
     ) [] (getConnectedEmitters progArchitecture)
 
 -- | Returns the value of the "priority" modifier. The type checker rejects a
--- task without one (SE-223) and the constant folding leaves its value as a
+-- task without one (SE-222) and the constant folding leaves its value as a
 -- literal.
 getPriority :: TPTask a -> TInteger
 getPriority = getPriority' . taskModifiers

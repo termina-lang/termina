@@ -1,4 +1,0 @@
-function test0() {
-    var x : u32 = other_fn();
-    return;
-}

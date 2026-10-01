@@ -1,11 +1,12 @@
-function test0() {
+task class TaskClass0 {
 
-    var x : u32 = 0;
+    snk0 : sink u32 triggers action0;
 
-    if (x is Ok) {
-        return;
-    } else {
-        return;
+    action action0(&priv self, _input : u32) -> Status<i32> {
+        var ret : Status<i32> = Success;
+        return ret;
     }
 
-}
+};
+
+task task0 : TaskClass0 = { snk0 <- system_except };

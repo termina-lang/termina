@@ -1,29 +1,11 @@
-interface Iface0 {
-    procedure proc0(&mut self, data : &mut Option<box u32>);
-};
+function test0() {
 
-resource class ResClas0 provides Iface0 {
+    var x : u32 = 0;
 
-    local : u32;
-
-    procedure proc0(&mut self, data : &mut Option<box u32>) {
-
-        match data {
-            case Some(value) => {
-                self->local = *value;
-                match data {
-                    case Some(value2) => {
-                        self->local = *value2;
-                    }
-                    case None => {
-                    }
-                }
-            }
-            case None => {
-            }
-        }
-
+    if (x is Success) {
+        return;
+    } else {
         return;
     }
 
-};
+}

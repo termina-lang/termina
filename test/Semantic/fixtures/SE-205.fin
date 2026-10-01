@@ -1,15 +1,11 @@
-interface IFoo {
-    procedure inc(&mut self);
-};
-
 task class TaskClass0 {
 
     snk0 : sink TimeVal triggers action0;
 
-    ap : access IFoo;
+    out_port : out u32;
 
     viewer peek(&self) -> u32 {
-        self->ap.inc();
+        self->out_port.send(0 : u32);
         return 0 : u32;
     }
 

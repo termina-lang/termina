@@ -102,8 +102,8 @@ data Error
   | EBinOpLeftTypeNotInt Op (TerminaType SemanticAnn) -- ^ Binary operation expected integer type on the left
   | EBinOpRightTypeNotInt Op (TerminaType SemanticAnn) -- ^ Binary operation expected integer type on the right
   | EBinOpRightTypeNotPos Op (TerminaType SemanticAnn) -- ^ Binary operation expected positive numeric type on the right
-  | EBinOpExpectedTypeNotPos Op (TerminaType SemanticAnn) -- ^ Shift or bitwise operation expected result type not positive numeric (SE-221)
-  | EBinOpLeftTypeNotPos Op (TerminaType SemanticAnn) -- ^ Shift or bitwise operation expected positive numeric type on the left (SE-222)
+  | EBinOpExpectedTypeNotPos Op (TerminaType SemanticAnn) -- ^ Shift or bitwise operation expected result type not positive numeric (SE-220)
+  | EBinOpLeftTypeNotPos Op (TerminaType SemanticAnn) -- ^ Shift or bitwise operation expected positive numeric type on the left (SE-221)
   | EBinOpLeftTypeNotEq Op (TerminaType SemanticAnn) -- ^ Binary operation expected equatable type on the left
   | EBinOpRightTypeNotEq Op (TerminaType SemanticAnn) -- ^ Binary operation expected equatable type on the right
   | EAtomicAccessInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for the atomic access interface
@@ -266,12 +266,12 @@ data Error
   | EUnprotectedResourceWithRegularFields (Identifier, Location) -- ^ Unprotected resource with regular fields
   | EMemberFunctionWithMutableSelfInTaskClass Identifier -- ^ Member function with mutable self reference in task class
   | EMemberFunctionWithMutableSelfInHandlerClass Identifier -- ^ Member function with mutable self reference in handler class
-  | ECharLiteralOutOfRange Char -- ^ Character literal whose code point is outside the 7-bit ASCII range (SE-217)
-  | EReferenceToPackedMember Identifier -- ^ Reference to a member reached through a packed struct, on a strict-alignment target (SE-218)
-  | EReservedIdentifier Identifier ReservedBy -- ^ Identifier that C keeps for itself (SE-219)
-  | EEmitterOnlyForHandler Identifier Identifier HandlerOnlyBecause -- ^ Emitter that only a handler may attend, connected to something else (SE-220)
-  | EMissingTaskPriority Identifier -- ^ Task declared without a priority (SE-223)
-  | EDuplicatedModifier Identifier -- ^ Modifier that appears more than once on the same declaration (SE-224)
+  | ECharLiteralOutOfRange Char -- ^ Character literal whose code point is outside the 7-bit ASCII range (SE-216)
+  | EReferenceToPackedMember Identifier -- ^ Reference to a member reached through a packed struct, on a strict-alignment target (SE-217)
+  | EReservedIdentifier Identifier ReservedBy -- ^ Identifier that C keeps for itself (SE-218)
+  | EEmitterOnlyForHandler Identifier Identifier HandlerOnlyBecause -- ^ Emitter that only a handler may attend, connected to something else (SE-219)
+  | EMissingTaskPriority Identifier -- ^ Task declared without a priority (SE-222)
+  | EDuplicatedModifier Identifier -- ^ Modifier that appears more than once on the same declaration (SE-223)
   deriving Show
 
 -- | Why an emitter takes a handler and not a task.
@@ -455,22 +455,22 @@ instance Diagnosable Error where
         diagnostic "SE-049" "binary operation expected arithmetic type on the right"
             ("The right operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of arithmetic type (integer or float).")
     describe (EBinOpExpectedTypeNotInt op ty) =
-        diagnostic "SE-214" "binary operation expected result type not integer"
+        diagnostic "SE-213" "binary operation expected result type not integer"
             ("The binary operation \x1b[31m" <> showText op <> "\x1b[0m will result in an integer value but the expected type is \x1b[31m" <> showText ty <> "\x1b[0m.")
     describe (EBinOpLeftTypeNotInt op ty) =
-        diagnostic "SE-215" "binary operation expected integer type on the left"
+        diagnostic "SE-214" "binary operation expected integer type on the left"
             ("The left operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of integer type.")
     describe (EBinOpRightTypeNotInt op ty) =
-        diagnostic "SE-216" "binary operation expected integer type on the right"
+        diagnostic "SE-215" "binary operation expected integer type on the right"
             ("The right operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of integer type.")
     describe (EBinOpRightTypeNotPos op ty) =
         diagnostic "SE-050" "binary operation expected positive numeric type on the right"
             ("The right operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of positive numeric type.")
     describe (EBinOpExpectedTypeNotPos op ty) =
-        diagnostic "SE-221" "binary operation expected result type not positive numeric"
+        diagnostic "SE-220" "binary operation expected result type not positive numeric"
             ("The binary operation \x1b[31m" <> showText op <> "\x1b[0m will result in a positive numeric value but the expected type is \x1b[31m" <> showText ty <> "\x1b[0m.\n" <> "Shifts and bitwise operations only take operands of positive numeric type.")
     describe (EBinOpLeftTypeNotPos op ty) =
-        diagnostic "SE-222" "binary operation expected positive numeric type on the left"
+        diagnostic "SE-221" "binary operation expected positive numeric type on the left"
             ("The left operand of the binary operation \x1b[31m" <> showText op <> "\x1b[0m is of type \x1b[31m" <> showText ty <> "\x1b[0m but it is expected to be of positive numeric type.\n" <> "Shifts and bitwise operations only take operands of positive numeric type.")
     describe (EBinOpLeftTypeNotEq op ty) =
         diagnostic "SE-051" "binary operation expected equatable type on the left"
@@ -895,119 +895,119 @@ instance Diagnosable Error where
         diagnostic "SE-178" "invalid use of a string initializer"
             ("You are trying to use a string initializer in an invalid context.\n" <> "String initializers can only be used to initialize arrays of characters.")
     describe (EStringInitializerNotArrayOfChars ty) =
-        diagnostic "SE-180" "assignment of a string array initializer to an invalid type"
+        diagnostic "SE-179" "assignment of a string array initializer to an invalid type"
             ("Invalid use of a string initializer.\n" <> "You are trying to assign a string initializer to an object of type \x1b[31m" <> showText ty <> "\x1b[0m.")
     describe (EInvalidConstType ty) =
-        diagnostic "SE-181" "invalid type for constant"
+        diagnostic "SE-180" "invalid type for constant"
             ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a constant.\n" <>
              "A constant holds a number, a boolean or a character, or an array, a struct, an enumeration, an option, a status or a result built from them.")
     describe (EInvalidAccessToConstExpr ident) =
-        diagnostic "SE-182" "invalid access to a constant expression"
+        diagnostic "SE-181" "invalid access to a constant expression"
             ("Constant expression \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be accessed in this context.\n")
     describe (EInvalidResultType ty) =
-        diagnostic "SE-183" "invalid type for result"
+        diagnostic "SE-182" "invalid type for result"
             ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a result.")
     describe (EInvalidStatusType ty) =
-        diagnostic "SE-184" "invalid type for status"
+        diagnostic "SE-183" "invalid type for status"
             ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a status.")
     describe (EInvalidVariantForOption variantName) =
-        diagnostic "SE-185" "invalid variant for option"
+        diagnostic "SE-184" "invalid variant for option"
             ("The variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant for an option.\n" <> "Only the variants \x1b[31mNone\x1b[0m and \x1b[31mSome\x1b[0m are valid.")
     describe (EInvalidVariantForResult variantName) =
-        diagnostic "SE-186" "invalid variant for result"
+        diagnostic "SE-185" "invalid variant for result"
             ("The variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant for a result.\n" <> "Only the variants \x1b[31mOk\x1b[0m and \x1b[31mError\x1b[0m are valid.")
     describe (EInvalidVariantForStatus variantName) =
-        diagnostic "SE-187" "invalid variant for status"
+        diagnostic "SE-186" "invalid variant for status"
             ("The variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant for a status.\n" <> "Only the variants \x1b[31mSuccess\x1b[0m, \x1b[31mFailure\x1b[0m are valid.")
     describe (EInvalidResultTypeSpecifier typeSpec) =
-        diagnostic "SE-188" "invalid type specifier for result"
+        diagnostic "SE-187" "invalid type specifier for result"
             ("The type specifier \x1b[31m" <> showText typeSpec <> "\x1b[0m is not a valid type specifier for a result.\n" <> "Result types must be of the form \x1b[31mResult<R; L>\x1b[0m, where \x1b[31mR\x1b[0m is the valid result type and \x1b[31mL\x1b[0m is the error type.")
     describe (EMonadicVariantParameterTypeMismatch expectedTy actualTy) =
-        diagnostic "SE-189" "monadic variant parameter type mismatch"
+        diagnostic "SE-188" "monadic variant parameter type mismatch"
             ("The parameter of the variant is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
     describe (EObjectPreviouslyMoved prevPos) =
         relatedTo prevPos "the object was previously moved here" $
-        diagnostic "SE-190" "object previously moved"
+        diagnostic "SE-189" "object previously moved"
             ("You are trying to access an object that has been moved.\n")
     describe (EIsStatusVariantInvalidType ty) =
-        diagnostic "SE-191" "invalid type for is-status-variant expression"
+        diagnostic "SE-190" "invalid type for is-status-variant expression"
             ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for is-status-variant expression.")
     describe (EIsResultVariantInvalidType ty) =
-        diagnostic "SE-192" "invalid type for is-result-variant expression"
+        diagnostic "SE-191" "invalid type for is-result-variant expression"
             ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for is-result-variant expression.")
     describe (EInvalidSystemExceptEmitterType ty) =
-        diagnostic "SE-193" "invalid system exception emitter type"
+        diagnostic "SE-192" "invalid system exception emitter type"
             ("System exception emitters emit data of type \x1b[31m" <> showText (TEnum "Exception" :: TerminaType a) <> "\x1b[0m but you are expecting data of type \x1b[31m" <> showText ty <> "\x1b[0m.")
     describe (EInvalidInterruptActionReturnType ident ty) =
-        diagnostic "SE-194" "invalid interrupt action return type"
+        diagnostic "SE-193" "invalid interrupt action return type"
             ("The return type of actions attached to the interrupt event is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <> "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m.")
     describe (EInvalidPeriodicTimerActionReturnType ident ty) =
-        diagnostic "SE-195" "invalid periodic timer action return type"
+        diagnostic "SE-194" "invalid periodic timer action return type"
             ("The return type of actions attached to the periodic timer event is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <> "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m.")
     describe (EInvalidSystemInitActionReturnType ident ty) =
-        diagnostic "SE-196" "invalid system init action return type"
+        diagnostic "SE-195" "invalid system init action return type"
             ("The return type of actions attached to the system init event is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <> "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m.")
     describe (EInvalidSystemExceptActionReturnType ident ty) =
-        diagnostic "SE-197" "invalid system exception action return type"
+        diagnostic "SE-196" "invalid system exception action return type"
             ("Actions that handle system exceptions shall not return a value.\n" <> "However, the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m.")
     describe (EInvalidMsgQueueActionReturnType ident ty) =
-        diagnostic "SE-198" "invalid message queue action return type"
+        diagnostic "SE-197" "invalid message queue action return type"
             ("The return type of the actions attached to the reception of messages from a message queue is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <> "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m.")
     describe (ETypeNotInScope ident qualifiedName) =
         let importString = T.replace "\\" "." $ T.pack qualifiedName
             importString' = T.replace "/" "." importString
         in
-            diagnostic "SE-199" "type not in scope"
+            diagnostic "SE-198" "type not in scope"
                 ("The type \x1b[31m" <> T.pack ident <> "\x1b[0m is not in scope.\n" <> "The type is defined in the module \x1b[31m" <> importString' <> "\x1b[0m. You need to import it.")
     describe (EFunctionNotInScope ident qualifiedName) =
         let importString = T.replace "\\" "." $ T.pack qualifiedName
             importString' = T.replace "/" "." importString
         in
-            diagnostic "SE-200" "function not in scope"
+            diagnostic "SE-199" "function not in scope"
                 ("The function \x1b[31m" <> T.pack ident <> "\x1b[0m is not in scope.\n" <> "The function is defined in the module \x1b[31m" <> importString' <> "\x1b[0m. You need to import it.")
     describe (EUnknownAction ident) =
-        diagnostic "SE-201" "unknown action"
+        diagnostic "SE-200" "unknown action"
             ("The action \x1b[31m" <> T.pack ident <> "\x1b[0m is not defined.")
     describe (EInvalidViewerParameterType ty) =
-        diagnostic "SE-204" "invalid viewer parameter type"
+        diagnostic "SE-203" "invalid viewer parameter type"
             ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a viewer parameter.")
     describe EInvalidAccessToProcedureFromImmutableSelfReference =
-        diagnostic "SE-205" "invalid access to procedure from immutable self reference"
+        diagnostic "SE-204" "invalid access to procedure from immutable self reference"
             ("You are trying to access a non-immutable procedure from an immutable self reference. " <> "Immutable self references can only access immutable procedures.")
     describe EInvalidAccessToOutPortFromImmutableSelfReference =
-        diagnostic "SE-206" "invalid access to out port from immutable self reference"
+        diagnostic "SE-205" "invalid access to out port from immutable self reference"
             ("You are trying to access an outbound port from an immutable self reference. " <> "Immutable self references cannot access outbound ports.")
     describe (EProcedureSelfAccessKindMismatch (ifaceId, procId, expectedAccessKind, prevPos) accessKind) =
         relatedTo prevPos "the interface procedure is defined here" $
-        diagnostic "SE-207" "self reference access kind mismatch in procedure"
+        diagnostic "SE-206" "self reference access kind mismatch in procedure"
             ("Procedure \x1b[31m" <> T.pack procId <> "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> "\x1b[0m is expected to have a self reference of access kind \x1b[31m" <> showText expectedAccessKind <> "\x1b[0m but the access kind of the self reference of the implementated procedure is \x1b[31m" <> showText accessKind <> "\x1b[0m.\n")
     describe (ETaskClassMethod (classId, clsPos) ident) =
         relatedTo clsPos "the class is defined here" $
-        diagnostic "SE-208" "task class defines a method"
+        diagnostic "SE-207" "task class defines a method"
             ("Task class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the method \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Task classes cannot define methods.")
     describe (EHandlerClassMethod (classId, clsPos) ident) =
         relatedTo clsPos "the class is defined here" $
-        diagnostic "SE-209" "handler class defines a method"
+        diagnostic "SE-208" "handler class defines a method"
             ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the method \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Handler classes cannot define methods.")
     describe (EResourceClassViewer (classId, clsPos) ident) =
         relatedTo clsPos "the class is defined here" $
-        diagnostic "SE-210" "resource class defines a viewer"
+        diagnostic "SE-209" "resource class defines a viewer"
             ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the viewer \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Resource classes cannot define viewers.")
     describe (EUnprotectedResourceWithRegularFields (clsId, prevPos)) =
         relatedTo prevPos "the resource class is defined here" $
-        diagnostic "SE-211" "unprotected resource with regular fields"
+        diagnostic "SE-210" "unprotected resource with regular fields"
             ("Resource class \x1b[31m" <> T.pack clsId <> "\x1b[0m defines regular fields but the resource is defined as unprotected.\n" <> "Unprotected resources cannot define regular fields.\n")
     describe (EMemberFunctionWithMutableSelfInTaskClass ident) =
-        diagnostic "SE-212" "mutable member function in task class"
+        diagnostic "SE-211" "mutable member function in task class"
             ("Member function \x1b[31m" <> T.pack ident <> "\x1b[0m defines a mutable self reference. " <> "Member functions in task classes cannot define mutable self references\n" <> "Only immutable or private self references are allowed.")
     describe (EMemberFunctionWithMutableSelfInHandlerClass ident) =
-        diagnostic "SE-213" "mutable member function in handler class"
+        diagnostic "SE-212" "mutable member function in handler class"
             ("Member function \x1b[31m" <> T.pack ident <> "\x1b[0m defines a mutable self reference. " <> "Member functions in handler classes cannot define mutable self references\n" <> "Only immutable or private self references are allowed.")
     describe (ECharLiteralOutOfRange cp) =
-        diagnostic "SE-217" "character literal out of range"
+        diagnostic "SE-216" "character literal out of range"
             ("The character literal has code point \x1b[31m" <> T.pack (show (fromEnum cp)) <> "\x1b[0m, which is outside the 7-bit ASCII range (0 to 127).")
     describe (EReservedIdentifier ident reservedBy) =
-        diagnostic "SE-219" "reserved identifier"
+        diagnostic "SE-218" "reserved identifier"
             ("The identifier \x1b[31m" <> T.pack ident <> "\x1b[0m " <> heldBy <> ".")
       where
         heldBy = case reservedBy of
@@ -1017,10 +1017,10 @@ instance Diagnosable Error where
             CPlatform plt -> "is declared by the headers of the target platform " <> T.pack (show plt)
             TerminaType -> "is a type of Termina"
     describe (EReferenceToPackedMember ident) =
-        diagnostic "SE-218" "reference to a packed struct member"
+        diagnostic "SE-217" "reference to a packed struct member"
             ("This reference reaches into the packed struct \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Taking a reference to a member of a packed struct yields an under-aligned pointer, whose\n" <> "packed provenance is lost at the call boundary; on a strict-alignment target the callee then\n" <> "performs a misaligned access (undefined behavior). Read or write the member by value instead.")
     describe (EEmitterOnlyForHandler emitter cls because) =
-        diagnostic "SE-220" "emitter that only a handler may attend"
+        diagnostic "SE-219" "emitter that only a handler may attend"
             ("The emitter \x1b[31m" <> T.pack emitter <> "\x1b[0m is connected to a sink port of \x1b[31m" <> T.pack cls <> "\x1b[0m, which is a task class.\n" <> reason <> "\nIts action has to be attended by a handler.")
       where
         reason = case because of
@@ -1029,10 +1029,10 @@ instance Diagnosable Error where
             ReportsOnTheFatalPath ->
                 "This emitter reports a failure that the system cannot recover from, and the system\nreboots once its action has run, so a task attending it would never run."
     describe (EMissingTaskPriority task) =
-        diagnostic "SE-223" "missing task priority"
+        diagnostic "SE-222" "missing task priority"
             ("The task \x1b[31m" <> T.pack task <> "\x1b[0m has no priority.\n" <> "Every task must set its priority with the #[priority(N)] modifier, and no two tasks may share one.")
     describe (EDuplicatedModifier modifier) =
-        diagnostic "SE-224" "duplicated modifier"
+        diagnostic "SE-223" "duplicated modifier"
             ("The modifier \x1b[31m" <> T.pack modifier <> "\x1b[0m appears more than once on this declaration.")
 
     -- | The two clauses below pick their detail with a case, which the script
@@ -1040,7 +1040,7 @@ instance Diagnosable Error where
     -- hand.
     describe (EInPortActionParamTypeMismatch (ident, prevPos) expectedTy actualTy) =
         relatedTo prevPos "the action is defined here" $
-        diagnostic "SE-202" "in port action parameter type mismatch"
+        diagnostic "SE-201" "in port action parameter type mismatch"
             (case expectedTy of
                 TUnit ->
                     "The action \x1b[31m" <> T.pack ident <> "\x1b[0m is expected to have no parameters but it defines a parameter of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n"
@@ -1049,7 +1049,7 @@ instance Diagnosable Error where
                         "\x1b[0m but the actual type is \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")
     describe (ESinkPortActionParamTypeMismatch (ident, prevPos) expectedTy actualTy) =
         relatedTo prevPos "the action is defined here" $
-        diagnostic "SE-203" "sink port action parameter type mismatch"
+        diagnostic "SE-202" "sink port action parameter type mismatch"
             (case expectedTy of
                 TUnit ->
                     "The action \x1b[31m" <> T.pack ident <> "\x1b[0m is expected to have no parameters but it defines a parameter of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n"

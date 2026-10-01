@@ -1,6 +1,4 @@
-function test0() {
-
-    var s : Status<i32> = None;
+function test0() -> Result {
 
     return;
 

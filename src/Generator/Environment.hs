@@ -105,7 +105,7 @@ getPlatformInitialGlobalEnv config FreeRTOS10STM32L432XX =
     [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime"] [] [])) Internal)]
 getPlatformInitialGlobalEnv _ TestPlatform =
     -- System emitters so the test harness can exercise their connection errors
-    -- (e.g. SE-158/194 for interrupts, SE-160/196 for system init, SE-193/197
+    -- (e.g. SE-158/193 for interrupts, SE-160/195 for system init, SE-192/196
     -- for system exceptions). They are name-resolution entries only; unlike the
     -- enable-* config flags they are not added to the program architecture, so
     -- an unconnected one does not trip the disconnected-emitter check.

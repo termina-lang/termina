@@ -6,7 +6,7 @@
 -- without a single test turning red.
 --
 -- The second case is the other half of the contract: only a handler may attend
--- this emitter, which the type checker rejects with SE-220. Before that rule
+-- this emitter, which the type checker rejects with SE-219. Before that rule
 -- existed the generator carried a second branch for a task target, unreachable
 -- in practice and broken for as long as it existed.
 module Pipeline.Positive.InitialEventSpec (spec) where
@@ -59,6 +59,6 @@ spec = describe "Full pipeline: the initial event" $ do
         either (expectationFailure . unpack) (goldenC "initial_event_handler")
           (renderMainFileWith systemInitConfig progArch)
 
-  it "SE-220: rejects an initial event attended by a task" $
+  it "SE-219: rejects an initial event attended by a task" $
     compileProjectErrorCodeWith systemInitConfig [("test", taskApp)]
-      `shouldBe` Just (pack "SE-220")
+      `shouldBe` Just (pack "SE-219")

@@ -35,8 +35,8 @@ spec = do
                   "        self->arr_port.store_index(0 : usize, 5 : u32);\n"
       compileErrorCode src `shouldBe` Just (pack "CFE-001")
 
-    it "CFE-014: atomic array index out of bounds with constant index" $ do
+    it "CFE-011: atomic array index out of bounds with constant index" $ do
       -- store_index at a constant index 10, out of the size-4 array.
       let src = atomicProgram "const bad_idx : usize = 10;\n" "4"
                   "        self->arr_port.store_index(bad_idx, 5 : u32);\n"
-      compileErrorCode src `shouldBe` Just (pack "CFE-014")
+      compileErrorCode src `shouldBe` Just (pack "CFE-011")

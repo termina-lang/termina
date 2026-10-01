@@ -1,4 +1,4 @@
-task class TaskClass0 {
+handler class HandlerClass0 {
 
     snk0 : sink u32 triggers action0;
 
@@ -12,6 +12,3 @@ task class TaskClass0 {
     }
 
 };
-
-emitter timer0 : PeriodicTimer = { period = { tv_sec = 10, tv_usec = 0 } };
-task task0 : TaskClass0 = { snk0 <- timer0 };

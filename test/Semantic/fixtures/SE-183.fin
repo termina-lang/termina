@@ -1,4 +1,4 @@
-function test0(r : Result<&u32; u32>) {
+function test0(s : Status<&u32>) {
 
     return;
 

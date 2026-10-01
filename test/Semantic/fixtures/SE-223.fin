@@ -11,4 +11,6 @@ task class TaskClass0 {
 
 channel chan : MsgQueue<u32; 10>;
 
+#[priority(10)]
+#[priority(11)]
 task task0 : TaskClass0 = { in_port <- chan };

@@ -72,13 +72,13 @@ testFloatLitToInt = "function test0() {\n" ++
 spec :: Spec
 spec = do
   describe "Floating-point semantic errors" $ do
-    it "SE-214: rejects modulo (%) on floating-point operands" $
+    it "SE-213: rejects modulo (%) on floating-point operands" $
       runNegativeTestTypeCheck testModulo
         `shouldSatisfy` isEBinOpExpectedTypeNotInt Modulo TFloat32
-    it "SE-221: rejects bitwise and (&) on floating-point operands" $
+    it "SE-220: rejects bitwise and (&) on floating-point operands" $
       runNegativeTestTypeCheck testBitwiseAnd
         `shouldSatisfy` isEBinOpExpectedTypeNotPos BitwiseAnd TFloat32
-    it "SE-221: rejects left shift (<<) on a floating-point operand" $
+    it "SE-220: rejects left shift (<<) on a floating-point operand" $
       runNegativeTestTypeCheck testShift
         `shouldSatisfy` isEBinOpExpectedTypeNotPos BitwiseLeftShift TFloat32
     it "SE-051: rejects equality (==) on floating-point operands" $

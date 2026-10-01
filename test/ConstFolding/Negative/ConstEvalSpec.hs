@@ -72,66 +72,66 @@ spec = do
                 "const L : u32 = 10 : u32 / K;\n"
       compileErrorCode src `shouldBe` Just (pack "CFE-006")
 
-    it "CFE-013: array index out of bounds with constant index" $ do
+    it "CFE-010: array index out of bounds with constant index" $ do
       let src = "const bad_idx : usize = 10;\n" ++
                 "function f() -> u8 {\n" ++
                 "    var a : [u8; 4] = [0; 4];\n" ++
                 "    a[bad_idx] = 0 : u8;\n" ++
                 "    return a[0];\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CFE-013")
+      compileErrorCode src `shouldBe` Just (pack "CFE-010")
 
-    it "CFE-016: shift amount greater than or equal to the type width" $ do
+    it "CFE-013: shift amount greater than or equal to the type width" $ do
       let src = "function f() -> u8 {\n" ++
                 "    var x : u8 = 0 : u8;\n" ++
                 "    x = x << 8 : usize;\n" ++
                 "    return x;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CFE-016")
+      compileErrorCode src `shouldBe` Just (pack "CFE-013")
 
-    it "CFE-018: task priority reserved for the runtime" $ do
+    it "CFE-014: task priority reserved for the runtime" $ do
       let src = timerTaskClass
              ++ periodicEmitter "timer" 1
              ++ "#[priority(0)]\n"
              ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
-      compileErrorCode src `shouldBe` Just (pack "CFE-018")
+      compileErrorCode src `shouldBe` Just (pack "CFE-014")
 
-    it "CFE-018: task priority out of range after folding a constant" $ do
+    it "CFE-014: task priority out of range after folding a constant" $ do
       let src = "constexpr base : u32 = 250 : u32;\n"
              ++ timerTaskClass
              ++ periodicEmitter "timer" 1
              ++ "#[priority(base + 5 : u32)]\n"
              ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
-      compileErrorCode src `shouldBe` Just (pack "CFE-018")
+      compileErrorCode src `shouldBe` Just (pack "CFE-014")
 
     -- | The tick is 10000 microseconds unless the project says otherwise.
-    it "CFE-019: timer period that is not a whole number of ticks" $ do
+    it "CFE-015: timer period that is not a whole number of ticks" $ do
       let src = timerTaskClass
              ++ "emitter timer : PeriodicTimer = { period = {tv_sec = 0, tv_usec = 15000} };\n"
              ++ "#[priority(1)]\n"
              ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
-      compileErrorCode src `shouldBe` Just (pack "CFE-019")
+      compileErrorCode src `shouldBe` Just (pack "CFE-015")
 
-    it "CFE-019: timer period of zero" $ do
+    it "CFE-015: timer period of zero" $ do
       let src = timerTaskClass
              ++ "emitter timer : PeriodicTimer = { period = {tv_sec = 0, tv_usec = 0} };\n"
              ++ "#[priority(1)]\n"
              ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
-      compileErrorCode src `shouldBe` Just (pack "CFE-019")
+      compileErrorCode src `shouldBe` Just (pack "CFE-015")
 
     -- | 50000000 s are 5000000000 ticks of 10000 microseconds, above the
     -- 32-bit count the test platform admits.
-    it "CFE-020: timer period longer than the platform admits" $ do
+    it "CFE-016: timer period longer than the platform admits" $ do
       let src = timerTaskClass
              ++ "emitter timer : PeriodicTimer = { period = {tv_sec = 50000000, tv_usec = 0} };\n"
              ++ "#[priority(1)]\n"
              ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
-      compileErrorCode src `shouldBe` Just (pack "CFE-020")
+      compileErrorCode src `shouldBe` Just (pack "CFE-016")
 
-    it "CFE-019: timer period off the tick after folding a constant" $ do
+    it "CFE-015: timer period off the tick after folding a constant" $ do
       let src = "constexpr half_tick : u32 = 5000 : u32;\n"
              ++ timerTaskClass
              ++ "emitter timer : PeriodicTimer = { period = {tv_sec = 1, tv_usec = half_tick} };\n"
              ++ "#[priority(1)]\n"
              ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
-      compileErrorCode src `shouldBe` Just (pack "CFE-019")
+      compileErrorCode src `shouldBe` Just (pack "CFE-015")

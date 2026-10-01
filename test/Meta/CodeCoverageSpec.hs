@@ -37,8 +37,8 @@ families =
   , Family "Semantic (SE)" "SE"
       "src/Semantic/Errors.hs"
       -- Most SE codes are tested via fixtures; the float-exclusive ones (e.g.
-      -- SE-214) and the detail assertions name their code in the it-label.
-      -- SE-220 needs a project with the system-init emitter switched on, which
+      -- SE-213) and the detail assertions name their code in the it-label.
+      -- SE-219 needs a project with the system-init emitter switched on, which
       -- the fixture harness does not build, so it is tested where that
       -- configuration already exists.
       ["test/Semantic/Negative/FloatSpec.hs", "test/Semantic/Negative/DetailSpec.hs",

@@ -2,7 +2,7 @@ function test0() {
 
     var x : u32 = 0;
 
-    if (x is Success) {
+    if (x is Ok) {
         return;
     } else {
         return;

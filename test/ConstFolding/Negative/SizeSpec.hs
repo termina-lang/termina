@@ -46,7 +46,7 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CFE-003")
 
-    it "CFE-010: array slice out of bounds" $ do
+    it "CFE-007: array slice out of bounds" $ do
       let src = "function take2(_data : &[u8; 2]) {\n" ++
                 "    return;\n" ++
                 "}\n" ++
@@ -57,9 +57,9 @@ spec = do
                 "    take2(&a[lo .. hi]);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CFE-010")
+      compileErrorCode src `shouldBe` Just (pack "CFE-007")
 
-    it "CFE-011: array slice with lower bound above upper bound" $ do
+    it "CFE-008: array slice with lower bound above upper bound" $ do
       let src = "function take2(_data : &[u8; 2]) {\n" ++
                 "    return;\n" ++
                 "}\n" ++
@@ -70,9 +70,9 @@ spec = do
                 "    take2(&a[lo .. hi]);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CFE-011")
+      compileErrorCode src `shouldBe` Just (pack "CFE-008")
 
-    it "CFE-012: array slice length does not match the expected size" $ do
+    it "CFE-009: array slice length does not match the expected size" $ do
       let src = "function take2(_data : &[u8; 2]) {\n" ++
                 "    return;\n" ++
                 "}\n" ++
@@ -83,9 +83,9 @@ spec = do
                 "    take2(&a[lo .. hi]);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CFE-012")
+      compileErrorCode src `shouldBe` Just (pack "CFE-009")
 
-    it "CFE-015: referenced array size mismatch" $ do
+    it "CFE-012: referenced array size mismatch" $ do
       let src = "constexpr n : usize = 4;\n" ++
                 "constexpr m : usize = 5;\n" ++
                 "function take(_data : &[u8; m]) {\n" ++
@@ -96,9 +96,9 @@ spec = do
                 "    take(&a);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CFE-015")
+      compileErrorCode src `shouldBe` Just (pack "CFE-012")
 
-    it "CFE-015: referenced multidimensional array inner size mismatch" $ do
+    it "CFE-012: referenced multidimensional array inner size mismatch" $ do
       let src = "constexpr n : usize = 4;\n" ++
                 "constexpr i : usize = 3;\n" ++
                 "constexpr j : usize = 2;\n" ++
@@ -110,9 +110,9 @@ spec = do
                 "    take(&a);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CFE-015")
+      compileErrorCode src `shouldBe` Just (pack "CFE-012")
 
-    it "CFE-015: referenced three-dimensional array innermost size mismatch" $ do
+    it "CFE-012: referenced three-dimensional array innermost size mismatch" $ do
       let src = "constexpr a : usize = 4;\n" ++
                 "constexpr b : usize = 3;\n" ++
                 "constexpr i : usize = 2;\n" ++
@@ -125,12 +125,12 @@ spec = do
                 "    take(&arr);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CFE-015")
+      compileErrorCode src `shouldBe` Just (pack "CFE-012")
 
     -- A procedure called through an access port is a block of its own in the
     -- basic-block AST and not a call expression, so its arguments go through a
     -- check of their own.
-    it "CFE-015: referenced array size mismatch in a procedure called through a port" $ do
+    it "CFE-012: referenced array size mismatch in a procedure called through a port" $ do
       let src = "constexpr n : usize = 32;\n" ++
                 "constexpr m : usize = 256;\n" ++
                 "interface IStore {\n" ++
@@ -153,4 +153,4 @@ spec = do
                 "        return ret;\n" ++
                 "    }\n" ++
                 "};"
-      compileErrorCode src `shouldBe` Just (pack "CFE-015")
+      compileErrorCode src `shouldBe` Just (pack "CFE-012")

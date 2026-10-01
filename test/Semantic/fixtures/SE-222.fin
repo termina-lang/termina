@@ -1,4 +1,14 @@
-function test0(a : i32, b : i32) -> bool {
-    let masked : bool = (a & b) == 0;
-    return masked;
-}
+task class TaskClass0 {
+
+    in_port : in u32 triggers handle;
+
+    action handle(&priv self, _msg : u32) -> Status<i32> {
+        let ret : Status<i32> = Success;
+        return ret;
+    }
+
+};
+
+channel chan : MsgQueue<u32; 10>;
+
+task task0 : TaskClass0 = { in_port <- chan };

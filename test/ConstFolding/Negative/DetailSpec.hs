@@ -14,7 +14,7 @@ import Test.Hspec
 overflow :: String
 overflow = "function f() -> u8 {\n    return 256 : u16 as u8;\n}"
 
--- CFE-010: slicing [0 .. 5] out of a 4-element array.
+-- CFE-007: slicing [0 .. 5] out of a 4-element array.
 sliceOutOfBounds :: String
 sliceOutOfBounds =
   "function take2(_data : &[u8; 2]) {\n    return;\n}\n" ++
@@ -32,7 +32,7 @@ spec = describe "ConstFolding: error detail (carried value)" $ do
     constFoldError overflow `shouldSatisfy` \case
       Just (AnnotatedError (EConstIntegerOverflow 256 _) _) -> True
       _ -> False
-  it "CFE-010 carries the out-of-bounds slice bounds" $
+  it "CFE-007 carries the out-of-bounds slice bounds" $
     constFoldError sliceOutOfBounds `shouldSatisfy` \case
       Just (AnnotatedError (EArraySliceOutOfBounds size upper) _) -> size == 4 && upper == 5
       _ -> False

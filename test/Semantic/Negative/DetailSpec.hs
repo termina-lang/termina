@@ -372,7 +372,7 @@ spec = do
        `shouldSatisfy`
         isEResourceClassOutPort "output_msg"
 
-  describe "SE-189: monadic variant parameter type mismatch (every variant)" $ do
+  describe "SE-188: monadic variant parameter type mismatch (every variant)" $ do
     it "Option Some with a wrong payload type" $
       runNegativeTestTypeCheck seMonadicOption
         `shouldSatisfy` isEMonadicVariantParameterTypeMismatch TUInt32 TBool

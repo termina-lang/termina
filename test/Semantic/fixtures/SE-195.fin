@@ -8,5 +8,4 @@ task class TaskClass0 {
 
 };
 
-emitter timer0 : PeriodicTimer = { period = { tv_sec = 10, tv_usec = 0 } };
-task task0 : TaskClass0 = { snk0 <- timer0 };
+task task0 : TaskClass0 = { snk0 <- system_init };

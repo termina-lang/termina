@@ -1,4 +1,4 @@
--- | The packed-member reference rule (SE-218), which fires only on
+-- | The packed-member reference rule (SE-217), which fires only on
 -- strict-alignment targets. Taking a reference to a location reached *through* a
 -- member of a packed struct yields an under-aligned pointer whose packed
 -- provenance is lost at the call boundary, so it is rejected. The subtle part is
@@ -100,20 +100,20 @@ wholePackedRef = prelude ++
 
 spec :: Spec
 spec = do
-  describe "SE-218: reference to a member of a packed struct (strict-alignment target)" $ do
+  describe "SE-217: reference to a member of a packed struct (strict-alignment target)" $ do
     it "rejects a reference to a scalar member" $
-      typeCheckErrorOn TestPlatform packedFieldRef `shouldBe` Just (pack "SE-218")
+      typeCheckErrorOn TestPlatform packedFieldRef `shouldBe` Just (pack "SE-217")
     it "rejects a reference reached through a nested packed member" $
-      typeCheckErrorOn TestPlatform nestedPackedRef `shouldBe` Just (pack "SE-218")
+      typeCheckErrorOn TestPlatform nestedPackedRef `shouldBe` Just (pack "SE-217")
     it "rejects a reference to an element of an array inside a packed struct" $
-      typeCheckErrorOn TestPlatform arrayInsidePackedRef `shouldBe` Just (pack "SE-218")
+      typeCheckErrorOn TestPlatform arrayInsidePackedRef `shouldBe` Just (pack "SE-217")
 
-  describe "SE-218: references that stay well-aligned are accepted" $ do
+  describe "SE-217: references that stay well-aligned are accepted" $ do
     it "accepts a reference to an element of an array of packed structs" $
       typeCheckErrorOn TestPlatform arrayOfPackedRef `shouldBe` Nothing
     it "accepts a reference to a whole packed struct" $
       typeCheckErrorOn TestPlatform wholePackedRef `shouldBe` Nothing
 
-  describe "SE-218: the rule is gated on the platform being strict-alignment" $ do
+  describe "SE-217: the rule is gated on the platform being strict-alignment" $ do
     it "accepts the same packed-member reference on a non-strict target" $
       typeCheckErrorOn POSIXGCC packedFieldRef `shouldBe` Nothing

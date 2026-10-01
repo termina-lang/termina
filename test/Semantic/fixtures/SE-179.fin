@@ -1,0 +1,9 @@
+
+
+function fun1() -> u32 {
+
+    var foo : u32 = "Hello world!";
+
+    return foo;
+
+}

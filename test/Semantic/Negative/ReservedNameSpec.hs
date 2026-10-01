@@ -1,4 +1,4 @@
--- | The names of C that a Termina identifier may not take (SE-219). The code
+-- | The names of C that a Termina identifier may not take (SE-218). The code
 -- spec covers one of the four reasons with a fixture; here the four are
 -- contrasted against the names that look alike and are correct, which is where
 -- the rule earns its keep: a local object called @total@ or @memory@ must go
@@ -99,7 +99,7 @@ localNamedMemory =
 
 -- | The types of the prelude are in the global environment and collide there;
 -- the ones that take type arguments are recognised by their shape, so nothing
--- held their names until SE-219 did.
+-- held their names until SE-218 did.
 structNamedOption, structNamedOptions, globalNamedPool :: String
 structNamedOption = "struct Option {\n    a : u32;\n};\n"
 structNamedOptions = "struct Options {\n    a : u32;\n};\n"
@@ -110,30 +110,30 @@ globalNamedPool =
 
 spec :: Spec
 spec = do
-  describe "SE-219: names that C keeps for itself" $ do
+  describe "SE-218: names that C keeps for itself" $ do
     it "rejects a local object named after a keyword of C" $
-      typeCheckErrorOn TestPlatform localNamedUnion `shouldBe` Just (pack "SE-219")
+      typeCheckErrorOn TestPlatform localNamedUnion `shouldBe` Just (pack "SE-218")
     it "rejects a local object named after a function of the standard library" $
-      typeCheckErrorOn TestPlatform localNamedMalloc `shouldBe` Just (pack "SE-219")
+      typeCheckErrorOn TestPlatform localNamedMalloc `shouldBe` Just (pack "SE-218")
     it "rejects a parameter whose underscore is followed by an uppercase letter" $
-      typeCheckErrorOn TestPlatform paramNamedUnderscoreUpper `shouldBe` Just (pack "SE-219")
+      typeCheckErrorOn TestPlatform paramNamedUnderscoreUpper `shouldBe` Just (pack "SE-218")
     it "rejects a function named after one of the standard library" $
-      typeCheckErrorOn TestPlatform globalNamedMemcpy `shouldBe` Just (pack "SE-219")
+      typeCheckErrorOn TestPlatform globalNamedMemcpy `shouldBe` Just (pack "SE-218")
     it "points at the parameter of a function" $
       typeCheckErrorPosOn TestPlatform secondParamNamedAbs `shouldBe` Just (2, 16)
     it "points at the parameter of a method" $
       typeCheckErrorPosOn TestPlatform methodParamNamedAbs `shouldBe` Just (11, 18)
 
-  describe "SE-219: the types of Termina that take type arguments" $ do
+  describe "SE-218: the types of Termina that take type arguments" $ do
     it "rejects a struct named Option" $
-      typeCheckErrorOn TestPlatform structNamedOption `shouldBe` Just (pack "SE-219")
+      typeCheckErrorOn TestPlatform structNamedOption `shouldBe` Just (pack "SE-218")
     it "rejects a function named Pool" $
-      typeCheckErrorOn TestPlatform globalNamedPool `shouldBe` Just (pack "SE-219")
+      typeCheckErrorOn TestPlatform globalNamedPool `shouldBe` Just (pack "SE-218")
     it "accepts a name that only begins like one of them" $
       typeCheckErrorOn TestPlatform structNamedOptions `shouldBe` Nothing
 
 
-  describe "SE-219: names that look alike and are correct" $ do
+  describe "SE-218: names that look alike and are correct" $ do
     it "accepts a parameter whose underscore is followed by a lowercase letter" $
       typeCheckErrorOn TestPlatform paramNamedUnderscoreLower `shouldBe` Nothing
     it "accepts a local object whose name only begins like one of the library" $
@@ -141,8 +141,8 @@ spec = do
     it "accepts a function whose name only begins like one of the library" $
       typeCheckErrorOn TestPlatform globalNamedMemory `shouldBe` Nothing
 
-  describe "SE-219: what the platform declares" $ do
+  describe "SE-218: what the platform declares" $ do
     it "rejects a local object named index on a platform that declares it" $
-      typeCheckErrorOn POSIXGCC localNamedIndex `shouldBe` Just (pack "SE-219")
+      typeCheckErrorOn POSIXGCC localNamedIndex `shouldBe` Just (pack "SE-218")
     it "accepts the same name on a platform that declares nothing" $
       typeCheckErrorOn TestPlatform localNamedIndex `shouldBe` Nothing

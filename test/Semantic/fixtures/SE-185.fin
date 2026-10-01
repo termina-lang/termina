@@ -1,6 +1,6 @@
 function test0() {
 
-    var o : Option<u32> = Ok(5 : u32);
+    var r : Result<u32; u32> = None;
 
     return;
 

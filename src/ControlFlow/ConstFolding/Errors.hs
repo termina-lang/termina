@@ -80,50 +80,50 @@ instance Diagnosable Error where
         diagnostic "CFE-006" "constant division by zero"
             "Division by zero in constant expression."
     describe (EArraySliceOutOfBounds size upperIndex) =
-        diagnostic "CFE-010" "array slice out of bounds"
+        diagnostic "CFE-007" "array slice out of bounds"
             ("The array slice is out of bounds. The upper index " <> emph (T.pack (show upperIndex)) <>
                 " is greater than the size of the array " <> emph (T.pack (show size)) <> ".")
     describe (EArraySliceNegativeRange lowerIndex upperIndex) =
-        diagnostic "CFE-011" "array slice negative range"
+        diagnostic "CFE-008" "array slice negative range"
             ("The array slice has a negative range. The lower index " <> emph (T.pack (show lowerIndex)) <>
                 " is greater than the upper index " <> emph (T.pack (show upperIndex)) <> ".")
     describe (EArraySliceInvalidRange size lowerIndex upperIndex) =
-        diagnostic "CFE-012" "array slice invalid range"
+        diagnostic "CFE-009" "array slice invalid range"
             ("The array slice has an invalid range. The size of the slice is expected to be " <> emph (T.pack (show size)) <>
                 " and the range is from " <> emph (T.pack (show lowerIndex)) <>
                 " to " <> emph (T.pack (show upperIndex)) <> ".")
     describe (EArrayIndexOutOfBounds size index) =
-        diagnostic "CFE-013" "array index out of bounds"
+        diagnostic "CFE-010" "array index out of bounds"
             ("The array index is out of bounds. The index " <> emph (T.pack (show index)) <>
                 " is greater than the size of the array " <> emph (T.pack (show size)) <> ".")
     describe (EAtomicArrayIndexOutOfBounds index size) =
-        diagnostic "CFE-014" "atomic array index out of bounds"
+        diagnostic "CFE-011" "atomic array index out of bounds"
             ("The atomic array index is out of bounds. The index " <> emph (T.pack (show index)) <>
                 " is greater than the size of the atomic array " <> emph (T.pack (show size)) <> ".")
     describe (EReferencedArraySizeMismatch expectedSize actualSize) =
-        diagnostic "CFE-015" "referenced array size mismatch"
+        diagnostic "CFE-012" "referenced array size mismatch"
             ("The referenced array size is " <> emph (T.pack (show actualSize)) <>
                 " but the expected size is " <> emph (T.pack (show expectedSize)) <> ".")
     describe (EShiftAmountOutOfBounds width amount) =
-        diagnostic "CFE-016" "shift amount out of bounds"
+        diagnostic "CFE-013" "shift amount out of bounds"
             ("The shift amount " <> emph (T.pack (show amount)) <>
                 " is greater than or equal to the width " <> emph (T.pack (show width)) <>
                 " of the shifted type.")
     describe (ETaskPriorityOutOfRange task priority) =
-        diagnostic "CFE-018" "task priority out of range"
+        diagnostic "CFE-014" "task priority out of range"
             ("The priority of the task " <> emph (T.pack task) <> " is " <>
                 emph (T.pack (show priority)) <> ", but it must be between " <>
                 emph (T.pack (show minTaskPriority)) <> " and " <>
                 emph (T.pack (show maxTaskPriority)) <> ".\n" <>
                 "Priority 0 is reserved for the runtime and 255 for the idle task.")
     describe (ETimerPeriodNotInTicks timer period tick) =
-        diagnostic "CFE-019" "timer period not a whole number of ticks"
+        diagnostic "CFE-015" "timer period not a whole number of ticks"
             ("The period of the periodic timer " <> emph (T.pack timer) <> " is " <>
                 emph (T.pack (show period)) <> " microseconds, but it must be a " <>
                 "positive multiple of the tick of " <>
                 emph (T.pack (show tick)) <> " microseconds.")
     describe (ETimerPeriodTooLong timer ticks maxTicks) =
-        diagnostic "CFE-020" "timer period too long for the platform"
+        diagnostic "CFE-016" "timer period too long for the platform"
             ("The period of the periodic timer " <> emph (T.pack timer) <> " is " <>
                 emph (T.pack (show ticks)) <> " ticks, but the platform admits at most " <>
                 emph (T.pack (show maxTicks)) <> ".")
