@@ -6,7 +6,7 @@
 -- instead of editing it by hand.
 --
 -- Compiler: gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
--- Flags: -O0 -g3 -D_DEFAULT_SOURCE -D__TERMINA_NUMBER_OF_INTERRUPTS=1 -std=gnu11 -pedantic-errors -Wall -Wextra 
+-- Flags: -O0 -g3 -D_DEFAULT_SOURCE -std=c11 -pedantic-errors -Wall -Wextra -Wconversion -Wmissing-prototypes -Wshadow -Wstrict-prototypes -Wcast-qual -Wundef -Wvla -Wwrite-strings -Wdouble-promotion 
 module Semantic.Reserved.POSIXGCC (reservedNames) where
 
 import qualified Data.Set as S
@@ -138,7 +138,6 @@ reservedNames = S.fromList
   , "LDBL_MIN_10_EXP"
   , "LDBL_MIN_EXP"
   , "LDBL_TRUE_MIN"
-  , "linux"
   , "memccpy"
   , "memchr"
   , "memcmp"
@@ -241,7 +240,6 @@ reservedNames = S.fromList
   , "UINTMAX_C"
   , "UINTMAX_MAX"
   , "UINTPTR_MAX"
-  , "unix"
   , "WCHAR_MAX"
   , "WCHAR_MIN"
   , "WINT_MAX"

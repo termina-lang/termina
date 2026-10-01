@@ -95,7 +95,6 @@ reservedNames = S.fromList
   , "FLT_ROUNDS"
   , "FLT_TRUE_MIN"
   , "index"
-  , "int"
   , "INT16_C"
   , "INT16_MAX"
   , "INT16_MIN"

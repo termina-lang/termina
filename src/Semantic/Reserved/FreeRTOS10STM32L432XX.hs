@@ -6,7 +6,7 @@
 -- instead of editing it by hand.
 --
 -- Compiler: arm-none-eabi-gcc (GNU Tools for STM32 13.3.rel1.20240926-1715) 13.3.1 20240614
--- Flags: -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -O0 -D__TERMINA_NUMBER_OF_INTERRUPTS=83 -DSTM32L432xx -fdata-sections -ffunction-sections -g3 -gdwarf-2 -std=c11 -pedantic-errors -Wall -Wextra 
+-- Flags: -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -O0 -DSTM32L432xx -fdata-sections -ffunction-sections -g3 -gdwarf-2 -std=c11 -pedantic-errors -Wall -Wextra -Wconversion -Wmissing-prototypes -Wshadow -Wstrict-prototypes -Wcast-qual -Wundef -Wvla -Wwrite-strings -Wdouble-promotion 
 module Semantic.Reserved.FreeRTOS10STM32L432XX (reservedNames) where
 
 import qualified Data.Set as S
@@ -84,7 +84,6 @@ reservedNames = S.fromList
   , "FLT_RADIX"
   , "FLT_ROUNDS"
   , "FLT_TRUE_MIN"
-  , "int"
   , "INT_FAST16_MAX"
   , "INT_FAST16_MIN"
   , "INT_FAST32_MAX"

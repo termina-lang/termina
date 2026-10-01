@@ -6,7 +6,7 @@
 -- instead of editing it by hand.
 --
 -- Compiler: sparc-gaisler-rtems5-gcc (Cobham Gaisler RCC 1.3.2) 10.5.0
--- Flags: -isystem /opt/rcc/sparc-gaisler-rtems5/leon3/lib/include -fmessage-length=0 -mcpu=leon3 -qbsp=leon3_sf -msoft-float -O0 -g3 -D__TERMINA_NUMBER_OF_INTERRUPTS=16 -std=gnu11 -pedantic-errors -Wall -Wextra 
+-- Flags: -isystem /opt/rcc/sparc-gaisler-rtems5/leon3/lib/include -fmessage-length=0 -mcpu=leon3 -qbsp=leon3_sf -msoft-float -D_DEFAULT_SOURCE -O0 -g3 -fanalyzer -Wcast-align=strict -Wlogical-op -Wduplicated-cond -Wduplicated-branches -std=c11 -pedantic-errors -Wall -Wextra -Wconversion -Wmissing-prototypes -Wshadow -Wstrict-prototypes -Wcast-qual -Wundef -Wvla -Wwrite-strings -Wdouble-promotion 
 module Semantic.Reserved.RTEMS5LEON3NEXYSA7 (reservedNames) where
 
 import qualified Data.Set as S
@@ -156,7 +156,6 @@ reservedNames = S.fromList
   , "SIG_ATOMIC_MAX"
   , "SIG_ATOMIC_MIN"
   , "SIZE_MAX"
-  , "sparc"
   , "stpcpy"
   , "stpncpy"
   , "strcasecmp"
