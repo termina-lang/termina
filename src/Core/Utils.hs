@@ -116,6 +116,7 @@ arrayOf (TArray ty size) = Just (ty, size)
 arrayOf (TReference _ (TArray ty size)) = Just (ty, size)
 arrayOf (TFixedLocation (TArray ty size)) = Just (ty, size)
 arrayOf (TConstSubtype ty) = arrayOf ty
+arrayOf (TAccessPort (TAtomicArrayAccess ty size)) = Just (ty, size)
 arrayOf _ = Nothing
 
 -- | The type without its constant mark.

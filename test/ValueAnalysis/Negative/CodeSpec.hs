@@ -507,6 +507,23 @@ spec = do
       fmap (pack "bit takes that value here" `isInfixOf`) message `shouldBe` Just True
       fmap (pack "never below the width" `isInfixOf`) message `shouldBe` Just True
 
+  describe "ValueAnalysis: atomic accesses to array elements" $ do
+
+    it "VAE-003: atomic store at an index that always falls outside the array" $ do
+      let src = "interface IPool {\n" ++
+                "    procedure touch(&mut self, i : usize);\n" ++
+                "};\n" ++
+                "resource class CPool provides IPool {\n" ++
+                "    pool : access AtomicArrayAccess<u32; 8>;\n" ++
+                "    procedure touch(&mut self, i : usize) {\n" ++
+                "        if i > 10 {\n" ++
+                "            self->pool.store_index(i, 0);\n" ++
+                "        }\n" ++
+                "        return;\n" ++
+                "    }\n" ++
+                "};\n"
+      compileErrorCode src `shouldBe` Just (pack "VAE-003")
+
   describe "ValueAnalysis: invariant comparisons outside a condition" $ do
 
     it "VAE-005: unsigned value compared to be less than zero in a declaration" $ do

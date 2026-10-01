@@ -21,6 +21,8 @@ import Elaboration.Obligations
 import Elaboration.Prover
 import Elaboration.Prover.Constant (constantProver)
 import Semantic.Types
+import Core.Utils (arrayOf)
+import Utils.Annotations (getAnnotation)
 
 import Control.Monad.Writer
 import qualified Data.Map.Strict as M
@@ -139,8 +141,8 @@ elabBasicBlock d bb = case bb of
   ProcedureInvoke obj ident args ann -> ProcedureInvoke (object obj) ident (map expr args) ann
   AtomicLoad obj e ann -> AtomicLoad (object obj) (expr e) ann
   AtomicStore obj e ann -> AtomicStore (object obj) (expr e) ann
-  AtomicArrayLoad obj index e ann -> AtomicArrayLoad (object obj) (expr index) (expr e) ann
-  AtomicArrayStore obj index e ann -> AtomicArrayStore (object obj) (expr index) (expr e) ann
+  AtomicArrayLoad obj index e ann -> AtomicArrayLoad (object obj) (atomicIndex obj index) (expr e) ann
+  AtomicArrayStore obj index e ann -> AtomicArrayStore (object obj) (atomicIndex obj index) (expr e) ann
   AllocBox obj e ann -> AllocBox (object obj) (expr e) ann
   FreeBox obj e ann -> FreeBox (object obj) (expr e) ann
   RegularBlock stmts -> RegularBlock (map statement stmts)
@@ -154,6 +156,16 @@ elabBasicBlock d bb = case bb of
     expr = elabExpr d
     object = elabObj d
     block = elabBlock d
+
+    -- | The index of an atomic access to an element of an array, which goes
+    -- through the bounds check unless the provers discharge it.
+    atomicIndex obj index =
+      case getTypeSemAnn (getAnnotation obj) >>= arrayOf of
+        Just (_, size) ->
+          if unchecked d (atomicIndexChecks bb)
+            then expr index
+            else CheckedIndex (elaborateConstant size) (expr index) (getAnnotation index)
+        Nothing -> expr index
 
     statement (Declaration ident ak ty mExpr ann) = Declaration ident ak ty (expr <$> mExpr) ann
     statement (AssignmentStmt obj e ann) = AssignmentStmt (object obj) (expr e) ann

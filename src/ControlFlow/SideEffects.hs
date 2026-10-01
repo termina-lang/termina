@@ -135,11 +135,13 @@ persistentEffect known e =
 
   where
 
-    -- | A binary operation or a slice that the elaboration left checked calls
-    -- the check of the OSAL, which raises an exception when it fails.
+    -- | A binary operation, a slice or the index of an atomic access that the
+    -- elaboration left checked calls the check of the OSAL, which raises an
+    -- exception when it fails.
     checkedOperation = case e of
       CheckedBinOp op _ _ ann -> Just (ChecksAtRunTime (operatorCheck op) (getLocation ann))
       CheckedArraySlice _ _ _ _ ann -> Just (ChecksAtRunTime SliceInBounds (getLocation ann))
+      CheckedIndex _ _ ann -> Just (ChecksAtRunTime IndexInBounds (getLocation ann))
       _ -> Nothing
 
     operatorCheck BitwiseLeftShift = ShiftBelowWidth
@@ -220,6 +222,9 @@ checkExpression expr = case expr of
   ReferenceExpression _ obj _ -> mapM_ checkExpression (indexExpressions obj)
   CheckedArraySlice ak obj lower upper ann -> checkSlice ak obj lower upper ann
   UncheckedArraySlice ak obj lower upper ann -> checkSlice ak obj lower upper ann
+  CheckedIndex size index _ -> do
+    checkExpression size
+    checkExpression index
   CheckedBinOp _ left right _ -> do
     checkExpression left
     checkExpression right
@@ -314,6 +319,7 @@ checkEffectOrdering e = case e of
   Casting inner _ _                  -> checkEffectOrdering inner
   CheckedArraySlice _ _ lower upper _   -> mapM_ checkEffectOrdering [lower, upper]
   UncheckedArraySlice _ _ lower upper _ -> mapM_ checkEffectOrdering [lower, upper]
+  CheckedIndex _ index _             -> checkEffectOrdering index
   ArrayInitializer inner size _      -> mapM_ checkInitElem [inner, size]
   ArrayExprListInitializer es _      -> mapM_ checkInitElem es
   StructInitializer fields _         -> mapM_ checkInitField fields

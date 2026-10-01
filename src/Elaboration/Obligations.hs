@@ -13,6 +13,7 @@ module Elaboration.Obligations (
   , Scope(..)
   , objectChecks
   , expressionChecks
+  , atomicIndexChecks
   , literalValue
   , scopeExpressions
   , scopeObligations
@@ -77,6 +78,21 @@ expressionChecks (BinOp op left right ann) =
   [ Obligation (getLocation ann, kind) (BinaryOperation op left right)
   | kind <- binOpChecks op (getTypeSemAnn (getAnnotation left)) ]
 expressionChecks _ = []
+
+-- | The check of an atomic access to an element of an array through a port,
+-- whose index falls inside the array as that of any other array access. It is
+-- named by the position of the access, since the index may be an array access
+-- with an obligation of its own.
+atomicIndexChecks :: BasicBlock SemanticAnn -> [Obligation]
+atomicIndexChecks bb = case bb of
+  AtomicArrayLoad obj index _ ann -> [indexIn obj index ann]
+  AtomicArrayStore obj index _ ann -> [indexIn obj index ann]
+  _ -> []
+
+  where
+
+    indexIn obj index ann =
+      Obligation (getLocation ann, IndexInBounds) (IndexOperation obj index)
 
 -- | The checks of a binary operation, which is carried out in the type of its
 -- left operand.
@@ -146,9 +162,32 @@ scopeExpressions (BodyScope blk) = blockExpressions blk
     childExpression (ChildObject obj) = AccessObject obj
     childExpression (ChildReference _ obj) = AccessObject obj
 
--- | Every obligation of a scope, in the order of the program text.
+-- | Every obligation of a scope: those of its expressions, in the order of the
+-- program text, and those of its atomic accesses to array elements.
 scopeObligations :: Scope -> [Obligation]
-scopeObligations = concatMap expressionObligations . scopeExpressions
+scopeObligations scope =
+  concatMap expressionObligations (scopeExpressions scope)
+  ++ concatMap atomicIndexChecks (scopeBlocks scope)
+
+-- | The basic blocks of a scope, those nested in others included.
+scopeBlocks :: Scope -> [BasicBlock SemanticAnn]
+scopeBlocks (ExpressionScope _) = []
+scopeBlocks (BodyScope blk) = blocksOf blk
+
+  where
+
+    blocksOf = concatMap withNested . blockBody
+
+    withNested bb = bb : case bb of
+      IfElseBlock condIf elseIfs mElse _ ->
+        blocksOf (condIfBody condIf)
+        ++ concatMap (blocksOf . condElseIfBody) elseIfs
+        ++ concatMap (blocksOf . condElseBody) (maybeToList mElse)
+      ForLoopBlock _ _ _ _ _ body _ -> blocksOf body
+      MatchBlock _ cases mDefault _ ->
+        concatMap (blocksOf . matchBody) cases
+        ++ concat [blocksOf b | DefaultCase b _ <- maybeToList mDefault]
+      _ -> []
 
 expressionObligations :: Expression SemanticAnn -> [Obligation]
 expressionObligations expr = expressionChecks expr ++ concatMap childObligations (expressionChildren expr)

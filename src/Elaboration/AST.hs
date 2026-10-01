@@ -57,6 +57,9 @@ data Expression a
   | CheckedArraySlice AccessKind (Object a) (Expression a) (Expression a) a
   -- | An array slice whose bounds are known to fall inside the array.
   | UncheckedArraySlice AccessKind (Object a) (Expression a) (Expression a) a
+  -- | The index of an atomic access to an element of an array, with the size
+  -- of the array first, which goes through the bounds check.
+  | CheckedIndex (Expression a) (Expression a) a
   deriving (Show, Functor)
 
 -- | How the passes read the expressions and the objects of this AST.
@@ -87,6 +90,7 @@ elaboratedTree = Tree children node
       EnumVariantInitializer _ _ args _ -> map ChildExpr args
       MonadicVariantInitializer variant _ -> map ChildExpr (monadicVariantExprs variant)
       StringInitializer {} -> []
+      CheckedIndex size index _ -> [ChildConstExpr size, ChildExpr index]
 
     node obj = case obj of
       Variable ident ann -> RootNode ident ann
@@ -140,6 +144,7 @@ instance Annotated Expression where
   getAnnotation (CheckedArraySlice _ _ _ _ a)     = a
   getAnnotation (UncheckedArraySlice _ _ _ _ a)   = a
   getAnnotation (StringInitializer _ a)           = a
+  getAnnotation (CheckedIndex _ _ a)              = a
 
   updateAnnotation (AccessObject obj) = AccessObject . updateAnnotation obj
   updateAnnotation (Constant c _) = Constant c
@@ -160,6 +165,7 @@ instance Annotated Expression where
   updateAnnotation (CheckedArraySlice ak obj e1 e2 _) = CheckedArraySlice ak obj e1 e2
   updateAnnotation (UncheckedArraySlice ak obj e1 e2 _) = UncheckedArraySlice ak obj e1 e2
   updateAnnotation (StringInitializer s _) = StringInitializer s
+  updateAnnotation (CheckedIndex size index _) = CheckedIndex size index
 
 type Const = Const' TerminaType
 type Parameter = Parameter' TerminaType

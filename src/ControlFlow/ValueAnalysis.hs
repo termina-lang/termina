@@ -66,7 +66,7 @@ import ControlFlow.ValueAnalysis.Errors
 import ControlFlow.Dataflow
 import Core.Utils (arrayOf, intRange, intTy, shiftWidth)
 import Elaboration.Obligations
-    (CheckKind(..), Obligation(..), ObligationId, Operation(..), expressionChecks, objectChecks)
+    (CheckKind(..), Obligation(..), ObligationId, Operation(..), expressionChecks, objectChecks, atomicIndexChecks)
 import Elaboration.Prover (Evidence(..))
 import Semantic.Types (SemanticAnn, getObjectSAnns, getTypeSemAnn)
 import Utils.Annotations
@@ -980,6 +980,7 @@ transfer = Transfer
   {
     onStatement = checkStatement
   , onSimpleBlock = \block -> do
+      mapM_ recordObligation (atomicIndexChecks block)
       mapM_ (mapM_ recordChild) (simpleBlockChildren block)
       mapM_ (mapM_ escapesIn) (simpleBlockChildren block)
   , onExpression = \expr -> recordExpression expr >> noteEscapes expr

@@ -576,6 +576,12 @@ genExpression expr@(CheckedArraySlice _ak obj lower upper ann) = do
                     @@ [cArraySize, cExpectedSize, cLower, cUpper] |>> getLocation ann
             return $ addrOf (cObj @$$ cFunctionCall @: cType) |>> getLocation ann
         (ty, _) -> throwError $ InternalError $ "Unsupported object. Not a reference to an array: " ++ show ty
+genExpression (CheckedIndex size index ann) = do
+    cArraySize <- genExpression size
+    cIndex <- genExpression index
+    let cFuncType = CTFunction size_t [_const size_t, _const size_t]
+    return $ ("termina__check__array_index" @: cFuncType |>> getLocation ann)
+        @@ [cArraySize, cIndex] |>> getLocation ann
 genExpression o = throwError $ InternalError $ "Unsupported expression: " ++ show o
 
 -- | Lowers an array or string initializer to a C initializer list { ... }.
