@@ -72,22 +72,6 @@ spec = do
                 "const L : u32 = 10 : u32 / K;\n"
       compileErrorCode src `shouldBe` Just (pack "CFE-006")
 
-    it "CFE-008: for loop with zero iterations" $ do
-      let src = "function f() {\n" ++
-                "    for i : usize in 3 : usize .. 3 : usize {\n" ++
-                "    }\n" ++
-                "    return;\n" ++
-                "}"
-      compileErrorCode src `shouldBe` Just (pack "CFE-008")
-
-    it "CFE-009: for loop with negative iterations" $ do
-      let src = "function f() {\n" ++
-                "    for i : usize in 5 : usize .. 3 : usize {\n" ++
-                "    }\n" ++
-                "    return;\n" ++
-                "}"
-      compileErrorCode src `shouldBe` Just (pack "CFE-009")
-
     it "CFE-013: array index out of bounds with constant index" $ do
       let src = "const bad_idx : usize = 10;\n" ++
                 "function f() -> u8 {\n" ++
@@ -104,16 +88,6 @@ spec = do
                 "    return x;\n" ++
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CFE-016")
-
-    it "CFE-017: comparison against a constant at the limit of the type range" $ do
-      let src = "function f(x : u32) -> u32 {\n" ++
-                "    var y : u32 = 0 : u32;\n" ++
-                "    if (x < 0 : u32) {\n" ++
-                "        y = 1 : u32;\n" ++
-                "    }\n" ++
-                "    return y;\n" ++
-                "}"
-      compileErrorCode src `shouldBe` Just (pack "CFE-017")
 
     it "CFE-018: task priority reserved for the runtime" $ do
       let src = timerTaskClass

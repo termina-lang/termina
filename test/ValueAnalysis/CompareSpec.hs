@@ -6,8 +6,7 @@
 -- source program reaches the ends table through the iterator of a loop of more
 -- turns than the limit, and through little else: a set outgrows the limit only
 -- after ten branches assigning ten values, and the interval it lands on is the
--- whole range of the type, whose comparisons the folding rejects earlier as
--- CFE-017.
+-- whole range of the type.
 module ValueAnalysis.CompareSpec (spec) where
 
 import ControlFlow.ValueAnalysis (Integers(..), compareValues)

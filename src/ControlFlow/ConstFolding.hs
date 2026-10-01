@@ -358,7 +358,6 @@ foldExpression e@(BinOp op lhs rhs ann) = do
       fConst <- evalBinOp plt (getLocation ann) op lConst rConst ty
       return $ Constant fConst ann'
     _ -> do
-      checkComparison (getLocation ann) op lhs' rhs'
       case (op, rhs') of
         (BitwiseLeftShift, Constant (I (TInteger k _) _) _)  -> checkShiftAmount k
         (BitwiseRightShift, Constant (I (TInteger k _) _) _) -> checkShiftAmount k
@@ -466,74 +465,6 @@ foldStatement (SingleExpStmt expr ann) = do
   expr' <- foldExpression expr
   return $ SingleExpStmt expr' ann'
 
--- | Checks that the result of a relational comparison between an integer
--- expression and a constant depends on the value of the expression. It does
--- not when the constant is at or beyond the limits of the range of the type of
--- the expression, e.g., when an unsigned expression is checked to be less than
--- zero.
-checkComparison :: Location -> Op -> Expression SemanticAnn -> Expression SemanticAnn -> ConstFoldMonad ()
-checkComparison loc op lhs rhs =
-  case op of
-    RelationalLT -> againstBounds
-    RelationalLTE -> againstBounds
-    RelationalGT -> againstBounds
-    RelationalGTE -> againstBounds
-    _ -> return ()
-
-  where
-
-    againstBounds = do
-      lhsType <- getExprType lhs
-      rhsType <- getExprType rhs
-      case (lhsType, rhsType) of
-        (TConstSubtype _, TConstSubtype _) -> return ()
-        (_, TConstSubtype _) -> checkBounds op lhsType rhs
-        (TConstSubtype _, _) -> checkBounds (swapOperands op) rhsType lhs
-        _ -> return ()
-
-    -- | Operator that yields the same result when the operands are swapped.
-    swapOperands :: Op -> Op
-    swapOperands RelationalLT = RelationalGT
-    swapOperands RelationalLTE = RelationalGTE
-    swapOperands RelationalGT = RelationalLT
-    swapOperands RelationalGTE = RelationalLTE
-    swapOperands o = o
-
-    -- | Checks the comparison (e op' constExpr), where e is of type ty.
-    checkBounds :: Op -> TerminaType SemanticAnn -> Expression SemanticAnn -> ConstFoldMonad ()
-    checkBounds op' ty constExpr = do
-      plt <- ST.gets targetPlatform
-      case intRange plt ty of
-        Nothing -> return ()
-        Just (lo, hi) -> do
-          value <- evalConstExpression constExpr
-          case value of
-            I (TInteger c _) _ ->
-              mapM_
-                (throwError . annotateError loc . EInvariantComparison c ty)
-                (fixedResult op' lo hi c)
-            _ -> return ()
-
-    -- | Result of (e op' c) for every value of e in [lo, hi], if it is the same
-    -- for all of them.
-    fixedResult :: Op -> Integer -> Integer -> Integer -> Maybe Bool
-    fixedResult op' lo hi c =
-      case op' of
-        RelationalLT -> decide (c <= lo) (c > hi)
-        RelationalLTE -> decide (c < lo) (c >= hi)
-        RelationalGT -> decide (c >= hi) (c < lo)
-        RelationalGTE -> decide (c > hi) (c <= lo)
-        _ -> Nothing
-
-    -- | The two ways the comparison can turn out the same for every value of
-    -- the range, and the silence that is left when neither of them holds.
-    decide :: Bool -> Bool -> Maybe Bool
-    decide alwaysFalse alwaysTrue =
-      case (alwaysFalse, alwaysTrue) of
-        (True, _) -> Just False
-        (_, True) -> Just True
-        _ -> Nothing
-
 foldBasicBlock :: BasicBlock SemanticAnn -> ConstFoldMonad (BasicBlock SemanticAnn)
 foldBasicBlock (RegularBlock stmts) =
   RegularBlock <$> mapM foldStatement stmts
@@ -575,13 +506,6 @@ foldBasicBlock (ForLoopBlock iter ty from_expr to_expr mWhile body_stmt ann) = d
   mWhile' <- mapM foldExpression mWhile
   fromValue <- evalConstExpression from_expr
   toValue <- evalConstExpression to_expr
-  case (fromValue, toValue) of
-    (I (TInteger lhs _) _, I (TInteger rhs _) _) -> do
-      if lhs == rhs then
-        throwError $ annotateError stmtLoc EForLoopStatementZeroIterations
-      else when (lhs > rhs)
-        (throwError $ annotateError stmtLoc (EForLoopStatementNegativeIterations lhs rhs))
-    _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
   -- | The bounds are written as the values they fold to.
   let from_expr' = Constant fromValue (buildExpAnn (getLocation (getAnnotation from_expr)) ty')
       to_expr' = Constant toValue (buildExpAnn (getLocation (getAnnotation to_expr)) ty')

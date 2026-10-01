@@ -219,7 +219,7 @@ firstAccessAssigns ident body =
       , onCondition = readExpr
       , onLoopGuard = readExpr
       , onCaseEntry = \_ _ -> return ()
-      , onLoopEntry = \_ _ _ _ -> return ()
+      , onLoopEntry = \_ _ _ _ _ -> return ()
       , refineTrue = const (return ())
       , refineFalse = const (return ())
       }

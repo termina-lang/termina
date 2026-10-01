@@ -429,7 +429,7 @@ transfer = Transfer
   , refineTrue = const (return ())
   , refineFalse = const (return ())
     -- | The iterator holds a number, which has no effects to order.
-  , onLoopEntry = \_ _ _ _ -> return ()
+  , onLoopEntry = \_ _ _ _ _ -> return ()
   }
 
 checkBlock :: Block SemanticAnn -> SideEffectsMonad ()

@@ -80,6 +80,11 @@ data Error =
     -- | Operation whose run-time check fails every time it runs, with what
     -- the pass knows of each name it reads (VAE-003)
   | EFailingCheck Failure [Reason]
+    -- | Loop whose range is empty, with the values of its bounds (VAE-004)
+  | EEmptyLoop Integer Integer
+    -- | Comparison that is not a whole condition, with the same value on
+    -- every evaluation and what the pass knows of each name it reads (VAE-005)
+  | EInvariantComparison (Const SemanticAnn) [Reason]
   deriving Show
 
 type ValueAnalysisError = AnnotatedError Error Location
@@ -192,6 +197,20 @@ instance Diagnosable Error where
         gives _ _ _ = False
 
         number = T.pack . show
+
+    describe (EEmptyLoop from end) =
+        unnecessary $
+            diagnostic "VAE-004" "loop that never runs"
+                ("The range of this loop goes from " <> emph (T.pack (show from))
+                    <> " up to but not including " <> emph (T.pack (show end))
+                    <> " and holds no value, so the body of this loop never runs.")
+
+    describe (EInvariantComparison value reasons) =
+        withReasons reasons $
+            diagnostic "VAE-005" "invariant comparison"
+                (saysReasons reasons <> "This comparison evaluates to "
+                    <> emph (showText value)
+                    <> " every time it is reached.")
 
 instance ErrorMessage ValueAnalysisError where
 

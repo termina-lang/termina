@@ -24,12 +24,14 @@ prog body =
     body ++
     "}\n"
 
--- | Like 'prog' but the driver returns @bool@ (for && / || cases).
+-- | Like 'prog' but the driver returns @bool@ (for && / || cases). Here @bump@
+-- returns a value the value analysis does not know, so the comparisons on it
+-- are not invariant.
 progBool :: String -> String
 progBool body =
     "function bump(a : &mut u32) -> u32 {\n" ++
-    "    *a = 1 : u32;\n" ++
-    "    return 0 : u32;\n" ++
+    "    *a = *a + 1 : u32;\n" ++
+    "    return *a;\n" ++
     "}\n" ++
     "function trigger() -> bool {\n" ++
     body ++

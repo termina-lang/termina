@@ -47,7 +47,7 @@ module ControlFlow.ValueAnalysis
   ) where
 
 import qualified Data.Map.Strict as M
-import Control.Monad (unless)
+import Control.Monad (unless, when)
 import Data.Function (on)
 import Data.List (isPrefixOf, nub, nubBy, sortOn)
 import Data.Maybe (listToMaybe, mapMaybe)
@@ -247,6 +247,12 @@ data Met =
     -- variant of the case, which is never taken when the state rules the
     -- variant out.
   | MetCase (Expression SemanticAnn) Identifier
+    -- | A comparison that is not a whole condition, which is invariant when
+    -- the state determines its value.
+  | MetComparison (Expression SemanticAnn)
+    -- | A loop, with the values of its bounds, whose body never runs when the
+    -- range they give is empty.
+  | MetLoop Integer Integer
 
 -- | What one function or member gives back, cell by cell: the values of what
 -- it returns under the empty path, and those of each field of it under the
@@ -435,6 +441,14 @@ observeCondition cond = do
 recordExpression :: Expression SemanticAnn -> ValueAnalysisMonad ()
 recordExpression expr = do
   mapM_ recordObligation (expressionChecks expr)
+  -- | A comparison is taken down wherever it is evaluated. One that is a whole
+  -- condition is taken down again as such right after, under the same
+  -- position, which is what the diagnostic then reads.
+  when (isComparison expr) $ do
+    locals <- getPath
+    let loc = getLocation . getAnnotation $ expr
+    modifyGlobal (\g ->
+      g { observed = M.insert loc (MetComparison expr, locals) (observed g) })
   case expr of
     BinOp LogicalAnd left right _ -> do
       recordExpression left
@@ -452,6 +466,17 @@ recordExpression expr = do
       refine holds cond
       m
       putPath entry
+
+    isComparison (BinOp op _ _ _) =
+      case op of
+        RelationalLT -> True
+        RelationalLTE -> True
+        RelationalGT -> True
+        RelationalGTE -> True
+        RelationalEqual -> True
+        RelationalNotEqual -> True
+        _ -> False
+    isComparison _ = False
 
 recordChild :: Child SemanticAnn -> ValueAnalysisMonad ()
 recordChild (ChildExpr expr) = recordExpression expr
@@ -857,16 +882,21 @@ refineEquality loc left right = do
 -- A range of few enough values goes in written out, which decides an equality
 -- that the ends alone cannot; a longer one goes in as an interval.
 seedIterator ::
-  Identifier -> TerminaType SemanticAnn
+  Location -> Identifier -> TerminaType SemanticAnn
   -> Expression SemanticAnn -> Expression SemanticAnn
   -> ValueAnalysisMonad ()
-seedIterator ident ty initE endE = do
+seedIterator loopLoc ident ty initE endE = do
   mFrom <- (>>= integerOfConst) <$> valueOf initE
   mTo <- (>>= integerOfConst) <$> valueOf endE
   range <- rangeOfType ty
+  locals <- getPath
+  mapM_ (\(from, end) ->
+    modifyGlobal (\g ->
+      g { observed = M.insert loopLoc (MetLoop from end, locals) (observed g) }))
+    ((,) <$> mFrom <*> mTo)
   case turns mFrom mTo of
     -- | Bounds the folding could not work out, and a loop of no turns at all,
-    -- which the folding rejects before this pass runs (CFE-008, CFE-009).
+    -- which the diagnostic reports (VAE-004).
     Nothing -> forget ident
     Just (from, to) ->
       let loc = getLocation . getAnnotation $ initE
@@ -1220,9 +1250,14 @@ valuesIn global locals expr =
     Just value -> Just (Discrete (S.singleton value))
     Nothing ->
       case expr of
-        AccessObject obj -> do
-          cell <- cellOf obj
-          varValues <$> M.lookup cell (known locals)
+        AccessObject obj ->
+          case cellOf obj >>= (`M.lookup` known locals) of
+            Just entry -> Just (varValues entry)
+            -- | An object the paths know nothing of may hold any value of its
+            -- type.
+            Nothing ->
+              uncurry Interval <$>
+                (getTypeSemAnn (getAnnotation obj) >>= intRange (platform global))
         -- | The body of the callee was walked knowing nothing of its
         -- parameters, so what it gives back holds for any call.
         -- | A variant written out, with or without data attached, says which
@@ -1504,6 +1539,16 @@ findings global =
           Just (annotateError loc
                   (EUnreachableCase variant (reasonsFor global locals discriminant)))
         _ -> Nothing
+    finding (loc, (MetComparison compared, locals)) =
+      case verdict locals compared of
+        Just value@(B _) ->
+          Just (annotateError loc
+                  (EInvariantComparison value (reasonsFor global locals compared)))
+        _ -> Nothing
+    finding (loc, (MetLoop from end, _)) =
+      if from >= end
+        then Just (annotateError loc (EEmptyLoop from end))
+        else Nothing
 
     -- | The folding evaluator answers first, which keeps the arithmetic of a
     -- condition it can work out whole, with its overflow and its division by

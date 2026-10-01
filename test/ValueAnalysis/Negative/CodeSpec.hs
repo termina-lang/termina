@@ -2,7 +2,8 @@
 -- time it is evaluated (VAE-001), whichever of the four sources the value
 -- comes from. The last case pins which finding a body with more than one of
 -- them reports, since the user resolves them one at a time. Then an operation
--- whose run-time check fails every time it runs (VAE-003).
+-- whose run-time check fails every time it runs (VAE-003), and a loop whose
+-- range is empty (VAE-004).
 module ValueAnalysis.Negative.CodeSpec (spec) where
 
 import Pipeline.Common (compileErrorCode, compileErrorMessage)
@@ -13,6 +14,26 @@ import Data.Text (isInfixOf, pack)
 spec :: Spec
 spec = do
   describe "ValueAnalysis: invariant control expressions" $ do
+
+    it "VAE-001: unsigned value compared to be less than zero" $ do
+      let src = "function f(x : u32) -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    if (x < 0 : u32) {\n" ++
+                "        y = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
+
+    it "VAE-001: constant on the left at the upper limit of the type" $ do
+      let src = "function f(x : u8) -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    if (255 : u8 >= x) {\n" ++
+                "        y = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
     it "VAE-001: condition built from literals alone" $ do
       let src = "function f() -> u32 {\n" ++
@@ -485,3 +506,64 @@ spec = do
       fmap (pack "test:5:16" `isInfixOf`) message `shouldBe` Just True
       fmap (pack "bit takes that value here" `isInfixOf`) message `shouldBe` Just True
       fmap (pack "never below the width" `isInfixOf`) message `shouldBe` Just True
+
+  describe "ValueAnalysis: invariant comparisons outside a condition" $ do
+
+    it "VAE-005: unsigned value compared to be less than zero in a declaration" $ do
+      let src = "function f(x : u32) -> bool {\n" ++
+                "    let negative : bool = x < 0 : u32;\n" ++
+                "    return negative;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-005")
+
+    it "VAE-005: comparison inside a condition that is not invariant as a whole" $ do
+      let src = "function f(x : u32, y : u32) -> u32 {\n" ++
+                "    var r : u32 = 0 : u32;\n" ++
+                "    if (x < 0 : u32 || y > 3 : u32) {\n" ++
+                "        r = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return r;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-005")
+
+    it "VAE-005: comparison of a value that a condition bounds" $ do
+      let src = "function f(x : u32) -> bool {\n" ++
+                "    var small : bool = false;\n" ++
+                "    if (x < 5 : u32) {\n" ++
+                "        small = x < 10 : u32;\n" ++
+                "    }\n" ++
+                "    return small;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-005")
+
+  describe "ValueAnalysis: loops that never run" $ do
+
+    it "VAE-004: loop whose bounds are equal" $ do
+      let src = "function f() {\n" ++
+                "    for i : usize in 3 : usize .. 3 : usize {\n" ++
+                "    }\n" ++
+                "    return;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-004")
+
+    it "VAE-004: loop whose lower bound is above the upper one" $ do
+      let src = "function f() {\n" ++
+                "    for i : usize in 5 : usize .. 3 : usize {\n" ++
+                "    }\n" ++
+                "    return;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-004")
+
+    it "VAE-004: loop bounded by a field of a constant" $ do
+      let src = "struct Config {\n" ++
+                "    turns : usize;\n" ++
+                "};\n" ++
+                "const CFG : Config = {turns = 0 : usize};\n" ++
+                "function f() -> usize {\n" ++
+                "    var r : usize = 0 : usize;\n" ++
+                "    for i : usize in 0 : usize .. CFG.turns {\n" ++
+                "        r = r + i;\n" ++
+                "    }\n" ++
+                "    return r;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-004")

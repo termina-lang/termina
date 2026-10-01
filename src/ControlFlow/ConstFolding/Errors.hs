@@ -39,8 +39,6 @@ data Error =
   | EConstIntegerOverflow Integer (TerminaType SemanticAnn) -- ^ Constant integer overflow
   | EConstIntegerUnderflow Integer (TerminaType SemanticAnn) -- ^ Constant integer overflow
   | EConstDivisionByZero -- ^ Constant division by zero
-  | EForLoopStatementZeroIterations -- ^ For loop statement with zero iterations
-  | EForLoopStatementNegativeIterations Integer Integer -- ^ For loop statement with negative iterations
   | EArraySliceOutOfBounds Integer Integer -- ^ Array slice out of bounds
   | EArraySliceNegativeRange Integer Integer -- ^ Array slice negative range
   | EArraySliceInvalidRange Integer Integer Integer -- ^ Array slice invalid range
@@ -48,7 +46,6 @@ data Error =
   | EAtomicArrayIndexOutOfBounds Integer Integer -- ^ Array index out of bounds
   | EReferencedArraySizeMismatch Integer Integer -- ^ Referenced array size mismatch
   | EShiftAmountOutOfBounds Integer Integer -- ^ Shift amount out of bounds (width, amount)
-  | EInvariantComparison Integer (TerminaType SemanticAnn) Bool -- ^ Comparison against a constant with a fixed result
   | ETaskPriorityOutOfRange Identifier Integer -- ^ Task priority out of range (task, priority)
   | ETimerPeriodNotInTicks Identifier Integer Integer -- ^ Period of a periodic timer that is not a whole number of ticks (timer, period and tick in microseconds)
   | ETimerPeriodTooLong Identifier Integer Integer -- ^ Period of a periodic timer longer than the platform admits (timer, period and maximum in ticks)
@@ -82,13 +79,6 @@ instance Diagnosable Error where
     describe EConstDivisionByZero =
         diagnostic "CFE-006" "constant division by zero"
             "Division by zero in constant expression."
-    describe EForLoopStatementZeroIterations =
-        diagnostic "CFE-008" "for loop statement with zero iterations"
-            "The for loop statement has zero iterations."
-    describe (EForLoopStatementNegativeIterations startIndex endIndex) =
-        diagnostic "CFE-009" "for loop statement with negative iterations"
-            ("The for loop statement has negative iterations from " <> emph (T.pack (show startIndex)) <>
-                " to " <> emph (T.pack (show endIndex)) <> ".")
     describe (EArraySliceOutOfBounds size upperIndex) =
         diagnostic "CFE-010" "array slice out of bounds"
             ("The array slice is out of bounds. The upper index " <> emph (T.pack (show upperIndex)) <>
@@ -119,11 +109,6 @@ instance Diagnosable Error where
             ("The shift amount " <> emph (T.pack (show amount)) <>
                 " is greater than or equal to the width " <> emph (T.pack (show width)) <>
                 " of the shifted type.")
-    describe (EInvariantComparison value ty result) =
-        diagnostic "CFE-017" "invariant comparison"
-            ("The comparison against " <> emph (T.pack (show value)) <>
-                " always evaluates to " <> emph (if result then "true" else "false") <>
-                " for any value of type " <> emph (showText ty) <> ".")
     describe (ETaskPriorityOutOfRange task priority) =
         diagnostic "CFE-018" "task priority out of range"
             ("The priority of the task " <> emph (T.pack task) <> " is " <>
