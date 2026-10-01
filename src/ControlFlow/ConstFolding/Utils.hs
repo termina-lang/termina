@@ -143,12 +143,14 @@ evalBinOp plt loc Addition (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr
     return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
   else
     throwError $ annotateError loc (EConstIntegerOverflow result ty)
-evalBinOp _ loc Subtraction (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
+evalBinOp plt loc Subtraction (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
   let result = lhs - rhs in
-  if posTy ty && result < 0 then
+  if memberIntCons plt result ty then
+    return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
+  else if result < 0 then
     throwError $ annotateError loc (EConstIntegerUnderflow result ty)
   else
-    return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
+    throwError $ annotateError loc (EConstIntegerOverflow result ty)
 evalBinOp _ loc Modulo (I (TInteger lhs repr) _) (I (TInteger rhs _) _) ty =
   if rhs == 0 then
     throwError $ annotateError loc EConstDivisionByZero

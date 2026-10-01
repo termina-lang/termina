@@ -22,6 +22,25 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CFE-005")
 
+    it "CFE-005: signed constant subtraction below the range of the type" $ do
+      let src = "function f() -> i8 {\n" ++
+                "    var b : i8 = -100 : i8 - 100 : i8;\n" ++
+                "    return b;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "CFE-005")
+
+    it "CFE-004: signed constant subtraction above the range of the type" $ do
+      let src = "const N : i8 = -100 : i8;\n" ++
+                "function f() -> i8 {\n" ++
+                "    var b : i8 = 100 : i8 - N;\n" ++
+                "    return b;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "CFE-004")
+
+    it "CFE-005: signed subtraction below the range in a global constant" $ do
+      let src = "const C : i8 = -100 : i8 - 100 : i8;\n"
+      compileErrorCode src `shouldBe` Just (pack "CFE-005")
+
     it "CFE-006: constant division by zero" $ do
       let src = "function f() -> u32 {\n" ++
                 "    return 1 : u32 / 0 : u32;\n" ++
