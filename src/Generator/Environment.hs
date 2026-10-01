@@ -9,7 +9,7 @@ import ControlFlow.Architecture
 import Configuration.Platform
 import qualified Configuration.Platform.RTEMS5LEON3NEXYSA7 as RTEMS5LEON3NEXYSA7.Config
 import qualified Configuration.Platform.POSIXGCC as POSIXGCC.Config
-import qualified Configuration.Platform.FreeRTOS10STM32L432XX as FreeRTOS10STM32L432XX.Config
+import qualified Configuration.Platform.FreeRTOS10STM32L432NUCLEOL432KC as FreeRTOS10STM32L432NUCLEOL432KC.Config
 import qualified Configuration.Platform.RTEMS6ZYNQ7000PYNQZ2 as RTEMS6ZYNQ7000PYNQZ2.Config
 
 getPlatformInitialGlobalEnv :: TerminaConfig -> Platform -> [(Identifier, LocatedElement (GEntry SemanticAnn))]
@@ -40,68 +40,68 @@ getPlatformInitialGlobalEnv config RTEMS5LEON3NEXYSA7 =
     -- | SystemAPI interface. This interface extends all the system interfaces.
     -- Each target platform should declare its own SystemAPI interface.
     [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime"] [] [])) Internal)]
-getPlatformInitialGlobalEnv config FreeRTOS10STM32L432XX =
-    let platformConfig = freertos10_stm32l432xx . platformFlags $ config in
-    [("wwdg_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableWwdgIrq          platformConfig] ++
-    [("pvd_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enablePvdIrq           platformConfig] ++
-    [("tamp_stamp_irq",   LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableTampStampIrq     platformConfig] ++
-    [("rtc_wkup_irq",     LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableRtcWkupIrq       platformConfig] ++
-    [("flash_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableFlashIrq          platformConfig] ++
-    [("rcc_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableRccIrq            platformConfig] ++
-    [("exti0_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableExti0Irq          platformConfig] ++
-    [("exti1_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableExti1Irq          platformConfig] ++
-    [("exti2_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableExti2Irq          platformConfig] ++
-    [("exti3_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableExti3Irq          platformConfig] ++
-    [("exti4_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableExti4Irq          platformConfig] ++
-    [("dma1_channel1_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableDma1Channel1Irq  platformConfig] ++
-    [("dma1_channel2_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableDma1Channel2Irq  platformConfig] ++
-    [("dma1_channel3_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableDma1Channel3Irq  platformConfig] ++
-    [("dma1_channel4_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableDma1Channel4Irq  platformConfig] ++
-    [("dma1_channel5_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableDma1Channel5Irq  platformConfig] ++
-    [("dma1_channel6_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableDma1Channel6Irq  platformConfig] ++
-    [("dma1_channel7_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableDma1Channel7Irq  platformConfig] ++
-    [("adc1_irq",         LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableAdc1Irq           platformConfig] ++
-    [("can1_tx_irq",      LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableCan1TxIrq         platformConfig] ++
-    [("can1_rx0_irq",     LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableCan1Rx0Irq        platformConfig] ++
-    [("can1_rx1_irq",     LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableCan1Rx1Irq        platformConfig] ++
-    [("can1_sce_irq",     LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableCan1SceIrq        platformConfig] ++
-    [("exti9_5_irq",      LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableExti9_5Irq        platformConfig] ++
-    [("tim1_brk_tim15_irq",    LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableTim1BrkTim15Irq    platformConfig] ++
-    [("tim1_up_tim16_irq",     LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableTim1UpTim16Irq     platformConfig] ++
-    [("tim1_trg_com_tim17_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableTim1TrgComTim17Irq platformConfig] ++
-    [("tim1_cc_irq",      LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableTim1CcIrq         platformConfig] ++
-    [("tim2_irq",         LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableTim2Irq           platformConfig] ++
-    [("i2c1_ev_irq",      LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableI2c1EvIrq         platformConfig] ++
-    [("i2c1_er_irq",      LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableI2c1ErIrq         platformConfig] ++
-    [("spi1_irq",         LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableSpi1Irq           platformConfig] ++
-    [("usart1_irq",       LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableUsart1Irq         platformConfig] ++
-    [("usart2_irq",       LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableUsart2Irq         platformConfig] ++
-    [("exti15_10_irq",    LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableExti15_10Irq      platformConfig] ++
-    [("rtc_alarm_irq",    LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableRtcAlarmIrq      platformConfig] ++
-    [("spi3_irq",         LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableSpi3Irq           platformConfig] ++
-    [("tim6_dac_irq",     LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableTim6DacIrq       platformConfig] ++
-    [("tim7_irq",         LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableTim7Irq           platformConfig] ++
-    [("dma2_channel1_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableDma2Channel1Irq  platformConfig] ++
-    [("dma2_channel2_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableDma2Channel2Irq  platformConfig] ++
-    [("dma2_channel3_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableDma2Channel3Irq  platformConfig] ++
-    [("dma2_channel4_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableDma2Channel4Irq  platformConfig] ++
-    [("dma2_channel5_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableDma2Channel5Irq  platformConfig] ++
-    [("comp_irq",         LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableCompIrq           platformConfig] ++
-    [("lptim1_irq",       LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableLptim1Irq         platformConfig] ++
-    [("lptim2_irq",       LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableLptim2Irq         platformConfig] ++
-    [("usb_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableUsbIrq            platformConfig] ++
-    [("dma2_channel6_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableDma2Channel6Irq  platformConfig] ++
-    [("dma2_channel7_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableDma2Channel7Irq  platformConfig] ++
-    [("lpuart1_irq",      LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableLpuart1Irq        platformConfig] ++
-    [("quad_spi_irq",     LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableQuadSpiIrq        platformConfig] ++
-    [("i2c3_ev_irq",      LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableI2c3EvIrq         platformConfig] ++
-    [("i2c3_er_irq",      LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableI2c3ErIrq         platformConfig] ++
-    [("sai1_irq",         LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableSai1Irq           platformConfig] ++
-    [("swpmi1_irq",       LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableSwpmi1Irq         platformConfig] ++
-    [("tsc_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableTscIrq            platformConfig] ++
-    [("rng_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableRngIrq            platformConfig] ++
-    [("fpu_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableFpuIrq            platformConfig] ++
-    [("crs_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableCrsIrq            platformConfig] ++
+getPlatformInitialGlobalEnv config FreeRTOS10STM32L432NUCLEOL432KC =
+    let platformConfig = freertos10_stm32l432_nucleol432kc . platformFlags $ config in
+    [("wwdg_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableWwdgIrq          platformConfig] ++
+    [("pvd_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enablePvdIrq           platformConfig] ++
+    [("tamp_stamp_irq",   LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTampStampIrq     platformConfig] ++
+    [("rtc_wkup_irq",     LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableRtcWkupIrq       platformConfig] ++
+    [("flash_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableFlashIrq          platformConfig] ++
+    [("rcc_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableRccIrq            platformConfig] ++
+    [("exti0_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableExti0Irq          platformConfig] ++
+    [("exti1_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableExti1Irq          platformConfig] ++
+    [("exti2_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableExti2Irq          platformConfig] ++
+    [("exti3_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableExti3Irq          platformConfig] ++
+    [("exti4_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableExti4Irq          platformConfig] ++
+    [("dma1_channel1_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma1Channel1Irq  platformConfig] ++
+    [("dma1_channel2_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma1Channel2Irq  platformConfig] ++
+    [("dma1_channel3_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma1Channel3Irq  platformConfig] ++
+    [("dma1_channel4_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma1Channel4Irq  platformConfig] ++
+    [("dma1_channel5_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma1Channel5Irq  platformConfig] ++
+    [("dma1_channel6_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma1Channel6Irq  platformConfig] ++
+    [("dma1_channel7_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma1Channel7Irq  platformConfig] ++
+    [("adc1_irq",         LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableAdc1Irq           platformConfig] ++
+    [("can1_tx_irq",      LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableCan1TxIrq         platformConfig] ++
+    [("can1_rx0_irq",     LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableCan1Rx0Irq        platformConfig] ++
+    [("can1_rx1_irq",     LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableCan1Rx1Irq        platformConfig] ++
+    [("can1_sce_irq",     LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableCan1SceIrq        platformConfig] ++
+    [("exti9_5_irq",      LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableExti9_5Irq        platformConfig] ++
+    [("tim1_brk_tim15_irq",    LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTim1BrkTim15Irq    platformConfig] ++
+    [("tim1_up_tim16_irq",     LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTim1UpTim16Irq     platformConfig] ++
+    [("tim1_trg_com_tim17_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTim1TrgComTim17Irq platformConfig] ++
+    [("tim1_cc_irq",      LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTim1CcIrq         platformConfig] ++
+    [("tim2_irq",         LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTim2Irq           platformConfig] ++
+    [("i2c1_ev_irq",      LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableI2c1EvIrq         platformConfig] ++
+    [("i2c1_er_irq",      LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableI2c1ErIrq         platformConfig] ++
+    [("spi1_irq",         LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableSpi1Irq           platformConfig] ++
+    [("usart1_irq",       LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableUsart1Irq         platformConfig] ++
+    [("usart2_irq",       LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableUsart2Irq         platformConfig] ++
+    [("exti15_10_irq",    LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableExti15_10Irq      platformConfig] ++
+    [("rtc_alarm_irq",    LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableRtcAlarmIrq      platformConfig] ++
+    [("spi3_irq",         LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableSpi3Irq           platformConfig] ++
+    [("tim6_dac_irq",     LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTim6DacIrq       platformConfig] ++
+    [("tim7_irq",         LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTim7Irq           platformConfig] ++
+    [("dma2_channel1_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma2Channel1Irq  platformConfig] ++
+    [("dma2_channel2_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma2Channel2Irq  platformConfig] ++
+    [("dma2_channel3_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma2Channel3Irq  platformConfig] ++
+    [("dma2_channel4_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma2Channel4Irq  platformConfig] ++
+    [("dma2_channel5_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma2Channel5Irq  platformConfig] ++
+    [("comp_irq",         LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableCompIrq           platformConfig] ++
+    [("lptim1_irq",       LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableLptim1Irq         platformConfig] ++
+    [("lptim2_irq",       LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableLptim2Irq         platformConfig] ++
+    [("usb_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableUsbIrq            platformConfig] ++
+    [("dma2_channel6_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma2Channel6Irq  platformConfig] ++
+    [("dma2_channel7_irq",LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma2Channel7Irq  platformConfig] ++
+    [("lpuart1_irq",      LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableLpuart1Irq        platformConfig] ++
+    [("quad_spi_irq",     LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableQuadSpiIrq        platformConfig] ++
+    [("i2c3_ev_irq",      LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableI2c3EvIrq         platformConfig] ++
+    [("i2c3_er_irq",      LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableI2c3ErIrq         platformConfig] ++
+    [("sai1_irq",         LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableSai1Irq           platformConfig] ++
+    [("swpmi1_irq",       LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableSwpmi1Irq         platformConfig] ++
+    [("tsc_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTscIrq            platformConfig] ++
+    [("rng_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableRngIrq            platformConfig] ++
+    [("fpu_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableFpuIrq            platformConfig] ++
+    [("crs_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableCrsIrq            platformConfig] ++
     -- | SystemAPI interface.
     [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime"] [] [])) Internal)]
 getPlatformInitialGlobalEnv config RTEMS6ZYNQ7000PYNQZ2 =
@@ -209,71 +209,71 @@ getPlatformInitialProgram config RTEMS5LEON3NEXYSA7 =
         [("irq_14", TPInterruptEmitter "irq_14" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3NEXYSA7.Config.enableIrq14 platformConfig] ++
         [("irq_15", TPInterruptEmitter "irq_15" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3NEXYSA7.Config.enableIrq15 platformConfig]
     }
-getPlatformInitialProgram config FreeRTOS10STM32L432XX =
-    let platformConfig = freertos10_stm32l432xx . platformFlags $ config
+getPlatformInitialProgram config FreeRTOS10STM32L432NUCLEOL432KC =
+    let platformConfig = freertos10_stm32l432_nucleol432kc . platformFlags $ config
         initialProgArch = emptyTerminaProgArch config in
     initialProgArch {
         emitters = M.union (emitters initialProgArch) . M.fromList $
-        [("wwdg_irq",          TPInterruptEmitter "wwdg_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableWwdgIrq          platformConfig] ++
-        [("pvd_irq",           TPInterruptEmitter "pvd_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enablePvdIrq           platformConfig] ++
-        [("tamp_stamp_irq",    TPInterruptEmitter "tamp_stamp_irq"    (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableTampStampIrq     platformConfig] ++
-        [("rtc_wkup_irq",      TPInterruptEmitter "rtc_wkup_irq"      (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableRtcWkupIrq       platformConfig] ++
-        [("flash_irq",         TPInterruptEmitter "flash_irq"         (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableFlashIrq          platformConfig] ++
-        [("rcc_irq",           TPInterruptEmitter "rcc_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableRccIrq            platformConfig] ++
-        [("exti0_irq",         TPInterruptEmitter "exti0_irq"         (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableExti0Irq          platformConfig] ++
-        [("exti1_irq",         TPInterruptEmitter "exti1_irq"         (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableExti1Irq          platformConfig] ++
-        [("exti2_irq",         TPInterruptEmitter "exti2_irq"         (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableExti2Irq          platformConfig] ++
-        [("exti3_irq",         TPInterruptEmitter "exti3_irq"         (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableExti3Irq          platformConfig] ++
-        [("exti4_irq",         TPInterruptEmitter "exti4_irq"         (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableExti4Irq          platformConfig] ++
-        [("dma1_channel1_irq", TPInterruptEmitter "dma1_channel1_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableDma1Channel1Irq  platformConfig] ++
-        [("dma1_channel2_irq", TPInterruptEmitter "dma1_channel2_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableDma1Channel2Irq  platformConfig] ++
-        [("dma1_channel3_irq", TPInterruptEmitter "dma1_channel3_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableDma1Channel3Irq  platformConfig] ++
-        [("dma1_channel4_irq", TPInterruptEmitter "dma1_channel4_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableDma1Channel4Irq  platformConfig] ++
-        [("dma1_channel5_irq", TPInterruptEmitter "dma1_channel5_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableDma1Channel5Irq  platformConfig] ++
-        [("dma1_channel6_irq", TPInterruptEmitter "dma1_channel6_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableDma1Channel6Irq  platformConfig] ++
-        [("dma1_channel7_irq", TPInterruptEmitter "dma1_channel7_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableDma1Channel7Irq  platformConfig] ++
-        [("adc1_irq",          TPInterruptEmitter "adc1_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableAdc1Irq           platformConfig] ++
-        [("can1_tx_irq",       TPInterruptEmitter "can1_tx_irq"       (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableCan1TxIrq         platformConfig] ++
-        [("can1_rx0_irq",      TPInterruptEmitter "can1_rx0_irq"      (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableCan1Rx0Irq        platformConfig] ++
-        [("can1_rx1_irq",      TPInterruptEmitter "can1_rx1_irq"      (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableCan1Rx1Irq        platformConfig] ++
-        [("can1_sce_irq",      TPInterruptEmitter "can1_sce_irq"      (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableCan1SceIrq        platformConfig] ++
-        [("exti9_5_irq",       TPInterruptEmitter "exti9_5_irq"       (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableExti9_5Irq        platformConfig] ++
-        [("tim1_brk_tim15_irq",     TPInterruptEmitter "tim1_brk_tim15_irq"     (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableTim1BrkTim15Irq    platformConfig] ++
-        [("tim1_up_tim16_irq",      TPInterruptEmitter "tim1_up_tim16_irq"      (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableTim1UpTim16Irq     platformConfig] ++
-        [("tim1_trg_com_tim17_irq", TPInterruptEmitter "tim1_trg_com_tim17_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableTim1TrgComTim17Irq platformConfig] ++
-        [("tim1_cc_irq",       TPInterruptEmitter "tim1_cc_irq"       (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableTim1CcIrq         platformConfig] ++
-        [("tim2_irq",          TPInterruptEmitter "tim2_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableTim2Irq           platformConfig] ++
-        [("i2c1_ev_irq",       TPInterruptEmitter "i2c1_ev_irq"       (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableI2c1EvIrq         platformConfig] ++
-        [("i2c1_er_irq",       TPInterruptEmitter "i2c1_er_irq"       (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableI2c1ErIrq         platformConfig] ++
-        [("spi1_irq",          TPInterruptEmitter "spi1_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableSpi1Irq           platformConfig] ++
-        [("usart1_irq",        TPInterruptEmitter "usart1_irq"        (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableUsart1Irq         platformConfig] ++
-        [("usart2_irq",        TPInterruptEmitter "usart2_irq"        (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableUsart2Irq         platformConfig] ++
-        [("exti15_10_irq",     TPInterruptEmitter "exti15_10_irq"     (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableExti15_10Irq      platformConfig] ++
-        [("rtc_alarm_irq",     TPInterruptEmitter "rtc_alarm_irq"     (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableRtcAlarmIrq      platformConfig] ++
-        [("spi3_irq",          TPInterruptEmitter "spi3_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableSpi3Irq           platformConfig] ++
-        [("tim6_dac_irq",      TPInterruptEmitter "tim6_dac_irq"      (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableTim6DacIrq       platformConfig] ++
-        [("tim7_irq",          TPInterruptEmitter "tim7_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableTim7Irq           platformConfig] ++
-        [("dma2_channel1_irq", TPInterruptEmitter "dma2_channel1_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableDma2Channel1Irq  platformConfig] ++
-        [("dma2_channel2_irq", TPInterruptEmitter "dma2_channel2_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableDma2Channel2Irq  platformConfig] ++
-        [("dma2_channel3_irq", TPInterruptEmitter "dma2_channel3_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableDma2Channel3Irq  platformConfig] ++
-        [("dma2_channel4_irq", TPInterruptEmitter "dma2_channel4_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableDma2Channel4Irq  platformConfig] ++
-        [("dma2_channel5_irq", TPInterruptEmitter "dma2_channel5_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableDma2Channel5Irq  platformConfig] ++
-        [("comp_irq",          TPInterruptEmitter "comp_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableCompIrq           platformConfig] ++
-        [("lptim1_irq",        TPInterruptEmitter "lptim1_irq"        (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableLptim1Irq         platformConfig] ++
-        [("lptim2_irq",        TPInterruptEmitter "lptim2_irq"        (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableLptim2Irq         platformConfig] ++
-        [("usb_irq",           TPInterruptEmitter "usb_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableUsbIrq            platformConfig] ++
-        [("dma2_channel6_irq", TPInterruptEmitter "dma2_channel6_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableDma2Channel6Irq  platformConfig] ++
-        [("dma2_channel7_irq", TPInterruptEmitter "dma2_channel7_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableDma2Channel7Irq  platformConfig] ++
-        [("lpuart1_irq",       TPInterruptEmitter "lpuart1_irq"       (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableLpuart1Irq        platformConfig] ++
-        [("quad_spi_irq",      TPInterruptEmitter "quad_spi_irq"      (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableQuadSpiIrq        platformConfig] ++
-        [("i2c3_ev_irq",       TPInterruptEmitter "i2c3_ev_irq"       (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableI2c3EvIrq         platformConfig] ++
-        [("i2c3_er_irq",       TPInterruptEmitter "i2c3_er_irq"       (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableI2c3ErIrq         platformConfig] ++
-        [("sai1_irq",          TPInterruptEmitter "sai1_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableSai1Irq           platformConfig] ++
-        [("swpmi1_irq",        TPInterruptEmitter "swpmi1_irq"        (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableSwpmi1Irq         platformConfig] ++
-        [("tsc_irq",           TPInterruptEmitter "tsc_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableTscIrq            platformConfig] ++
-        [("rng_irq",           TPInterruptEmitter "rng_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableRngIrq            platformConfig] ++
-        [("fpu_irq",           TPInterruptEmitter "fpu_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableFpuIrq            platformConfig] ++
-        [("crs_irq",           TPInterruptEmitter "crs_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableCrsIrq            platformConfig]
+        [("wwdg_irq",          TPInterruptEmitter "wwdg_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableWwdgIrq          platformConfig] ++
+        [("pvd_irq",           TPInterruptEmitter "pvd_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enablePvdIrq           platformConfig] ++
+        [("tamp_stamp_irq",    TPInterruptEmitter "tamp_stamp_irq"    (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTampStampIrq     platformConfig] ++
+        [("rtc_wkup_irq",      TPInterruptEmitter "rtc_wkup_irq"      (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableRtcWkupIrq       platformConfig] ++
+        [("flash_irq",         TPInterruptEmitter "flash_irq"         (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableFlashIrq          platformConfig] ++
+        [("rcc_irq",           TPInterruptEmitter "rcc_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableRccIrq            platformConfig] ++
+        [("exti0_irq",         TPInterruptEmitter "exti0_irq"         (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableExti0Irq          platformConfig] ++
+        [("exti1_irq",         TPInterruptEmitter "exti1_irq"         (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableExti1Irq          platformConfig] ++
+        [("exti2_irq",         TPInterruptEmitter "exti2_irq"         (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableExti2Irq          platformConfig] ++
+        [("exti3_irq",         TPInterruptEmitter "exti3_irq"         (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableExti3Irq          platformConfig] ++
+        [("exti4_irq",         TPInterruptEmitter "exti4_irq"         (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableExti4Irq          platformConfig] ++
+        [("dma1_channel1_irq", TPInterruptEmitter "dma1_channel1_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma1Channel1Irq  platformConfig] ++
+        [("dma1_channel2_irq", TPInterruptEmitter "dma1_channel2_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma1Channel2Irq  platformConfig] ++
+        [("dma1_channel3_irq", TPInterruptEmitter "dma1_channel3_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma1Channel3Irq  platformConfig] ++
+        [("dma1_channel4_irq", TPInterruptEmitter "dma1_channel4_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma1Channel4Irq  platformConfig] ++
+        [("dma1_channel5_irq", TPInterruptEmitter "dma1_channel5_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma1Channel5Irq  platformConfig] ++
+        [("dma1_channel6_irq", TPInterruptEmitter "dma1_channel6_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma1Channel6Irq  platformConfig] ++
+        [("dma1_channel7_irq", TPInterruptEmitter "dma1_channel7_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma1Channel7Irq  platformConfig] ++
+        [("adc1_irq",          TPInterruptEmitter "adc1_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableAdc1Irq           platformConfig] ++
+        [("can1_tx_irq",       TPInterruptEmitter "can1_tx_irq"       (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableCan1TxIrq         platformConfig] ++
+        [("can1_rx0_irq",      TPInterruptEmitter "can1_rx0_irq"      (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableCan1Rx0Irq        platformConfig] ++
+        [("can1_rx1_irq",      TPInterruptEmitter "can1_rx1_irq"      (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableCan1Rx1Irq        platformConfig] ++
+        [("can1_sce_irq",      TPInterruptEmitter "can1_sce_irq"      (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableCan1SceIrq        platformConfig] ++
+        [("exti9_5_irq",       TPInterruptEmitter "exti9_5_irq"       (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableExti9_5Irq        platformConfig] ++
+        [("tim1_brk_tim15_irq",     TPInterruptEmitter "tim1_brk_tim15_irq"     (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTim1BrkTim15Irq    platformConfig] ++
+        [("tim1_up_tim16_irq",      TPInterruptEmitter "tim1_up_tim16_irq"      (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTim1UpTim16Irq     platformConfig] ++
+        [("tim1_trg_com_tim17_irq", TPInterruptEmitter "tim1_trg_com_tim17_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTim1TrgComTim17Irq platformConfig] ++
+        [("tim1_cc_irq",       TPInterruptEmitter "tim1_cc_irq"       (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTim1CcIrq         platformConfig] ++
+        [("tim2_irq",          TPInterruptEmitter "tim2_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTim2Irq           platformConfig] ++
+        [("i2c1_ev_irq",       TPInterruptEmitter "i2c1_ev_irq"       (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableI2c1EvIrq         platformConfig] ++
+        [("i2c1_er_irq",       TPInterruptEmitter "i2c1_er_irq"       (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableI2c1ErIrq         platformConfig] ++
+        [("spi1_irq",          TPInterruptEmitter "spi1_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableSpi1Irq           platformConfig] ++
+        [("usart1_irq",        TPInterruptEmitter "usart1_irq"        (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableUsart1Irq         platformConfig] ++
+        [("usart2_irq",        TPInterruptEmitter "usart2_irq"        (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableUsart2Irq         platformConfig] ++
+        [("exti15_10_irq",     TPInterruptEmitter "exti15_10_irq"     (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableExti15_10Irq      platformConfig] ++
+        [("rtc_alarm_irq",     TPInterruptEmitter "rtc_alarm_irq"     (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableRtcAlarmIrq      platformConfig] ++
+        [("spi3_irq",          TPInterruptEmitter "spi3_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableSpi3Irq           platformConfig] ++
+        [("tim6_dac_irq",      TPInterruptEmitter "tim6_dac_irq"      (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTim6DacIrq       platformConfig] ++
+        [("tim7_irq",          TPInterruptEmitter "tim7_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTim7Irq           platformConfig] ++
+        [("dma2_channel1_irq", TPInterruptEmitter "dma2_channel1_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma2Channel1Irq  platformConfig] ++
+        [("dma2_channel2_irq", TPInterruptEmitter "dma2_channel2_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma2Channel2Irq  platformConfig] ++
+        [("dma2_channel3_irq", TPInterruptEmitter "dma2_channel3_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma2Channel3Irq  platformConfig] ++
+        [("dma2_channel4_irq", TPInterruptEmitter "dma2_channel4_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma2Channel4Irq  platformConfig] ++
+        [("dma2_channel5_irq", TPInterruptEmitter "dma2_channel5_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma2Channel5Irq  platformConfig] ++
+        [("comp_irq",          TPInterruptEmitter "comp_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableCompIrq           platformConfig] ++
+        [("lptim1_irq",        TPInterruptEmitter "lptim1_irq"        (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableLptim1Irq         platformConfig] ++
+        [("lptim2_irq",        TPInterruptEmitter "lptim2_irq"        (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableLptim2Irq         platformConfig] ++
+        [("usb_irq",           TPInterruptEmitter "usb_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableUsbIrq            platformConfig] ++
+        [("dma2_channel6_irq", TPInterruptEmitter "dma2_channel6_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma2Channel6Irq  platformConfig] ++
+        [("dma2_channel7_irq", TPInterruptEmitter "dma2_channel7_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableDma2Channel7Irq  platformConfig] ++
+        [("lpuart1_irq",       TPInterruptEmitter "lpuart1_irq"       (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableLpuart1Irq        platformConfig] ++
+        [("quad_spi_irq",      TPInterruptEmitter "quad_spi_irq"      (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableQuadSpiIrq        platformConfig] ++
+        [("i2c3_ev_irq",       TPInterruptEmitter "i2c3_ev_irq"       (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableI2c3EvIrq         platformConfig] ++
+        [("i2c3_er_irq",       TPInterruptEmitter "i2c3_er_irq"       (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableI2c3ErIrq         platformConfig] ++
+        [("sai1_irq",          TPInterruptEmitter "sai1_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableSai1Irq           platformConfig] ++
+        [("swpmi1_irq",        TPInterruptEmitter "swpmi1_irq"        (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableSwpmi1Irq         platformConfig] ++
+        [("tsc_irq",           TPInterruptEmitter "tsc_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableTscIrq            platformConfig] ++
+        [("rng_irq",           TPInterruptEmitter "rng_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableRngIrq            platformConfig] ++
+        [("fpu_irq",           TPInterruptEmitter "fpu_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableFpuIrq            platformConfig] ++
+        [("crs_irq",           TPInterruptEmitter "crs_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432NUCLEOL432KC.Config.enableCrsIrq            platformConfig]
     }
 getPlatformInitialProgram config RTEMS6ZYNQ7000PYNQZ2 =
     let platformConfig = rtems6_zynq7000_pynqz2 . platformFlags $ config

@@ -1,13 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Configuration.Platform.FreeRTOS10STM32L432XX where
+module Configuration.Platform.FreeRTOS10STM32L432NUCLEOL432KC where
 import Data.Yaml
 
--- | Interrupt emitter enable flags for the FreeRTOS V10 / STM32L432XX platform.
+-- | Interrupt emitter enable flags for the FreeRTOS V10 / STM32L432 / NUCLEO-L432KC platform.
 -- Each field corresponds to a peripheral interrupt source in the STM32L432xx
 -- vector table (startup_stm32l432xx.s).  Set a flag to True in the project
 -- configuration to deploy an interrupt emitter for that interrupt source.
-data FreeRTOS10STM32L432XXFlags = FreeRTOS10STM32L432XXFlags {
+data FreeRTOS10STM32L432NUCLEOL432KCFlags = FreeRTOS10STM32L432NUCLEOL432KCFlags {
     enableWwdgIrq          :: !Bool,  -- ^ Window Watchdog
     enablePvdIrq           :: !Bool,  -- ^ PVD through EXTI Line detection
     enableTampStampIrq     :: !Bool,  -- ^ Tamper and TimeStamp through EXTI line
@@ -70,8 +70,8 @@ data FreeRTOS10STM32L432XXFlags = FreeRTOS10STM32L432XXFlags {
     enableCrsIrq           :: !Bool   -- ^ CRS
 } deriving (Eq, Show)
 
-defaultFreeRTOS10STM32L432XXFlags :: FreeRTOS10STM32L432XXFlags
-defaultFreeRTOS10STM32L432XXFlags = FreeRTOS10STM32L432XXFlags {
+defaultFreeRTOS10STM32L432NUCLEOL432KCFlags :: FreeRTOS10STM32L432NUCLEOL432KCFlags
+defaultFreeRTOS10STM32L432NUCLEOL432KCFlags = FreeRTOS10STM32L432NUCLEOL432KCFlags {
     enableWwdgIrq            = False,
     enablePvdIrq             = False,
     enableTampStampIrq       = False,
@@ -134,9 +134,9 @@ defaultFreeRTOS10STM32L432XXFlags = FreeRTOS10STM32L432XXFlags {
     enableCrsIrq             = False
 }
 
-instance FromJSON FreeRTOS10STM32L432XXFlags where
+instance FromJSON FreeRTOS10STM32L432NUCLEOL432KCFlags where
   parseJSON (Object o) =
-    FreeRTOS10STM32L432XXFlags <$>
+    FreeRTOS10STM32L432NUCLEOL432KCFlags <$>
     o .:? "enable-wwdg-irq"              .!= False <*>
     o .:? "enable-pvd-irq"               .!= False <*>
     o .:? "enable-tamp-stamp-irq"        .!= False <*>
@@ -199,9 +199,9 @@ instance FromJSON FreeRTOS10STM32L432XXFlags where
     o .:? "enable-crs-irq"               .!= False
   parseJSON _ = fail "Expected configuration object"
 
-instance ToJSON FreeRTOS10STM32L432XXFlags where
+instance ToJSON FreeRTOS10STM32L432NUCLEOL432KCFlags where
     toJSON (
-        FreeRTOS10STM32L432XXFlags
+        FreeRTOS10STM32L432NUCLEOL432KCFlags
             flagsEnableWwdgIrq
             flagsEnablePvdIrq
             flagsEnableTampStampIrq

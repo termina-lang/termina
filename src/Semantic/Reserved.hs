@@ -22,7 +22,7 @@ import Configuration.Platform (Platform(..))
 import Data.Char (isUpper)
 import qualified Data.Set as S
 
-import qualified Semantic.Reserved.FreeRTOS10STM32L432XX as FreeRTOS10STM32L432XX
+import qualified Semantic.Reserved.FreeRTOS10STM32L432NUCLEOL432KC as FreeRTOS10STM32L432NUCLEOL432KC
 import qualified Semantic.Reserved.POSIXGCC as POSIXGCC
 import qualified Semantic.Reserved.RTEMS5LEON3NEXYSA7 as RTEMS5LEON3NEXYSA7
 import qualified Semantic.Reserved.RTEMS6ZYNQ7000PYNQZ2 as RTEMS6ZYNQ7000PYNQZ2
@@ -68,7 +68,7 @@ terminaTypes = S.fromList [
 platformNames :: Platform -> S.Set Identifier
 platformNames POSIXGCC = POSIXGCC.reservedNames
 platformNames RTEMS5LEON3NEXYSA7 = RTEMS5LEON3NEXYSA7.reservedNames
-platformNames FreeRTOS10STM32L432XX = FreeRTOS10STM32L432XX.reservedNames
+platformNames FreeRTOS10STM32L432NUCLEOL432KC = FreeRTOS10STM32L432NUCLEOL432KC.reservedNames
 platformNames RTEMS6ZYNQ7000PYNQZ2 = RTEMS6ZYNQ7000PYNQZ2.reservedNames
 -- | The platform of the test suite links against no library at all.
 platformNames TestPlatform = S.empty
