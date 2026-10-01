@@ -38,7 +38,7 @@ getPlatformInitialGlobalEnv config RTEMS5LEON3NEXYSA7 =
     [("irq_15", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS5LEON3NEXYSA7.Config.enableIrq15 platformConfig] ++
     -- | SystemAPI interface. This interface extends all the system interfaces.
     -- Each target platform should declare its own SystemAPI interface.
-    [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime", "SysPrint"] [] [])) Internal)]
+    [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime"] [] [])) Internal)]
 getPlatformInitialGlobalEnv config FreeRTOS10STM32L432XX =
     let platformConfig = freertos10_stm32l432xx . platformFlags $ config in
     [("wwdg_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableWwdgIrq          platformConfig] ++
