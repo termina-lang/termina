@@ -10,6 +10,7 @@ import Configuration.Platform
 import qualified Configuration.Platform.RTEMS5LEON3NEXYSA7 as RTEMS5LEON3NEXYSA7.Config
 import qualified Configuration.Platform.POSIXGCC as POSIXGCC.Config
 import qualified Configuration.Platform.FreeRTOS10STM32L432XX as FreeRTOS10STM32L432XX.Config
+import qualified Configuration.Platform.RTEMS6ZYNQ7000PYNQZ2 as RTEMS6ZYNQ7000PYNQZ2.Config
 
 getPlatformInitialGlobalEnv :: TerminaConfig -> Platform -> [(Identifier, LocatedElement (GEntry SemanticAnn))]
 getPlatformInitialGlobalEnv config POSIXGCC =
@@ -101,6 +102,70 @@ getPlatformInitialGlobalEnv config FreeRTOS10STM32L432XX =
     [("rng_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableRngIrq            platformConfig] ++
     [("fpu_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableFpuIrq            platformConfig] ++
     [("crs_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableCrsIrq            platformConfig] ++
+    -- | SystemAPI interface.
+    [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime"] [] [])) Internal)]
+getPlatformInitialGlobalEnv config RTEMS6ZYNQ7000PYNQZ2 =
+    let platformConfig = rtems6_zynq7000_pynqz2 . platformFlags $ config in
+    [("cpu_0_irq",             LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableCpu0Irq            platformConfig] ++
+    [("cpu_1_irq",             LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableCpu1Irq            platformConfig] ++
+    [("l2_cache_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableL2CacheIrq         platformConfig] ++
+    [("ocm_irq",               LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableOcmIrq             platformConfig] ++
+    [("pmu_0_irq",             LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enablePmu0Irq            platformConfig] ++
+    [("pmu_1_irq",             LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enablePmu1Irq            platformConfig] ++
+    [("xadc_irq",              LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableXadcIrq            platformConfig] ++
+    [("dvi_irq",               LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDviIrq             platformConfig] ++
+    [("swdt_irq",              LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableSwdtIrq            platformConfig] ++
+    [("ttc_0_0_irq",           LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableTtc00Irq           platformConfig] ++
+    [("ttc_1_0_irq",           LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableTtc10Irq           platformConfig] ++
+    [("ttc_2_0_irq",           LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableTtc20Irq           platformConfig] ++
+    [("dmac_abort_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmacAbortIrq       platformConfig] ++
+    [("dmac_0_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmac0Irq           platformConfig] ++
+    [("dmac_1_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmac1Irq           platformConfig] ++
+    [("dmac_2_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmac2Irq           platformConfig] ++
+    [("dmac_3_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmac3Irq           platformConfig] ++
+    [("smc_irq",               LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableSmcIrq             platformConfig] ++
+    [("quad_spi_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableQuadSpiIrq         platformConfig] ++
+    [("gpio_irq",              LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableGpioIrq            platformConfig] ++
+    [("usb_0_irq",             LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableUsb0Irq            platformConfig] ++
+    [("ethernet_0_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableEthernet0Irq       platformConfig] ++
+    [("ethernet_0_wakeup_irq", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableEthernet0WakeupIrq platformConfig] ++
+    [("sdio_0_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableSdio0Irq           platformConfig] ++
+    [("i2c_0_irq",             LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableI2c0Irq            platformConfig] ++
+    [("spi_0_irq",             LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableSpi0Irq            platformConfig] ++
+    [("uart_0_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableUart0Irq           platformConfig] ++
+    [("can_0_irq",             LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableCan0Irq            platformConfig] ++
+    [("fpga_0_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga0Irq           platformConfig] ++
+    [("fpga_1_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga1Irq           platformConfig] ++
+    [("fpga_2_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga2Irq           platformConfig] ++
+    [("fpga_3_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga3Irq           platformConfig] ++
+    [("fpga_4_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga4Irq           platformConfig] ++
+    [("fpga_5_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga5Irq           platformConfig] ++
+    [("fpga_6_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga6Irq           platformConfig] ++
+    [("fpga_7_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga7Irq           platformConfig] ++
+    [("ttc_0_1_irq",           LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableTtc01Irq           platformConfig] ++
+    [("ttc_1_1_irq",           LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableTtc11Irq           platformConfig] ++
+    [("ttc_2_1_irq",           LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableTtc21Irq           platformConfig] ++
+    [("dmac_4_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmac4Irq           platformConfig] ++
+    [("dmac_5_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmac5Irq           platformConfig] ++
+    [("dmac_6_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmac6Irq           platformConfig] ++
+    [("dmac_7_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmac7Irq           platformConfig] ++
+    [("usb_1_irq",             LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableUsb1Irq            platformConfig] ++
+    [("ethernet_1_irq",        LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableEthernet1Irq       platformConfig] ++
+    [("ethernet_1_wakeup_irq", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableEthernet1WakeupIrq platformConfig] ++
+    [("sdio_1_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableSdio1Irq           platformConfig] ++
+    [("i2c_1_irq",             LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableI2c1Irq            platformConfig] ++
+    [("spi_1_irq",             LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableSpi1Irq            platformConfig] ++
+    [("uart_1_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableUart1Irq           platformConfig] ++
+    [("can_1_irq",             LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableCan1Irq            platformConfig] ++
+    [("fpga_8_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga8Irq           platformConfig] ++
+    [("fpga_9_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga9Irq           platformConfig] ++
+    [("fpga_10_irq",           LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga10Irq          platformConfig] ++
+    [("fpga_11_irq",           LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga11Irq          platformConfig] ++
+    [("fpga_12_irq",           LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga12Irq          platformConfig] ++
+    [("fpga_13_irq",           LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga13Irq          platformConfig] ++
+    [("fpga_14_irq",           LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga14Irq          platformConfig] ++
+    [("fpga_15_irq",           LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga15Irq          platformConfig] ++
+    [("parity_irq",            LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS6ZYNQ7000PYNQZ2.Config.enableParityIrq          platformConfig] ++
     -- | SystemAPI interface.
     [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime"] [] [])) Internal)]
 getPlatformInitialGlobalEnv _ TestPlatform =
@@ -209,6 +274,72 @@ getPlatformInitialProgram config FreeRTOS10STM32L432XX =
         [("rng_irq",           TPInterruptEmitter "rng_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableRngIrq            platformConfig] ++
         [("fpu_irq",           TPInterruptEmitter "fpu_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableFpuIrq            platformConfig] ++
         [("crs_irq",           TPInterruptEmitter "crs_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | FreeRTOS10STM32L432XX.Config.enableCrsIrq            platformConfig]
+    }
+getPlatformInitialProgram config RTEMS6ZYNQ7000PYNQZ2 =
+    let platformConfig = rtems6_zynq7000_pynqz2 . platformFlags $ config
+        initialProgArch = emptyTerminaProgArch config in
+    initialProgArch {
+        emitters = M.union (emitters initialProgArch) . M.fromList $
+        [("cpu_0_irq",             TPInterruptEmitter "cpu_0_irq"             (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableCpu0Irq            platformConfig] ++
+        [("cpu_1_irq",             TPInterruptEmitter "cpu_1_irq"             (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableCpu1Irq            platformConfig] ++
+        [("l2_cache_irq",          TPInterruptEmitter "l2_cache_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableL2CacheIrq         platformConfig] ++
+        [("ocm_irq",               TPInterruptEmitter "ocm_irq"               (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableOcmIrq             platformConfig] ++
+        [("pmu_0_irq",             TPInterruptEmitter "pmu_0_irq"             (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enablePmu0Irq            platformConfig] ++
+        [("pmu_1_irq",             TPInterruptEmitter "pmu_1_irq"             (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enablePmu1Irq            platformConfig] ++
+        [("xadc_irq",              TPInterruptEmitter "xadc_irq"              (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableXadcIrq            platformConfig] ++
+        [("dvi_irq",               TPInterruptEmitter "dvi_irq"               (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDviIrq             platformConfig] ++
+        [("swdt_irq",              TPInterruptEmitter "swdt_irq"              (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableSwdtIrq            platformConfig] ++
+        [("ttc_0_0_irq",           TPInterruptEmitter "ttc_0_0_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableTtc00Irq           platformConfig] ++
+        [("ttc_1_0_irq",           TPInterruptEmitter "ttc_1_0_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableTtc10Irq           platformConfig] ++
+        [("ttc_2_0_irq",           TPInterruptEmitter "ttc_2_0_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableTtc20Irq           platformConfig] ++
+        [("dmac_abort_irq",        TPInterruptEmitter "dmac_abort_irq"        (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmacAbortIrq       platformConfig] ++
+        [("dmac_0_irq",            TPInterruptEmitter "dmac_0_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmac0Irq           platformConfig] ++
+        [("dmac_1_irq",            TPInterruptEmitter "dmac_1_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmac1Irq           platformConfig] ++
+        [("dmac_2_irq",            TPInterruptEmitter "dmac_2_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmac2Irq           platformConfig] ++
+        [("dmac_3_irq",            TPInterruptEmitter "dmac_3_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmac3Irq           platformConfig] ++
+        [("smc_irq",               TPInterruptEmitter "smc_irq"               (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableSmcIrq             platformConfig] ++
+        [("quad_spi_irq",          TPInterruptEmitter "quad_spi_irq"          (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableQuadSpiIrq         platformConfig] ++
+        [("gpio_irq",              TPInterruptEmitter "gpio_irq"              (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableGpioIrq            platformConfig] ++
+        [("usb_0_irq",             TPInterruptEmitter "usb_0_irq"             (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableUsb0Irq            platformConfig] ++
+        [("ethernet_0_irq",        TPInterruptEmitter "ethernet_0_irq"        (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableEthernet0Irq       platformConfig] ++
+        [("ethernet_0_wakeup_irq", TPInterruptEmitter "ethernet_0_wakeup_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableEthernet0WakeupIrq platformConfig] ++
+        [("sdio_0_irq",            TPInterruptEmitter "sdio_0_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableSdio0Irq           platformConfig] ++
+        [("i2c_0_irq",             TPInterruptEmitter "i2c_0_irq"             (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableI2c0Irq            platformConfig] ++
+        [("spi_0_irq",             TPInterruptEmitter "spi_0_irq"             (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableSpi0Irq            platformConfig] ++
+        [("uart_0_irq",            TPInterruptEmitter "uart_0_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableUart0Irq           platformConfig] ++
+        [("can_0_irq",             TPInterruptEmitter "can_0_irq"             (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableCan0Irq            platformConfig] ++
+        [("fpga_0_irq",            TPInterruptEmitter "fpga_0_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga0Irq           platformConfig] ++
+        [("fpga_1_irq",            TPInterruptEmitter "fpga_1_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga1Irq           platformConfig] ++
+        [("fpga_2_irq",            TPInterruptEmitter "fpga_2_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga2Irq           platformConfig] ++
+        [("fpga_3_irq",            TPInterruptEmitter "fpga_3_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga3Irq           platformConfig] ++
+        [("fpga_4_irq",            TPInterruptEmitter "fpga_4_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga4Irq           platformConfig] ++
+        [("fpga_5_irq",            TPInterruptEmitter "fpga_5_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga5Irq           platformConfig] ++
+        [("fpga_6_irq",            TPInterruptEmitter "fpga_6_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga6Irq           platformConfig] ++
+        [("fpga_7_irq",            TPInterruptEmitter "fpga_7_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga7Irq           platformConfig] ++
+        [("ttc_0_1_irq",           TPInterruptEmitter "ttc_0_1_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableTtc01Irq           platformConfig] ++
+        [("ttc_1_1_irq",           TPInterruptEmitter "ttc_1_1_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableTtc11Irq           platformConfig] ++
+        [("ttc_2_1_irq",           TPInterruptEmitter "ttc_2_1_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableTtc21Irq           platformConfig] ++
+        [("dmac_4_irq",            TPInterruptEmitter "dmac_4_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmac4Irq           platformConfig] ++
+        [("dmac_5_irq",            TPInterruptEmitter "dmac_5_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmac5Irq           platformConfig] ++
+        [("dmac_6_irq",            TPInterruptEmitter "dmac_6_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmac6Irq           platformConfig] ++
+        [("dmac_7_irq",            TPInterruptEmitter "dmac_7_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableDmac7Irq           platformConfig] ++
+        [("usb_1_irq",             TPInterruptEmitter "usb_1_irq"             (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableUsb1Irq            platformConfig] ++
+        [("ethernet_1_irq",        TPInterruptEmitter "ethernet_1_irq"        (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableEthernet1Irq       platformConfig] ++
+        [("ethernet_1_wakeup_irq", TPInterruptEmitter "ethernet_1_wakeup_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableEthernet1WakeupIrq platformConfig] ++
+        [("sdio_1_irq",            TPInterruptEmitter "sdio_1_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableSdio1Irq           platformConfig] ++
+        [("i2c_1_irq",             TPInterruptEmitter "i2c_1_irq"             (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableI2c1Irq            platformConfig] ++
+        [("spi_1_irq",             TPInterruptEmitter "spi_1_irq"             (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableSpi1Irq            platformConfig] ++
+        [("uart_1_irq",            TPInterruptEmitter "uart_1_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableUart1Irq           platformConfig] ++
+        [("can_1_irq",             TPInterruptEmitter "can_1_irq"             (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableCan1Irq            platformConfig] ++
+        [("fpga_8_irq",            TPInterruptEmitter "fpga_8_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga8Irq           platformConfig] ++
+        [("fpga_9_irq",            TPInterruptEmitter "fpga_9_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga9Irq           platformConfig] ++
+        [("fpga_10_irq",           TPInterruptEmitter "fpga_10_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga10Irq          platformConfig] ++
+        [("fpga_11_irq",           TPInterruptEmitter "fpga_11_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga11Irq          platformConfig] ++
+        [("fpga_12_irq",           TPInterruptEmitter "fpga_12_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga12Irq          platformConfig] ++
+        [("fpga_13_irq",           TPInterruptEmitter "fpga_13_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga13Irq          platformConfig] ++
+        [("fpga_14_irq",           TPInterruptEmitter "fpga_14_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga14Irq          platformConfig] ++
+        [("fpga_15_irq",           TPInterruptEmitter "fpga_15_irq"           (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableFpga15Irq          platformConfig] ++
+        [("parity_irq",            TPInterruptEmitter "parity_irq"            (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS6ZYNQ7000PYNQZ2.Config.enableParityIrq          platformConfig]
     }
 getPlatformInitialProgram config TestPlatform = emptyTerminaProgArch config
 

@@ -144,6 +144,7 @@ instance ToJSON TerminaConfig where
             <> case prjPlatform of
                 "rtems5-leon3-nexysa7"      -> ["platform-flags" .= object ["rtems5-leon3-nexysa7"      .= rtems5_leon3_nexysa7      prjPlatformFlags]]
                 "freertos10-stm32l432xx" -> ["platform-flags" .= object ["freertos10-stm32l432xx" .= freertos10_stm32l432xx prjPlatformFlags]]
+                "rtems6-zynq7000-pynqz2" -> ["platform-flags" .= object ["rtems6-zynq7000-pynqz2" .= rtems6_zynq7000_pynqz2 prjPlatformFlags]]
                 _ -> []
 
 defaultConfig :: String -> Platform -> TerminaConfig

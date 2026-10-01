@@ -8,11 +8,13 @@ import Core.AST (Identifier)
 import Configuration.Platform.RTEMS5LEON3NEXYSA7
 import Configuration.Platform.POSIXGCC
 import Configuration.Platform.FreeRTOS10STM32L432XX
+import Configuration.Platform.RTEMS6ZYNQ7000PYNQZ2
 
 data Platform =
     POSIXGCC
     | RTEMS5LEON3NEXYSA7
     | FreeRTOS10STM32L432XX
+    | RTEMS6ZYNQ7000PYNQZ2
     | TestPlatform
     deriving Eq
 
@@ -25,6 +27,7 @@ usizeWidth :: Platform -> Integer
 usizeWidth POSIXGCC              = 64
 usizeWidth RTEMS5LEON3NEXYSA7    = 32
 usizeWidth FreeRTOS10STM32L432XX = 32
+usizeWidth RTEMS6ZYNQ7000PYNQZ2  = 32
 usizeWidth TestPlatform          = 32
 
 -- | The bit width of C @int@ on the target, which is what decides whether an
@@ -36,6 +39,7 @@ intWidth :: Platform -> Integer
 intWidth POSIXGCC              = 32
 intWidth RTEMS5LEON3NEXYSA7    = 32
 intWidth FreeRTOS10STM32L432XX = 32
+intWidth RTEMS6ZYNQ7000PYNQZ2  = 32
 intWidth TestPlatform          = 32
 
 -- | Whether the target requires naturally-aligned memory accesses, i.e. a
@@ -49,6 +53,7 @@ strictAlignment :: Platform -> Bool
 strictAlignment POSIXGCC              = False   -- x86 host: misaligned access is fine
 strictAlignment RTEMS5LEON3NEXYSA7    = True    -- SPARC/LEON3: traps
 strictAlignment FreeRTOS10STM32L432XX = True    -- Cortex-M: conservative
+strictAlignment RTEMS6ZYNQ7000PYNQZ2  = True    -- Cortex-A9: conservative
 strictAlignment TestPlatform          = True
 
 -- | The maximum number of significant initial characters a generated
@@ -67,6 +72,7 @@ maxIdentifierLength :: Platform -> Maybe Integer
 maxIdentifierLength POSIXGCC              = Nothing
 maxIdentifierLength RTEMS5LEON3NEXYSA7    = Nothing
 maxIdentifierLength FreeRTOS10STM32L432XX = Nothing
+maxIdentifierLength RTEMS6ZYNQ7000PYNQZ2  = Nothing
 maxIdentifierLength TestPlatform          = Nothing
 
 -- | The longest period, in ticks, that a periodic timer may have on a platform,
@@ -76,12 +82,14 @@ maxTimerPeriodTicks :: Platform -> Maybe Integer
 maxTimerPeriodTicks POSIXGCC              = Nothing
 maxTimerPeriodTicks RTEMS5LEON3NEXYSA7    = Just 0xFFFFFFFF
 maxTimerPeriodTicks FreeRTOS10STM32L432XX = Just 0xFFFFFFFF
+maxTimerPeriodTicks RTEMS6ZYNQ7000PYNQZ2  = Just 0xFFFFFFFF
 maxTimerPeriodTicks TestPlatform          = Just 0xFFFFFFFF
 
 data PlatformFlags = PlatformFlags {
     rtems5_leon3_nexysa7        :: RTEMS5LEON3NEXYSA7Flags,
     posix_gcc                :: POSIXGCCFlags,
-    freertos10_stm32l432xx   :: FreeRTOS10STM32L432XXFlags
+    freertos10_stm32l432xx   :: FreeRTOS10STM32L432XXFlags,
+    rtems6_zynq7000_pynqz2   :: RTEMS6ZYNQ7000PYNQZ2Flags
 } deriving (Eq, Show)
 
 -- | The interrupts the platform exposes, each one with the vector it is wired
@@ -158,6 +166,69 @@ getPlatformInterruptMap FreeRTOS10STM32L432XX =
         ("fpu_irq",           81),
         ("crs_irq",           82)
     ]
+getPlatformInterruptMap RTEMS6ZYNQ7000PYNQZ2 =
+    M.fromList [
+        ("cpu_0_irq",             32),
+        ("cpu_1_irq",             33),
+        ("l2_cache_irq",          34),
+        ("ocm_irq",               35),
+        ("pmu_0_irq",             37),
+        ("pmu_1_irq",             38),
+        ("xadc_irq",              39),
+        ("dvi_irq",               40),
+        ("swdt_irq",              41),
+        ("ttc_0_0_irq",           42),
+        ("ttc_1_0_irq",           43),
+        ("ttc_2_0_irq",           44),
+        ("dmac_abort_irq",        45),
+        ("dmac_0_irq",            46),
+        ("dmac_1_irq",            47),
+        ("dmac_2_irq",            48),
+        ("dmac_3_irq",            49),
+        ("smc_irq",               50),
+        ("quad_spi_irq",          51),
+        ("gpio_irq",              52),
+        ("usb_0_irq",             53),
+        ("ethernet_0_irq",        54),
+        ("ethernet_0_wakeup_irq", 55),
+        ("sdio_0_irq",            56),
+        ("i2c_0_irq",             57),
+        ("spi_0_irq",             58),
+        ("uart_0_irq",            59),
+        ("can_0_irq",             60),
+        ("fpga_0_irq",            61),
+        ("fpga_1_irq",            62),
+        ("fpga_2_irq",            63),
+        ("fpga_3_irq",            64),
+        ("fpga_4_irq",            65),
+        ("fpga_5_irq",            66),
+        ("fpga_6_irq",            67),
+        ("fpga_7_irq",            68),
+        ("ttc_0_1_irq",           69),
+        ("ttc_1_1_irq",           70),
+        ("ttc_2_1_irq",           71),
+        ("dmac_4_irq",            72),
+        ("dmac_5_irq",            73),
+        ("dmac_6_irq",            74),
+        ("dmac_7_irq",            75),
+        ("usb_1_irq",             76),
+        ("ethernet_1_irq",        77),
+        ("ethernet_1_wakeup_irq", 78),
+        ("sdio_1_irq",            79),
+        ("i2c_1_irq",             80),
+        ("spi_1_irq",             81),
+        ("uart_1_irq",            82),
+        ("can_1_irq",             83),
+        ("fpga_8_irq",            84),
+        ("fpga_9_irq",            85),
+        ("fpga_10_irq",           86),
+        ("fpga_11_irq",           87),
+        ("fpga_12_irq",           88),
+        ("fpga_13_irq",           89),
+        ("fpga_14_irq",           90),
+        ("fpga_15_irq",           91),
+        ("parity_irq",            92)
+    ]
 getPlatformInterruptMap TestPlatform = M.empty
 
 -- | The size of the interrupt table of the platform, which the runtime
@@ -175,7 +246,8 @@ defaultPlatformFlags :: PlatformFlags
 defaultPlatformFlags = PlatformFlags {
     rtems5_leon3_nexysa7      = defaultRTEMS5LEON3NEXYSA7Flags,
     posix_gcc              = defaultPOSIXGCCFlags,
-    freertos10_stm32l432xx = defaultFreeRTOS10STM32L432XXFlags
+    freertos10_stm32l432xx = defaultFreeRTOS10STM32L432XXFlags,
+    rtems6_zynq7000_pynqz2 = defaultRTEMS6ZYNQ7000PYNQZ2Flags
 }
 
 instance FromJSON PlatformFlags where
@@ -183,13 +255,15 @@ instance FromJSON PlatformFlags where
     PlatformFlags <$>
     o .:? "rtems5-leon3-nexysa7"      .!= defaultRTEMS5LEON3NEXYSA7Flags <*>
     o .:? "posix-gcc"              .!= defaultPOSIXGCCFlags <*>
-    o .:? "freertos10-stm32l432xx" .!= defaultFreeRTOS10STM32L432XXFlags
+    o .:? "freertos10-stm32l432xx" .!= defaultFreeRTOS10STM32L432XXFlags <*>
+    o .:? "rtems6-zynq7000-pynqz2" .!= defaultRTEMS6ZYNQ7000PYNQZ2Flags
   parseJSON _ = fail "Expected configuration object"
 
 instance Show Platform where
     show POSIXGCC = "posix-gcc"
     show RTEMS5LEON3NEXYSA7 = "rtems5-leon3-nexysa7"
     show FreeRTOS10STM32L432XX = "freertos-stm32l432xx"
+    show RTEMS6ZYNQ7000PYNQZ2 = "rtems6-zynq7000-pynqz2"
     show TestPlatform = "test-platform"
 
 instance ToJSON PlatformFlags where
@@ -198,21 +272,25 @@ instance ToJSON PlatformFlags where
             flagsRTEMSLEON3NEXYSA7
             flagsPOSIXGCC
             flagsFreeRTOS10STM32L432XX
+            flagsRTEMS6ZYNQ7000PYNQZ2
         ) = object [
             "rtems5-leon3-nexysa7"      .= flagsRTEMSLEON3NEXYSA7,
             "posix-gcc"              .= flagsPOSIXGCC,
-            "freertos10-stm32l432xx" .= flagsFreeRTOS10STM32L432XX
+            "freertos10-stm32l432xx" .= flagsFreeRTOS10STM32L432XX,
+            "rtems6-zynq7000-pynqz2" .= flagsRTEMS6ZYNQ7000PYNQZ2
         ]
 
 checkPlatform :: String -> Maybe Platform
 checkPlatform "posix-gcc" = Just POSIXGCC
 checkPlatform "rtems5-leon3-nexysa7" = Just RTEMS5LEON3NEXYSA7
 checkPlatform "freertos10-stm32l432xx" = Just FreeRTOS10STM32L432XX
+checkPlatform "rtems6-zynq7000-pynqz2" = Just RTEMS6ZYNQ7000PYNQZ2
 checkPlatform _ = Nothing
 
 supportedPlatforms :: [(Platform, String)]
 supportedPlatforms = [
         (POSIXGCC, "POSIX on GCC"),
         (RTEMS5LEON3NEXYSA7, "RTEMS version 5 for LEON3 Nexys A7 board"),
-        (FreeRTOS10STM32L432XX, "FreeRTOS V10 for STM32L432XX microcontroller")
+        (FreeRTOS10STM32L432XX, "FreeRTOS V10 for STM32L432XX microcontroller"),
+        (RTEMS6ZYNQ7000PYNQZ2, "RTEMS version 6 for Zynq-7000 PYNQ-Z2 board")
     ]
