@@ -17,7 +17,7 @@ import Text.Parsec (runParser)
 import Generator.LanguageC.Printer (runCPrinter)
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
-import Elaboration (provers, elaborateProgram)
+import Command.Common (constFolding, valueAnalysisCheck, sideEffectCheck)
 import Core.AST
 import Configuration.Configuration 
 import Configuration.Platform
@@ -86,20 +86,33 @@ typeSingleModule parsedModule = do
                     (sourcecode parsedModule)
                     (SemanticData typedProgram)
 
-printSourceModule :: Bool -> BasicBlocksModule -> IO ()
-printSourceModule debugBuild bbModule = do
-    let tAST = fst . elaborateProgram provers . loweredAST . metadata $ bbModule
+-- | Folds the constants of the module, analyses its values, elaborates its
+-- run-time checks and checks its side effects, as the build does, so the code
+-- generator receives the program it expects.
+elaborateSingleModule :: BasicBlocksModule -> IO ElaboratedModule
+elaborateSingleModule bbModule = do
+    let config = defaultConfig "test" TestPlatform
+        project = M.singleton (qualifiedName bbModule) bbModule
+    (foldedProject, constEnvs) <- constFolding config TestPlatform project
+    evidence <- valueAnalysisCheck TestPlatform constEnvs foldedProject
+    let (elaboratedProject, _) = elaborateProject evidence foldedProject
+    sideEffectCheck TestPlatform elaboratedProject
+    return $ elaboratedProject M.! qualifiedName bbModule
+
+printSourceModule :: Bool -> ElaboratedModule -> IO ()
+printSourceModule debugBuild eModule = do
+    let tAST = elaboratedAST . metadata $ eModule
         config = defaultConfig "test" TestPlatform
-    case runGenSourceFile config TestPlatform (qualifiedName bbModule) tAST of
+    case runGenSourceFile config TestPlatform (qualifiedName eModule) tAST of
         Left err -> die. errorMessage $ show err
         Right cSourceFile -> TIO.putStrLn $ runCPrinter debugBuild cSourceFile
 
-printHeaderModule :: Bool -> BasicBlocksModule -> IO ()
-printHeaderModule debugBuild bbModule = do
-    let tAST = fst . elaborateProgram provers . loweredAST . metadata $ bbModule
+printHeaderModule :: Bool -> ElaboratedModule -> IO ()
+printHeaderModule debugBuild eModule = do
+    let tAST = elaboratedAST . metadata $ eModule
         configParams = defaultConfig "test" TestPlatform
-        moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
-    case runGenHeaderFile configParams TestPlatform (qualifiedName bbModule) moduleDeps tAST emptyMonadicTypes of
+        moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules eModule
+    case runGenHeaderFile configParams TestPlatform (qualifiedName eModule) moduleDeps tAST emptyMonadicTypes of
         Left err -> die . errorMessage $ show err
         Right (cHeaderFile, _) -> TIO.putStrLn $ runCPrinter debugBuild cHeaderFile
 
@@ -129,12 +142,13 @@ tryCommand (TryCmdArgs targetFile noUsageChecking printHeader debugBuild) = do
                             TIO.putStrLn (toText err sourceFilesMap) >> exitFailure) 
                         $ boxUsageCheckModule bbModule
                 )
+            eModule <- elaborateSingleModule bbModule
             if printHeader then
                 -- | Print the resulting header file into the standard output
-                printHeaderModule debugBuild bbModule
+                printHeaderModule debugBuild eModule
             else
                 -- | Print the resulting source file into the standard output
-                printSourceModule debugBuild bbModule
+                printSourceModule debugBuild eModule
 
 
 
