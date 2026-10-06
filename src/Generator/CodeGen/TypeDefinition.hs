@@ -51,10 +51,16 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface Regular
     where
 
         genInterfaceProcedureField :: InterfaceMember' TerminaType expr SemanticAnn -> CGenerator CDeclaration
-        genInterfaceProcedureField (InterfaceProcedure _ak procedure params _modifiers _) = do
+        genInterfaceProcedureField (InterfaceProcedure ak procedure params _modifiers _) = do
             cParams <- mapM genCParameter params
-            let cEventParam = CParameter eventParam (_const . ptr $ _const termina__event_t)
-                cThisParam = CParameter thisParam (_const . ptr $ void)
+            -- | The pointer to the procedure takes the instance as the
+            -- procedure itself does: read only when the procedure takes
+            -- &self.
+            let cThisType = case ak of
+                    Immutable -> _const . ptr $ _const void
+                    _ -> _const . ptr $ void
+                cEventParam = CParameter eventParam (_const . ptr $ _const termina__event_t)
+                cThisParam = CParameter thisParam cThisType
                 cFuncPointerType = CTFunctionPointer (CTVoid noqual) (cEventParam : cThisParam : cParams) noqual
             return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
 genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface SystemInterface _)) (SemanticAnn (FTy (AccessPortField members)) _)) = do
