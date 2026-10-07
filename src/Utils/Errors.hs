@@ -131,21 +131,30 @@ errorToDiagnostics (AnnotatedError err pos) _files =
 
         diag = describe err
 
-        -- | The editor shows the explanation next to the title, without the
-        -- colour escapes the terminal reads. The title opens the message here
-        -- and opens a sentence, so it takes a capital: the terminal writes it
-        -- after "error [SE-150]: " and keeps it lowercase.
+        -- | The editor shows the explanation alone, without the colour escapes
+        -- the terminal reads, since it already says what the title says and the
+        -- code of the error goes next to it. An error with no explanation shows
+        -- its title, which opens the message here and so takes a capital: the
+        -- terminal writes it after "error [SE-150]: " and keeps it lowercase.
         message =
             case diagDetail diag of
                 Nothing -> capitalize (diagTitle diag) <> "."
-                Just detail -> capitalize (diagTitle diag) <> ".\n" <> stripAnsi detail
+                Just detail -> T.strip (stripAnsi detail)
 
         tags = [LSP.DiagnosticTag_Unnecessary | diagUnnecessary diag]
 
         related =
-            [ LSP.DiagnosticRelatedInformation lspLoc (stripAnsi what)
+            [ LSP.DiagnosticRelatedInformation lspLoc (relatedMessage what)
             | (loc, what) <- diagRelated diag
             , Just lspLoc <- [loc2Location loc] ]
+
+        -- | The terminal writes a related message before the excerpt of the
+        -- source it points at, so it may open with a line break and close with a
+        -- colon. The editor writes it after the link to the position, with no
+        -- excerpt below, as clangd and rust-analyzer do with theirs: without the
+        -- line break and the colon.
+        relatedMessage what =
+            capitalize (T.dropWhileEnd (== ':') (T.strip (stripAnsi what)))
 
 -- | The LSP location of a position in the source, which a related piece of
 -- information needs so that the editor can navigate to it.
