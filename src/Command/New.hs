@@ -63,7 +63,7 @@ showSupportedPlatforms =
 
 validateProjectName :: String -> IO ()
 validateProjectName project =
-    unless (all (\x -> isAlphaNum x || x == '_') project) (die . errorMessage $ "Project name must be alphanumeric")
+    unless (all (\x -> isAlphaNum x || x == '_' || x == '-') project) (die . errorMessage $ "Project name must contain only letters, digits, '_' and '-'")
 
 emptyAppModuleContent :: String -> String
 emptyAppModuleContent projectName = unlines [
