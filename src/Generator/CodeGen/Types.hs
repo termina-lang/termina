@@ -277,6 +277,10 @@ termina__exec__reboot :: CExpression
 termina__exec__reboot = "termina__exec__reboot" @:
     CTFunction void []
 
+termina__exec__handover :: CExpression
+termina__exec__handover = "termina__exec__handover" @:
+    CTFunction void []
+
 termina__pool__alloc :: CExpression
 termina__pool__alloc = "termina__pool__alloc" @:
     CTFunction void

@@ -69,7 +69,9 @@ elaborateElement ps element = case element of
   Function ident params mRet body modifiers ann ->
     Function ident params mRet
       <$> body' body <*> mapM modifier modifiers <*> pure ann
-  GlobalDeclaration global -> GlobalDeclaration <$> elaborateGlobal global
+  ExternFunction ident params mRet mode modifiers ann ->
+    ExternFunction ident params mRet mode <$> mapM modifier modifiers <*> pure ann
+  GlobalDeclaration global ->GlobalDeclaration <$> elaborateGlobal global
   TypeDefinition typeDef ann -> TypeDefinition <$> elaborateTypeDef typeDef <*> pure ann
 
   where
@@ -149,6 +151,7 @@ elabBasicBlock d bb = case bb of
   ReturnBlock mExpr ann -> ReturnBlock (expr <$> mExpr) ann
   ContinueBlock e ann -> ContinueBlock (expr e) ann
   RebootBlock ann -> RebootBlock ann
+  NoReturnCall e ann -> NoReturnCall (expr e) ann
   SystemCall obj ident args ann -> SystemCall (object obj) ident (map expr args) ann
 
   where

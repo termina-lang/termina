@@ -459,6 +459,7 @@ checkSimpleBlock bb = case bb of
   ReturnBlock mRet _             -> mapM_ checkFullExpression mRet
   ContinueBlock e _              -> checkFullExpression e
   RebootBlock _                  -> return ()
+  NoReturnCall e _               -> checkFullExpression e
   -- | The blocks that branch are walked by the shared skeleton.
   RegularBlock {}                -> return ()
   IfElseBlock {}                 -> return ()
@@ -496,6 +497,7 @@ mutableSelfMethodNames members = S.fromList
 checkElement :: AnnASTElement SemanticAnn -> SideEffectsMonad ()
 checkElement (Function ident _ps _ty body _mods _ann) =
     startCallable >> checkBlock body >> endFunction ident
+checkElement (ExternFunction {})                       = return ()
 checkElement (TypeDefinition tyDef _ann)               = checkTypeDef tyDef
 checkElement (GlobalDeclaration {})                    = return ()
 

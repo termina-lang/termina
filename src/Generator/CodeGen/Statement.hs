@@ -847,6 +847,12 @@ genBlocks (ContinueBlock expr ann) = do
     return [pre_cr (_return (Just cExpr)) |>> getLocation ann]
 genBlocks (RebootBlock ann) = do
     return [pre_cr $ termina__exec__reboot @@ [] |>> getLocation ann]
+genBlocks (NoReturnCall expr ann) = do
+    cExpr <- genExpression expr
+    return [
+            pre_cr $ termina__exec__handover @@ [] |>> getLocation ann,
+            no_cr cExpr |>> getLocation ann
+        ]
 genBlocks (SystemCall obj ident args ann) = do
     (cFuncType, _) <- case ann of
         SemanticAnn (ETy (AppType pts ts)) _ -> do

@@ -59,11 +59,11 @@ getGlobalTypeDef loc tid  = gets global >>=
 
 getFunctionTy :: Location 
   -> Identifier 
-  -> SemanticMonad ([Parameter SemanticAnn], TerminaType SemanticAnn, Location)
+  -> SemanticMonad ([Parameter SemanticAnn], TerminaType SemanticAnn, ReturnMode, Location)
 getFunctionTy loc iden =
   catchError (getGlobalEntry loc iden) (\_ -> throwError $ annotateError loc (EFunctionNotFound iden))
   >>= \case
-    LocatedElement (GFun (FunctionSeman args retty)) entryLoc -> do
+    LocatedElement (GFun (FunctionSeman args retty mode)) entryLoc -> do
       case entryLoc of
         Position qualifiedName _ _ -> do
           -- | Check that the type is defined in the current module
@@ -75,7 +75,7 @@ getFunctionTy loc iden =
             throwError $ annotateError loc (EFunctionNotInScope iden qualifiedName)
         _ -> return ()
       
-      return (args, retty, entryLoc)
+      return (args, retty, mode, entryLoc)
     LocatedElement _ entryLoc -> throwError $ annotateError loc (EGlobalNotFunction (iden, entryLoc))
 
 -- | Get the type definition of an enum type from the global environment.
@@ -135,7 +135,7 @@ insertGlobalTy loc tydef =
 
 insertGlobalFun :: Location -> Identifier -> [Parameter SemanticAnn] -> TerminaType SemanticAnn -> SemanticMonad ()
 insertGlobalFun loc ident ps rettype =
-  insertGlobal ident (LocatedElement (GFun (FunctionSeman ps rettype)) loc) (EUsedFunName ident)
+  insertGlobal ident (LocatedElement (GFun (FunctionSeman ps rettype Returns)) loc) (EUsedFunName ident)
 
 insertGlobal :: Identifier -> LocatedElement (GEntry SemanticAnn) -> (Location -> Error) -> SemanticMonad ()
 insertGlobal ident entry err =

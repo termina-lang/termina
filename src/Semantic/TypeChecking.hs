@@ -54,8 +54,22 @@ typeElement (Function ident ps_ts mts bret mds_ts anns) = do
       typedBret <- typeBlock mty bret
       return (ps_ty, typedBret)
   mds_ty <- typeModifiers anns typeGlobalObject mds_ts
-  let functionSeman = FunctionSeman ps_ty (fromMaybe TUnit mty)
+  let functionSeman = FunctionSeman ps_ty (fromMaybe TUnit mty) Returns
   return (Function ident ps_ty mty typedBret mds_ty (SemanticAnn (FnTy functionSeman) anns), LocatedElement (GFun functionSeman) anns)
+typeElement (ExternFunction ident ps_ts mts mode mds_ts anns) = do
+  -- A function that never comes back to the caller has nothing to return
+  when (mode == NoReturn && isJust mts) $
+    throwError $ annotateError anns (ENoReturnFunctionReturnType ident)
+  -- Check the return type and the parameters with the rules of a function
+  mty <- mapM (typeTypeSpecifier anns typeGlobalObject >=>
+      (\ty -> checkReturnType anns ty >> return ty)) mts
+  ps_ty <- localScope $ forM ps_ts (\param@(Parameter paramId _ pann) -> do
+      typedParam <- typeParameter anns param
+      insertLocalImmutObj pann paramId (paramType typedParam)
+      return typedParam)
+  mds_ty <- typeModifiers anns typeGlobalObject mds_ts
+  let functionSeman = FunctionSeman ps_ty (fromMaybe TUnit mty) mode
+  return (ExternFunction ident ps_ty mty mode mds_ty (SemanticAnn (FnTy functionSeman) anns), LocatedElement (GFun functionSeman) anns)
 typeElement (GlobalDeclaration gbl) = first GlobalDeclaration <$> typeGlobal gbl
 typeElement (TypeDefinition tydef ann) = do
   typed_tydef <- typeTypeDefinition ann tydef
@@ -75,6 +89,8 @@ semanticTypeDef (Interface kind i extends cls m) = Interface kind i extends cls 
 -- Adding Global elements to the environment.
 addElement :: SAST.AnnASTElement SemanticAnn -> LocatedElement (GEntry SemanticAnn) -> SemanticMonad ()
 addElement (Function ident _ _ _ _ _) el =
+  insertGlobal ident el (EUsedFunName ident)
+addElement (ExternFunction ident _ _ _ _ _) el =
   insertGlobal ident el (EUsedFunName ident)
 addElement (GlobalDeclaration glb) el =
   let global_name = getGlobalIdentifier glb in

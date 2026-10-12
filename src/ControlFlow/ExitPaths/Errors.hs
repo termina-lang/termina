@@ -19,6 +19,8 @@ data ExitCheckError =
     | EEActionIfBlockMissingElseExit -- ^ Missing else exit on an action if block (EE-011)
     | EEInvalidReboot -- ^ Invalid reboot statement (EE-012)
     | EEActionInvalidReboot -- ^ Invalid reboot statement on an action (EE-013)
+    | EEInvalidNoReturnCall -- ^ Invalid call to a noreturn function (EE-014)
+    | EEActionInvalidNoReturnCall -- ^ Invalid call to a noreturn function on an action (EE-015)
     deriving (Show)
 
 type PathsCheckError = AnnotatedError ExitCheckError Location
@@ -77,6 +79,14 @@ instance Diagnosable ExitCheckError where
         diagnostic "EE-013" "invalid reboot statement on an action"
             ("Invalid reboot statement.\n" <>
                 "Reboot statements are only allowed as the last statement of an execution path of an action.")
+    describe EEInvalidNoReturnCall =
+        diagnostic "EE-014" "invalid call to a noreturn function"
+            ("Invalid call to a noreturn function.\n" <>
+                "Calls to noreturn functions are only allowed inside actions.")
+    describe EEActionInvalidNoReturnCall =
+        diagnostic "EE-015" "invalid call to a noreturn function on an action"
+            ("Invalid call to a noreturn function.\n" <>
+                "Calls to noreturn functions are only allowed as the last statement of an execution path of an action.")
     describe EEInvalidCheckState = diagnosticWithoutDetail "Internal" "internal error"
 
 instance ErrorMessage PathsCheckError where

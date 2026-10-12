@@ -60,6 +60,7 @@ declaredNames = foldr addName M.empty
 
     addName :: AnnASTElement' ty expr blk Location -> DeclaredEnv -> DeclaredEnv
     addName element'@(Function ident _ _ _ _ _) = M.insert ident (getAnnotation element')
+    addName element'@(ExternFunction ident _ _ _ _ _) = M.insert ident (getAnnotation element')
     addName element'@(GlobalDeclaration glb) = M.insert (getGlobalIdentifier glb) (getAnnotation element')
     addName element'@(TypeDefinition tydef _) = M.insert (getTypeIdentifier tydef) (getAnnotation element')
 
@@ -74,10 +75,10 @@ stdlibGlobalEnv outBufSize inBufSize =
     -- | Floating-point bit reinterpretation. These are Prelude functions whose
     -- body is provided by the OSAL (memcpy-based static inline). They lower to a
     -- direct C call of the same name.
-    ("f32_to_bits", LocatedElement (GFun (FunctionSeman [builtinParameter "value" TFloat32] TUInt32)) Internal),
-    ("f32_from_bits", LocatedElement (GFun (FunctionSeman [builtinParameter "bits" TUInt32] TFloat32)) Internal),
-    ("f64_to_bits", LocatedElement (GFun (FunctionSeman [builtinParameter "value" TFloat64] TUInt64)) Internal),
-    ("f64_from_bits", LocatedElement (GFun (FunctionSeman [builtinParameter "bits" TUInt64] TFloat64)) Internal),
+    ("f32_to_bits", LocatedElement (GFun (FunctionSeman [builtinParameter "value" TFloat32] TUInt32 Returns)) Internal),
+    ("f32_from_bits", LocatedElement (GFun (FunctionSeman [builtinParameter "bits" TUInt32] TFloat32 Returns)) Internal),
+    ("f64_to_bits", LocatedElement (GFun (FunctionSeman [builtinParameter "value" TFloat64] TUInt64 Returns)) Internal),
+    ("f64_from_bits", LocatedElement (GFun (FunctionSeman [builtinParameter "bits" TUInt64] TFloat64 Returns)) Internal),
     ("TimeVal", LocatedElement (GType (Struct "TimeVal" [FieldDefinition "tv_sec" TUInt32 (buildExpAnn Internal TUInt32), FieldDefinition "tv_usec" TUInt32 (buildExpAnn Internal TUInt32)] [])) Internal),
     ("Interrupt", LocatedElement (GType (Class EmitterClass "Interrupt" [] [] [])) Internal),
     ("PeriodicTimer", LocatedElement (GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (TStruct "TimeVal") (buildExpAnn Internal (TStruct "TimeVal")))] [] [])) Internal),

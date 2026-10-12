@@ -1,0 +1,17 @@
+extern noreturn function jump_to_image(entry : usize);
+
+task class foo {
+
+    snk : sink u32 triggers action0;
+
+    action action0(&priv self, data : u32) -> Status<i32> {
+
+        var st : Status<i32> = Success;
+
+        jump_to_image(data as usize);
+
+        return st;
+
+    }
+
+};

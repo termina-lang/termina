@@ -993,6 +993,28 @@ typeAssignmentExpression expectedType typeObj expr = do
   catchExpectedCopy loc EInvalidAssignmentExprType (copyTyOrFail loc expr_type)
   return typed_expr
 
+-- | Type a call to a global function, once the caller has looked the function
+-- up and decided that the call may appear where it is.
+typeFunctionCall ::
+  Maybe (SAST.TerminaType SemanticAnn)
+  -> Identifier
+  -> [SAST.Parameter SemanticAnn] -- ^ parameters of the function
+  -> SAST.TerminaType SemanticAnn -- ^ return type of the function
+  -> Location -- ^ where the function is declared
+  -> [Expression ParserAnn] -- ^ arguments of the call
+  -> ParserAnn
+  -> SemanticMonad (SAST.Expression SemanticAnn)
+typeFunctionCall expectedType ident ps retty funcLocation args ann = do
+  let expAnn = buildExpAnnApp ann ps retty
+      (psLen , asLen) = (length ps, length args)
+  -- Check that the number of parameters are OK
+  when (psLen < asLen) (throwError $ annotateError ann (EFunctionCallExtraArgs (ident, ps, funcLocation) (fromIntegral asLen)))
+  when (psLen > asLen) (throwError $ annotateError ann (EFunctionCallMissingArgs (ident, ps, funcLocation) (fromIntegral asLen)))
+  typed_args <- localScope $ zipWithM (\(p, idx) e -> catchMismatch ann (EFunctionCallArgTypeMismatch (ident, p, funcLocation) idx)
+      (typeExpression (Just (paramType p)) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
+  mapM_ (flip (sameTyOrError ann) retty) expectedType
+  return $ SAST.FunctionCall ident typed_args expAnn
+
 -- | Function |typeExpression| takes an expression from the parser, traverse it
 -- annotating each node with its type.
 -- Since we are also creating new nodes (|Unbox| annotations), instead of just
@@ -1407,16 +1429,12 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
 ---------------------------------------
 -- | Function Expression.  A tradicional function call
 typeExpression expectedType _ (FunctionCall ident args ann) = do
-  (ps, retty, funcLocation) <- getFunctionTy ann ident
-  let expAnn = buildExpAnnApp ann ps retty
-      (psLen , asLen) = (length ps, length args)
-  -- Check that the number of parameters are OK
-  when (psLen < asLen) (throwError $ annotateError ann (EFunctionCallExtraArgs (ident, ps, funcLocation) (fromIntegral asLen)))
-  when (psLen > asLen) (throwError $ annotateError ann (EFunctionCallMissingArgs (ident, ps, funcLocation) (fromIntegral asLen)))
-  typed_args <- localScope $ zipWithM (\(p, idx) e -> catchMismatch ann (EFunctionCallArgTypeMismatch (ident, p, funcLocation) idx)
-      (typeExpression (Just (paramType p)) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
-  mapM_ (flip (sameTyOrError ann) retty) expectedType
-  return $ SAST.FunctionCall ident typed_args expAnn
+  (ps, retty, mode, funcLocation) <- getFunctionTy ann ident
+  -- | A call that never comes back has no value, and the statement that
+  -- makes it is the only place it may appear (see typeNoReturnCall)
+  when (mode == NoReturn) $
+    throwError $ annotateError ann (ENoReturnCallInExpression (ident, funcLocation))
+  typeFunctionCall expectedType ident ps retty funcLocation args ann
 
 ----------------------------------------
 typeExpression expectedType typeObj (MemberFunctionCall obj ident args ann) = do
@@ -1433,7 +1451,7 @@ typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann)
       -- NOTE: We have reused the code from MemberFunctionCall, but we must take into
       -- account that, for the time being, when we are accessing a member function through
       -- a reference, the object (self) can only be of a user-defined class type. There
-      -- cannot be references to ports. 
+      -- cannot be references to ports.
       ((ps, typed_args), fty) <- typeMemberFunctionCall ann ak rTy ident args
       mapM_ (flip (sameTyOrError ann) fty) expectedType
       return $ SAST.DerefMemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)

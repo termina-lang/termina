@@ -416,7 +416,7 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
 
         genTaskFunctionDeclaration :: CGenerator CFileItem
         genTaskFunctionDeclaration = do
-            return $ CExtDecl (CEDFunction Nothing void (terminafy ("task_entry" <::> identifier)) [
+            return $ CExtDecl (CEDFunction Nothing [] void (terminafy ("task_entry" <::> identifier)) [
                     CDecl (CTypeSpec (_const . ptr $ void)) (Just "arg") Nothing
                 ]) (buildDeclarationAnn ann True)
 
@@ -445,7 +445,7 @@ genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier _ _ _) an
             cEventParam <- getEventParam
             cSelfParam <- genConstSelfParam clsdef
             clsFuncName <- genClassFunctionName identifier viewer
-            return $ CExtDecl (CEDFunction storage retType clsFuncName (cEventParam : cSelfParam : cParamDecls)) (buildDeclarationAnn ann True)
+            return $ CExtDecl (CEDFunction storage [] retType clsFuncName (cEventParam : cSelfParam : cParamDecls)) (buildDeclarationAnn ann True)
         ClassProcedure ak procedure params _ _ -> do
             cParamDecls <- mapM genParameterDeclaration params
             cEventParam <- getEventParam
@@ -453,7 +453,7 @@ genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier _ _ _) an
                 Immutable -> genConstThisParam
                 _ -> genThisParam
             clsFuncName <- genClassFunctionName identifier procedure
-            return $ CExtDecl (CEDFunction storage void clsFuncName (cEventParam : cThisParam : cParamDecls)) (buildDeclarationAnn ann True)
+            return $ CExtDecl (CEDFunction storage [] void clsFuncName (cEventParam : cThisParam : cParamDecls)) (buildDeclarationAnn ann True)
         ClassMethod ak method params rts _ _ -> do
             cParamDecls <- mapM genParameterDeclaration params
             retType <- maybe (return (CTVoid noqual)) (genType noqual) rts
@@ -462,7 +462,7 @@ genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier _ _ _) an
             cSelfParam <- case ak of
                 Immutable -> genConstSelfParam clsdef
                 _ -> genSelfParam clsdef
-            return $ CExtDecl (CEDFunction storage retType clsFuncName ([cEventParam, cSelfParam] ++ cParamDecls)) (buildDeclarationAnn ann True)
+            return $ CExtDecl (CEDFunction storage [] retType clsFuncName ([cEventParam, cSelfParam] ++ cParamDecls)) (buildDeclarationAnn ann True)
         ClassAction ak action param rts _ _ -> do
             retType <- genType noqual rts
             cEventParam <- getEventParam
@@ -473,9 +473,9 @@ genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier _ _ _) an
             case param of
                 Just p -> do
                     cParamDecl <- genParameterDeclaration p
-                    return $ CExtDecl (CEDFunction storage retType clsFuncName [cEventParam, cThisParam, cParamDecl]) (buildDeclarationAnn ann True)
+                    return $ CExtDecl (CEDFunction storage [] retType clsFuncName [cEventParam, cThisParam, cParamDecl]) (buildDeclarationAnn ann True)
                 Nothing ->
-                    return $ CExtDecl (CEDFunction storage retType clsFuncName [cEventParam, cThisParam]) (buildDeclarationAnn ann True)
+                    return $ CExtDecl (CEDFunction storage [] retType clsFuncName [cEventParam, cThisParam]) (buildDeclarationAnn ann True)
         _ -> throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
 
     where

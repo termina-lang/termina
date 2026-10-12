@@ -20,6 +20,7 @@ doesBlockExit :: BasicBlock SemanticAnn -> Bool
 doesBlockExit (ReturnBlock {}) = True
 doesBlockExit (ContinueBlock {}) = True
 doesBlockExit (RebootBlock {}) = True
+doesBlockExit (NoReturnCall {}) = True
 doesBlockExit (IfElseBlock (CondIf _ ifBlocks _) elseIfBlocks (Just (CondElse elseBlocks _)) _) =
     let
         -- | Check the exit of the if block
@@ -67,7 +68,8 @@ checkBlockPaths loc stmts = do
                 (ReturnBlock _ ann: _) -> throwError $ annotateError (getLocation ann) EEInvalidReturn
                 (ContinueBlock _ ann : _) -> throwError $ annotateError (getLocation ann) EEInvalidContinue
                 (RebootBlock ann : _) -> throwError $ annotateError (getLocation ann) EEInvalidReboot
-                (IfElseBlock (CondIf _ ifBlocks _) elseIfBlocks (Just elseBlocks) _ : xb) -> 
+                (NoReturnCall _ ann : _) -> throwError $ annotateError (getLocation ann) EEInvalidNoReturnCall
+                (IfElseBlock (CondIf _ ifBlocks _) elseIfBlocks (Just elseBlocks) _ : xb) ->
                     checkBlockPaths loc (reverse (blockBody ifBlocks)) >> 
                     mapM_
                         (\(CondElseIf _ elifBlocks ann') -> 
@@ -115,6 +117,9 @@ checkActionPaths loc stmts = do
                         RebootBlock {} ->
                             -- | The rest of the blocks shall not exit
                             setAllowedSend >> checkActionPaths loc xb
+                        NoReturnCall {} ->
+                            -- | The rest of the blocks shall not exit
+                            setAllowedSend >> checkActionPaths loc xb
                         blk@(IfElseBlock (CondIf _ ifBlocks _) elseIfBlocks (Just (CondElse elseBlocks _)) ann) ->
                             if not (doesBlockExit blk) then
                                 throwError $ annotateError (getLocation ann) EEActionIfBlockShallExit
@@ -154,6 +159,7 @@ checkActionPaths loc stmts = do
                         ReturnBlock _ ann -> throwError $ annotateError (getLocation ann) EEInvalidReturn
                         ContinueBlock _ ann -> throwError $ annotateError (getLocation ann) EEActionInvalidContinue
                         RebootBlock ann -> throwError $ annotateError (getLocation ann) EEActionInvalidReboot
+                        NoReturnCall _ ann -> throwError $ annotateError (getLocation ann) EEActionInvalidNoReturnCall
                         SendMessage {} ->
                             -- | The rest of the blocks shall not exit
                             setAllowedSend >> checkActionPaths loc xb
@@ -201,7 +207,10 @@ checkActionPaths loc stmts = do
                         ContinueBlock {} -> 
                             -- | The rest of the blocks shall not exit
                             setAllowedSend >> checkActionPaths loc xb
-                        RebootBlock {} -> 
+                        RebootBlock {} ->
+                            -- | The rest of the blocks shall not exit
+                            setAllowedSend >> checkActionPaths loc xb
+                        NoReturnCall {} ->
                             -- | The rest of the blocks shall not exit
                             setAllowedSend >> checkActionPaths loc xb
                         SendMessage {} ->
@@ -241,6 +250,7 @@ checkActionPaths loc stmts = do
                         ReturnBlock _ ann -> throwError $ annotateError (getLocation ann) EEInvalidReturn
                         ContinueBlock _ ann -> throwError $ annotateError (getLocation ann) EEActionInvalidContinue
                         RebootBlock ann -> throwError $ annotateError (getLocation ann) EEActionInvalidReboot
+                        NoReturnCall _ ann -> throwError $ annotateError (getLocation ann) EEActionInvalidNoReturnCall
                         SendMessage {} ->
                             -- | The rest of the blocks shall not exit
                             checkActionPaths loc xb
@@ -279,6 +289,7 @@ checkActionPaths loc stmts = do
                 (SendMessage _ _ ann : _) -> throwError $ annotateError (getLocation ann) EEActionInvalidSend
                 (ContinueBlock _ ann : _) -> throwError $ annotateError (getLocation ann) EEActionInvalidContinue
                 (RebootBlock ann : _) -> throwError $ annotateError (getLocation ann) EEActionInvalidReboot
+                (NoReturnCall _ ann : _) -> throwError $ annotateError (getLocation ann) EEActionInvalidNoReturnCall
                 (IfElseBlock (CondIf _ ifBlocks _) elseIfBlocks (Just (CondElse elseBlocks _)) _ : xb) -> 
                     checkActionPaths loc (reverse (blockBody ifBlocks)) >> 
                     mapM_
@@ -323,6 +334,7 @@ checkExitPathTypeDef (Interface {}) = return ()
 checkExitPathAnnASTElement :: AnnASTElement SemanticAnn -> BBPathsCheck ()
 checkExitPathAnnASTElement (Function _name _args _retType (Block body _) _modifiers ann) = 
     void $ setMustExit >> checkBlockPaths (getLocation ann) (reverse body)
+checkExitPathAnnASTElement (ExternFunction {}) = return ()
 checkExitPathAnnASTElement (GlobalDeclaration {}) = return ()
 checkExitPathAnnASTElement (TypeDefinition typeDef _ann) =
     checkExitPathTypeDef typeDef

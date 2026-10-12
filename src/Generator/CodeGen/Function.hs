@@ -18,7 +18,12 @@ genFunctionDecl :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genFunctionDecl (Function identifier parameters rts _ _ ann) = do
     cRetType <- maybe (return (CTVoid noqual)) (genType noqual) rts
     cParamDecls <- mapM genParameterDeclaration parameters
-    return [CExtDecl (CEDFunction Nothing cRetType identifier cParamDecls) (buildDeclarationAnn ann True)]
+    return [CExtDecl (CEDFunction Nothing [] cRetType identifier cParamDecls) (buildDeclarationAnn ann True)]
+genFunctionDecl (ExternFunction identifier parameters rts mode _ ann) = do
+    cRetType <- maybe (return (CTVoid noqual)) (genType noqual) rts
+    cParamDecls <- mapM genParameterDeclaration parameters
+    let funspecs = [CNoReturn | mode == NoReturn]
+    return [CExtDecl (CEDFunction Nothing funspecs cRetType identifier cParamDecls) (buildDeclarationAnn ann True)]
 genFunctionDecl item = throwError $ InternalError $ "Not a function: " ++ show item
 
 genFunction :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]

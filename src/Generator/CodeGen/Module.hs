@@ -35,12 +35,14 @@ genHeaderASTElement typedef@(TypeDefinition {}) = genTypeDefinitionDecl typedef
 genHeaderASTElement glb@(GlobalDeclaration {}) = genGlobalDecl glb
 genHeaderASTElement func@(Function {}) = do
     genFunctionDecl func
+genHeaderASTElement func@(ExternFunction {}) = genFunctionDecl func
 
 genSourceASTElement :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genSourceASTElement typedef@(TypeDefinition (Class {}) _) = genClassDefinition typedef
 genSourceASTElement (TypeDefinition {}) = return []
 genSourceASTElement glb@(GlobalDeclaration {}) = genGlobal glb
 genSourceASTElement func@(Function {}) = genFunction func
+genSourceASTElement (ExternFunction {}) = return []
 
 genHeaderFile ::
     -- | Include option.h

@@ -127,6 +127,10 @@ data BasicBlock' ty expr obj a =
         (expr a)
         a
     | RebootBlock a
+    -- | Call to an extern noreturn function
+    | NoReturnCall
+        (expr a) -- ^ call expression
+        a
     -- | System call
     | SystemCall
         (obj a) -- ^ access port
@@ -182,6 +186,7 @@ simpleBlockChildren bb = case bb of
   ReturnBlock mExpr _ -> Just (map ChildExpr (maybeToList mExpr))
   ContinueBlock expr _ -> Just [ChildExpr expr]
   RebootBlock _ -> Just []
+  NoReturnCall expr _ -> Just [ChildExpr expr]
   IfElseBlock {} -> Nothing
   ForLoopBlock {} -> Nothing
   MatchBlock {} -> Nothing

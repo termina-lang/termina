@@ -59,6 +59,8 @@ lexer = Tok.makeTokenParser langDef
       ++ -- Global declarations
               -- Global declarations
              ["task", "function", "handler", "resource", "const", "constexpr"]
+      ++ -- Functions implemented in C
+             ["extern", "noreturn"]
       ++ -- Stmt
               -- Stmt
              ["var", "let", "match", "case", "for", "if", "else", "return", "continue", "while"]
@@ -853,6 +855,28 @@ functionParser = do
   blockRet <- blockParser
   Function name params typeSpec blockRet modifiers . Position current startPos <$> getPosition
 
+-- | Declaration of a function implemented in C:
+-- @extern function name(params) -> ty;@ or
+-- @extern noreturn function name(params);@. The parser accepts a return type
+-- on a noreturn function so that the type checker can say what is wrong with
+-- it.
+externFunctionParser :: TerminaParser (AnnASTElement ParserAnn)
+externFunctionParser = do
+  current <- getState
+  modifiers <- many modifierParser
+  startPos <- getPosition
+  reserved "extern"
+  returnMode <- option Returns (NoReturn <$ reserved "noreturn")
+  reserved "function"
+  name <- identifierParser
+  params <- parens (sepBy parameterParser comma)
+  typeSpec <- optionMaybe (do
+    reservedOp "->"
+    typeSpecifierParser)
+  endPos <- getPosition
+  _ <- semi
+  return $ ExternFunction name params typeSpec returnMode modifiers (Position current startPos endPos)
+
 constLiteralParser :: TerminaParser (Const ParserAnn)
 constLiteralParser = try parseLitFloat <|> parseLitInteger <|> parseLitBool <|> parseLitChar <|> parseLitNull
   where
@@ -1359,7 +1383,7 @@ enumDefinitionParser = do
 -- | Top Level parser
 topLevel :: TerminaParser (AnnotatedProgram ParserAnn)
 topLevel = many $
-  try functionParser <|> try globalDeclParser
+  try functionParser <|> try externFunctionParser <|> try globalDeclParser
   <|> try typeDefintionParser
 
 moduleIdentifierParser :: TerminaParser [ String ]

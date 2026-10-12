@@ -103,6 +103,7 @@ indexModule program =
 
         topLevelOf :: SAST.AnnASTElement SemanticAnn -> [(Identifier, Location)]
         topLevelOf (SAST.Function ident _ _ _ _ ann) = [(ident, getLocation ann)]
+        topLevelOf (SAST.ExternFunction ident _ _ _ _ ann) = [(ident, getLocation ann)]
         topLevelOf (SAST.GlobalDeclaration glb) = [(globalName glb, getLocation (getAnnotation glb))]
         topLevelOf (SAST.TypeDefinition tydef ann) = [(typeName tydef, getLocation ann)]
 
@@ -148,6 +149,7 @@ indexModule program =
 
         elemRefs :: SAST.AnnASTElement SemanticAnn -> [Entry]
         elemRefs (SAST.Function _ params _ body _ _) = blockRefs (paramsEnv params) body
+        elemRefs (SAST.ExternFunction {}) = []
         elemRefs (SAST.GlobalDeclaration glb) = globalRefs glb
         elemRefs (SAST.TypeDefinition (SAST.Class _ _ members _ _) _) =
             concatMap classMemberRefs members

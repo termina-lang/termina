@@ -88,6 +88,15 @@ data AnnASTElement' ty expr blk a =
     [Modifier' expr a] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
 
+  -- | Declaration of a function implemented in C, outside Termina
+  | ExternFunction
+    Identifier -- ^ function identifier, which is also the C symbol
+    [Parameter' ty a] -- ^ list of parameters (possibly empty)
+    (Maybe (ty a)) -- ^ type of the return value (optional)
+    ReturnMode -- ^ whether a call comes back to the caller
+    [Modifier' expr a] -- ^ list of possible modifiers
+    a -- ^ transpiler annotations
+
   -- | Global declaration constructor
   | GlobalDeclaration
     (Global' ty expr a) -- ^ the global object
@@ -101,11 +110,13 @@ data AnnASTElement' ty expr blk a =
 instance Annotated (AnnASTElement' ty expr blk) where
   getAnnotation :: AnnASTElement' ty expr blk a -> a
   getAnnotation (Function _ _ _ _ _ a) = a
+  getAnnotation (ExternFunction _ _ _ _ _ a) = a
   getAnnotation (GlobalDeclaration glb) =  getAnnotation glb
   getAnnotation (TypeDefinition _ a) =  a
 
   updateAnnotation :: AnnASTElement' ty expr blk a -> a -> AnnASTElement' ty expr blk a
   updateAnnotation (Function n p r b m _) = Function n p r b m
+  updateAnnotation (ExternFunction n p r k m _) = ExternFunction n p r k m
   updateAnnotation (GlobalDeclaration glb) = GlobalDeclaration . updateAnnotation glb
   updateAnnotation (TypeDefinition t _) = TypeDefinition t
 
@@ -114,6 +125,12 @@ data ModuleImport' pf a = ModuleImport
   , moduleAnn :: a
   }
   deriving (Functor, Show)
+
+-- | Whether a call to a function comes back to the caller. Only an extern
+-- function can be declared @noreturn@: it hands control to software outside
+-- Termina, and its calls are placed like a @reboot@.
+data ReturnMode = Returns | NoReturn
+  deriving (Show, Eq)
 
 -- | Modifier data type
 -- Modifiers can be applied to different constructs. They must include

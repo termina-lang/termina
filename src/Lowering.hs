@@ -36,6 +36,8 @@ appendRegularBlock acc currBlock [] =
     return $ currBlock : acc
 appendRegularBlock acc currBlock@(RegularBlock currStmts) (stmt : xs) =
     case stmt of
+        SAST.SingleExpStmt _ (SemanticAnn (STy NoReturnCallStmtType) _) ->
+            lowerStatements (currBlock : acc) (stmt : xs)
         SAST.SingleExpStmt expr ann ->
             case expr of
                 SAST.MemberFunctionCall obj _ _ _ -> do
@@ -78,6 +80,8 @@ lowerStatements acc [] =
     return acc
 lowerStatements acc (stmt : xs) =
     case stmt of
+        SAST.SingleExpStmt expr ann@(SemanticAnn (STy NoReturnCallStmtType) _) ->
+            lowerStatements (NoReturnCall expr ann : acc) xs
         -- | Procedure calls are always a single statement, since they do not
         -- return any value.  For those cases, we shall create a new single
         -- block that will depend on the type of the object and the procedure or
@@ -258,6 +262,8 @@ lowerElement :: SAST.AnnASTElement SemanticAnn -> LoweringMonad (AnnASTElement S
 lowerElement (SAST.Function name args retType body modifiers ann) = do
     bRet <- lowerBlock body
     return $ Function name args retType bRet modifiers ann
+lowerElement (SAST.ExternFunction name args retType mode modifiers ann) =
+    return $ ExternFunction name args retType mode modifiers ann
 lowerElement (SAST.GlobalDeclaration global) =
     return $ GlobalDeclaration global
 lowerElement (SAST.TypeDefinition typeDef ann) = do

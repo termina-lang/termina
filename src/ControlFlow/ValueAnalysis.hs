@@ -1076,6 +1076,7 @@ checkReturning name body = do
 
 checkElement :: AnnASTElement SemanticAnn -> ValueAnalysisMonad ()
 checkElement (Function ident _ps _mTy body _mods _ann) = checkReturning ident body
+checkElement (ExternFunction {}) = return ()
 checkElement (TypeDefinition tyDef _ann) = checkTypeDef tyDef
 checkElement (GlobalDeclaration {}) = return ()
 

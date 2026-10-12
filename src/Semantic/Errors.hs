@@ -272,6 +272,8 @@ data Error
   | EEmitterOnlyForHandler Identifier Identifier HandlerOnlyBecause -- ^ Emitter that only a handler may attend, connected to something else (SE-219)
   | EMissingTaskPriority Identifier -- ^ Task declared without a priority (SE-222)
   | EDuplicatedModifier Identifier -- ^ Modifier that appears more than once on the same declaration (SE-223)
+  | ENoReturnCallInExpression (Identifier, Location) -- ^ Call to a noreturn function inside an expression (SE-224)
+  | ENoReturnFunctionReturnType Identifier -- ^ Noreturn function declared with a return type (SE-225)
   deriving Show
 
 -- | Why an emitter takes a handler and not a task.
@@ -1034,6 +1036,13 @@ instance Diagnosable Error where
     describe (EDuplicatedModifier modifier) =
         diagnostic "SE-223" "duplicated modifier"
             ("The modifier \x1b[31m" <> T.pack modifier <> "\x1b[0m appears more than once on this declaration.")
+    describe (ENoReturnCallInExpression (ident, funcPos)) =
+        relatedTo funcPos "the function is declared here" $
+        diagnostic "SE-224" "noreturn function called inside an expression"
+            ("The function \x1b[31m" <> T.pack ident <> "\x1b[0m is declared noreturn, so a call to it never comes back to the caller.\n" <> "It can only be called as a statement of its own.")
+    describe (ENoReturnFunctionReturnType ident) =
+        diagnostic "SE-225" "noreturn function with a return type"
+            ("The extern function \x1b[31m" <> T.pack ident <> "\x1b[0m is declared noreturn and cannot have a return type.")
 
     -- | The two clauses below pick their detail with a case, which the script
     -- that moved the rest of this table does not read, so they were moved by

@@ -31,6 +31,7 @@ data ExprSeman a
 
 data StmtSeman a
   = SimpleStmtType -- ^ Statement with no type
+    | NoReturnCallStmtType -- ^ Call to an extern noreturn function
     | MatchCaseStmtType [TerminaType a] -- ^ Match case with types
     | PortConnection (ConnectionSeman a)
   deriving (Show, Functor)
@@ -38,7 +39,7 @@ data StmtSeman a
 data ProcedureSeman a = ProcedureSeman Identifier [Parameter a] [Modifier a]
   deriving (Show, Functor)
 
-data FunctionSeman a = FunctionSeman [Parameter a] (TerminaType a)
+data FunctionSeman a = FunctionSeman [Parameter a] (TerminaType a) ReturnMode
   deriving (Show, Functor)
 
 data ConnectionSeman a =
@@ -215,6 +216,9 @@ buildTypeAnn = SemanticAnn TTy
 
 buildStmtAnn :: Location -> SemanticAnn
 buildStmtAnn = SemanticAnn (STy SimpleStmtType)
+
+buildNoReturnCallStmtAnn :: Location -> SemanticAnn
+buildNoReturnCallStmtAnn = SemanticAnn (STy NoReturnCallStmtType)
 
 buildStmtMatchCaseAnn :: Location -> [TerminaType SemanticAnn] -> SemanticAnn
 buildStmtMatchCaseAnn loc ts = SemanticAnn (STy (MatchCaseStmtType ts)) loc

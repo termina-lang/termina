@@ -443,6 +443,7 @@ checkTypeDef _ = return ()
 
 checkElement :: AnnASTElement SemanticAnn -> VarUsageMonad ()
 checkElement (Function _ident ps _ty body _mods ann) = checkBody ps (getLocation ann) body
+checkElement (ExternFunction {}) = return ()
 checkElement (TypeDefinition tyDef _ann) = checkTypeDef tyDef
 checkElement (GlobalDeclaration {}) = return ()
 

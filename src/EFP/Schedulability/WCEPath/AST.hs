@@ -68,6 +68,11 @@ data WCEPathBlock a
         BlockPosition
         a
     | WCEPReboot BlockPosition a
+    -- | Call to an extern noreturn function
+    | WCEPNoReturnCall
+        Identifier -- ^ Function name
+        BlockPosition
+        a
     -- | System call
     | WCEPSystemCall 
         Identifier

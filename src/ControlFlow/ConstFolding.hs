@@ -155,6 +155,7 @@ foldAnnotation (SemanticAnn (FTy (AccessPortField ifaces)) exprLoc) = do
   ifaces' <- mapM foldInterfaceMember ifaces
   return $ SemanticAnn (FTy (AccessPortField ifaces')) exprLoc
 foldAnnotation ann@(SemanticAnn (STy SimpleStmtType) _) = return ann
+foldAnnotation ann@(SemanticAnn (STy NoReturnCallStmtType) _) = return ann
 foldAnnotation (SemanticAnn (STy (MatchCaseStmtType tys)) exprLoc) = do
   tys' <- mapM (foldType exprLoc) tys
   return $ SemanticAnn (STy (MatchCaseStmtType tys')) exprLoc
@@ -193,10 +194,10 @@ foldAnnotation (SemanticAnn (GTy ty) loc) = do
   ty' <- foldType loc ty
   return $ SemanticAnn (GTy ty') loc
 foldAnnotation ann@(SemanticAnn TTy _) = return ann
-foldAnnotation (SemanticAnn (FnTy (FunctionSeman params rty)) loc) = do
+foldAnnotation (SemanticAnn (FnTy (FunctionSeman params rty mode)) loc) = do
   rty' <- foldType loc rty
   params' <- mapM (foldParam loc) params
-  return $ SemanticAnn (FnTy (FunctionSeman params' rty')) loc
+  return $ SemanticAnn (FnTy (FunctionSeman params' rty' mode)) loc
 
 foldFieldValueAssignment :: FieldAssignment SemanticAnn -> ConstFoldMonad (FieldAssignment SemanticAnn)
 foldFieldValueAssignment (FieldValueAssignment ident expr ann) = do
@@ -611,6 +612,10 @@ foldBasicBlock (ContinueBlock expr ann) = do
 foldBasicBlock (RebootBlock ann) = do
   ann' <- foldAnnotation ann
   return $ RebootBlock ann'
+foldBasicBlock (NoReturnCall expr ann) = do
+  ann' <- foldAnnotation ann
+  expr' <- foldExpression expr
+  return $ NoReturnCall expr' ann'
 foldBasicBlock (SystemCall obj ident exprs ann) = do
   ann' <- foldAnnotation ann
   obj' <- foldObject obj
@@ -853,6 +858,12 @@ foldElement (Function ident params mrty body mods ann) = do
   mrty' <- mapM (foldType funLoc) mrty
   body' <- foldBasicBlocks body
   return $ Function ident params' mrty' body' mods ann'
+foldElement (ExternFunction ident params mrty mode mods ann) = do
+  let funLoc = getLocation ann
+  ann' <- foldAnnotation ann
+  params' <- mapM (foldParam funLoc) params
+  mrty' <- mapM (foldType funLoc) mrty
+  return $ ExternFunction ident params' mrty' mode mods ann'
 
 constFoldModule :: BasicBlocksModule -> ConstFoldMonad BasicBlocksModule
 constFoldModule (TerminaModuleData modQualifiedName modFullPath 

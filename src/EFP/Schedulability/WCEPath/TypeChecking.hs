@@ -103,6 +103,7 @@ typePathBlock tpCls (WCEPContinue actionName pos ann) = do
         Nothing -> throwError . annotateError (getLocation ann) $ EUnknownMemberFunction actionName (classIdentifier tpCls, getLocation . classAnns $ tpCls)
         Just _ -> return $ WCEPContinue actionName pos (WCEPBlock (getLocation ann))
 typePathBlock _tpCls (WCEPReboot pos ann) = return $ WCEPReboot pos (WCEPBlock (getLocation ann))
+typePathBlock _tpCls (WCEPNoReturnCall funcName pos ann) = return $ WCEPNoReturnCall funcName pos (WCEPBlock (getLocation ann))
 typePathBlock _tpCls (WCEPSystemCall sysCallName pos ann) = do
     return $ WCEPSystemCall sysCallName pos (WCEPBlock (getLocation ann))
 

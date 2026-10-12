@@ -58,6 +58,10 @@ data TransPathBlock a
         a
     | TPBlockReturn BlockPosition a
     | TPBlockReboot BlockPosition a
+    | TPBlockNoReturnCall
+        Identifier -- ^ Function name
+        BlockPosition
+        a
     | TPBlockSystemCall 
         Identifier
         BlockPosition

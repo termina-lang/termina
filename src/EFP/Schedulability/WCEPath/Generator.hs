@@ -207,6 +207,11 @@ genPaths (ContinueBlock expr ann) =
         _ -> error "Unexpected expression in Continue block when generating WCE paths"
 genPaths (RebootBlock ann) =
     [WCEPReboot (loc2BlockPos . getLocation $ ann) Generated]
+genPaths (NoReturnCall expr ann) =
+    case expr of
+        (FunctionCall ident _args _) ->
+            [WCEPNoReturnCall ident (loc2BlockPos . getLocation $ ann) Generated]
+        _ -> error "Unexpected expression in NoReturnCall block when generating WCE paths"
 genPaths (SystemCall _obj syscallId _args ann) = do
     [WCEPSystemCall syscallId (loc2BlockPos . getLocation $ ann) Generated]
 

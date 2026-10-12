@@ -257,6 +257,7 @@ genPaths _ (WCEPContinue _actionName _pos _ann) =
     -- | Continuations are directly defined by the user when defining the transaction
     return []
 genPaths _ (WCEPReboot pos _ann) = return [(0, TPBlockReboot pos TRPBlockTy)]
+genPaths _ (WCEPNoReturnCall funcName pos _ann) = return [(0, TPBlockNoReturnCall funcName pos TRPBlockTy)]
 
 genTPaths :: Identifier -> [(WCETime, [TransPathBlock TRPSemAnn])]
     -> [WCEPathBlock WCEPSemAnn]

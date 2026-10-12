@@ -346,6 +346,8 @@ checkElement (Function _ident ps _ty blk _mods anns)
  >> mapM_ (useArraySize . paramType) ps
  >> mapM_ (`defArgumentsProc` getLocation anns) ps
  -- >> mapM_ ((annotateError (location anns)) . defVariable . paramIdentifier) ps
+checkElement (ExternFunction {})
+  = return ()
 checkElement (GlobalDeclaration {})
   = return ()
 checkElement (TypeDefinition tyDef _ann)

@@ -71,6 +71,8 @@ genBlock _currentCmp acc (TPBlockReturn {}) = do
     return acc 
 genBlock _currentCmp acc (TPBlockReboot {}) = do
     return acc
+genBlock _currentCmp acc (TPBlockNoReturnCall {}) = do
+    return acc
 genBlock _currentCmp acc (TPBlockSystemCall {}) = do
     return acc
 

@@ -120,12 +120,23 @@ typeStatement retTy (ForLoopStmt it_id it_ts from_expr to_expr mWhile body_stmt 
         )
     <*> localScope (insertLocalImmutObj anns it_id it_ty >> typeBlock retTy body_stmt)
     <*> return (buildStmtAnn anns)
+-- | A call to a noreturn function can only appear as a statement of its own,
+-- and its statement is marked so that lowering turns it into a NoReturnCall
+-- block.
 typeStatement _retTy (SingleExpStmt expr anns) = do
-  typed_expr <- catchError (typeExpression (Just TUnit) typeRHSObject expr) (
+  let typeUnitExpression = case expr of
+        FunctionCall ident args cann -> do
+          (ps, retty, mode, funcLocation) <- getFunctionTy cann ident
+          typed_call <- typeFunctionCall (Just TUnit) ident ps retty funcLocation args cann
+          return (typed_call, if mode == NoReturn then buildNoReturnCallStmtAnn else buildStmtAnn)
+        _ -> do
+          typed_expr <- typeExpression (Just TUnit) typeRHSObject expr
+          return (typed_expr, buildStmtAnn)
+  (typed_expr, stmtAnn) <- catchError typeUnitExpression (
     \err -> case getError err of
       EMismatch ty _ -> throwError $ annotateError anns (ESingleExpressionTypeNotUnit ty)
       _ -> throwError err)
-  return $ SAST.SingleExpStmt typed_expr (buildStmtAnn anns)
+  return $ SAST.SingleExpStmt typed_expr (stmtAnn anns)
 typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
   typed_matchE <- typeExpression Nothing typeRHSObject matchE
   -- | A constant is matched on as a value of its type.

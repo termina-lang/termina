@@ -1,0 +1,1 @@
+extern noreturn function jump_to_image(entry : usize) -> u32;

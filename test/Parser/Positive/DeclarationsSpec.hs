@@ -5,7 +5,7 @@ module Parser.Positive.DeclarationsSpec (spec) where
 
 import Parser.Common (parseWith, ctorName)
 import Parser.Parsing
-  ( functionParser, constDeclParser, constExprDeclParser
+  ( functionParser, externFunctionParser, constDeclParser, constExprDeclParser
   , taskDeclParser, resourceDeclParser, handlerDeclParser
   , channelDeclParser, emitterDeclParser, globalDeclParser
   , structDefinitionParser, enumDefinitionParser
@@ -26,6 +26,14 @@ spec = describe "Parser: top-level declarations" $ do
       , ("many params, with return", "function f(x : u32, y : u32) -> u32 { return x; }")
       , ("many params, no return",   "function f(x : u32, y : u32) { return; }")
       , ("single underscores and an ignored param", "function f_a(_x : u32, y_z : u32) -> u32 { return y_z; }")
+      ]
+
+  describe "extern functions (with and without return type, noreturn)" $
+    mapM_ (\(name, src) -> it ("parses an extern function with " ++ name) $
+              ctorOf externFunctionParser src `shouldBe` "ExternFunction")
+      [ ("no params, no return",   "extern function f();")
+      , ("many params, with return", "extern function f(x : u32, y : &[u8; 4]) -> u16;")
+      , ("noreturn",               "extern noreturn function f(entry : usize);")
       ]
 
   -- NB: each row stores the already-parsed constructor name (a String), not the

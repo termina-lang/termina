@@ -58,7 +58,7 @@ generatedIdentifiers file = concatMap itemIdents (fileItems file)
 
     extDeclIdents :: CExternalDeclaration -> [Ident]
     extDeclIdents (CEDVariable _ (CDecl _ mid _)) = maybeToList mid
-    extDeclIdents (CEDFunction _ _ ident params) = ident : paramIdents params
+    extDeclIdents (CEDFunction _ _ _ ident params) = ident : paramIdents params
     extDeclIdents (CEDEnum mid (CEnum _ constants _)) = maybeToList mid ++ map fst constants
     extDeclIdents (CEDStructUnion mid _) = maybeToList mid
     extDeclIdents (CEDTypeDef ident _) = [ident]

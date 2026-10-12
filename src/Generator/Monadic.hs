@@ -172,6 +172,10 @@ mapMonadicTypes (Function _ params maybeRet blkRet _ _) =
   mapMaybeMonadic maybeRet >>
   -- | Get the monadic types types from the return block
   mapM_ mapStatementMonadic (blockBody blkRet)
+mapMonadicTypes (ExternFunction _ params maybeRet _ _ _) =
+  -- | Get the monadic types types from the parameters and the return type
+  mapM_ mapParameterMonadic params >>
+  mapMaybeMonadic maybeRet
 mapMonadicTypes (TypeDefinition typeDef _) =
   -- | Get the monadic types types from the type definition
   mapTypeDefMonadic typeDef

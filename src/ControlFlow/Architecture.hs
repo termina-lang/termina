@@ -317,6 +317,8 @@ genArchElement _ (Function identifier params mRet block _ ann) =
     tp {
       functions = M.insert identifier (TPFunction identifier params mRet block ann) (functions tp)
     }
+-- | An extern function has no body for the architecture to keep
+genArchElement _ (ExternFunction {}) = return ()
 genArchElement modName (GlobalDeclaration glb) = genArchGlobal modName glb
 genArchElement _ (TypeDefinition typeDef ann) = genArchTypeDef ann typeDef
 

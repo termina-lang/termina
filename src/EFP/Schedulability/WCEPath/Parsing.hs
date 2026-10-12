@@ -155,6 +155,15 @@ rebootParser = do
     loc <- blockPositionParser
     WCEPReboot loc . Position current startPos <$> getPosition
 
+noReturnCallParser :: SchedParser (WCEPathBlock ParserAnn)
+noReturnCallParser = do
+    current <- getState
+    startPos <- getPosition
+    _ <- reserved "noreturn"
+    funcName <- parens identifierParser
+    loc <- blockPositionParser
+    WCEPNoReturnCall funcName loc . Position current startPos <$> getPosition
+
 systemCallParser :: SchedParser (WCEPathBlock ParserAnn)
 systemCallParser = do
     current <- getState
@@ -170,6 +179,7 @@ wcepPathBlockParser =
     <|> try returnParser
     <|> try continueParser
     <|> try rebootParser
+    <|> try noReturnCallParser
     <|> try systemCallParser
     <|> try condIfParser
     <|> try condElseIfParser

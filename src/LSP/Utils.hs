@@ -286,6 +286,8 @@ getDocumentSymbols = Prelude.concatMap toDocumentSymbol
     toDocumentSymbol :: SAST.AnnASTElement SemanticAnn -> [LSP.DocumentSymbol]
     toDocumentSymbol (SAST.Function name _ _ _ _ ann) =
       symbol (T.pack name) LSP.SymbolKind_Function (getLocation ann) []
+    toDocumentSymbol (SAST.ExternFunction name _ _ _ _ ann) =
+      symbol (T.pack name) LSP.SymbolKind_Function (getLocation ann) []
     toDocumentSymbol (SAST.TypeDefinition (Class _ name members _ _) ann) =
       symbol (T.pack name) LSP.SymbolKind_Class (getLocation ann)
         (Prelude.concatMap toClassMemberSymbol members)

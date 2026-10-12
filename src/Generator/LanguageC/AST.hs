@@ -65,7 +65,7 @@ data CDeclaration' a =
 
 data CExternalDeclaration' a
     = CEDVariable (Maybe CStorageSpecifier) (CDeclaration' a)
-    | CEDFunction (Maybe CStorageSpecifier) CType Ident [CDeclaration' a]
+    | CEDFunction (Maybe CStorageSpecifier) [CFunctionSpecifier] CType Ident [CDeclaration' a]
     | CEDEnum (Maybe Ident) (CEnum' a)
     | CEDStructUnion (Maybe Ident) (CStructureUnion' a)
     | CEDTypeDef Ident CType
@@ -180,6 +180,12 @@ instance Pretty CStorageSpecifier where
     pretty CStatic = pretty "static"
     pretty CExtern = pretty "extern"
     pretty CThread = pretty "_Thread_local"
+
+data CFunctionSpecifier
+  = CNoReturn    -- ^ C11 _Noreturn
+
+instance Pretty CFunctionSpecifier where
+    pretty CNoReturn = pretty "_Noreturn"
 
 -- | C char constant
 newtype CChar = CChar Char

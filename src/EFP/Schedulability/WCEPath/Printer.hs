@@ -55,6 +55,8 @@ instance WCEPathPrinter (WCEPathBlock a) where
         pretty "continue" <> parens (pretty actionName) <> pprint loc
     pprint (WCEPReboot loc _) =
         pretty "reboot" <> pprint loc
+    pprint (WCEPNoReturnCall funcName loc _) =
+        pretty "noreturn" <> parens (pretty funcName) <> pprint loc
     pprint (WCEPSystemCall sysCallName loc _) =
         pretty "syscall" <> parens (pretty sysCallName) <> pprint loc
     pprint (WCEPathCondIf blocks loc _) =

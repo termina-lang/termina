@@ -59,6 +59,34 @@ loopFunction =
   "    return acc;\n" ++
   "}\n"
 
+-- | An action whose only path ends in a call to a noreturn function, with no
+-- return after it.
+noReturnAction :: String
+noReturnAction =
+  "extern noreturn function jump_to_image(entry : usize);\n" ++
+  "task class foo {\n" ++
+  "    snk : sink usize triggers action0;\n" ++
+  "    action action0(&priv self, entry : usize) -> Status<i32> {\n" ++
+  "        jump_to_image(entry);\n" ++
+  "    }\n" ++
+  "};\n"
+
+-- | An action that calls a noreturn function in one branch of an if and
+-- returns after it.
+noReturnBranchAction :: String
+noReturnBranchAction =
+  "extern noreturn function jump_to_image(entry : usize);\n" ++
+  "task class foo {\n" ++
+  "    snk : sink usize triggers action0;\n" ++
+  "    action action0(&priv self, entry : usize) -> Status<i32> {\n" ++
+  "        var st : Status<i32> = Success;\n" ++
+  "        if (entry != 0) {\n" ++
+  "            jump_to_image(entry);\n" ++
+  "        }\n" ++
+  "        return st;\n" ++
+  "    }\n" ++
+  "};\n"
+
 rebootBranchAction :: String
 rebootBranchAction =
   "task class foo {\n" ++
@@ -96,6 +124,8 @@ spec = describe "Exit paths: well-formed paths raise no error" $
     , ("accepts an action that exits on every path", goodAction)
     , ("accepts a function that matches then returns", matchFunction)
     , ("accepts a function with a for loop then a return", loopFunction)
+    , ("accepts an action that ends in a noreturn call", noReturnAction)
+    , ("accepts an action with a noreturn call in a branch", noReturnBranchAction)
     , ("accepts an action with a reboot in a branch", rebootBranchAction)
     , ("accepts an action with a continue in a branch", continueBranchAction)
     ]
