@@ -169,8 +169,11 @@ checkActionPaths loc stmts = do
                                 elseBlockState <- localScope (setAllowedContinue >> checkActionPaths loc (reverse (blockBody elseBlocks)))
                                 put (max elseBlockState stateElseIfs)
                                 checkActionPaths loc xb
-                        IfElseBlock (CondIf _ ifBlocks _) _ _ _ ->
-                            checkActionPaths loc (reverse (blockBody ifBlocks)) >>
+                        -- | Without an else there is always a path that skips
+                        -- the branch, so the branch may exit
+                        IfElseBlock (CondIf _ ifBlocks _) _ _ _ -> do
+                            stateIfBlock <- localScope (setAllowedContinue >> checkActionPaths loc (reverse (blockBody ifBlocks)))
+                            put (max step stateIfBlock)
                             checkActionPaths loc xb
                         blk@(MatchBlock _ cases mDefaultCase _) ->
                             if doesBlockExit blk then

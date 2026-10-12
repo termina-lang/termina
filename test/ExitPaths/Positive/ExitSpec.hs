@@ -59,6 +59,36 @@ loopFunction =
   "    return acc;\n" ++
   "}\n"
 
+rebootBranchAction :: String
+rebootBranchAction =
+  "task class foo {\n" ++
+  "    snk : sink usize triggers action0;\n" ++
+  "    action action0(&priv self, entry : usize) -> Status<i32> {\n" ++
+  "        var st : Status<i32> = Success;\n" ++
+  "        if (entry != 0) {\n" ++
+  "            reboot;\n" ++
+  "        }\n" ++
+  "        return st;\n" ++
+  "    }\n" ++
+  "};\n"
+
+continueBranchAction :: String
+continueBranchAction =
+  "task class foo {\n" ++
+  "    snk : sink u32 triggers action0;\n" ++
+  "    action action1(&priv self, data : u32) -> Status<i32> {\n" ++
+  "        var st : Status<i32> = Success;\n" ++
+  "        return st;\n" ++
+  "    }\n" ++
+  "    action action0(&priv self, data : u32) -> Status<i32> {\n" ++
+  "        var st : Status<i32> = Success;\n" ++
+  "        if (data == 0 : u32) {\n" ++
+  "            continue self->action1(data);\n" ++
+  "        }\n" ++
+  "        return st;\n" ++
+  "    }\n" ++
+  "};\n"
+
 spec :: Spec
 spec = describe "Exit paths: well-formed paths raise no error" $
   mapM_ (\(name, src) -> it name $ exitPathsError src `shouldSatisfy` isNothing)
@@ -66,4 +96,6 @@ spec = describe "Exit paths: well-formed paths raise no error" $
     , ("accepts an action that exits on every path", goodAction)
     , ("accepts a function that matches then returns", matchFunction)
     , ("accepts a function with a for loop then a return", loopFunction)
+    , ("accepts an action with a reboot in a branch", rebootBranchAction)
+    , ("accepts an action with a continue in a branch", continueBranchAction)
     ]
