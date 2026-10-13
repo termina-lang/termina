@@ -170,6 +170,11 @@ stdlibGlobalEnv outBufSize inBufSize =
         -- | Source of the fatal error, as the operating system numbers it
         TUInt32,
         -- | Code of the fatal error, which may be an address
+        TUSize],
+      -- | Stack overflow detected by the operating system
+      EnumVariant "EStackOverflow" [
+        -- | Identifier of the task, or the invalid identifier when the stack
+        -- is not of a task of the application
         TUSize]
       ] [])) Internal),
     -- | SysTime interface
