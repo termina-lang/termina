@@ -143,13 +143,10 @@ typeGlobal (Const ident ts expr mods anns) = do
   globalConstTyOrFail anns ty
   -- | A constant has the type TConstSubtype of the declared one, which marks
   -- it, and every scalar read from it with a constant path, as a constant
-  -- expression. The initializer of an aggregate constant is typed against the
-  -- declared type, which is what the initializers expect.
+  -- expression. Its initializer is typed against that type, which makes every
+  -- field and element of it a constant too.
   let constType = TConstSubtype ty
-  typed_expr <-
-    if constTy ty
-      then typeExpression (Just constType) typeGlobalObject expr
-      else typeAssignmentExpression ty typeGlobalObject expr
+  typed_expr <- typeAssignmentExpression constType typeGlobalObject expr
   tyMods <- typeModifiers anns typeGlobalObject mods
   return (SAST.Const ident constType typed_expr tyMods (buildGlobalAnn anns constType), LocatedElement (GConst constType typed_expr) anns)
 typeGlobal (ConstExpr ident ts expr mods anns) = do

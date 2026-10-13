@@ -256,6 +256,15 @@ sameTyOrError :: Location -> TerminaType SemanticAnn -> TerminaType SemanticAnn 
 sameTyOrError loc expectedTy actualTy =
   unless (sameTy expectedTy actualTy) (throwError $ annotateError loc $ EMismatch expectedTy actualTy)
 
+-- | Checks the type of an expression against the expected one, if any. Where a
+-- constant is expected, an expression of the right type that is not a constant
+-- one, such as a call, is not a constant expression.
+checkExpectedTy :: Location -> Maybe (TerminaType SemanticAnn) -> TerminaType SemanticAnn -> SemanticMonad ()
+checkExpectedTy loc (Just (TConstSubtype ty)) actualTy = do
+  sameTyOrError loc ty (withoutConst actualTy)
+  constSubtypeOrFail loc actualTy
+checkExpectedTy loc expectedTy actualTy = mapM_ (flip (sameTyOrError loc) actualTy) expectedTy
+
 unBox :: Object SemanticAnn -> Object SemanticAnn
 unBox t = Unbox t (unboxTypeAnn (getAnnotation t))
 

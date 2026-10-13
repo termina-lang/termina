@@ -421,10 +421,7 @@ typeObject getVarTy (ArrayIndexExpression obj idx ann) = do
     TConstSubtype (TArray ty_elems _vexp) -> do
         idx_typed  <- catchMismatch (getAnnotation idx) EArrayIndexNotUSize (typeExpression (Just TUSize) typeRHSObject idx)
         idx_ty <- getExprType idx_typed
-        let elem_ty = case idx_ty of
-              TConstSubtype _ -> TConstSubtype ty_elems
-              _ -> ty_elems
-        checkObjectNotMoved ann $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann obj_ak elem_ty
+        checkObjectNotMoved ann $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann obj_ak (partTy idx_ty ty_elems)
     ty -> throwError $ annotateError ann (EInvalidArrayIndexing ty)
 typeObject getVarTy (MemberAccess obj ident ann) = do
   -- | Attention on deck!
@@ -441,9 +438,7 @@ typeObject getVarTy (MemberAccess obj ident ann) = do
   let (typed_obj, obj_ak, obj_ty) =
         maybe (typed_obj', obj_ak', obj_ty') (unBox typed_obj', Mutable, ) (isBox obj_ty')
   -- | A field of a constant is itself a constant.
-  ft <- case obj_ty of
-    TConstSubtype ty -> (\(fty, fann) -> (TConstSubtype fty, fann)) <$> getMemberField ann ty ident
-    _ -> getMemberField ann obj_ty ident
+  ft <- (\(fty, fann) -> (partTy obj_ty fty, fann)) <$> getMemberField ann (withoutConst obj_ty) ident
   case ft of
     (fty@(TAccessPort (TInterface _ _)), SemanticAnn (FTy (AccessPortField members)) _) ->
       checkObjectNotMoved ann $ SAST.MemberAccess typed_obj ident $ buildExpAnnAccessPortObj ann obj_ak members fty
@@ -805,6 +800,14 @@ typeTypeSpecifier _ _ TSFloat64 = return TFloat64
 typeTypeSpecifier _ _ TSUnit   = return TUnit
 typeTypeSpecifier loc _ ts = throwError $ annotateError loc (EInvalidTypeSpecifier ts)
 
+-- | The type of a part of a value: a field, an element or the value of a
+-- variant. The first argument decides whether the part is a constant: the
+-- whole value when a field is read or an initializer is typed, the index when
+-- an element is read.
+partTy :: SAST.TerminaType SemanticAnn -> SAST.TerminaType SemanticAnn -> SAST.TerminaType SemanticAnn
+partTy (TConstSubtype _) ty = TConstSubtype ty
+partTy _ ty = ty
+
 typeAssignmentExpression ::
   SAST.TerminaType SemanticAnn ->
   (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn)) ->
@@ -838,23 +841,6 @@ typeAssignmentExpression expected_type@(TAtomicArray ty size) typeObj (StructIni
   SAST.StructInitializer
         <$> typeFieldAssignments pann (expected_type, Builtin) typeObj [FieldDefinition "values" (TArray ty size) (buildExpAnn Internal (TArray ty size))] fs
         <*> pure (buildExpAnn pann expected_type)
-typeAssignmentExpression expected_type@(TStruct id_ty) typeObj (StructInitializer fs mts pann) = do
-  -- | Check field type
-  case mts of
-    (Just ts) -> do
-      init_ty <- typeTypeSpecifier pann typeObj ts
-      catchMismatch pann
-        (EStructInitializerTypeMismatch expected_type)
-        (sameTyOrError pann expected_type init_ty)
-      getGlobalTypeDef pann id_ty
-    Nothing -> getGlobalTypeDef pann id_ty
-  >>= \case{
-    LocatedElement (Struct _ ty_fs _mods) strLoc  ->
-      SAST.StructInitializer
-        <$> typeFieldAssignments pann (expected_type, strLoc) typeObj ty_fs fs
-        <*> pure (buildExpAnn pann (TStruct id_ty));
-    _ -> throwError $ annotateError Internal EExpectedStructType;
-  }
 typeAssignmentExpression expected_type@(TGlobal _ id_ty) typeObj (StructInitializer fs mts pann) = do
   -- | Check field type
   case mts of
@@ -873,46 +859,76 @@ typeAssignmentExpression expected_type@(TGlobal _ id_ty) typeObj (StructInitiali
         <*> pure (buildExpAnn pann (TGlobal clsKind id_ty));
     _ -> throwError $ annotateError Internal EExpectedClassType;
   }
-typeAssignmentExpression expected_type@(TEnum id_expected) typeObj (EnumVariantInitializer id_ty variant args pann) = do
-  unless (id_expected == id_ty) (throwError $ annotateError pann (EEnumInitializerExpectedTypeMismatch expected_type (TEnum id_ty)))
-  -- | Enum Variant
-  getEnumTy pann id_ty
-  >>= \case {
-    LocatedElement (Enum enumId ty_vs _mods) loc ->
-      case Data.List.find ((variant ==) . variantIdentifier) ty_vs of
-        Nothing -> throwError $ annotateError pann (EEnumVariantNotFound enumId variant)
-        Just (EnumVariant _ ps) ->
-          let (psLen , asLen ) = (length ps, length args) in
-          if psLen == asLen
-          then
-             flip (SAST.EnumVariantInitializer id_ty variant) (buildExpAnn pann (TEnum id_ty))
-              <$> zipWithM (\(ty, position) e ->
-                catchError (typeAssignmentExpression ty typeObj e) (\err -> case getError err of
-                  EMismatch _ actualTy -> throwError $ annotateError (getAnnotation e) (EEnumVariantParamTypeMismatch (enumId, loc) (variant, position, ty) actualTy)
-                  EAssignmentExprMismatch _ actualTy -> throwError $ annotateError (getAnnotation e) (EEnumVariantParamTypeMismatch (enumId, loc) (variant, position, ty) actualTy)
-                  _ -> throwError err)) (zip ps [0 :: Integer ..]) args
-          else if psLen < asLen
-          then throwError $ annotateError pann (EEnumVariantExtraParams (enumId, loc) (variant, ps) (fromIntegral asLen))
-          else throwError $ annotateError pann (EEnumVariantMissingParams (enumId, loc) (variant, ps) (fromIntegral asLen))
-     ;
-    _ -> throwError $ annotateError Internal EExpectedEnumType
-  }
+-- | A struct, constant or not. It goes after the atomics and the classes,
+-- whose initializers it would take otherwise.
+typeAssignmentExpression expected_type typeObj (StructInitializer fs mts pann) =
+  case withoutConst expected_type of
+    TStruct id_ty -> do
+      -- | Check field type
+      case mts of
+        (Just ts) -> do
+          init_ty <- typeTypeSpecifier pann typeObj ts
+          catchMismatch pann
+            (EStructInitializerTypeMismatch (TStruct id_ty))
+            (sameTyOrError pann (TStruct id_ty) init_ty)
+          getGlobalTypeDef pann id_ty
+        Nothing -> getGlobalTypeDef pann id_ty
+      >>= \case{
+        LocatedElement (Struct _ ty_fs _mods) strLoc  ->
+          -- | A field of a constant is itself a constant.
+          let fields = map (\fd -> fd { fieldTerminaType = partTy expected_type (fieldTerminaType fd) }) ty_fs
+          in SAST.StructInitializer
+            <$> typeFieldAssignments pann (TStruct id_ty, strLoc) typeObj fields fs
+            <*> pure (buildExpAnn pann (TStruct id_ty));
+        _ -> throwError $ annotateError Internal EExpectedStructType;
+      }
+    _ -> throwError $ annotateError pann EStructInitializerInvalidUse
+typeAssignmentExpression expected_type typeObj (EnumVariantInitializer id_ty variant args pann) =
+  case withoutConst expected_type of
+    TEnum id_expected -> do
+      unless (id_expected == id_ty) (throwError $ annotateError pann (EEnumInitializerExpectedTypeMismatch (TEnum id_expected) (TEnum id_ty)))
+      -- | Enum Variant
+      getEnumTy pann id_ty
+      >>= \case {
+        LocatedElement (Enum enumId ty_vs _mods) loc ->
+          case Data.List.find ((variant ==) . variantIdentifier) ty_vs of
+            Nothing -> throwError $ annotateError pann (EEnumVariantNotFound enumId variant)
+            Just (EnumVariant _ ps) ->
+              let (psLen , asLen ) = (length ps, length args) in
+              if psLen == asLen
+              then
+                 flip (SAST.EnumVariantInitializer id_ty variant) (buildExpAnn pann (TEnum id_ty))
+                  <$> zipWithM (\(ty, position) e ->
+                    -- | A parameter of a constant is itself a constant.
+                    catchError (typeAssignmentExpression (partTy expected_type ty) typeObj e) (\err -> case getError err of
+                      EMismatch _ actualTy -> throwError $ annotateError (getAnnotation e) (EEnumVariantParamTypeMismatch (enumId, loc) (variant, position, ty) actualTy)
+                      EAssignmentExprMismatch _ actualTy -> throwError $ annotateError (getAnnotation e) (EEnumVariantParamTypeMismatch (enumId, loc) (variant, position, ty) actualTy)
+                      _ -> throwError err)) (zip ps [0 :: Integer ..]) args
+              else if psLen < asLen
+              then throwError $ annotateError pann (EEnumVariantExtraParams (enumId, loc) (variant, ps) (fromIntegral asLen))
+              else throwError $ annotateError pann (EEnumVariantMissingParams (enumId, loc) (variant, ps) (fromIntegral asLen))
+         ;
+        _ -> throwError $ annotateError Internal EExpectedEnumType
+      }
+    _ -> throwError $ annotateError pann EEnumVariantInitializerInvalidUse
 typeAssignmentExpression expectedType typeObj (ArrayInitializer iexp size pann) = do
 -- | TArray Initialization
-  case expectedType of
+  case withoutConst expectedType of
     TArray ts _ -> do
       -- | We do not need to catch any error, since it will be correctly handler
-      -- by the recursive call to |typeAssignmentExpression|
-      typed_init <- typeAssignmentExpression ts typeObj iexp
+      -- by the recursive call to |typeAssignmentExpression|. An element of a
+      -- constant is itself a constant.
+      typed_init <- typeAssignmentExpression (partTy expectedType ts) typeObj iexp
       typed_init_size <- typeExpression (Just (TConstSubtype TUSize)) typeObj size
       -- We will check the size of the array when we are performing the const propagation.
       return $ SAST.ArrayInitializer typed_init typed_init_size (buildExpAnn pann (TArray ts typed_init_size))
     ts -> throwError $ annotateError pann (EArrayInitializerNotArray ts)
 typeAssignmentExpression expectedType typeObj (ArrayExprListInitializer exprs pann) = do
-  case expectedType of
+  case withoutConst expectedType of
     TArray ts _s -> do
+      -- | An element of a constant is itself a constant.
       typed_exprs <- mapM (\e ->
-        catchError (typeAssignmentExpression ts typeObj e) (\err -> case getError err of
+        catchError (typeAssignmentExpression (partTy expectedType ts) typeObj e) (\err -> case getError err of
           EMismatch _ ty -> throwError $ annotateError (getAnnotation e) (EArrayExprListInitializerExprTypeMismatch ts ty)
           EAssignmentExprMismatch _ ty -> throwError $ annotateError (getAnnotation e) (EArrayExprListInitializerExprTypeMismatch ts ty)
           _ -> throwError err)) exprs
@@ -924,13 +940,13 @@ typeAssignmentExpression expectedType typeObj (ArrayExprListInitializer exprs pa
       return $ SAST.ArrayExprListInitializer typed_exprs (buildExpAnn pann (TArray ts typed_init_size))
     ts -> throwError $ annotateError pann (EArrayExprListInitializerNotArray ts)
 typeAssignmentExpression expectedType typeObj (MonadicVariantInitializer vexp anns) =
-  case expectedType of
+  case withoutConst expectedType of
     TOption ts -> do
       case vexp of
         None -> return $ SAST.MonadicVariantInitializer None (buildExpAnn anns (TOption ts))
         Some e -> do
-          typed_e <- 
-            catchError (typeAssignmentExpression ts typeObj e) (\err -> case getError err of
+          typed_e <-
+            catchError (typeAssignmentExpression (paramTy ts) typeObj e) (\err -> case getError err of
                   EMismatch _ actualTy -> throwError $ annotateError (getAnnotation e) (EMonadicVariantParameterTypeMismatch ts actualTy)
                   EAssignmentExprMismatch _ actualTy -> throwError $ annotateError (getAnnotation e) (EMonadicVariantParameterTypeMismatch ts actualTy)
                   _ -> throwError err)
@@ -943,14 +959,14 @@ typeAssignmentExpression expectedType typeObj (MonadicVariantInitializer vexp an
       case vexp of
         Ok e -> do
           typed_e <- 
-            catchError (typeAssignmentExpression tsOk typeObj e) (\err -> case getError err of
+            catchError (typeAssignmentExpression (paramTy tsOk) typeObj e) (\err -> case getError err of
                   EMismatch _ actualTy -> throwError $ annotateError (getAnnotation e) (EMonadicVariantParameterTypeMismatch tsOk actualTy)
                   EAssignmentExprMismatch _ actualTy -> throwError $ annotateError (getAnnotation e) (EMonadicVariantParameterTypeMismatch tsOk actualTy)
                   _ -> throwError err)
           return $ SAST.MonadicVariantInitializer (Ok typed_e) (buildExpAnn anns (TResult tsOk tsError))
         Error e -> do
           typed_e <- 
-            catchError (typeAssignmentExpression tsError typeObj e) (\err -> case getError err of
+            catchError (typeAssignmentExpression (paramTy tsError) typeObj e) (\err -> case getError err of
                   EMismatch _ actualTy -> throwError $ annotateError (getAnnotation e) (EMonadicVariantParameterTypeMismatch tsError actualTy)
                   EAssignmentExprMismatch _ actualTy -> throwError $ annotateError (getAnnotation e) (EMonadicVariantParameterTypeMismatch tsError actualTy)
                   _ -> throwError err)
@@ -963,8 +979,8 @@ typeAssignmentExpression expectedType typeObj (MonadicVariantInitializer vexp an
       case vexp of
         Success -> return $ SAST.MonadicVariantInitializer Success (buildExpAnn anns (TStatus ts))
         Failure e -> do
-          typed_e <- 
-            catchError (typeAssignmentExpression ts typeObj e) (\err -> case getError err of
+          typed_e <-
+            catchError (typeAssignmentExpression (paramTy ts) typeObj e) (\err -> case getError err of
                   EMismatch _ actualTy -> throwError $ annotateError (getAnnotation e) (EMonadicVariantParameterTypeMismatch ts actualTy)
                   EAssignmentExprMismatch _ actualTy -> throwError $ annotateError (getAnnotation e) (EMonadicVariantParameterTypeMismatch ts actualTy)
                   _ -> throwError err)
@@ -974,9 +990,13 @@ typeAssignmentExpression expectedType typeObj (MonadicVariantInitializer vexp an
         Ok _ -> throwError $ annotateError anns (EInvalidVariantForStatus "Ok")
         Error _ -> throwError $ annotateError anns (EInvalidVariantForStatus "Error")
     _ -> throwError $ annotateError anns EMonadicVariantInitializerInvalidUse
+  where
+    -- | The value inside a constant Option, Result or Status is itself a
+    -- constant.
+    paramTy = partTy expectedType
 typeAssignmentExpression expectedType _typeObj (StringInitializer value pann) = do
 -- | TArray Initialization
-  case expectedType of
+  case withoutConst expectedType of
     TArray TChar _ -> do
       -- We will check the size of the array when we are performing the const propagation.
       -- The size of the expression list initializer will be the number of its elements
@@ -1013,7 +1033,7 @@ typeFunctionCall expectedType ident ps retty funcLocation args ann = do
   when (psLen > asLen) (throwError $ annotateError ann (EFunctionCallMissingArgs (ident, ps, funcLocation) (fromIntegral asLen)))
   typed_args <- localScope $ zipWithM (\(p, idx) e -> catchMismatch ann (EFunctionCallArgTypeMismatch (ident, p, funcLocation) idx)
       (typeExpression (Just (paramType p)) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
-  mapM_ (flip (sameTyOrError ann) retty) expectedType
+  checkExpectedTy ann expectedType retty
   return $ SAST.FunctionCall ident typed_args expAnn
 
 -- | Function |typeExpression| takes an expression from the parser, traverse it
@@ -1039,24 +1059,8 @@ typeExpression expectedType typeObj (AccessObject obj) = do
       case M.lookup ident glb of
         Just (LocatedElement (GConstExpr _ty expr) _) -> do
           exprType <- getExprType expr
-          case (expectedType, exprType) of
-            (Just (TConstSubtype ts), TConstSubtype ts') -> do
-              -- If the type must be an expected type, then check it.
-              sameTyOrError loc ts ts'
-              return expr
-            (Just (TConstSubtype ts), ts') -> do
-              -- If the type must be an expected type, then check it.
-              sameTyOrError loc ts ts'
-              -- We need to return an error because the type is not a const type.
-              throwError $ annotateError loc EExpressionNotConstant
-            (Just ts, ts') -> do
-              -- If the type must be an expected type, then check it.
-              sameTyOrError loc ts ts'
-              return expr
-            -- If we are requesting an object without an expected type, then we must
-            -- be casting the result. Thus, we must return an unboxed object.
-            (Nothing, _) ->
-              return expr
+          checkExpectedTy loc expectedType exprType
+          return expr
         _ -> typeObjExpression
     _ -> typeObjExpression
 
@@ -1078,18 +1082,8 @@ typeExpression expectedType typeObj (AccessObject obj) = do
           sameTyOrError (getAnnotation obj) ts ts'
           -- If we have an box and expect an unboxed type:
           return $ SAST.AccessObject (unBox typed_obj)
-        (Just (TConstSubtype ts), TConstSubtype ts') -> do
-          -- If the type must be an expected type, then check it.
-          sameTyOrError (getAnnotation obj) ts ts'
-          return $ SAST.AccessObject typed_obj
-        (Just (TConstSubtype ts), ts') -> do
-          -- If the type must be an expected type, then check it.
-          sameTyOrError (getAnnotation obj) ts ts'
-          -- We need to return an error because the type is not a const type.
-          throwError $ annotateError (getAnnotation obj) EExpressionNotConstant
-        (Just ts, ts') -> do
-          -- If the type must be an expected type, then check it.
-          sameTyOrError (getAnnotation obj) ts ts'
+        (Just _, _) -> do
+          checkExpectedTy (getAnnotation obj) expectedType obj_type
           return $ SAST.AccessObject typed_obj
         -- If we are requesting an object without an expected type, then we must
         -- be casting the result. Thus, we must return an unboxed object.
@@ -1162,7 +1156,7 @@ typeExpression expectedType typeObj (Casting e nts pann) = do
           (TConstSubtype _, TConstSubtype _) -> nty
           (_, TConstSubtype _) -> TConstSubtype nty
           (_, _) -> nty
-  mapM_ (flip (sameTyOrError pann) result_ty) expectedType
+  checkExpectedTy pann expectedType result_ty
   return (SAST.Casting typed_exp nty (buildExpAnn pann result_ty))
 typeExpression expectedType typeObj (BinOp op le re pann) = do
 
@@ -1398,12 +1392,12 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
         -- the access kind of the object.
         TBoxSubtype ty -> do
           -- | Check that the expected type is the same as the base type.  
-          mapM_ (flip (sameTyOrError pann) (TReference refKind ty)) expectedType
+          checkExpectedTy pann expectedType (TReference refKind ty)
           return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (TReference refKind ty)))
         _ -> do
           -- | Check if the we are allowed to create that kind of reference from the object
           checkReferenceAccessKind obj_ak
-          mapM_ (flip (sameTyOrError pann) (TReference refKind obj_type)) expectedType
+          checkExpectedTy pann expectedType (TReference refKind obj_type)
           return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (TReference refKind obj_type)))
 
   where 
@@ -1442,7 +1436,7 @@ typeExpression expectedType typeObj (MemberFunctionCall obj ident args ann) = do
   obj_typed <- typeObj obj
   (ak, obj_ty) <- getObjType obj_typed
   ((ps, typed_args), fty) <- typeMemberFunctionCall ann ak obj_ty ident args
-  mapM_ (flip (sameTyOrError ann) fty) expectedType
+  checkExpectedTy ann expectedType fty
   return $ SAST.MemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)
 typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann) = do
   obj_typed <- typeObj obj
@@ -1454,7 +1448,7 @@ typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann)
       -- a reference, the object (self) can only be of a user-defined class type. There
       -- cannot be references to ports.
       ((ps, typed_args), fty) <- typeMemberFunctionCall ann ak rTy ident args
-      mapM_ (flip (sameTyOrError ann) fty) expectedType
+      checkExpectedTy ann expectedType fty
       return $ SAST.DerefMemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)
     ty -> throwError $ annotateError ann $ EDereferenceInvalidType ty
 typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_id pann) = do
@@ -1469,7 +1463,7 @@ typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_i
     Enum lhs_enum ty_vs _mods ->
       case Data.List.find ((variant_id ==) . variantIdentifier) ty_vs of
         Just (EnumVariant {}) -> do
-          mapM_ (flip (sameTyOrError pann) test_ty) expectedType
+          checkExpectedTy pann expectedType test_ty
           return $ SAST.IsEnumVariantExpression obj_typed id_ty variant_id (buildExpAnn pann test_ty)
         Nothing -> throwError $ annotateError pann (EEnumVariantNotFound lhs_enum variant_id)
     _ -> throwError $ annotateError Internal EExpectedEnumType
@@ -1490,7 +1484,7 @@ typeExpression expectedType typeObj (IsMonadicVariantExpression obj variant_id p
       (obj_ty, test_ty) <- testedTy <$> getObjType obj_typed
       case obj_ty of
         (TOption {}) -> do
-          mapM_ (flip (sameTyOrError pann) test_ty) expectedType
+          checkExpectedTy pann expectedType test_ty
           return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann test_ty)
         _ -> throwError $ annotateError pann (EIsOptionVariantInvalidType obj_ty)
 
@@ -1500,7 +1494,7 @@ typeExpression expectedType typeObj (IsMonadicVariantExpression obj variant_id p
       (obj_ty, test_ty) <- testedTy <$> getObjType obj_typed
       case obj_ty of
         (TStatus {}) -> do
-          mapM_ (flip (sameTyOrError pann) test_ty) expectedType
+          checkExpectedTy pann expectedType test_ty
           return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann test_ty)
         _ -> throwError $ annotateError pann (EIsStatusVariantInvalidType obj_ty)
 
@@ -1510,7 +1504,7 @@ typeExpression expectedType typeObj (IsMonadicVariantExpression obj variant_id p
       (obj_ty, test_ty) <- testedTy <$> getObjType obj_typed
       case obj_ty of
         (TResult {}) -> do
-          mapM_ (flip (sameTyOrError pann) test_ty) expectedType
+          checkExpectedTy pann expectedType test_ty
           return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann test_ty)
         _ -> throwError $ annotateError pann (EIsResultVariantInvalidType obj_ty)
 
