@@ -1,0 +1,13 @@
+task class foo {
+
+    snk : sink u32 triggers action0;
+
+    action action1(&priv self, data : u32) -> u32 {
+        return data;
+    }
+
+    action action0(&priv self, data : u32) -> Status<i32> {
+        continue self->action1(data);
+    }
+
+};

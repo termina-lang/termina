@@ -274,6 +274,7 @@ data Error
   | EDuplicatedModifier Identifier -- ^ Modifier that appears more than once on the same declaration (SE-223)
   | ENoReturnCallInExpression (Identifier, Location) -- ^ Call to a noreturn function inside an expression (SE-224)
   | ENoReturnFunctionReturnType Identifier -- ^ Noreturn function declared with a return type (SE-225)
+  | EContinueActionReturnTypeMismatch (Identifier, Location) (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Continued action returns another type than the current one (SE-226)
   deriving Show
 
 -- | Why an emitter takes a handler and not a task.
@@ -1043,6 +1044,10 @@ instance Diagnosable Error where
     describe (ENoReturnFunctionReturnType ident) =
         diagnostic "SE-225" "noreturn function with a return type"
             ("The extern function \x1b[31m" <> T.pack ident <> "\x1b[0m is declared noreturn and cannot have a return type.")
+    describe (EContinueActionReturnTypeMismatch (ident, actionPos) expectedTy actualTy) =
+        relatedTo actionPos "the action is defined here" $
+        diagnostic "SE-226" "continuation action return type mismatch"
+            ("The action \x1b[31m" <> T.pack ident <> "\x1b[0m returns \x1b[31m" <> showText actualTy <> "\x1b[0m, but the action that continues to it returns \x1b[31m" <> showText expectedTy <> "\x1b[0m.\n" <> "The action that a continue reaches returns the result of the whole chain, so both have to return the same type.")
 
     -- | The two clauses below pick their detail with a case, which the script
     -- that moved the rest of this table does not read, so they were moved by
