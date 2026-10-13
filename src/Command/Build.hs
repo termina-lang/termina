@@ -458,6 +458,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     checkResourceUsage loweredProject programArchitecture
     checkPoolUsage loweredProject programArchitecture
     checkTaskPriorities loweredProject programArchitecture
+    checkSystemExceptAction loweredProject programArchitecture
     checkProjectBoxSources loweredProject programArchitecture
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")

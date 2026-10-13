@@ -4,7 +4,8 @@ module ControlFlow.Architecture.Checks (
     runCheckChannelConnections,
     runCheckEmitterConnections,
     runCheckBoxSources,
-    runCheckTaskPriorities
+    runCheckTaskPriorities,
+    runCheckSystemExceptAction
 ) where
 import Semantic.Types
 import ControlFlow.Architecture.Types
@@ -43,3 +44,8 @@ runCheckTaskPriorities ::
     TerminaProgArch SemanticAnn
     -> Either ArchitectureError ()
 runCheckTaskPriorities = runReader (runExceptT checkTaskPriorities)
+
+runCheckSystemExceptAction ::
+    TerminaProgArch SemanticAnn
+    -> Either ArchitectureError ()
+runCheckSystemExceptAction = runReader (runExceptT checkSystemExceptAction)

@@ -120,6 +120,72 @@ spec = do
              ++ "task t2 : TimerTask = { ticks = 0, timer_port <- timer };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-001")
 
+    it "AE-010: reboot in the action that attends system_except" $ do
+      let src =
+            "handler class FaultHandler {\n" ++
+            "    faults : u32;\n" ++
+            "    except_port : sink Exception triggers on_fault;\n" ++
+            "    action on_fault(&priv self, _ex : Exception) {\n" ++
+            "        self->faults = self->faults + 1 : u32;\n" ++
+            "        reboot;\n" ++
+            "    }\n" ++
+            "};\n" ++
+            "handler fault_handler : FaultHandler = { faults = 0, except_port <- system_except };\n"
+      compileErrorCode src `shouldBe` Just (pack "AE-010")
+
+    it "AE-010: noreturn call in the action that attends system_except" $ do
+      let src =
+            "extern noreturn function jump_to_safe_image();\n" ++
+            "handler class FaultHandler {\n" ++
+            "    faults : u32;\n" ++
+            "    except_port : sink Exception triggers on_fault;\n" ++
+            "    action on_fault(&priv self, _ex : Exception) {\n" ++
+            "        self->faults = self->faults + 1 : u32;\n" ++
+            "        jump_to_safe_image();\n" ++
+            "    }\n" ++
+            "};\n" ++
+            "handler fault_handler : FaultHandler = { faults = 0, except_port <- system_except };\n"
+      compileErrorCode src `shouldBe` Just (pack "AE-010")
+
+    it "AE-011: send in the action that attends system_except" $ do
+      let src =
+            "handler class FaultHandler {\n" ++
+            "    faults : u32;\n" ++
+            "    except_port : sink Exception triggers on_fault;\n" ++
+            "    report_port : out u32;\n" ++
+            "    action on_fault(&priv self, _ex : Exception) {\n" ++
+            "        self->faults = self->faults + 1 : u32;\n" ++
+            "        self->report_port.send(self->faults);\n" ++
+            "        return;\n" ++
+            "    }\n" ++
+            "};\n" ++
+            "task class FdirTask {\n" ++
+            "    last : u32;\n" ++
+            "    reports : in u32 triggers on_report;\n" ++
+            "    action on_report(&priv self, code : u32) -> Status<i32> {\n" ++
+            "        self->last = self->last + code;\n" ++
+            returnSuccess ++
+            "    }\n" ++
+            "};\n" ++
+            "channel report_chan : MsgQueue<u32; 4>;\n" ++
+            "handler fault_handler : FaultHandler = { faults = 0, except_port <- system_except, report_port -> report_chan };\n" ++
+            "#[priority(10)]\n" ++
+            "task fdir : FdirTask = { last = 0, reports <- report_chan };\n"
+      compileErrorCode src `shouldBe` Just (pack "AE-011")
+
+    it "accepts a system_except action that neither reboots nor hands over" $ do
+      let src =
+            "handler class FaultHandler {\n" ++
+            "    faults : u32;\n" ++
+            "    except_port : sink Exception triggers on_fault;\n" ++
+            "    action on_fault(&priv self, _ex : Exception) {\n" ++
+            "        self->faults = self->faults + 1 : u32;\n" ++
+            "        return;\n" ++
+            "    }\n" ++
+            "};\n" ++
+            "handler fault_handler : FaultHandler = { faults = 0, except_port <- system_except };\n"
+      compileErrorCode src `shouldBe` Nothing
+
     it "AE-009: two tasks with the same priority" $ do
       let src = timerTaskClass
              ++ periodicEmitter "timer1" 1

@@ -35,6 +35,8 @@ data Error =
     | EUnusedResource Identifier -- ^ Unused resource (AE-007)
     | EUnusedPool Identifier -- ^ Unused pool (AE-008)
     | EDuplicatedTaskPriority Identifier Integer Identifier Location -- ^ Two tasks with the same priority (AE-009)
+    | EExitInSystemExceptAction Identifier Identifier -- ^ Reboot or noreturn call in the action that attends system_except (AE-010)
+    | ESendInSystemExceptAction Identifier Identifier -- ^ Send in the action that attends system_except (AE-011)
     deriving Show
 
 type ArchitectureError = AnnotatedError Error Location
@@ -89,6 +91,16 @@ instance Diagnosable Error where
                     emph (T.pack (show priority)) <> ", the same as task " <>
                     emph (T.pack prevTask) <> ". " <>
                     "No two tasks may share a priority.")
+    describe (EExitInSystemExceptAction cls action) =
+        diagnostic "AE-010" "reboot or noreturn call in the system exception action"
+            ("The action " <> emph (T.pack action) <> " of the handler class " <>
+                emph (T.pack cls) <> " attends system_except, and the system reboots once it has run. " <>
+                "It cannot reboot nor call a noreturn function.")
+    describe (ESendInSystemExceptAction cls action) =
+        diagnostic "AE-011" "send in the system exception action"
+            ("The action " <> emph (T.pack action) <> " of the handler class " <>
+                emph (T.pack cls) <> " attends system_except, and the system reboots once it has run. " <>
+                "A message sent from it would reach a task that never runs.")
     -- | Everything else is a broken invariant of the compiler, which has no code
     -- of its own.
     describe _ = diagnosticWithoutDetail "Internal" "internal error"

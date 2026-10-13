@@ -196,6 +196,17 @@ checkTaskPriorities loweredProject progArchitecture =
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
+checkSystemExceptAction :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
+checkSystemExceptAction loweredProject progArchitecture =
+  let result = runCheckSystemExceptAction progArchitecture in
+  case result of
+    Left err ->
+      let sourceFilesMap =
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
+                M.empty loweredProject in
+      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+    Right _ -> return ()
+
 checkPoolUsage :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
 checkPoolUsage loweredProject progArchitecture =
   let result = runCheckPoolUsage progArchitecture in
