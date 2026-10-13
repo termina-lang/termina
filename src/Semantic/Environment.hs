@@ -153,7 +153,24 @@ stdlibGlobalEnv outBufSize inBufSize =
         -- | Operation of the runtime that failed
         TUInt32,
         -- | Error code of the operating system
-        TInt32]
+        TInt32],
+      -- | Fault of the processor. The fields are numbers of the platform,
+      -- decoded with the platform at hand.
+      EnumVariant "EProcessorFault" [
+        -- | Exception number of the architecture
+        TUInt32,
+        -- | Fault status register, or 0 when there is none
+        TUInt32,
+        -- | Address of the instruction that failed, or 0 when unknown
+        TUSize,
+        -- | Faulting address, or 0 when the architecture gives none
+        TUSize],
+      -- | Fatal error raised by the operating system itself
+      EnumVariant "EKernelFailure" [
+        -- | Source of the fatal error, as the operating system numbers it
+        TUInt32,
+        -- | Code of the fatal error, which may be an address
+        TUSize]
       ] [])) Internal),
     -- | SysTime interface
     ("SysTime", LocatedElement (GType (Interface SystemInterface "SysTime" [] [
