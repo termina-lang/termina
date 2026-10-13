@@ -123,7 +123,9 @@ genMakefile params loweredProject mExtern =
                 ]
 
         externRule = [
-            MRule "$(EXTERN_OBJ)" ["$(EXTERN_OBJS)", "$(EXTERN_LIBS)"] [
+            -- | The Makefile holds the list of extern functions, so a new one
+            -- relinks the object even when no C changed
+            MRule "$(EXTERN_OBJ)" ["$(EXTERN_OBJS)", "$(EXTERN_LIBS)", "$R/Makefile"] [
                 MakeCommand False [MFragment "@echo Linking $@"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
                 MakeCommand False [MFragment "@$(call termina_extern_link,$@,$(EXTERN_OBJS),$(EXTERN_LIBS),$(EXTERN_SYMBOLS))"]
