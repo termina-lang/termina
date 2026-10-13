@@ -75,8 +75,21 @@ genEmitter (TPSystemInitEmitter emitterId _ ) = do
             Just (target, _, _) -> do
                 genElement target
                 genEventConnection emitterId target
-genEmitter (TPSystemExceptEmitter emitterId _ ) =
-    throwError $ "SystemExcept emitter " <> T.pack emitterId <> " not supported in PlantUML generation."
+genEmitter (TPSystemExceptEmitter emitterId _ ) = do
+    cmps <- ST.gets participants
+    if M.member emitterId cmps then
+        return ()
+    else do
+        progArch <- ST.gets arch
+        let emitterBoundary = PlantUMLCmpBoundary emitterId (Just $ T.pack "SystemExcept") (Just $ PlantUMLColorName "Red")
+        ST.modify $ \s -> s {
+            participants = M.insert emitterId emitterBoundary (participants s)
+        }
+        case M.lookup emitterId (emitterTargets progArch) of
+            Nothing -> throwError $ "Emitter " <> T.pack emitterId <> " has no target."
+            Just (target, _, _) -> do
+                genElement target
+                genEventConnection emitterId target
 
 genResourceAccesses :: Int -> Identifier -> [Identifier] -> PlantUMLCmpGenMonad a ()
 genResourceAccesses currentDepth entityId apConns = do

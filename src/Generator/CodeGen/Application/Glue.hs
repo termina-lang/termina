@@ -106,6 +106,8 @@ genInitEmitters progArchitecture = do
                 | any (\case { TPPeriodicTimerEmitter {} -> True; _ -> False }) installedEmitters]
             ++ [pre_cr $ var "interrupt_connection" termina__interrupt_connection_t
                 | any (\case { TPInterruptEmitter {} -> True; _ -> False }) installedEmitters]
+            ++ [pre_cr $ var "except_connection" termina__system_except_connection_t
+                | any (\case { TPSystemExceptEmitter {} -> True; _ -> False }) installedEmitters]
     initEmitter <- mapM genEmitterConnection installedEmitters
     return [pre_cr $ static_function (terminafy $ "app" <::> "init_emitters") ["status" @: (_const . ptr $ termina__error_code_t)] @-> void $
             trail_cr . block $ genStatusSteps declarations initEmitter | not (null initEmitter)]
@@ -227,6 +229,35 @@ genInitEmitters progArchitecture = do
                                 ]
                             ]
                     Nothing -> throwError $ InternalError $ "Invalid connection for interrupt: " ++ show targetEntity
+        -- | Only a handler can attend system_except (SE-219)
+        genEmitterConnection (TPSystemExceptEmitter systemExcept _) = do
+            emitterId <- genDefineEmitterIdLabel systemExcept
+            (targetEntity, targetPort) <- case M.lookup systemExcept (emitterTargets progArchitecture) of
+                Just (entity, port, _) -> return (entity, port)
+                Nothing -> throwError $ InternalError $ "System except emitter not connected: " ++ show systemExcept
+            case M.lookup targetEntity (handlers progArchitecture) of
+                Just (TPHandler identifier classId _ _ _ _ _ _) -> do
+                    let cls = handlerClasses progArchitecture M.! classId
+                        (_, targetAction) = sinkPorts cls M.! targetPort
+                        connection = "except_connection" @: termina__system_except_connection_t
+                    handlerId <- genDefineHandlerIdLabel identifier
+                    return [
+                            -- except_connection.handler_object = (void *)&identifier;
+                            pre_cr $ connection @. "handler_object" @: ptr void
+                                @= cast (ptr void) (addrOf (identifier @: typeDef classId)),
+                            -- except_connection.handler_id = handlerId;
+                            no_cr $ connection @. "handler_id" @: termina__id_t
+                                @= handlerId @: termina__id_t,
+                            -- except_connection.handler_action = &classId__targetAction;
+                            no_cr $ connection @. "handler_action" @: termina__system_except_action_t
+                                @= addrOf (classId <::> targetAction @: termina__system_except_action_t),
+                            -- termina__except__init_emitter(emitterId, &except_connection);
+                            pre_cr $ termina__except__init_emitter @@ [
+                                emitterId @: termina__id_t,
+                                addrOf connection
+                            ]
+                        ]
+                Nothing -> throwError $ InternalError $ "Invalid connection for system except: " ++ show targetEntity
         genEmitterConnection _ = throwError $ InternalError "Invalid event emitter"
 
 -- | Function termina__app__init_mutexes. This function is called from the

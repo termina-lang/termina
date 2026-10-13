@@ -6,6 +6,7 @@ module Pipeline.Common
   , runFullProjectAppWith
   , runTypedModule
   , systemInitConfig
+  , systemExceptConfig
   , renderMainFile
   , renderMainFileWith
   , renderInitFile
@@ -365,6 +366,11 @@ configParams = defaultConfig "test" TestPlatform
 -- default leaves switched off.
 systemInitConfig :: TerminaConfig
 systemInitConfig = configParams { enableSystemInit = True }
+
+-- | The configuration a project needs to connect @system_except@, which the
+-- default leaves switched off.
+systemExceptConfig :: TerminaConfig
+systemExceptConfig = configParams { enableSystemExcept = True }
 
 initialEnv :: TerminaConfig -> Environment
 initialEnv cfg = makeInitialGlobalEnv (Just cfg) TestPlatform

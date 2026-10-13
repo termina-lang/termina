@@ -324,9 +324,9 @@ genArchElement _ (TypeDefinition typeDef ann) = genArchTypeDef ann typeDef
 
 emptyTerminaProgArch :: TerminaConfig -> TerminaProgArch SemanticAnn
 emptyTerminaProgArch config = TerminaProgArch {
-  emitters = if enableSystemInit config then M.fromList [
-    ("system_init", TPSystemInitEmitter "system_init" (SemanticAnn (GTy (TGlobal EmitterClass "SystemInit")) Internal))
-  ] else M.empty,
+  emitters = M.fromList $
+    [("system_init", TPSystemInitEmitter "system_init" (SemanticAnn (GTy (TGlobal EmitterClass "SystemInit")) Internal)) | enableSystemInit config] ++
+    [("system_except", TPSystemExceptEmitter "system_except" (SemanticAnn (GTy (TGlobal EmitterClass "SystemExcept")) Internal)) | enableSystemExcept config],
   functions = M.empty,
   globalConstants = M.empty,
   emitterTargets = M.empty,
