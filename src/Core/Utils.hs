@@ -593,7 +593,7 @@ findClassViewerOrMethod i
     }
   )
 
-findClassAction :: Identifier -> [ ClassMember' ty blk a ] -> Maybe (Maybe (Parameter' ty a), ty a, a)
+findClassAction :: Identifier -> [ ClassMember' ty blk a ] -> Maybe (Maybe (Parameter' ty a), Maybe (ty a), a)
 findClassAction i
   =  fmap
   (\case {

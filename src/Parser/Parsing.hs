@@ -1276,7 +1276,7 @@ classActionParser = do
       ak <- selfAccessKindParser
       param <- optionMaybe (comma >> parameterParser)
       return (ak, param)
-  typeSpec <- reservedOp "->" >>  typeSpecifierParser
+  typeSpec <- optionMaybe (reservedOp "->" >> typeSpecifierParser)
   blockRet <- blockParser
   ClassAction ak name param typeSpec blockRet . Position current startPos <$> getPosition
 

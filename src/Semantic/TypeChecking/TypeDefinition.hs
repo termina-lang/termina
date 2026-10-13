@@ -344,21 +344,21 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
                   return (ps_ty, typed_bret)
               let newVw = SAST.ClassViewer mIdent ps_ty mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
               return (newVw : prevMembers)
-            ClassAction ak mIdent param ts mbody mann -> do
-              ty <- typeTypeSpecifier mann typeGlobalObject ts
+            ClassAction ak mIdent param mts mbody mann -> do
+              mty <- mapM (typeTypeSpecifier mann typeGlobalObject >=>
+                  (\ty -> checkReturnType mann ty >> return ty)) mts
               param_ty <- mapM (typeActionParameter mann) param
-              checkReturnType mann ty
-              typed_bret <- localScope $ do 
+              typed_bret <- localScope $ do
                   insertLocalImmutObj mann "self" (TReference ak (TGlobal kind ident))
                   mapM_ (\p_ty -> insertLocalImmutObj (getLocation (paramAnnotation p_ty)) (paramIdentifier p_ty) (paramType p_ty)) param_ty
-                  typeBlock (Just ty) mbody
-              let newAct = SAST.ClassAction ak mIdent param_ty ty typed_bret (buildExpAnn mann ty)
+                  typeBlock mty mbody
+              let newAct = SAST.ClassAction ak mIdent param_ty mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
               return (newAct : prevMembers)
         ) [] topSortOrder
     -- Check that the sink and in ports are well defined, i.e., that the actions
     -- triggered by the ports are defined in the class.
-    let ty_action_map = foldl (\accumulatedActions m -> 
-          case m of 
+    let ty_action_map = foldl (\accumulatedActions m ->
+          case m of
               ClassAction _ act mty _ _ actann  -> M.insert act (mty, getLocation actann) accumulatedActions
               _ -> accumulatedActions) M.empty fnChecked
     mapM_ (checkTriggeredAction ty_action_map) ty_fls

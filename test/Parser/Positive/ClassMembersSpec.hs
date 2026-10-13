@@ -3,8 +3,7 @@
 --
 --   * method / viewer : 0/1/many params, with and without return type
 --   * procedure / interface procedure : 0/1/many params, never a return type
---   * action : 0 or 1 param (single, optional); the parser currently requires a
---     return type (see TODO: actions should be allowed to return nothing)
+--   * action : 0 or 1 param (single, optional), with and without return type
 module Parser.Positive.ClassMembersSpec (spec) where
 
 import Parser.Common (parseWith, ctorName)
@@ -39,9 +38,10 @@ spec = describe "Parser: class members" $ do
     , ("many params", "procedure p(&mut self, x : u32, y : u32);")
     ]
 
-  describe "actions (0 or 1 param; return type currently required)" $ table classActionParser "ClassAction"
+  describe "actions (0 or 1 param, with and without return type)" $ table classActionParser "ClassAction"
     [ ("no param",  "action a(&priv self) -> u32 { return 0 : u32; }")
     , ("one param", "action a(&priv self, x : u32) -> u32 { return x; }")
+    , ("one param, no return", "action a(&priv self, x : Exception) { return; }")
     ]
 
   describe "viewers" $ table classViewerParser "ClassViewer"

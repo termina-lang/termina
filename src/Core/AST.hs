@@ -538,7 +538,7 @@ data ClassMember' ty blk a
       AccessKind  -- ^ access kind (immutable or private)
       Identifier  -- ^ name of the method
       (Maybe (Parameter' ty a)) -- ^ input parameter
-      (ty a) -- ^ type of the return value
+      (Maybe (ty a)) -- ^ type of the return value (optional)
       (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
   deriving (Show, Functor)

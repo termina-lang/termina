@@ -17,6 +17,7 @@ import Semantic.Errors
 -- Semantic Monad
 import Semantic.Monad
 import qualified Data.Map.Strict as M
+import Data.Maybe (fromMaybe)
 
 ----------------------------------------
 -- Libaries and stuff
@@ -1577,7 +1578,7 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection Inb
         \case
           LocatedElement (Class _ _ members _ _) _ -> 
             case findClassAction action members of
-              Just (_, rty, _) -> return rty
+              Just (_, rty, _) -> return (fromMaybe TUnit rty)
               Nothing -> throwError $ annotateError Internal EExpectedClassType
           _ -> throwError $ annotateError Internal EExpectedClassType
 

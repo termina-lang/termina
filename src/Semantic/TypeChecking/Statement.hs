@@ -363,7 +363,7 @@ typeStatement _rTy (ContinueStmt contE anns) =
                         case args of
                           [arg] -> do
                             typed_arg <- typeExpression (Just ty) typeRHSObject arg
-                            return (([param], [typed_arg]), rty)
+                            return (([param], [typed_arg]), fromMaybe TUnit rty)
                           [] -> throwError $ annotateError ann (EContinueActionMissingArgs (ident, loc))
                           _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [param], loc) (fromIntegral (length args)))
                     Just (Nothing, _, SemanticAnn _ loc) -> do

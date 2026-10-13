@@ -464,7 +464,7 @@ genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier _ _ _) an
                 _ -> genSelfParam clsdef
             return $ CExtDecl (CEDFunction storage [] retType clsFuncName ([cEventParam, cSelfParam] ++ cParamDecls)) (buildDeclarationAnn ann True)
         ClassAction ak action param rts _ _ -> do
-            retType <- genType noqual rts
+            retType <- maybe (return void) (genType noqual) rts
             cEventParam <- getEventParam
             cThisParam <- case ak of
                 Immutable -> genConstThisParam
@@ -729,7 +729,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                 (buildDeclarationAnn ann True)
         genClassFunctionDefinition (ClassAction ak action param rts (Block stmts _) ann) = do
             clsFuncName <- genClassFunctionName identifier action
-            cRetType <- genType noqual rts
+            cRetType <- maybe (return void) (genType noqual) rts
             cEventParam <- getEventParam
             cThisParam <-  case ak of
                 Immutable -> genConstThisParam
