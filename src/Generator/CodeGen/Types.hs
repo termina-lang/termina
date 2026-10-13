@@ -37,6 +37,19 @@ termina__error_code_t = typeDef "termina__error_code_t"
 termina__error__none :: CExpression
 termina__error__none = "termina__error__none" @: termina__error_code_t
 
+termina__error__invalid_id :: CExpression
+termina__error__invalid_id = "termina__error__invalid_id" @: termina__error_code_t
+
+-- | The operations of the runtime whose failure raises ERuntimeFailure, and
+-- the one the generated code reports: dispatching an event to the action of a
+-- task.
+termina__runtime_operation_t :: CType
+termina__runtime_operation_t = typeDef "termina__runtime_operation_t"
+
+termina__runtime_operation__task_dispatch :: CExpression
+termina__runtime_operation__task_dispatch =
+    "termina__runtime_operation__task_dispatch" @: termina__runtime_operation_t
+
 termina__lock_t, termina__resource_lock_type_t,
     termina__enum__resource_lock_type__mutex_params_t :: CType
 termina__lock_t = typeDef "termina__lock_t"
@@ -286,6 +299,16 @@ termina__except__action_failure = "termina__except__action_failure" @:
             _const size_t,
             -- | const int32_t error_code
             _const int32_t
+        ]
+
+termina__except__runtime_failure :: CExpression
+termina__except__runtime_failure = "termina__except__runtime_failure" @:
+    CTFunction void
+        [
+            -- | const termina__runtime_operation_t operation
+            _const termina__runtime_operation_t,
+            -- | const termina__error_code_t error_code
+            _const termina__error_code_t
         ]
 
 termina__exec__reboot :: CExpression

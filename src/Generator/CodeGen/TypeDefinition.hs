@@ -623,20 +623,30 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                                 addrOf ("event" @: termina__event_t),
                                 addrOf ("status" @: termina__error_code_t)
                             ],
-                    -- if (status != Status__Success)
+                    -- if (status != termina__error__none)
                     pre_cr $ _if
                             ("status" @: termina__error_code_t @!= termina__error__none)
                         $ block [
-                            -- break;
-                            no_cr _break
+                            -- termina__except__msg_queue_recv_error(
+                            --     self->_task_msg_queue_id, status);
+                            no_cr $ termina__except__msg_queue_recv_error @@ [
+                                ("self" @: ptr classStructType) @. taskMsgQueueIDField @: termina__id_t,
+                                "status" @: termina__error_code_t
+                            ]
                         ],
                     pre_cr $ _switch ("event" @: termina__event_t @. "port_id" @: termina__id_t) $
                         trail_cr . block $ (cases ++
                             [
-                                -- default:
+                                -- default: the event names a port the task
+                                -- does not have, so the event is corrupted
                                 pre_cr $ _default $
-                                    -- termina__exec__reboot(1);
-                                    indent . pre_cr $ termina__exec__reboot @@ [],
+                                    -- termina__except__runtime_failure(
+                                    --     termina__runtime_operation__task_dispatch,
+                                    --     termina__error__invalid_id);
+                                    indent . pre_cr $ termina__except__runtime_failure @@ [
+                                        termina__runtime_operation__task_dispatch,
+                                        termina__error__invalid_id
+                                    ],
                                     indent . pre_cr $ _break
                             ])
                 ]

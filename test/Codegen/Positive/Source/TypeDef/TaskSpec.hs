@@ -165,7 +165,8 @@ spec = do
               "        termina__msg_queue__recv(self->_task_msg_queue_id, &event, &status);\n" ++
               "\n" ++
               "        if (status != termina__error__none) {\n" ++
-              "            break;\n" ++
+              "            termina__except__msg_queue_recv_error(self->_task_msg_queue_id,\n" ++
+              "                                                  status);\n" ++
               "        }\n" ++
               "\n" ++
               "        switch (event.port_id) {\n" ++
@@ -198,7 +199,8 @@ spec = do
               "\n" ++
               "            default:\n" ++
               "\n" ++
-              "                termina__exec__reboot();\n" ++
+              "                termina__except__runtime_failure(termina__runtime_operation__task_dispatch,\n" ++
+              "                                                 termina__error__invalid_id);\n" ++
               "\n" ++
               "                break;\n" ++
               "\n" ++
