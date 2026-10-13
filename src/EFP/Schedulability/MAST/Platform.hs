@@ -10,7 +10,7 @@ import qualified Data.Text as T
 import Configuration.Configuration
 import Utils.Annotations
 import EFP.Schedulability.MAST.Errors
-import qualified EFP.Schedulability.MAST.Platform.RTEMS5LEON3NEXYSA7 as RTEMS5LEON3NEXYSA7
+import qualified EFP.Schedulability.MAST.Platform.RTEMS5LEON3SFNEXYSA7 as RTEMS5LEON3SFNEXYSA7
 import Control.Monad.State
 import EFP.Schedulability.MAST.Utils
 
@@ -25,33 +25,33 @@ getProcessingResources = do
     plt <- getPlatform
     tick <- gets (microsecondsPerTick . configParams)
     case plt of
-        RTEMS5LEON3NEXYSA7 -> return $ RTEMS5LEON3NEXYSA7.getProcessingResources (fromIntegral tick / 1.0e6)
+        RTEMS5LEON3SFNEXYSA7 -> return $ RTEMS5LEON3SFNEXYSA7.getProcessingResources (fromIntegral tick / 1.0e6)
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 
 getSchedulers :: MASTGenMonad (M.Map Identifier MASTScheduler)
 getSchedulers = do
     plt <- getPlatform
     case plt of
-        RTEMS5LEON3NEXYSA7 -> return RTEMS5LEON3NEXYSA7.getSchedulers
+        RTEMS5LEON3SFNEXYSA7 -> return RTEMS5LEON3SFNEXYSA7.getSchedulers
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 
 getTaskPriority :: TPTask a -> MASTGenMonad Priority
 getTaskPriority task = do
     plt <- getPlatform
     case plt of
-        RTEMS5LEON3NEXYSA7 -> return $ RTEMS5LEON3NEXYSA7.getTaskPriority task
+        RTEMS5LEON3SFNEXYSA7 -> return $ RTEMS5LEON3SFNEXYSA7.getTaskPriority task
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 
 getEmitterPriority :: TPEmitter a -> MASTGenMonad Priority
 getEmitterPriority (TPInterruptEmitter emitterId _) = do
     plt <- getPlatform
     case plt of
-        RTEMS5LEON3NEXYSA7 -> RTEMS5LEON3NEXYSA7.getIrqPriority emitterId
+        RTEMS5LEON3SFNEXYSA7 -> RTEMS5LEON3SFNEXYSA7.getIrqPriority emitterId
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 getEmitterPriority (TPPeriodicTimerEmitter {}) = do
     plt <- getPlatform
     case plt of
-        RTEMS5LEON3NEXYSA7 -> RTEMS5LEON3NEXYSA7.getTimerIrqPriority
+        RTEMS5LEON3SFNEXYSA7 -> RTEMS5LEON3SFNEXYSA7.getTimerIrqPriority
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 getEmitterPriority (TPSystemInitEmitter {}) = throwError . annotateError Internal $ EUnsupportedSystemInitEmitter
 getEmitterPriority (TPSystemExceptEmitter {}) = throwError . annotateError Internal $ EUnsupportedSystemExceptEmitter
@@ -60,26 +60,26 @@ genTaskSchedulingServer :: TPTask a -> MASTGenMonad MASTSchedulingServer
 genTaskSchedulingServer task = do
     plt <- getPlatform
     case plt of
-        RTEMS5LEON3NEXYSA7 -> return $ RTEMS5LEON3NEXYSA7.genTaskSchedulingServer task
+        RTEMS5LEON3SFNEXYSA7 -> return $ RTEMS5LEON3SFNEXYSA7.genTaskSchedulingServer task
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 
 getProcessingResource :: Identifier -> MASTGenMonad Identifier
 getProcessingResource componentId = do
     plt <- getPlatform
     case plt of
-        RTEMS5LEON3NEXYSA7 -> return $ RTEMS5LEON3NEXYSA7.getProcessingResource componentId
+        RTEMS5LEON3SFNEXYSA7 -> return $ RTEMS5LEON3SFNEXYSA7.getProcessingResource componentId
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 
 genIrqLockSharedResource :: Identifier -> MASTGenMonad ()
 genIrqLockSharedResource resourceId = do
     plt <- getPlatform
     case plt of
-        RTEMS5LEON3NEXYSA7 -> do
-            let irqLockOperation = RTEMS5LEON3NEXYSA7.genIrqLockOperation resourceId
+        RTEMS5LEON3SFNEXYSA7 -> do
+            let irqLockOperation = RTEMS5LEON3SFNEXYSA7.genIrqLockOperation resourceId
             insertOperation irqLockOperation
-            let irqUnlockOperation = RTEMS5LEON3NEXYSA7.genIrqUnlockOperation resourceId
+            let irqUnlockOperation = RTEMS5LEON3SFNEXYSA7.genIrqUnlockOperation resourceId
             insertOperation irqUnlockOperation
-            let sharedResource = RTEMS5LEON3NEXYSA7.genIrqSharedResource resourceId
+            let sharedResource = RTEMS5LEON3SFNEXYSA7.genIrqSharedResource resourceId
             insertSharedResource sharedResource
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 
@@ -87,12 +87,12 @@ genMutexLockSharedResource :: Identifier -> AnyPriority -> MASTGenMonad ()
 genMutexLockSharedResource resourceId ceil = do
     plt <- getPlatform
     case plt of
-        RTEMS5LEON3NEXYSA7 -> do
-            let mutexLockOperation = RTEMS5LEON3NEXYSA7.genMutexLockOperation resourceId
+        RTEMS5LEON3SFNEXYSA7 -> do
+            let mutexLockOperation = RTEMS5LEON3SFNEXYSA7.genMutexLockOperation resourceId
             insertOperation mutexLockOperation
-            let mutexUnlockOperation = RTEMS5LEON3NEXYSA7.genMutexUnlockOperation resourceId
+            let mutexUnlockOperation = RTEMS5LEON3SFNEXYSA7.genMutexUnlockOperation resourceId
             insertOperation mutexUnlockOperation
-            let sharedResource = RTEMS5LEON3NEXYSA7.genMutexSharedResource resourceId ceil
+            let sharedResource = RTEMS5LEON3SFNEXYSA7.genMutexSharedResource resourceId ceil
             insertSharedResource sharedResource
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 
@@ -100,19 +100,19 @@ genUnprotectedPool :: Identifier -> MASTGenMonad ()
 genUnprotectedPool poolId = do
     plt <- getPlatform
     case plt of
-        RTEMS5LEON3NEXYSA7 -> do
-            insertOperation $ RTEMS5LEON3NEXYSA7.genUnprotectedAllocBoxOperation poolId
-            insertOperation $ RTEMS5LEON3NEXYSA7.genUnprotectedFreeBoxOperation poolId
+        RTEMS5LEON3SFNEXYSA7 -> do
+            insertOperation $ RTEMS5LEON3SFNEXYSA7.genUnprotectedAllocBoxOperation poolId
+            insertOperation $ RTEMS5LEON3SFNEXYSA7.genUnprotectedFreeBoxOperation poolId
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 
 genIrqLockSharedPool :: Identifier -> MASTGenMonad ()
 genIrqLockSharedPool poolId = do
     plt <- getPlatform
     case plt of
-        RTEMS5LEON3NEXYSA7 -> do
-            insertOperation $ RTEMS5LEON3NEXYSA7.genIrqLockAllocBoxOperation poolId
-            insertOperation $ RTEMS5LEON3NEXYSA7.genIrqUnlockFreeBoxOperation poolId
-            let sharedResource = RTEMS5LEON3NEXYSA7.genIrqSharedResource poolId
+        RTEMS5LEON3SFNEXYSA7 -> do
+            insertOperation $ RTEMS5LEON3SFNEXYSA7.genIrqLockAllocBoxOperation poolId
+            insertOperation $ RTEMS5LEON3SFNEXYSA7.genIrqUnlockFreeBoxOperation poolId
+            let sharedResource = RTEMS5LEON3SFNEXYSA7.genIrqSharedResource poolId
             insertSharedResource sharedResource
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 
@@ -120,10 +120,10 @@ genMutexLockSharedPool :: Identifier -> AnyPriority -> MASTGenMonad ()
 genMutexLockSharedPool poolId ceil = do
     plt <- getPlatform
     case plt of
-        RTEMS5LEON3NEXYSA7 -> do
-            insertOperation $ RTEMS5LEON3NEXYSA7.genMutexLockAllocBoxOperation poolId
-            insertOperation $ RTEMS5LEON3NEXYSA7.genMutexUnlockFreeBoxOperation poolId
-            let sharedResource = RTEMS5LEON3NEXYSA7.genMutexSharedResource poolId ceil
+        RTEMS5LEON3SFNEXYSA7 -> do
+            insertOperation $ RTEMS5LEON3SFNEXYSA7.genMutexLockAllocBoxOperation poolId
+            insertOperation $ RTEMS5LEON3SFNEXYSA7.genMutexUnlockFreeBoxOperation poolId
+            let sharedResource = RTEMS5LEON3SFNEXYSA7.genMutexSharedResource poolId ceil
             insertSharedResource sharedResource
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 
@@ -131,33 +131,33 @@ genTimerTopHalfMASTOperation :: MASTGenMonad MASTOperation
 genTimerTopHalfMASTOperation = do
     plt <- getPlatform
     case plt of
-        RTEMS5LEON3NEXYSA7 -> return RTEMS5LEON3NEXYSA7.timerTopHalfMASTOperation
+        RTEMS5LEON3SFNEXYSA7 -> return RTEMS5LEON3SFNEXYSA7.timerTopHalfMASTOperation
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 
 genTimerTopHalfSchedulingServer :: MASTGenMonad MASTSchedulingServer
 genTimerTopHalfSchedulingServer = do
     plt <- getPlatform
     case plt of
-        RTEMS5LEON3NEXYSA7 -> return RTEMS5LEON3NEXYSA7.timerTopHalfSchedulingServer
+        RTEMS5LEON3SFNEXYSA7 -> return RTEMS5LEON3SFNEXYSA7.timerTopHalfSchedulingServer
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 
 genIrqTopHalfMASTOperation :: Identifier -> MASTGenMonad MASTOperation
 genIrqTopHalfMASTOperation emitterId = do
     plt <- getPlatform
     case plt of
-        RTEMS5LEON3NEXYSA7 -> return $ RTEMS5LEON3NEXYSA7.irqTopHalfMASTOperation emitterId
+        RTEMS5LEON3SFNEXYSA7 -> return $ RTEMS5LEON3SFNEXYSA7.irqTopHalfMASTOperation emitterId
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 
 genIrqHandlerSchedulingServer :: Identifier -> MASTGenMonad MASTSchedulingServer
 genIrqHandlerSchedulingServer emitterId = do
     plt <- getPlatform
     case plt of
-        RTEMS5LEON3NEXYSA7 -> RTEMS5LEON3NEXYSA7.genIrqHandlerSchedulingServer emitterId
+        RTEMS5LEON3SFNEXYSA7 -> RTEMS5LEON3SFNEXYSA7.genIrqHandlerSchedulingServer emitterId
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
 
 genSystemCallMASTOperations :: MASTGenMonad (M.Map Identifier MASTOperation)
 genSystemCallMASTOperations = do
     plt <- getPlatform
     case plt of
-        RTEMS5LEON3NEXYSA7 -> return $ M.fromList RTEMS5LEON3NEXYSA7.genSystemCallMASTOperations
+        RTEMS5LEON3SFNEXYSA7 -> return $ M.fromList RTEMS5LEON3SFNEXYSA7.genSystemCallMASTOperations
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)

@@ -109,7 +109,7 @@ devcontainerContent project = unlines [
 -- for the Nucleo board, and hw_server, whose first core listens on port 3000,
 -- for the PYNQ-Z2 board.
 gdbServerAddress :: Platform -> Maybe String
-gdbServerAddress RTEMS5LEON3NEXYSA7 = Just "host.docker.internal:2222"
+gdbServerAddress RTEMS5LEON3SFNEXYSA7 = Just "host.docker.internal:2222"
 gdbServerAddress FreeRTOS10STM32L432NUCLEOL432KC = Just "host.docker.internal:61234"
 gdbServerAddress RTEMS6ZYNQ7000PYNQZ2 = Just "host.docker.internal:3000"
 gdbServerAddress _ = Nothing

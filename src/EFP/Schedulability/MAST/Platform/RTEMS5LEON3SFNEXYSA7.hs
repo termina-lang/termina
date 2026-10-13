@@ -1,4 +1,4 @@
-module EFP.Schedulability.MAST.Platform.RTEMS5LEON3NEXYSA7 where
+module EFP.Schedulability.MAST.Platform.RTEMS5LEON3SFNEXYSA7 where
 
 import EFP.Schedulability.MAST.AST
 import EFP.Schedulability.MAST.Monad

@@ -5,14 +5,14 @@ module Configuration.Platform where
 import Data.Yaml
 import qualified Data.Map.Strict as M
 import Core.AST (Identifier)
-import Configuration.Platform.RTEMS5LEON3NEXYSA7
+import Configuration.Platform.RTEMS5LEON3SFNEXYSA7
 import Configuration.Platform.POSIXGCC
 import Configuration.Platform.FreeRTOS10STM32L432NUCLEOL432KC
 import Configuration.Platform.RTEMS6ZYNQ7000PYNQZ2
 
 data Platform =
     POSIXGCC
-    | RTEMS5LEON3NEXYSA7
+    | RTEMS5LEON3SFNEXYSA7
     | FreeRTOS10STM32L432NUCLEOL432KC
     | RTEMS6ZYNQ7000PYNQZ2
     | TestPlatform
@@ -25,7 +25,7 @@ data Platform =
 -- host would warrant a separate platform (e.g. @POSIXGCC32b@).
 usizeWidth :: Platform -> Integer
 usizeWidth POSIXGCC                        = 64
-usizeWidth RTEMS5LEON3NEXYSA7              = 32
+usizeWidth RTEMS5LEON3SFNEXYSA7              = 32
 usizeWidth FreeRTOS10STM32L432NUCLEOL432KC = 32
 usizeWidth RTEMS6ZYNQ7000PYNQZ2            = 32
 usizeWidth TestPlatform                    = 32
@@ -37,7 +37,7 @@ usizeWidth TestPlatform                    = 32
 -- A type as wide as @int@, or wider, is not promoted and wraps on its own.
 intWidth :: Platform -> Integer
 intWidth POSIXGCC                        = 32
-intWidth RTEMS5LEON3NEXYSA7              = 32
+intWidth RTEMS5LEON3SFNEXYSA7              = 32
 intWidth FreeRTOS10STM32L432NUCLEOL432KC = 32
 intWidth RTEMS6ZYNQ7000PYNQZ2            = 32
 intWidth TestPlatform                    = 32
@@ -51,7 +51,7 @@ intWidth TestPlatform                    = 32
 -- misaligned accesses (x86) do not need the restriction.
 strictAlignment :: Platform -> Bool
 strictAlignment POSIXGCC                        = False   -- x86 host: misaligned access is fine
-strictAlignment RTEMS5LEON3NEXYSA7              = True    -- SPARC/LEON3: traps
+strictAlignment RTEMS5LEON3SFNEXYSA7              = True    -- SPARC/LEON3: traps
 strictAlignment FreeRTOS10STM32L432NUCLEOL432KC = True    -- Cortex-M: conservative
 strictAlignment RTEMS6ZYNQ7000PYNQZ2            = True    -- Cortex-A9: conservative
 strictAlignment TestPlatform                    = True
@@ -70,7 +70,7 @@ strictAlignment TestPlatform                    = True
 -- rule out significant-character collisions, so no pairwise analysis is needed.
 maxIdentifierLength :: Platform -> Maybe Integer
 maxIdentifierLength POSIXGCC                        = Nothing
-maxIdentifierLength RTEMS5LEON3NEXYSA7              = Nothing
+maxIdentifierLength RTEMS5LEON3SFNEXYSA7              = Nothing
 maxIdentifierLength FreeRTOS10STM32L432NUCLEOL432KC = Nothing
 maxIdentifierLength RTEMS6ZYNQ7000PYNQZ2            = Nothing
 maxIdentifierLength TestPlatform                    = Nothing
@@ -80,13 +80,13 @@ maxIdentifierLength TestPlatform                    = Nothing
 -- type of the period is the only bound.
 maxTimerPeriodTicks :: Platform -> Maybe Integer
 maxTimerPeriodTicks POSIXGCC                        = Nothing
-maxTimerPeriodTicks RTEMS5LEON3NEXYSA7              = Just 0xFFFFFFFF
+maxTimerPeriodTicks RTEMS5LEON3SFNEXYSA7              = Just 0xFFFFFFFF
 maxTimerPeriodTicks FreeRTOS10STM32L432NUCLEOL432KC = Just 0xFFFFFFFF
 maxTimerPeriodTicks RTEMS6ZYNQ7000PYNQZ2            = Just 0xFFFFFFFF
 maxTimerPeriodTicks TestPlatform                    = Just 0xFFFFFFFF
 
 data PlatformFlags = PlatformFlags {
-    rtems5_leon3_nexysa7        :: RTEMS5LEON3NEXYSA7Flags,
+    rtems5_leon3sf_nexysa7        :: RTEMS5LEON3SFNEXYSA7Flags,
     posix_gcc                :: POSIXGCCFlags,
     freertos10_stm32l432_nucleol432kc   :: FreeRTOS10STM32L432NUCLEOL432KCFlags,
     rtems6_zynq7000_pynqz2   :: RTEMS6ZYNQ7000PYNQZ2Flags
@@ -98,7 +98,7 @@ data PlatformFlags = PlatformFlags {
 getPlatformInterruptMap :: Platform -> M.Map Identifier Integer
 getPlatformInterruptMap POSIXGCC =
     M.fromList [("kbd_irq", 0)]
-getPlatformInterruptMap RTEMS5LEON3NEXYSA7 =
+getPlatformInterruptMap RTEMS5LEON3SFNEXYSA7 =
     M.fromList [("irq_1", 1), ("irq_2", 2), ("irq_3", 3), ("irq_4", 4), 
                 ("irq_5", 5), ("irq_6", 6), ("irq_7", 7), ("irq_8", 8), 
                 ("irq_9", 9), ("irq_10", 10), ("irq_11", 11), ("irq_12", 12), 
@@ -244,7 +244,7 @@ interruptTableSize plt =
 
 defaultPlatformFlags :: PlatformFlags
 defaultPlatformFlags = PlatformFlags {
-    rtems5_leon3_nexysa7      = defaultRTEMS5LEON3NEXYSA7Flags,
+    rtems5_leon3sf_nexysa7      = defaultRTEMS5LEON3SFNEXYSA7Flags,
     posix_gcc              = defaultPOSIXGCCFlags,
     freertos10_stm32l432_nucleol432kc = defaultFreeRTOS10STM32L432NUCLEOL432KCFlags,
     rtems6_zynq7000_pynqz2 = defaultRTEMS6ZYNQ7000PYNQZ2Flags
@@ -253,7 +253,7 @@ defaultPlatformFlags = PlatformFlags {
 instance FromJSON PlatformFlags where
   parseJSON (Object o) =
     PlatformFlags <$>
-    o .:? "rtems5-leon3-nexysa7"      .!= defaultRTEMS5LEON3NEXYSA7Flags <*>
+    o .:? "rtems5-leon3sf-nexysa7"      .!= defaultRTEMS5LEON3SFNEXYSA7Flags <*>
     o .:? "posix-gcc"              .!= defaultPOSIXGCCFlags <*>
     o .:? "freertos10-stm32l432-nucleol432kc" .!= defaultFreeRTOS10STM32L432NUCLEOL432KCFlags <*>
     o .:? "rtems6-zynq7000-pynqz2" .!= defaultRTEMS6ZYNQ7000PYNQZ2Flags
@@ -261,7 +261,7 @@ instance FromJSON PlatformFlags where
 
 instance Show Platform where
     show POSIXGCC = "posix-gcc"
-    show RTEMS5LEON3NEXYSA7 = "rtems5-leon3-nexysa7"
+    show RTEMS5LEON3SFNEXYSA7 = "rtems5-leon3sf-nexysa7"
     show FreeRTOS10STM32L432NUCLEOL432KC = "freertos10-stm32l432-nucleol432kc"
     show RTEMS6ZYNQ7000PYNQZ2 = "rtems6-zynq7000-pynqz2"
     show TestPlatform = "test-platform"
@@ -269,12 +269,12 @@ instance Show Platform where
 instance ToJSON PlatformFlags where
     toJSON (
         PlatformFlags
-            flagsRTEMSLEON3NEXYSA7
+            flagsRTEMS5LEON3SFNEXYSA7
             flagsPOSIXGCC
             flagsFreeRTOS10STM32L432NUCLEOL432KC
             flagsRTEMS6ZYNQ7000PYNQZ2
         ) = object [
-            "rtems5-leon3-nexysa7"      .= flagsRTEMSLEON3NEXYSA7,
+            "rtems5-leon3sf-nexysa7"      .= flagsRTEMS5LEON3SFNEXYSA7,
             "posix-gcc"              .= flagsPOSIXGCC,
             "freertos10-stm32l432-nucleol432kc" .= flagsFreeRTOS10STM32L432NUCLEOL432KC,
             "rtems6-zynq7000-pynqz2" .= flagsRTEMS6ZYNQ7000PYNQZ2
@@ -282,7 +282,7 @@ instance ToJSON PlatformFlags where
 
 checkPlatform :: String -> Maybe Platform
 checkPlatform "posix-gcc" = Just POSIXGCC
-checkPlatform "rtems5-leon3-nexysa7" = Just RTEMS5LEON3NEXYSA7
+checkPlatform "rtems5-leon3sf-nexysa7" = Just RTEMS5LEON3SFNEXYSA7
 checkPlatform "freertos10-stm32l432-nucleol432kc" = Just FreeRTOS10STM32L432NUCLEOL432KC
 checkPlatform "rtems6-zynq7000-pynqz2" = Just RTEMS6ZYNQ7000PYNQZ2
 checkPlatform _ = Nothing
@@ -290,7 +290,7 @@ checkPlatform _ = Nothing
 supportedPlatforms :: [(Platform, String)]
 supportedPlatforms = [
         (POSIXGCC, "POSIX on GCC"),
-        (RTEMS5LEON3NEXYSA7, "RTEMS version 5 for LEON3 Nexys A7 board"),
+        (RTEMS5LEON3SFNEXYSA7, "RTEMS version 5 for LEON3 Nexys A7 board, soft-float"),
         (FreeRTOS10STM32L432NUCLEOL432KC, "FreeRTOS V10 for STM32L432 NUCLEO-L432KC board"),
         (RTEMS6ZYNQ7000PYNQZ2, "RTEMS version 6 for Zynq-7000 PYNQ-Z2 board")
     ]

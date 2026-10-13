@@ -17,7 +17,7 @@ import Test.Hspec
 manifest :: String -> BS.ByteString
 manifest extra = BS.pack $
   "name: test\n" ++
-  "platform: rtems5-leon3-nexysa7\n" ++
+  "platform: rtems5-leon3sf-nexysa7\n" ++
   "source-modules: src\n" ++
   "output-folder: output\n" ++
   "builder: make\n" ++
@@ -35,9 +35,9 @@ spec = describe "Manifest: extern section" $ do
        "  sources:\n" ++
        "    - crc.c\n" ++
        "  libraries:\n" ++
-       "    rtems5-leon3-nexysa7:\n" ++
+       "    rtems5-leon3sf-nexysa7:\n" ++
        "      - leon3sf/libmcs.a\n"))
-      `shouldBe` Just (ExternConfig ["crc.c"] (M.fromList [(T.pack "rtems5-leon3-nexysa7", ["leon3sf/libmcs.a"])]))
+      `shouldBe` Just (ExternConfig ["crc.c"] (M.fromList [(T.pack "rtems5-leon3sf-nexysa7", ["leon3sf/libmcs.a"])]))
 
   it "has no C when the section is absent" $
     parsedExtern (manifest "") `shouldBe` Just (ExternConfig [] M.empty)
