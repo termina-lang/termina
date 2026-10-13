@@ -3,6 +3,8 @@
 module Configuration.Platform where
 
 import Data.Yaml
+import qualified Data.Aeson.Key as K
+import qualified Data.Aeson.KeyMap as KM
 import qualified Data.Map.Strict as M
 import Core.AST (Identifier)
 import Configuration.Platform.RTEMS5LEON3SFNEXYSA7
@@ -251,12 +253,17 @@ defaultPlatformFlags = PlatformFlags {
 }
 
 instance FromJSON PlatformFlags where
-  parseJSON (Object o) =
+  parseJSON (Object o) = do
+    -- | A key that names no platform would be ignored, and the flags under it
+    -- would be lost without a word
+    mapM_ (\key -> case checkPlatform (K.toString key) of
+        Nothing -> fail $ "Unknown platform \"" ++ K.toString key ++ "\" in the platform flags"
+        Just _ -> return ()) (KM.keys o)
     PlatformFlags <$>
-    o .:? "rtems5-leon3sf-nexysa7"      .!= defaultRTEMS5LEON3SFNEXYSA7Flags <*>
-    o .:? "posix-gcc"              .!= defaultPOSIXGCCFlags <*>
-    o .:? "freertos10-stm32l432-nucleol432kc" .!= defaultFreeRTOS10STM32L432NUCLEOL432KCFlags <*>
-    o .:? "rtems6-zynq7000-pynqz2" .!= defaultRTEMS6ZYNQ7000PYNQZ2Flags
+      o .:? "rtems5-leon3sf-nexysa7"      .!= defaultRTEMS5LEON3SFNEXYSA7Flags <*>
+      o .:? "posix-gcc"              .!= defaultPOSIXGCCFlags <*>
+      o .:? "freertos10-stm32l432-nucleol432kc" .!= defaultFreeRTOS10STM32L432NUCLEOL432KCFlags <*>
+      o .:? "rtems6-zynq7000-pynqz2" .!= defaultRTEMS6ZYNQ7000PYNQZ2Flags
   parseJSON _ = fail "Expected configuration object"
 
 instance Show Platform where
