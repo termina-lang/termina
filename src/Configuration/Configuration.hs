@@ -2,6 +2,7 @@
 
 module Configuration.Configuration (
     TerminaConfig(..),
+    ExternConfig(..),
     ProjectProfile(..),
     ProjectBuilder(..),
     defaultConfig,
@@ -13,11 +14,34 @@ module Configuration.Configuration (
 ) where
 
 import qualified Data.Text as T
+import qualified Data.Map.Strict as M
 import Data.Yaml
 
 import Configuration.Platform
 
 data ProjectProfile = Debug | Release deriving (Eq, Show)
+
+-- | The C of the project, in the "extern" folder: the sources compiled with
+-- the generated code, and the precompiled libraries of each platform. The
+-- paths are relative to the "extern" folder.
+data ExternConfig = ExternConfig {
+    externSources :: ![FilePath],
+    externLibraries :: !(M.Map T.Text [FilePath])
+  } deriving (Eq, Show)
+
+emptyExternConfig :: ExternConfig
+emptyExternConfig = ExternConfig [] M.empty
+
+instance FromJSON ExternConfig where
+  parseJSON (Object o) =
+    ExternConfig <$>
+    o .:? "sources" .!= [] <*>
+    o .:? "libraries" .!= M.empty
+  parseJSON _ = fail "Expected extern object"
+
+instance ToJSON ExternConfig where
+  toJSON (ExternConfig srcs libs) = object $
+    ["sources" .= srcs | not (null srcs)] <> ["libraries" .= libs | not (M.null libs)]
 
 defaultSysPrintOutputBufferSize, defaultSysReadInputBufferSize :: Integer
 defaultSysPrintOutputBufferSize = 256
@@ -74,7 +98,8 @@ data TerminaConfig =
     microsecondsPerTick :: !Integer,
     enableSystemExcept :: !Bool,
     builder :: !ProjectBuilder,
-    platformFlags :: !PlatformFlags
+    platformFlags :: !PlatformFlags,
+    externConfig :: !ExternConfig
   } deriving (Eq, Show)
 
 -- | Instance for parsing the "termina.yaml" configuration file
@@ -94,7 +119,8 @@ instance FromJSON TerminaConfig where
     (o .:?  "microseconds-per-tick" .!= defaultMicrosecondsPerTick >>= tickLength) <*>
     o .:?  "enable-system-except" .!= False <*>
     o .:   "builder" <*>
-    o .:?  "platform-flags" .!= defaultPlatformFlags
+    o .:?  "platform-flags" .!= defaultPlatformFlags <*>
+    o .:?  "extern" .!= emptyExternConfig
 
     where
 
@@ -122,6 +148,7 @@ instance ToJSON TerminaConfig where
             prjEnableSystemExcept
             prjBuilder
             prjPlatformFlags
+            prjExternConfig
         ) = object $ [
             "name" .= prjName,
             "platform" .= prjPlatform,
@@ -146,6 +173,7 @@ instance ToJSON TerminaConfig where
                 "freertos10-stm32l432-nucleol432kc" -> ["platform-flags" .= object ["freertos10-stm32l432-nucleol432kc" .= freertos10_stm32l432_nucleol432kc prjPlatformFlags]]
                 "rtems6-zynq7000-pynqz2" -> ["platform-flags" .= object ["rtems6-zynq7000-pynqz2" .= rtems6_zynq7000_pynqz2 prjPlatformFlags]]
                 _ -> []
+            <> ["extern" .= prjExternConfig | prjExternConfig /= emptyExternConfig]
 
 defaultConfig :: String -> Platform -> TerminaConfig
 defaultConfig projectName plt = TerminaConfig {
@@ -162,5 +190,6 @@ defaultConfig projectName plt = TerminaConfig {
     microsecondsPerTick = defaultMicrosecondsPerTick,
     enableSystemExcept = False,
     builder = Make,
-    platformFlags = defaultPlatformFlags
+    platformFlags = defaultPlatformFlags,
+    externConfig = emptyExternConfig
 }

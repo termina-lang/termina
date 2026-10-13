@@ -40,6 +40,7 @@ import System.Environment
 import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
 import EFP.Schedulability.WCEPath.Printer
 import Command.Common
+import Command.Extern (prepareExtern)
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.PlantUML
 import Extras.PlantUML.Printer
@@ -401,6 +402,9 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     unless existSourceFolder (die . errorMessage $ "Source folder \"" ++ sourceModulesFolder config ++ "\" does not exist")
     existAppFolder <- doesDirectoryExist appFolder
     unless existAppFolder (die . errorMessage $ "Application folder \"" ++ appFolder ++ "\" does not exist")
+    -- | Check the C of the project and copy it to the output folder
+    when chatty (putStrLn . debugMessage $ "Checking the extern C of the project")
+    mExtern <- prepareExtern config
     -- | Create output header and source folder if it does not exist
     let outputSrcFolder = outputFolder config </> "src"
     let outputIncludeFolder = outputFolder config </> "include"
@@ -464,7 +468,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     when chatty (putStrLn . debugMessage $ "Generating code")
     genModules config plt monadicTypes elaboratedProject
     genInitFile config plt elaboratedProject (qualifiedName appModule)
-    genPlatformCode config plt loweredProject (qualifiedName appModule) programArchitecture
+    genPlatformCode config plt loweredProject (qualifiedName appModule) programArchitecture mExtern
     genChecksReportFile config loweredProject checksReports
     unless (S.null (S.filter (\case {
         TStruct _ -> False;

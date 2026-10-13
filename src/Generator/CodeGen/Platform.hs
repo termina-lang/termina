@@ -16,6 +16,7 @@ import Command.Types
 import Configuration.Platform
 import Generator.CodeGen.Application.Glue
 import Generator.CodeGen.Application.Makefile
+import Command.Extern (ExternBuild)
 import Generator.Makefile.Printer
 import Generator.CodeGen.Application.Config
 import Utils.Annotations
@@ -27,9 +28,9 @@ import Control.Monad
 import Control.Exception
 import System.IO.Error
 
-genPlatformCode :: TerminaConfig -> Platform -> LoweredProject -> QualifiedName -> TerminaProgArch SemanticAnn -> IO ()
-genPlatformCode _ TestPlatform _ _ _ = return ()
-genPlatformCode params plt loweredProject appModName progArchitecture = do
+genPlatformCode :: TerminaConfig -> Platform -> LoweredProject -> QualifiedName -> TerminaProgArch SemanticAnn -> Maybe ExternBuild -> IO ()
+genPlatformCode _ TestPlatform _ _ _ _ = return ()
+genPlatformCode params plt loweredProject appModName progArchitecture mExtern = do
   let appModule = loweredProject M.! appModName
   exePath <- getExecutablePath
   exeModificationTime <- getModificationTime exePath
@@ -74,7 +75,7 @@ genPlatformCode params plt loweredProject appModName progArchitecture = do
     None -> return ()
     Make -> do
       let makefilePath = destinationPath </> "Makefile"
-          makefile = genMakefile params loweredProject
+          makefile = genMakefile params loweredProject mExtern
       makefileExists <- doesFileExist makefilePath
       if makefileExists
         then do

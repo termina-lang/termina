@@ -2,6 +2,7 @@
 
 module Generator.CodeGen.Application.Makefile where
 import Command.Types
+import Command.Extern
 import Generator.Makefile.AST
 import System.FilePath
 import qualified Data.Text as T
@@ -10,9 +11,9 @@ import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
 
-genMakefile :: TerminaConfig -> LoweredProject -> Makefile
-genMakefile params loweredProject =
-    Makefile [
+genMakefile :: TerminaConfig -> LoweredProject -> Maybe ExternBuild -> Makefile
+genMakefile params loweredProject mExtern =
+    Makefile $ [
         MakeBlock [
             MVariable MSimple "R" [MFragment "$(shell pwd)"]
         ],
@@ -42,22 +43,23 @@ genMakefile params loweredProject =
         MakeBlock $ 
             MVariable MAppend "SRCS" [MFunction "wildcard" [MFragment "$R/*.c"]] :
             map (\srcFolder -> MVariable MAppend "SRCS" [MFunction "wildcard" [MFragment $ "$R/src/" </> srcFolder </> "*.c"]]) (S.toList sourceFolders)
-        ,
-        MakeBlock [
+        ] ++ externVariables ++ [
+        MakeBlock $ [
             MVariable MAppend "OBJS" [MFunction "patsubst"
                 [MFragment "%.c", MFragment "%.o", MFunction "patsubst"
                     [MFragment "%.s", MFragment "%.o", MFunction "patsubst"
                         [MFragment "$(TERMINA_OSAL_DIR)/%", MFragment "$(TARGET_DIR_NAME)/termina/%", MFunction "wildcard" [MFragment "$(OSAL_SRCS)"]]]]],
             MVariable MAppend "OBJS" [MFunction "patsubst" [MFragment "%.c", MFragment "%.o", MFunction "patsubst" [MFragment "$R/%", MFragment "$(TARGET_DIR_NAME)/%", MFragment "$(SRCS)"]]]
-        ],
+        ] ++ [MVariable MAppend "OBJS" [MFragment "$(EXTERN_OBJ)"] | hasExtern],
         MakeBlock [
             MVariable MAppend "CPPFLAGS" [MFunction "patsubst" [MFragment "%", MFragment "-iquote %", MFragment "$(PROJECT_INCLUDE_DIRS)"]],
             MVariable MAppend "CPPFLAGS" [MFunction "patsubst" [MFragment "%", MFragment "-I %", MFragment "$(INCLUDE_DIRS)"]]
         ],
         MakeBlock [
-            MVariable MSimple "DEPS" [MFunction "patsubst" [MFragment "%.o", MFragment "%.d", MFragment "$(OBJS)"]]
+            MVariable MSimple "DEPS" [MFunction "patsubst" [MFragment "%.o", MFragment "%.d",
+                MFragment (if hasExtern then "$(OBJS) $(EXTERN_OBJS)" else "$(OBJS)")]]
         ],
-        MakeBlock [
+        MakeBlock $ [
             MRule "all" ["$(TARGET)"] [],
             MRule "$(TARGET_DIR_NAME)/termina/%.o" ["$(TERMINA_OSAL_DIR)/%.s"] [
                 MakeCommand False [MFragment "@echo Building $<"],
@@ -78,10 +80,12 @@ genMakefile params loweredProject =
                 MakeCommand False [MFragment "@echo Linking $@"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
                 MakeCommand False [MFragment "@$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@"]
-            ],
+            ]
+        ] ++ externRule ++ [
             MRule "clean" [] [
                 MakeCommand False [MFragment "@echo Cleaning up"],
-                MakeCommand False [MFragment "@$(RM) $(OBJS) $(DEPS) $(TARGET)"]
+                MakeCommand False [MFragment
+                    (if hasExtern then "@$(RM) $(OBJS) $(EXTERN_OBJS) $(DEPS) $(TARGET)" else "@$(RM) $(OBJS) $(DEPS) $(TARGET)")]
             ],
             MRule "dist-clean" ["clean"] [
                 MakeCommand False [MFragment "@echo Mr. Proper is cleaning up"],
@@ -98,3 +102,29 @@ genMakefile params loweredProject =
     where
 
         sourceFolders = foldr (S.insert . takeDirectory) S.empty $ M.keys loweredProject
+
+        hasExtern = maybe False (const True) mExtern
+
+        -- | The C of the project is linked into a single relocatable object in
+        -- which only the extern functions stay global. How it is linked and
+        -- checked depends on the toolchain, so the platform files of the OSAL
+        -- define termina_extern_link.
+        externVariables = case mExtern of
+            Nothing -> []
+            Just (ExternBuild srcs libs) -> [
+                MakeBlock $
+                    map (\src -> MVariable MAppend "EXTERN_SRCS" [MFragment $ "$R" </> externFolder </> src]) srcs
+                    ++ map (\lib -> MVariable MAppend "EXTERN_LIBS" [MFragment $ "$R" </> externFolder </> lib]) libs
+                    ++ [
+                        MVariable MSimple "EXTERN_SYMBOLS" [MFragment . unwords $ externSymbols loweredProject],
+                        MVariable MSimple "EXTERN_OBJS" [MFunction "patsubst" [MFragment "$R/%.c", MFragment "$(TARGET_DIR_NAME)/%.o", MFragment "$(EXTERN_SRCS)"]],
+                        MVariable MSimple "EXTERN_OBJ" [MFragment "$(TARGET_DIR_NAME)/$(PROJECT_NAME).ext.o"]
+                    ]
+                ]
+
+        externRule = [
+            MRule "$(EXTERN_OBJ)" ["$(EXTERN_OBJS)", "$(EXTERN_LIBS)"] [
+                MakeCommand False [MFragment "@echo Linking $@"],
+                MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
+                MakeCommand False [MFragment "@$(call termina_extern_link,$@,$(EXTERN_OBJS),$(EXTERN_LIBS),$(EXTERN_SYMBOLS))"]
+            ] | hasExtern]
