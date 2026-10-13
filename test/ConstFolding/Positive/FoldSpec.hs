@@ -93,13 +93,6 @@ aggregateConstants =
   "const Q : Point = P;\n" ++
   "function f() -> u32 {\n" ++
   "    var r : u32 = P.x + Q.y;\n" ++
-  "    match M {\n" ++
-  "        case On(n, p) => {\n" ++
-  "            r = r + p.y + n as u32;\n" ++
-  "        }\n" ++
-  "        case Off => {\n" ++
-  "        }\n" ++
-  "    }\n" ++
   "    return r + PS[1].x;\n" ++
   "}"
 

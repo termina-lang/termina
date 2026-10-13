@@ -1255,11 +1255,16 @@ valuesIn global locals expr =
         AccessObject obj ->
           case cellOf obj >>= (`M.lookup` known locals) of
             Just entry -> Just (varValues entry)
-            -- | An object the paths know nothing of may hold any value of its
-            -- type.
             Nothing ->
-              uncurry Interval <$>
-                (getTypeSemAnn (getAnnotation obj) >>= intRange (platform global))
+              case cellOf obj >>= constInitializerOf of
+                -- | A constant of the module that the folding kept whole, such
+                -- as a variant, holds what its initializer says.
+                Just initializer -> valuesIn global locals initializer
+                -- | An object the paths know nothing of may hold any value of
+                -- its type.
+                Nothing ->
+                  uncurry Interval <$>
+                    (getTypeSemAnn (getAnnotation obj) >>= intRange (platform global))
         -- | The body of the callee was walked knowing nothing of its
         -- parameters, so what it gives back holds for any call.
         -- | A variant written out, with or without data attached, says which
@@ -1292,6 +1297,14 @@ valuesIn global locals expr =
         _ -> Nothing
 
   where
+
+    -- | The initializer of a constant of the module that the folding kept as
+    -- an expression.
+    constInitializerOf (Cell ident []) =
+      case M.lookup ident (moduleConsts global) of
+        Just (ConstInitializer initializer) -> Just initializer
+        _ -> Nothing
+    constInitializerOf _ = Nothing
 
     -- | The values modulo the range of an unsigned type. An interval that
     -- crosses a multiple of the modulus gives every value of the type.

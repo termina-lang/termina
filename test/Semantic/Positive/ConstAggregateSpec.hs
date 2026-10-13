@@ -6,8 +6,9 @@ import Test.Hspec
 import Data.Text (pack)
 
 -- A global const struct or enumeration keeps its bare type and is bound with
--- Immutable access, like a const array: its fields can be read and matched on,
--- and writing to a field is rejected as a write to a constant. A constant
+-- Immutable access, like a const array: its fields can be read, and writing to
+-- a field is rejected as a write to a constant. A match on a constant has a
+-- case that is never taken, which the value analysis rejects. A constant
 -- cannot hold a box, which the option, status and result types rule out.
 
 point :: String
@@ -55,7 +56,7 @@ spec = do
     it "Takes a field or an element of a constant as a constant expression" $
       compileErrorCode (mode ++ constantPaths) `shouldBe` Nothing
 
-    it "Slices, references, tests and matches on constants in a function body" $
+    it "Slices, references and tests on constants in a function body" $
       compileErrorCode (point ++ mode ++
         "const A : [u32; 4] = {5 : u32, 6 : u32, 7 : u32, 8 : u32};\n" ++
         "const O : Option<u32> = Some(4 : u32);\n" ++
@@ -69,10 +70,6 @@ spec = do
         "}\n" ++
         "function g() -> u32 {\n" ++
         "    var r : u32 = sum2(&A[1 : usize .. 3 : usize]) + px(&P) + flags(M is Mode::Off, O is Some);\n" ++
-        "    match O {\n" ++
-        "        case Some(v) => { r = r + v; }\n" ++
-        "        case None => { r = 1 : u32; }\n" ++
-        "    }\n" ++
         "    return r;\n" ++
         "}")
         `shouldBe` Nothing
@@ -121,7 +118,7 @@ spec = do
         "}")
         `shouldBe` Nothing
 
-    it "Matches on a const enumeration" $
+    it "VAE-002: rejects a match on a const enumeration, whose Off case is never taken" $
       compileErrorCode (mode ++
         "function read_mode() -> u8 {\n" ++
         "    var r : u8 = 0 : u8;\n" ++
@@ -134,7 +131,7 @@ spec = do
         "    }\n" ++
         "    return r;\n" ++
         "}")
-        `shouldBe` Nothing
+        `shouldBe` Just (pack "VAE-002")
 
     it "Rejects writing to a field of a const struct" $
       compileErrorCode (point ++
