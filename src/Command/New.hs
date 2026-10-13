@@ -114,6 +114,8 @@ gdbServerAddress FreeRTOS10STM32L432NUCLEOL432KC = Just "host.docker.internal:61
 gdbServerAddress RTEMS6ZYNQ7000PYNQZ2 = Just "host.docker.internal:3000"
 gdbServerAddress _ = Nothing
 
+-- | The debugger runs from the root of the project: the @#line@ directives of
+-- the generated C name the Termina modules relative to it.
 launchContent :: String -> FilePath -> Platform -> String
 launchContent project output plt =
     case gdbServerAddress plt of
@@ -126,7 +128,7 @@ launchContent project output plt =
                 "            \"type\": \"cppdbg\",",
                 "            \"request\": \"launch\",",
                 "            \"program\": \"${workspaceFolder}/" ++ output ++ "/bin/" ++ project ++ "\",",
-                "            \"cwd\": \"${workspaceFolder}/" ++ output ++ "\",",
+                "            \"cwd\": \"${workspaceFolder}\",",
                 "            \"MIMode\": \"gdb\",",
                 "            \"preLaunchTask\": \"termina: build\",",
                 "            \"setupCommands\": [",
@@ -145,7 +147,7 @@ launchContent project output plt =
                 "            \"type\": \"cppdbg\",",
                 "            \"request\": \"launch\",",
                 "            \"program\": \"${workspaceFolder}/" ++ output ++ "/bin/" ++ project ++ "\",",
-                "            \"cwd\": \"${workspaceFolder}/" ++ output ++ "\",",
+                "            \"cwd\": \"${workspaceFolder}\",",
                 "            \"MIMode\": \"gdb\",",
                 "            \"miDebuggerPath\": \"gdb-multiarch\",",
                 "            \"miDebuggerServerAddress\": \"${input:gdbServer}\",",
