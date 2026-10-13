@@ -817,8 +817,10 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
 
         genMatchCaseParams :: CObject -> CType -> MatchCase SemanticAnn -> CGenerator [CCompoundBlockItem]
         genMatchCaseParams cObj cParamsStructType (MatchCase this_variant params _ (SemanticAnn semann loc')) = do
+            -- | The variables a case binds are immutable, as a let is, so they
+            -- are const in C
             cParamTypes <- case getMatchCaseTypes semann of
-                Just ts -> traverse (genType noqual) ts
+                Just ts -> traverse (genType constqual) ts
                 Nothing -> throwError $ InternalError "Match case without types"
             -- The parameters are numbered before the ignored ones are dropped,
             -- so that each one reads the field of its own position.
@@ -901,9 +903,10 @@ genStatement (AssignmentStmt obj expr ann) = do
             _ -> do
                 cExpr <- genExpression expr
                 return [pre_cr (cObj @= cExpr) |>> getLocation ann]
-genStatement (Declaration identifier _ ts expr ann) = do
+genStatement (Declaration identifier ak ts expr ann) = do
   let loc = getLocation ann
-  cType <- genType noqual ts
+  -- | A let is lowered as a const in C
+  cType <- genType (if ak == Immutable then constqual else noqual) ts
   -- | After constant folding every array size is a literal, so a declaration is
   -- always a single C initializer "T x = <init>;". genInitializerExpr expands
   -- array fills and char-array strings into element lists. (Arrays are not

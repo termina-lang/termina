@@ -126,7 +126,7 @@ spec = do
               "\n" ++
               "    if (alloc_msg._variant == Option__Some) {\n" ++
               "        \n" ++
-              "        termina__box_t msg = alloc_msg.Some._0;\n" ++
+              "        const termina__box_t msg = alloc_msg.Some._0;\n" ++
               "\n" ++
               "        self->message_pool.free(termina__ev, self->message_pool._that, msg);\n" ++
               "\n" ++

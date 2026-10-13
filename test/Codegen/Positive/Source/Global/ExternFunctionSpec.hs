@@ -74,7 +74,7 @@ spec = do
               "\n" ++
               "uint16_t checksum(const uint8_t data[16U]) {\n" ++
               "    \n" ++
-              "    uint16_t crc = crc16(data, 16U);\n" ++
+              "    const uint16_t crc = crc16(data, 16U);\n" ++
               "\n" ++
               "    return crc;\n" ++
               "\n" ++

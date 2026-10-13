@@ -91,9 +91,72 @@ test3 = "enum Sample {\n" ++
         "    return ret;\n" ++
         "}"
 
+-- | A match through a reference binds pointers to the data of the variant.
+-- Through & the data cannot be written, and through &mut it can, while the
+-- pointer itself never changes.
+test4 :: String
+test4 = "enum Sample {\n" ++
+        "    Pair (u8, u32),\n" ++
+        "    Empty\n" ++
+        "};\n" ++
+        "\n" ++
+        "function match_test4(s : &Sample, t : &mut Sample) -> u32 {\n" ++
+        "    var ret : u32 = 0 : u32;\n" ++
+        "    match s {\n" ++
+        "        case Pair(_a, b) => {\n" ++
+        "            ret = *b;\n" ++
+        "        }\n" ++
+        "        case Empty => {\n" ++
+        "        }\n" ++
+        "    }\n" ++
+        "    match t {\n" ++
+        "        case Pair(_a, b) => {\n" ++
+        "            *b = ret;\n" ++
+        "        }\n" ++
+        "        case Empty => {\n" ++
+        "        }\n" ++
+        "    }\n" ++
+        "    return ret;\n" ++
+        "}"
+
+-- | The same through references taken in the match itself.
+test5 :: String
+test5 = "enum Sample {\n" ++
+        "    Pair (u8, u32),\n" ++
+        "    Empty\n" ++
+        "};\n" ++
+        "\n" ++
+        "function match_test5(s : Sample) -> u32 {\n" ++
+        "    var ret : u32 = 0 : u32;\n" ++
+        "    var t : Sample = s;\n" ++
+        "    match &s {\n" ++
+        "        case Pair(_a, b) => {\n" ++
+        "            ret = *b;\n" ++
+        "        }\n" ++
+        "        case Empty => {\n" ++
+        "        }\n" ++
+        "    }\n" ++
+        "    match &mut t {\n" ++
+        "        case Pair(_a, b) => {\n" ++
+        "            *b = ret;\n" ++
+        "        }\n" ++
+        "        case Empty => {\n" ++
+        "        }\n" ++
+        "    }\n" ++
+        "    return ret;\n" ++
+        "}"
+
 spec :: Spec
 spec = do
   describe "Code generation for match statements" $ do
+    it "Binds a pointer to const data through a reference taken in the match" $ do
+      renderSource test5 `shouldSatisfy` isInfixOf (pack "const uint32_t * const b = &s.Pair._1;")
+    it "Binds a pointer to writable data through a mutable reference taken in the match" $ do
+      renderSource test5 `shouldSatisfy` isInfixOf (pack "        uint32_t * const b = &t.Pair._1;")
+    it "Binds a pointer to const data through a reference" $ do
+      renderSource test4 `shouldSatisfy` isInfixOf (pack "const uint32_t * const b = &s->Pair._1;")
+    it "Binds a pointer to writable data through a mutable reference" $ do
+      renderSource test4 `shouldSatisfy` isInfixOf (pack "        uint32_t * const b = &t->Pair._1;")
     it "Declares a procedure matching an option-box" $ do
       renderHeader test0 `shouldBe`
         pack ("#ifndef TEST_H__\n" ++
@@ -126,7 +189,7 @@ spec = do
               "\n" ++
               "    if (option0._variant == Option__Some) {\n" ++
               "        \n" ++
-              "        termina__box_t value = option0.Some._0;\n" ++
+              "        const termina__box_t value = option0.Some._0;\n" ++
               "\n" ++
               "        foo = *(uint32_t *)value.data;\n" ++
               "\n" ++
@@ -177,7 +240,7 @@ spec = do
               "\n" ++
               "    } else {\n" ++
               "        \n" ++
-              "        termina__box_t value = option0.Some._0;\n" ++
+              "        const termina__box_t value = option0.Some._0;\n" ++
               "\n" ++
               "        foo = *(uint32_t *)value.data;\n" ++
               "\n" ++
@@ -236,14 +299,14 @@ spec = do
               "\n" ++
               "    if (msg._variant == Message__In) {\n" ++
               "        \n" ++
-              "        uint32_t param0 = msg.In._0;\n" ++
-              "        uint32_t param1 = msg.In._1;\n" ++
+              "        const uint32_t param0 = msg.In._0;\n" ++
+              "        const uint32_t param1 = msg.In._1;\n" ++
               "\n" ++
               "        ret = param0 + param1;\n" ++
               "\n" ++
               "    } else if (msg._variant == Message__Out) {\n" ++
               "        \n" ++
-              "        uint32_t result = msg.Out._0;\n" ++
+              "        const uint32_t result = msg.Out._0;\n" ++
               "\n" ++
               "        ret = result;\n" ++
               "\n" ++
@@ -271,7 +334,7 @@ spec = do
               "\n" ++
               "    if (s._variant == Sample__Pair) {\n" ++
               "        \n" ++
-              "        uint32_t b = s.Pair._1;\n" ++
+              "        const uint32_t b = s.Pair._1;\n" ++
               "\n" ++
               "        ret = b;\n" ++
               "\n" ++

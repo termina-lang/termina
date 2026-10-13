@@ -77,7 +77,7 @@ genType qual (TStatus ts) = do
     return (CTTypeDef optName qual)
 -- Non-primitive types:
 -- | Box subtype
-genType _qual (TBoxSubtype _) = return (CTTypeDef boxStruct noqual)
+genType qual (TBoxSubtype _) = return (CTTypeDef boxStruct qual)
 -- | Const subtype
 genType _qual (TConstSubtype ty) = genType constqual ty
 -- | TPool type
