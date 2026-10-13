@@ -21,7 +21,6 @@ getPlatformInitialGlobalEnv config POSIXGCC =
     [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime", "SysPrint", "SysGetChar"] [] [])) Internal)]
 getPlatformInitialGlobalEnv config RTEMS5LEON3SFNEXYSA7 = 
     let platformConfig = rtems5_leon3sf_nexysa7 . platformFlags $ config in
-    [("irq_0", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS5LEON3SFNEXYSA7.Config.enableIrq0 platformConfig] ++
     [("irq_1", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS5LEON3SFNEXYSA7.Config.enableIrq1 platformConfig] ++
     [("irq_2", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS5LEON3SFNEXYSA7.Config.enableIrq2 platformConfig] ++
     [("irq_3", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS5LEON3SFNEXYSA7.Config.enableIrq3 platformConfig] ++
@@ -192,7 +191,6 @@ getPlatformInitialProgram config RTEMS5LEON3SFNEXYSA7 =
         initialProgArch = emptyTerminaProgArch config in
     initialProgArch {
         emitters = M.union (emitters initialProgArch) . M.fromList $ 
-        [("irq_0", TPInterruptEmitter "irq_1" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3SFNEXYSA7.Config.enableIrq0 platformConfig] ++
         [("irq_1", TPInterruptEmitter "irq_1" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3SFNEXYSA7.Config.enableIrq1 platformConfig] ++
         [("irq_2", TPInterruptEmitter "irq_2" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3SFNEXYSA7.Config.enableIrq2 platformConfig] ++
         [("irq_3", TPInterruptEmitter "irq_3" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3SFNEXYSA7.Config.enableIrq3 platformConfig] ++

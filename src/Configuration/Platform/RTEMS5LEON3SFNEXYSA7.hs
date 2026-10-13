@@ -3,8 +3,9 @@
 module Configuration.Platform.RTEMS5LEON3SFNEXYSA7 where
 import Data.Yaml
 
+-- | The interrupts of the IRQMP that an application may attend. The controller
+-- has no line 0, so the first one is irq_1.
 data RTEMS5LEON3SFNEXYSA7Flags = RTEMS5LEON3SFNEXYSA7Flags {
-    enableIrq0 :: !Bool,
     enableIrq1 :: !Bool,
     enableIrq2 :: !Bool,
     enableIrq3 :: !Bool,
@@ -24,7 +25,6 @@ data RTEMS5LEON3SFNEXYSA7Flags = RTEMS5LEON3SFNEXYSA7Flags {
 
 defaultRTEMS5LEON3SFNEXYSA7Flags :: RTEMS5LEON3SFNEXYSA7Flags
 defaultRTEMS5LEON3SFNEXYSA7Flags = RTEMS5LEON3SFNEXYSA7Flags {
-    enableIrq0 = False,
     enableIrq1 = False,
     enableIrq2 = False,
     enableIrq3 = False,
@@ -45,7 +45,6 @@ defaultRTEMS5LEON3SFNEXYSA7Flags = RTEMS5LEON3SFNEXYSA7Flags {
 instance FromJSON RTEMS5LEON3SFNEXYSA7Flags where
   parseJSON (Object o) =
     RTEMS5LEON3SFNEXYSA7Flags <$>
-    o .:? "enable-irq-0" .!= False <*>
     o .:? "enable-irq-1" .!= False <*>
     o .:? "enable-irq-2" .!= False <*>
     o .:? "enable-irq-3" .!= False <*>
@@ -66,7 +65,6 @@ instance FromJSON RTEMS5LEON3SFNEXYSA7Flags where
 instance ToJSON RTEMS5LEON3SFNEXYSA7Flags where
     toJSON (
         RTEMS5LEON3SFNEXYSA7Flags 
-            flagsRTEMS5LEON3SFNEXYSA7EnableIrq0
             flagsRTEMS5LEON3SFNEXYSA7EnableIrq1
             flagsRTEMS5LEON3SFNEXYSA7EnableIrq2
             flagsRTEMS5LEON3SFNEXYSA7EnableIrq3
@@ -83,7 +81,6 @@ instance ToJSON RTEMS5LEON3SFNEXYSA7Flags where
             flagsRTEMS5LEON3SFNEXYSA7EnableIrq14
             flagsRTEMS5LEON3SFNEXYSA7EnableIrq15
         ) = object [
-            "enable-irq-0" .= flagsRTEMS5LEON3SFNEXYSA7EnableIrq0,
             "enable-irq-1" .= flagsRTEMS5LEON3SFNEXYSA7EnableIrq1,
             "enable-irq-2" .= flagsRTEMS5LEON3SFNEXYSA7EnableIrq2,
             "enable-irq-3" .= flagsRTEMS5LEON3SFNEXYSA7EnableIrq3,
