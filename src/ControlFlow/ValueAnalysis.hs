@@ -30,12 +30,6 @@
 module ControlFlow.ValueAnalysis
   (
     runValueAnalysisCheck
-    -- * For the tests
-    --
-    -- | The verdict of a comparison has two tables of six operators that no
-    -- source program can reach yet, and the bound a branch puts on a variable
-    -- is the one operation that makes the pass claim more, so their tests
-    -- drive them from here.
   , Integers(..)
   , compareValues
   , Bound(..)
@@ -1324,17 +1318,12 @@ valuesIn global locals expr =
 
     widthOf ty = if intTy ty then Just (shiftWidth (platform global) ty) else Nothing
 
--- | The most values that 'arithmetic' works out one pair at a time before it
--- falls back on the ends of its operands.
-pairLimit :: Int
-pairLimit = 64
-
 -- | What an arithmetic operation on two integer operands may give, in a type
 -- with the given range, where the width is that of the left operand, which is
 -- what bounds the amount of a shift.
 --
--- Two short lists are worked out pair by pair, and otherwise the result is
--- bounded from the ends of the operands. A pair the operation would not
+-- Two lists are worked out pair by pair, and otherwise the result is bounded
+-- from the ends of the operands. A pair the operation would not
 -- complete, a division by zero or a shift by the width or more, raises an
 -- exception and gives nothing, so it is left out. A result outside the range
 -- of an unsigned type wraps, and one outside the range of a signed type
@@ -1350,7 +1339,7 @@ arithmetic range width op left right = do
 exactResults :: Integer -> Op -> Integers -> Integers -> Maybe Integers
 exactResults width op left right =
   case (left, right) of
-    (Listed ls, Listed rs) | S.size ls * S.size rs <= pairLimit ->
+    (Listed ls, Listed rs) ->
       let results = S.fromList [ r | a <- S.toList ls, b <- S.toList rs, Just r <- [pairwiseOp a b] ]
       in if S.null results then Nothing else Just (Listed results)
     _ -> uncurry Spanning <$> fromOperandEnds (ends left) (ends right)
