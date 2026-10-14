@@ -144,7 +144,7 @@ genConfigFile mName config progArchitecture = do
         genMessagesForQueues [] = throwError $ InternalError "Invalid message queue list: empty list"
 
         genMessageBufferMemory :: [OSALMsgQueue] -> CGenerator [CFileItem]
-        genMessageBufferMemory [] = return []
+        genMessageBufferMemory [] = return [pre_cr $ _define "TERMINA__APP_CONFIG__MESSAGE_BUFFER_MEMORY" (Just ["0"])]
         genMessageBufferMemory msgq = do
             messagesForQueue <- genMessagesForQueues msgq
             return [
