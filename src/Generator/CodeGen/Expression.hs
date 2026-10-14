@@ -3,7 +3,7 @@ module Generator.CodeGen.Expression where
 
 import Elaboration.AST
 import Elaboration (elaborateConstant)
-import qualified Lowering.AST as L
+import qualified Lowering.AST as LAST
 import Generator.LanguageC.AST
 import Semantic.Types
 import Control.Monad.Except
@@ -150,7 +150,7 @@ genCParameter (Parameter identifier ts _) =
 
 -- | Generates a constant expression of the semantic AST, such as the size of
 -- an array type.
-genConstExpression :: L.Expression SemanticAnn -> CGenerator CExpression
+genConstExpression :: LAST.Expression SemanticAnn -> CGenerator CExpression
 genConstExpression = genExpression . elaborateConstant
 
 genObject :: Object SemanticAnn -> CGenerator CObject
@@ -215,7 +215,7 @@ genArrayAccess obj cIndex = do
     return $ cObj @$$ cIndex @: ctype
 
 -- | The element type and the size of an array object.
-getArrayType :: Object SemanticAnn -> CGenerator (TerminaType SemanticAnn, L.Expression SemanticAnn)
+getArrayType :: Object SemanticAnn -> CGenerator (TerminaType SemanticAnn, LAST.Expression SemanticAnn)
 getArrayType obj = do
     objType <- getObjType obj
     maybe (throwError $ InternalError $ "Invalid object type: " ++ show obj ++ ". Expected an array.")

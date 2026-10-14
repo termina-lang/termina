@@ -1,7 +1,7 @@
 module Codegen.Positive.Printer.Common where
 
-import qualified Lowering.AST as L
-import qualified Elaboration.AST as E
+import qualified Lowering.AST as LAST
+import qualified Elaboration.AST as EAST
 import Elaboration (provers, elaborateProgram, elaborateBody, elaborateExpression)
 import Utils.Annotations
 import Text.Parsec.Pos (newPos)
@@ -201,7 +201,7 @@ renderStatement stmt =
     Left err -> pack $ show err
     Right bBlocks ->
       let config = defaultConfig "test" TestPlatform in
-      case runState (runExceptT (Prelude.concat <$> traverse genBlocks (E.blockBody (elaborateBody provers (L.Block bBlocks stmtSemAnn))))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
+      case runState (runExceptT (Prelude.concat <$> traverse genBlocks (EAST.blockBody (elaborateBody provers (LAST.Block bBlocks stmtSemAnn))))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
         (Left err, _) -> pack $ show err
         (Right cStmts, _) -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
@@ -235,5 +235,5 @@ renderFunction func =
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 -- | Elaborates a single lowered element with the provers of a build.
-elaborateElement :: L.AnnASTElement SemanticAnn -> E.AnnASTElement SemanticAnn
+elaborateElement :: LAST.AnnASTElement SemanticAnn -> EAST.AnnASTElement SemanticAnn
 elaborateElement element' = Prelude.head (fst (elaborateProgram provers [element']))

@@ -6,7 +6,7 @@ import qualified Data.Map.Strict as M
 
 import qualified Parser.AST as PAST
 import qualified Semantic.AST as SAST
-import qualified Lowering.AST as CFAST
+import qualified Lowering.AST as LAST
 import qualified Elaboration.AST as EAST
 import qualified EFP.Schedulability.WCEPath.AST as TPAST
 
@@ -33,7 +33,7 @@ newtype SemanticData = SemanticData {
 } deriving (Show)
 
 newtype BasicBlocksData = BasicBlockData {
-  loweredAST :: CFAST.AnnotatedProgram STYPES.SemanticAnn
+  loweredAST :: LAST.AnnotatedProgram STYPES.SemanticAnn
 } deriving (Show)
 
 newtype ElaboratedData = ElaboratedData {

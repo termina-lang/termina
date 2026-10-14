@@ -15,7 +15,7 @@ module Elaboration (
   , elaborateConstant
 ) where
 
-import qualified Lowering.AST as L
+import qualified Lowering.AST as LAST
 import Elaboration.AST
 import Elaboration.Obligations
 import Elaboration.Prover
@@ -41,15 +41,15 @@ type ElaborationM = Writer ElaborationReport
 -- | Whether the obligation is discharged.
 type Discharged = ObligationId -> Bool
 
-elaborateProgram :: [Prover] -> L.AnnotatedProgram SemanticAnn -> (AnnotatedProgram SemanticAnn, ElaborationReport)
+elaborateProgram :: [Prover] -> LAST.AnnotatedProgram SemanticAnn -> (AnnotatedProgram SemanticAnn, ElaborationReport)
 elaborateProgram ps = runWriter . mapM (elaborateElement ps)
 
 -- | Elaborates a body on its own, leaving out the report.
-elaborateBody :: [Prover] -> L.Block SemanticAnn -> Block SemanticAnn
+elaborateBody :: [Prover] -> LAST.Block SemanticAnn -> Block SemanticAnn
 elaborateBody ps = fst . runWriter . elaborateBodyM ps
 
 -- | Elaborates an expression on its own, leaving out the report.
-elaborateExpression :: [Prover] -> L.Expression SemanticAnn -> Expression SemanticAnn
+elaborateExpression :: [Prover] -> LAST.Expression SemanticAnn -> Expression SemanticAnn
 elaborateExpression ps = fst . runWriter . elaborateExpressionM ps
 
 elaborateScope :: [Prover] -> Scope -> ElaborationM Discharged
@@ -58,13 +58,13 @@ elaborateScope ps scope = do
   tell [(oid, M.lookup oid proved) | Obligation oid _ <- obligations]
   return (`M.member` proved)
 
-elaborateBodyM :: [Prover] -> L.Block SemanticAnn -> ElaborationM (Block SemanticAnn)
+elaborateBodyM :: [Prover] -> LAST.Block SemanticAnn -> ElaborationM (Block SemanticAnn)
 elaborateBodyM ps blk = (`elabBlock` blk) <$> elaborateScope ps (BodyScope blk)
 
-elaborateExpressionM :: [Prover] -> L.Expression SemanticAnn -> ElaborationM (Expression SemanticAnn)
+elaborateExpressionM :: [Prover] -> LAST.Expression SemanticAnn -> ElaborationM (Expression SemanticAnn)
 elaborateExpressionM ps expr = (`elabExpr` expr) <$> elaborateScope ps (ExpressionScope expr)
 
-elaborateElement :: [Prover] -> L.AnnASTElement SemanticAnn -> ElaborationM (AnnASTElement SemanticAnn)
+elaborateElement :: [Prover] -> LAST.AnnASTElement SemanticAnn -> ElaborationM (AnnASTElement SemanticAnn)
 elaborateElement ps element = case element of
   Function ident params mRet body modifiers ann ->
     Function ident params mRet
@@ -121,13 +121,13 @@ elaborateElement ps element = case element of
 
 -- | Elaborates a constant expression, such as the size of an array type. The
 -- constant folding has evaluated its operations, so none of them is checked.
-elaborateConstant :: L.Expression SemanticAnn -> Expression SemanticAnn
+elaborateConstant :: LAST.Expression SemanticAnn -> Expression SemanticAnn
 elaborateConstant = elabExpr (const True)
 
-elabBlock :: Discharged -> L.Block SemanticAnn -> Block SemanticAnn
+elabBlock :: Discharged -> LAST.Block SemanticAnn -> Block SemanticAnn
 elabBlock d (Block body ann) = Block (map (elabBasicBlock d) body) ann
 
-elabBasicBlock :: Discharged -> L.BasicBlock SemanticAnn -> BasicBlock SemanticAnn
+elabBasicBlock :: Discharged -> LAST.BasicBlock SemanticAnn -> BasicBlock SemanticAnn
 elabBasicBlock d bb = case bb of
   IfElseBlock (CondIf cond body ann) elseIfs mElse ann' ->
     IfElseBlock (CondIf (expr cond) (block body) ann)
@@ -178,38 +178,38 @@ elabBasicBlock d bb = case bb of
 unchecked :: Discharged -> [Obligation] -> Bool
 unchecked d = all (d . obligationId)
 
-elabObj :: Discharged -> L.Object SemanticAnn -> Object SemanticAnn
+elabObj :: Discharged -> LAST.Object SemanticAnn -> Object SemanticAnn
 elabObj d obj = case obj of
-  L.Variable ident ann -> Variable ident ann
-  L.ArrayIndexExpression inner index ann ->
+  LAST.Variable ident ann -> Variable ident ann
+  LAST.ArrayIndexExpression inner index ann ->
     (if unchecked d (objectChecks obj) then UncheckedArrayIndex else CheckedArrayIndex)
       (elabObj d inner) (elabExpr d index) ann
-  L.MemberAccess inner ident ann -> MemberAccess (elabObj d inner) ident ann
-  L.Dereference inner ann -> Dereference (elabObj d inner) ann
-  L.DereferenceMemberAccess inner ident ann -> DereferenceMemberAccess (elabObj d inner) ident ann
-  L.Unbox inner ann -> Unbox (elabObj d inner) ann
+  LAST.MemberAccess inner ident ann -> MemberAccess (elabObj d inner) ident ann
+  LAST.Dereference inner ann -> Dereference (elabObj d inner) ann
+  LAST.DereferenceMemberAccess inner ident ann -> DereferenceMemberAccess (elabObj d inner) ident ann
+  LAST.Unbox inner ann -> Unbox (elabObj d inner) ann
 
-elabExpr :: Discharged -> L.Expression SemanticAnn -> Expression SemanticAnn
+elabExpr :: Discharged -> LAST.Expression SemanticAnn -> Expression SemanticAnn
 elabExpr d e = case e of
-  L.AccessObject obj -> AccessObject (object obj)
-  L.Constant c ann -> Constant c ann
-  L.BinOp op left right ann ->
+  LAST.AccessObject obj -> AccessObject (object obj)
+  LAST.Constant c ann -> Constant c ann
+  LAST.BinOp op left right ann ->
     (if unchecked d (expressionChecks e) then UncheckedBinOp else CheckedBinOp)
       op (expr left) (expr right) ann
-  L.ReferenceExpression ak obj ann -> ReferenceExpression ak (object obj) ann
-  L.Casting inner ty ann -> Casting (expr inner) ty ann
-  L.FunctionCall ident args ann -> FunctionCall ident (map expr args) ann
-  L.MemberFunctionCall obj ident args ann -> MemberFunctionCall (object obj) ident (map expr args) ann
-  L.DerefMemberFunctionCall obj ident args ann -> DerefMemberFunctionCall (object obj) ident (map expr args) ann
-  L.ArrayInitializer inner size ann -> ArrayInitializer (expr inner) (expr size) ann
-  L.ArrayExprListInitializer exprs ann -> ArrayExprListInitializer (map expr exprs) ann
-  L.StructInitializer fields ann -> StructInitializer (map field fields) ann
-  L.EnumVariantInitializer enum variant args ann -> EnumVariantInitializer enum variant (map expr args) ann
-  L.MonadicVariantInitializer variant ann -> MonadicVariantInitializer (monadic variant) ann
-  L.StringInitializer str ann -> StringInitializer str ann
-  L.IsEnumVariantExpression obj enum variant ann -> IsEnumVariantExpression (object obj) enum variant ann
-  L.IsMonadicVariantExpression obj label ann -> IsMonadicVariantExpression (object obj) label ann
-  L.ArraySliceExpression ak obj lower upper ann ->
+  LAST.ReferenceExpression ak obj ann -> ReferenceExpression ak (object obj) ann
+  LAST.Casting inner ty ann -> Casting (expr inner) ty ann
+  LAST.FunctionCall ident args ann -> FunctionCall ident (map expr args) ann
+  LAST.MemberFunctionCall obj ident args ann -> MemberFunctionCall (object obj) ident (map expr args) ann
+  LAST.DerefMemberFunctionCall obj ident args ann -> DerefMemberFunctionCall (object obj) ident (map expr args) ann
+  LAST.ArrayInitializer inner size ann -> ArrayInitializer (expr inner) (expr size) ann
+  LAST.ArrayExprListInitializer exprs ann -> ArrayExprListInitializer (map expr exprs) ann
+  LAST.StructInitializer fields ann -> StructInitializer (map field fields) ann
+  LAST.EnumVariantInitializer enum variant args ann -> EnumVariantInitializer enum variant (map expr args) ann
+  LAST.MonadicVariantInitializer variant ann -> MonadicVariantInitializer (monadic variant) ann
+  LAST.StringInitializer str ann -> StringInitializer str ann
+  LAST.IsEnumVariantExpression obj enum variant ann -> IsEnumVariantExpression (object obj) enum variant ann
+  LAST.IsMonadicVariantExpression obj label ann -> IsMonadicVariantExpression (object obj) label ann
+  LAST.ArraySliceExpression ak obj lower upper ann ->
     (if unchecked d (expressionChecks e) then UncheckedArraySlice else CheckedArraySlice)
       ak (object obj) (expr lower) (expr upper) ann
 

@@ -9,7 +9,7 @@ import Control.Monad.Except
 import qualified Control.Monad.State as ST
 import EFP.Schedulability.RT.Errors
 import EFP.Schedulability.RT.Parser.AST
-import qualified EFP.Schedulability.RT.Semantic.AST as SAST
+import qualified EFP.Schedulability.RT.Semantic.AST as RTSAST
 import Control.Monad
 import EFP.Schedulability.WCEPath.AST
 import qualified Data.Set as S
@@ -82,7 +82,7 @@ typeCondExpression (ConstInt i@(TInteger intVal _) ann) = do
     return i
 typeCondExpression expr = throwError . annotateError (getLocation . getAnnotation $ expr) $ EInvalidConditionalExpression
 
-typeTransStep :: [Continuation]-> RTTransStep ParserAnn -> RTMonad (SAST.RTTransStep RTSemAnn)
+typeTransStep :: [Continuation]-> RTTransStep ParserAnn -> RTMonad (RTSAST.RTTransStep RTSemAnn)
 typeTransStep [] (RTTransStepAction stepName componentName actionId pathName nextStep ann) = do
     -- Check that the step name is unique in the current context
     checkStepNameUnique stepName (getLocation ann)
@@ -112,13 +112,13 @@ typeTransStep [] (RTTransStepAction stepName componentName actionId pathName nex
             getPathContinuations componentName outputConns trPath
     typedNextStep <- case (continuations, nextStep) of
         -- | No expected continuations and no next step: ok
-        ([], RTTransStepEnd stId ann') -> return $ SAST.RTTransStepEnd stId (RTStepTy (getLocation ann'))
+        ([], RTTransStepEnd stId ann') -> return $ RTSAST.RTTransStepEnd stId (RTStepTy (getLocation ann'))
         -- | Expected continuations but no next step: error
         (cs, RTTransStepEnd {}) -> throwError . annotateError (getLocation ann) $ EActionMustContinue (classIdentifier tpCls) actionId pathName cs
         -- | No expected continuations but next step provided: error
         ([], _) -> throwError . annotateError (getLocation ann) $ EActionMustNotContinue (classIdentifier tpCls) actionId pathName (getLocation . getAnnotation $ trPath)
         (validContinuations, next) -> typeTransStep validContinuations next
-    return $ SAST.RTTransStepAction stepName componentName actionId pathName typedNextStep (RTStepTy (getLocation ann))
+    return $ RTSAST.RTTransStepAction stepName componentName actionId pathName typedNextStep (RTStepTy (getLocation ann))
 typeTransStep [] (RTTransStepConditional (c:cs) ann) =
     case c of
         (condExpr, step@(RTTransStepAction _ componentName actionId _ _ _)) -> do
@@ -134,7 +134,7 @@ typeTransStep [] (RTTransStepConditional (c:cs) ann) =
                         return (tyCondExpr', typedStep')
                     _ -> throwError . annotateError (getLocation ann) $ EExpectedStepActionContinuation
             -- | TODO: Check that the sum of all conditions is 100 and that they are all non-negative integer expressions
-            return $ SAST.RTTransStepConditional ((typedCondExpr, typedStep) : typedCondTransSteps) (RTStepTy (getLocation ann))
+            return $ RTSAST.RTTransStepConditional ((typedCondExpr, typedStep) : typedCondTransSteps) (RTStepTy (getLocation ann))
         _ -> throwError . annotateError (getLocation ann) $ EExpectedStepActionContinuation
 typeTransStep [] (RTTransStepMuticast _ ann) = throwError . annotateError (getLocation ann) $ EInvalidInitialStepMulticast
 typeTransStep [cont] (RTTransStepMuticast _ ann) = throwError . annotateError (getLocation ann) $ EInvalidMulticastSingleContinuation cont
@@ -165,11 +165,11 @@ typeTransStep [(taskId, actionId)] (RTTransStepAction stepName targetTask target
     -- | Get all possible continuations from the transactional path
     continuations <- getPathContinuations targetTask outputConns trPath
     typedNextStep <- case (continuations, nextStep) of
-        ([], RTTransStepEnd stName ann') -> return $ SAST.RTTransStepEnd stName (RTStepTy (getLocation ann'))
+        ([], RTTransStepEnd stName ann') -> return $ RTSAST.RTTransStepEnd stName (RTStepTy (getLocation ann'))
         (cs, RTTransStepEnd {}) -> throwError . annotateError (getLocation ann) $ EActionMustContinue (classIdentifier tpCls) targetAction pathName cs
         ([], _) -> throwError . annotateError (getLocation ann) $ EActionMustNotContinue (classIdentifier tpCls) targetAction pathName (getLocation . getAnnotation $ trPath)
         (validContinuations, next) -> typeTransStep validContinuations next
-    return $ SAST.RTTransStepAction stepName targetTask targetAction pathName typedNextStep (RTStepTy (getLocation ann))
+    return $ RTSAST.RTTransStepAction stepName targetTask targetAction pathName typedNextStep (RTStepTy (getLocation ann))
 typeTransStep [cont] (RTTransStepConditional condTransSteps ann) = do
     -- | Check that there are at least two branches
     when (length condTransSteps < 2) $
@@ -184,17 +184,17 @@ typeTransStep [cont] (RTTransStepConditional condTransSteps ann) = do
             RTTransStepMuticast {} -> throwError . annotateError (getLocation ann) $ EExpectedStepActionContinuation
             RTTransStepEnd {} -> throwError . annotateError (getLocation ann) $ EExpectedStepActionContinuation
     -- TODO: Check that the sum of all conditions is 100
-    return $ SAST.RTTransStepConditional typedCondTransSteps (RTStepTy (getLocation ann))
+    return $ RTSAST.RTTransStepConditional typedCondTransSteps (RTStepTy (getLocation ann))
 typeTransStep validContinuations (RTTransStepMuticast transSteps ann) = do
     (_, _, typedTransSteps) <- foldM typeMultiCastStep (S.fromList validContinuations, M.empty, []) transSteps
-    return $ SAST.RTTransStepMuticast typedTransSteps (RTStepTy (getLocation ann))
+    return $ RTSAST.RTTransStepMuticast typedTransSteps (RTStepTy (getLocation ann))
 
     where
 
         typeMultiCastStep ::
-            (S.Set Continuation, M.Map Continuation Location, [SAST.RTTransStep RTSemAnn])
+            (S.Set Continuation, M.Map Continuation Location, [RTSAST.RTTransStep RTSemAnn])
             -> RTTransStep ParserAnn
-            -> RTMonad (S.Set Continuation, M.Map Continuation Location, [SAST.RTTransStep RTSemAnn])
+            -> RTMonad (S.Set Continuation, M.Map Continuation Location, [RTSAST.RTTransStep RTSemAnn])
         typeMultiCastStep (contSet, visitedSteps, typedTransSteps) step =
             case step of
                 RTTransStepAction _ targetTask targetAction _ _ stepAnn ->

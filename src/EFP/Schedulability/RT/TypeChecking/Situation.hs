@@ -9,7 +9,7 @@ import Control.Monad.Except
 import qualified Control.Monad.State as ST
 import EFP.Schedulability.RT.Errors
 import EFP.Schedulability.RT.Parser.AST
-import qualified EFP.Schedulability.RT.Semantic.AST as SAST
+import qualified EFP.Schedulability.RT.Semantic.AST as RTSAST
 import Control.Monad
 import qualified Data.Set as S
 import EFP.Schedulability.Core.Types
@@ -18,7 +18,7 @@ import EFP.Schedulability.RT.Utils
 import EFP.Schedulability.RT.TypeChecking.ConstExpression
 
 
-typeEventDefinition :: SAST.RTEventMap RTSemAnn -> RTEvent ParserAnn -> RTMonad (SAST.RTEventMap RTSemAnn)
+typeEventDefinition :: RTSAST.RTEventMap RTSemAnn -> RTEvent ParserAnn -> RTMonad (RTSAST.RTEventMap RTSemAnn)
 typeEventDefinition acc (RTEventBursty eventId evInit ann') = do
     -- | Check that the field has not been initialized before
     case M.lookup eventId acc of
@@ -38,7 +38,7 @@ typeEventDefinition acc (RTEventPeriodic eventId evInit ann') = do
 
 -- | Type transaction object expression
 -- It must refer to a valid transaction identifier
-typeTransactionObjectExpr :: ConstExpression ParserAnn -> RTMonad (SAST.RTElement RTSemAnn)
+typeTransactionObjectExpr :: ConstExpression ParserAnn -> RTMonad (RTSAST.RTElement RTSemAnn)
 typeTransactionObjectExpr (ConstObject ident ann') = do
     trans <- ST.gets transactions
     case M.lookup ident trans of
@@ -58,15 +58,15 @@ typeEmitterObjectExpr expr =
     throwError . annotateError (getLocation . getAnnotation $ expr) $ EInvalidEmitterFieldType
 
 -- | This function recursively extracts all step names from a transaction step
-extractStepNames :: S.Set Identifier -> SAST.RTTransStep RTSemAnn -> S.Set Identifier
-extractStepNames acc (SAST.RTTransStepEnd stepName _) =
+extractStepNames :: S.Set Identifier -> RTSAST.RTTransStep RTSemAnn -> S.Set Identifier
+extractStepNames acc (RTSAST.RTTransStepEnd stepName _) =
     S.insert stepName acc
-extractStepNames acc (SAST.RTTransStepAction stepName _ _ _ nextStep _) =
+extractStepNames acc (RTSAST.RTTransStepAction stepName _ _ _ nextStep _) =
     let acc' = S.insert stepName acc in
     extractStepNames acc' nextStep
-extractStepNames acc (SAST.RTTransStepMuticast transSteps _) =
+extractStepNames acc (RTSAST.RTTransStepMuticast transSteps _) =
     foldl extractStepNames acc transSteps
-extractStepNames acc (SAST.RTTransStepConditional condSteps _) =
+extractStepNames acc (RTSAST.RTTransStepConditional condSteps _) =
     foldl (\a (_, step) -> extractStepNames a step) acc condSteps
 
 typeDeadline :: ConstExpression RTSemAnn -> RTMonad Double
@@ -79,7 +79,7 @@ typeDeadline (ConstInt (TInteger intVal _) ann) = do
     return deadline
 typeDeadline expr = throwError . annotateError (getLocation . getAnnotation $ expr) $ EInvalidDeadlineExpression
 
-typeDeadlinesMap :: Identifier -> ConstStructInitializer ParserAnn -> RTMonad (SAST.RTDeadlineMap RTSemAnn)
+typeDeadlinesMap :: Identifier -> ConstStructInitializer ParserAnn -> RTMonad (RTSAST.RTDeadlineMap RTSemAnn)
 typeDeadlinesMap transactionId (ConstStructInitializer fields ann) = do
     trans <- ST.gets transactions
     -- | Get all the step identifiers in the transaction
@@ -87,8 +87,8 @@ typeDeadlinesMap transactionId (ConstStructInitializer fields ann) = do
         Just t -> return t
         Nothing -> throwError . annotateError (getLocation ann) $ EUnknownTransaction transactionId
     steps <- case transaction of
-        SAST.RTTransaction _ firstStep _ -> return $ extractStepNames S.empty firstStep
-        SAST.RTSituation {} -> throwError . annotateError Internal $ EInvalidTransactionMap
+        RTSAST.RTTransaction _ firstStep _ -> return $ extractStepNames S.empty firstStep
+        RTSAST.RTSituation {} -> throwError . annotateError Internal $ EInvalidTransactionMap
     deadlines <- mapM (\(ConstFieldAssignment fname fvalue ann') -> do
         -- Check that the name is a valid step name in the transaction
         unless (S.member fname steps) $
@@ -156,7 +156,7 @@ typeArrivalsField (ConstInt i@(TInteger intVal _) ann) = do
     return i
 typeArrivalsField expr = throwError . annotateError (getLocation . getAnnotation $ expr) $ EInvalidArrivalsExpression
 
-typeBurstyEvent :: Identifier -> ConstStructInitializer ParserAnn -> RTMonad (SAST.RTEvent RTSemAnn)
+typeBurstyEvent :: Identifier -> ConstStructInitializer ParserAnn -> RTMonad (RTSAST.RTEvent RTSemAnn)
 typeBurstyEvent eventId (ConstStructInitializer fields' ann) = do
     let validNames = S.fromList ["interval", "arrivals", "deadlines", "transaction", "emitter"]
     -- | Check that all fields are valid and there are no duplicates
@@ -187,11 +187,11 @@ typeBurstyEvent eventId (ConstStructInitializer fields' ann) = do
         Just (ConstFieldAssignment _ (ConstStructSimpleValue expr) _) -> do
             transaction <- typeTransactionObjectExpr expr
             case transaction of
-                SAST.RTTransaction ident (SAST.RTTransStepAction _ targetCmp targetAction _ _ _) _ ->
+                RTSAST.RTTransaction ident (RTSAST.RTTransStepAction _ targetCmp targetAction _ _ _) _ ->
                     checkEmitterConnection (getLocation ann) emitterId targetCmp targetAction
                     >> return ident
-                SAST.RTTransaction {} -> throwError . annotateError Internal $ EInvalidTransaction
-                SAST.RTSituation {} -> throwError . annotateError Internal $ EInvalidTransactionMap
+                RTSAST.RTTransaction {} -> throwError . annotateError Internal $ EInvalidTransaction
+                RTSAST.RTSituation {} -> throwError . annotateError Internal $ EInvalidTransactionMap
         Just (ConstFieldAssignment _ (ConstStructFieldValue _) _) ->
             throwError . annotateError (getLocation ann) $ EInvalidEventFieldType "transaction"
         Nothing -> throwError . annotateError (getLocation ann) $ EMissingEventField "transaction"
@@ -203,9 +203,9 @@ typeBurstyEvent eventId (ConstStructInitializer fields' ann) = do
             throwError . annotateError (getLocation ann) $ EInvalidEventFieldType "deadlines"
         Nothing ->
             throwError . annotateError (getLocation ann) $ EMissingEventField "deadlines"
-    return $ SAST.RTEventBursty eventId emitterId transactionId intervalExpr arrivalsExpr deadlinesMap (RTEventTy (getLocation ann))
+    return $ RTSAST.RTEventBursty eventId emitterId transactionId intervalExpr arrivalsExpr deadlinesMap (RTEventTy (getLocation ann))
 
-typePeriodicEvent :: Identifier -> ConstStructInitializer ParserAnn -> RTMonad (SAST.RTEvent RTSemAnn)
+typePeriodicEvent :: Identifier -> ConstStructInitializer ParserAnn -> RTMonad (RTSAST.RTEvent RTSemAnn)
 typePeriodicEvent eventId (ConstStructInitializer fields' ann) = do
     let validNames = S.fromList ["deadlines", "transaction", "emitter"]
     -- | Check that all fields are valid and there are no duplicates
@@ -222,11 +222,11 @@ typePeriodicEvent eventId (ConstStructInitializer fields' ann) = do
         Just (ConstFieldAssignment _ (ConstStructSimpleValue expr) _) -> do
             transaction <- typeTransactionObjectExpr expr
             case transaction of
-                SAST.RTTransaction ident (SAST.RTTransStepAction _ targetCmp targetAction _ _ _) _ ->
+                RTSAST.RTTransaction ident (RTSAST.RTTransStepAction _ targetCmp targetAction _ _ _) _ ->
                     checkEmitterConnection (getLocation ann) emitterId targetCmp targetAction
                     >> return ident
-                SAST.RTTransaction {} -> throwError . annotateError Internal $ EInvalidTransaction
-                SAST.RTSituation {} -> throwError . annotateError Internal $ EInvalidTransactionMap
+                RTSAST.RTTransaction {} -> throwError . annotateError Internal $ EInvalidTransaction
+                RTSAST.RTSituation {} -> throwError . annotateError Internal $ EInvalidTransactionMap
         Just (ConstFieldAssignment _ (ConstStructFieldValue _) _) ->
             throwError . annotateError (getLocation ann) $ EInvalidEventFieldType "transaction"
         Nothing -> throwError . annotateError (getLocation ann) $ EMissingEventField "transaction"
@@ -238,4 +238,4 @@ typePeriodicEvent eventId (ConstStructInitializer fields' ann) = do
             throwError . annotateError (getLocation ann) $ EInvalidEventFieldType "deadlines"
         Nothing ->
             throwError . annotateError (getLocation ann) $ EMissingEventField "deadlines"
-    return $ SAST.RTEventPeriodic eventId emitterId transactionId deadlinesMap (RTEventTy (getLocation ann))
+    return $ RTSAST.RTEventPeriodic eventId emitterId transactionId deadlinesMap (RTEventTy (getLocation ann))
