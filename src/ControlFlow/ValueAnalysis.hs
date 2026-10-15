@@ -232,21 +232,21 @@ covers (Interval lo hi) (Discrete vs) = all inside (S.toList vs)
 covers (Discrete left) (Discrete right) = right `S.isSubsetOf` left
 covers (Discrete _) (Interval _ _) = False
 
--- | A place the walk meets that decides which path is taken, which is what
--- the diagnostic reads once the walk is over.
-data Met =
+-- | A boolean question the state where the walk meets it may answer, which
+-- the diagnostic reports when it does once the walk is over.
+data Predicate =
     -- | A condition, which is invariant when the state determines its value.
-    MetCondition (Expression SemanticAnn)
+    ConditionPredicate (Expression SemanticAnn)
     -- | A case of a match, with what the match discriminates on and the
     -- variant of the case, which is never taken when the state rules the
     -- variant out.
-  | MetCase (Expression SemanticAnn) Identifier
+  | CasePredicate (Expression SemanticAnn) Identifier
     -- | A comparison that is not a whole condition, which is invariant when
     -- the state determines its value.
-  | MetComparison (Expression SemanticAnn)
+  | ComparisonPredicate (Expression SemanticAnn)
     -- | A loop, with the values of its bounds, whose body never runs when the
     -- range they give is empty.
-  | MetLoop Integer Integer
+  | LoopPredicate Integer Integer
 
 -- | What one function or member gives back, cell by cell: the values of what
 -- it returns under the empty path, and those of each field of it under the
@@ -264,12 +264,12 @@ data ValueAnalysisGlobal = ValueAnalysisGlobal
     -- makes this pass answer for the case a condition is constant outright.
     moduleConsts :: M.Map Identifier ConstEntry,
     platform :: Platform,
-    -- | Every place the walk has met that decides a path, with the state of
-    -- the path where it met it, under its position. A loop meets the same
-    -- place once per turn and each turn overwrites the one before, so what is
-    -- left is what the last turn saw, which is the turn that starts from the
-    -- settled state of the head.
-    observed :: M.Map Location (Met, ValueAnalysisPath),
+    -- | Every predicate the walk has met, with the state of the path where it
+    -- met it, under its position. A loop meets the same predicate once per
+    -- turn and each turn overwrites the one before, so what is left is what
+    -- the last turn saw, which is the turn that starts from the settled state
+    -- of the head.
+    predicates :: M.Map Location (Predicate, ValueAnalysisPath),
     -- | What each function and member walked so far gives back, including
     -- those of the modules this one imports.
     returnedValues :: ReturnedValues,
@@ -281,8 +281,8 @@ data ValueAnalysisGlobal = ValueAnalysisGlobal
     -- | For each run-time check the walk has met, the operation and the state
     -- of the path there, which the diagnostic reads to tell whether the check
     -- fails every time. A loop overwrites it on every turn, as it does
-    -- 'observed', so what is left is the settled state.
-  , met :: M.Map ObligationId (Operation, ValueAnalysisPath)
+    -- 'predicates', so what is left is the settled state.
+  , obligations :: M.Map ObligationId (Operation, ValueAnalysisPath)
   }
 
 type ValueAnalysisMonad = DataflowM ValueAnalysisPath ValueAnalysisGlobal ValueAnalysisError
@@ -424,7 +424,7 @@ observeCondition cond = do
   locals <- getPath
   let loc = getLocation . getAnnotation $ cond
   modifyGlobal (\g ->
-    g { observed = M.insert loc (MetCondition cond, locals) (observed g) })
+    g { predicates = M.insert loc (ConditionPredicate cond, locals) (predicates g) })
 
 -- | Takes down, for each run-time check of an expression, whether the values
 -- of the path show that it holds. The right operand of @&&@ runs only when the
@@ -442,7 +442,7 @@ recordExpression expr = do
     locals <- getPath
     let loc = getLocation . getAnnotation $ expr
     modifyGlobal (\g ->
-      g { observed = M.insert loc (MetComparison expr, locals) (observed g) })
+      g { predicates = M.insert loc (ComparisonPredicate expr, locals) (predicates g) })
   case expr of
     BinOp LogicalAnd left right _ -> do
       recordExpression left
@@ -498,7 +498,7 @@ recordObligation (Obligation oid@(_, kind) operation) = do
   locals <- getPath
   let shown = Evidence "value" <$> holdsBy global locals kind operation
   modifyGlobal (\g -> g { proofs = M.insertWith both oid shown (proofs g)
-                        , met = M.insert oid (operation, locals) (met g) })
+                        , obligations = M.insert oid (operation, locals) (obligations g) })
 
   where
 
@@ -701,9 +701,9 @@ enterCase discriminant (MatchCase variant bvars _ ann) = do
   -- itself says.
   locals <- getPath
   modifyGlobal (\g ->
-    g { observed =
-          M.insert (getLocation ann) (MetCase discriminant variant, locals)
-            (observed g) })
+    g { predicates =
+          M.insert (getLocation ann) (CasePredicate discriminant variant, locals)
+            (predicates g) })
   -- | The variables a case binds are declared by the case, with a value that
   -- comes from the variant it matched.
   mapM_ (forget . fst) bvars
@@ -886,7 +886,7 @@ seedIterator loopLoc ident ty initE endE = do
   locals <- getPath
   mapM_ (\(from, end) ->
     modifyGlobal (\g ->
-      g { observed = M.insert loopLoc (MetLoop from end, locals) (observed g) }))
+      g { predicates = M.insert loopLoc (LoopPredicate from end, locals) (predicates g) }))
     ((,) <$> mFrom <*> mTo)
   case turns mFrom mTo of
     -- | Bounds the folding could not work out, and a loop of no turns at all,
@@ -1511,8 +1511,8 @@ reasonsFor global locals cond =
 findings :: ValueAnalysisGlobal -> [ValueAnalysisError]
 findings global =
   map snd . sortOn fst $
-    mapMaybe (\entry@(loc, _) -> (,) loc <$> finding entry) (M.toList (observed global))
-    ++ mapMaybe failing (M.toList (met global))
+    mapMaybe (\entry@(loc, _) -> (,) loc <$> finding entry) (M.toList (predicates global))
+    ++ mapMaybe failing (M.toList (obligations global))
 
   where
 
@@ -1531,25 +1531,25 @@ findings global =
         (_, BinaryOperation _ _ right) -> reasonsFor global locals right
         _ -> []
 
-    finding (loc, (MetCondition cond, locals)) =
+    finding (loc, (ConditionPredicate cond, locals)) =
       case verdict locals cond of
         Just value@(B _) ->
           Just (annotateError loc
                   (EInvariantCondition value (reasonsFor global locals cond)))
         _ -> Nothing
-    finding (loc, (MetCase discriminant variant, locals)) =
+    finding (loc, (CasePredicate discriminant variant, locals)) =
       case valuesIn global locals discriminant >>= isVariant variant of
         Just False ->
           Just (annotateError loc
                   (EUnreachableCase variant (reasonsFor global locals discriminant)))
         _ -> Nothing
-    finding (loc, (MetComparison compared, locals)) =
+    finding (loc, (ComparisonPredicate compared, locals)) =
       case verdict locals compared of
         Just value@(B _) ->
           Just (annotateError loc
                   (EInvariantComparison value (reasonsFor global locals compared)))
         _ -> Nothing
-    finding (loc, (MetLoop from end, _)) =
+    finding (loc, (LoopPredicate from end, _)) =
       if from >= end
         then Just (annotateError loc (EEmptyLoop from end))
         else Nothing
