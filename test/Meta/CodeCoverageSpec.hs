@@ -53,6 +53,10 @@ families =
       "src/ControlFlow/VarScope/Errors.hs"
       ["test/VarScope/Negative/CodeSpec.hs"] []
       []
+  , Family "DequeUsage (DQE)" "DQE"
+      "src/ControlFlow/DequeUsage/Errors.hs"
+      ["test/DequeUsage/Negative/CodeSpec.hs"] []
+      []
   , Family "BoxUsage (BE)" "BE"
       "src/ControlFlow/BoxUsage/Errors.hs"
       ["test/VarUsage/Negative/CodeSpec.hs"] []

@@ -186,9 +186,11 @@ data TerminaType' expr a
   | TPool (TerminaType' expr a) (expr a) -- Memory pools
   | TAtomic (TerminaType' expr a) -- TAtomic variables
   | TAtomicArray (TerminaType' expr a) (expr a) -- TAtomic arrays
+  | TDeque (TerminaType' expr a) (expr a) -- Deques of boxes owned by one component
   | TAllocator (TerminaType' expr a) -- Interface of memory pools
   | TAtomicAccess (TerminaType' expr a) -- Interface to access atomic variables
   | TAtomicArrayAccess (TerminaType' expr a) (expr a) -- Interface to access atomic arrays
+  | TDequeAccess (TerminaType' expr a) -- Interface to access deques
   -- Non-primitive types
   | TReference AccessKind (TerminaType' expr a)
   | TBoxSubtype (TerminaType' expr a)
@@ -301,6 +303,8 @@ instance (ShowText (expr a)) => ShowText (TerminaType' expr a) where
     showText (TAtomicArrayAccess ts size) = "AtomicArrayAccess<" <> showText ts <> "; " <> showText size <> ">"
     showText (TAtomic ts) = "Atomic<" <> showText ts <> ">"
     showText (TAtomicArray ts size) = "AtomicArray<" <> showText ts <> "; " <> showText size <> ">"
+    showText (TDeque ts size) = "Deque<" <> showText ts <> "; " <> showText size <> ">"
+    showText (TDequeAccess ts) = "DequeAccess<" <> showText ts <> ">"
     showText (TReference ak ts) = "&" <> showText ak <> showText ts
     showText (TBoxSubtype ts) = "box " <> showText ts
     showText (TFixedLocation ts) = "loc " <> showText ts

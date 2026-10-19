@@ -138,6 +138,15 @@ spec = do
              ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
       compileErrorCode src `shouldBe` Just (pack "CFE-015")
 
+    it "CFE-017: deque with a capacity of zero" $ do
+      let src = timerTaskClass
+             ++ "const capacity : usize = 0;\n"
+             ++ "resource empty_deque : Deque<u32; capacity>;\n"
+             ++ "emitter timer : PeriodicTimer = { period = {tv_sec = 1, tv_usec = 0} };\n"
+             ++ "#[priority(1)]\n"
+             ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
+      compileErrorCode src `shouldBe` Just (pack "CFE-017")
+
     -- | 50000000 s are 5000000000 ticks of 10000 microseconds, above the
     -- 32-bit count the test platform admits.
     it "CFE-016: timer period longer than the platform admits" $ do

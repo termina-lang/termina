@@ -28,6 +28,14 @@ genInitializeObj loc before (Resource identifier ty@(TAtomicArray {}) (Just expr
     cType <- genType noqual ty
     let cObj = identifier @: cType
     genAtomicArrayInitialization loc before 0 cObj expr
+-- | A deque starts empty, over the array that holds its boxes
+genInitializeObj loc before (Resource identifier (TDeque _ size) _ _ _) = do
+    cSize <- genConstExpression size
+    let initCall = termina__deque__init @@
+            [addrOf (identifier @: termina__deque_t), dequeItems identifier @: CTArray termina__box_t cSize, cSize] |>> loc
+    if before
+        then return [pre_cr initCall |>> loc]
+        else return [no_cr initCall |>> loc]
 genInitializeObj loc before (Resource identifier _ mexpr _ _) = do
     let cObj = identifier @: typeDef identifier
     let cLockNone = 

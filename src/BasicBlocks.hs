@@ -16,6 +16,14 @@ import Utils.Annotations
 
 import Data.Maybe (maybeToList)
 
+data DequeEnd = DequeBack | DequeFront
+  deriving (Show, Eq)
+
+-- | What a put into a deque does when the deque is full: try_put leaves the new
+-- box out and replace takes the one at the front out
+data DequeExchangeKind = DequeTryPut | DequeReplace
+  deriving (Show, Eq)
+
 data MatchCase' ty expr obj a = MatchCase
   {
     matchIdentifier :: Identifier
@@ -118,6 +126,24 @@ data BasicBlock' ty expr obj a =
         (obj a) -- port that implements the allocator interface
         (expr a) -- ^ argument expression
         a
+    -- | Call to the take procedure of a deque
+    | DequeTake
+        (obj a) -- ^ port that accesses the deque
+        (expr a) -- ^ argument expression
+        a
+    -- | Call to the put or put_front procedure of a deque
+    | DequePut
+        DequeEnd -- ^ end of the deque the box goes into
+        (obj a) -- ^ port that accesses the deque
+        (expr a) -- ^ box expression
+        a
+    -- | Call to the try_put or replace procedure of a deque
+    | DequeExchange
+        DequeExchangeKind
+        (obj a) -- ^ port that accesses the deque
+        (expr a) -- ^ box expression
+        (expr a) -- ^ reference to the option that gets the box left out
+        a
     -- | Regular block (list of statements)
     | RegularBlock [Statement' ty expr obj a]
     | ReturnBlock
@@ -183,6 +209,9 @@ simpleBlockChildren bb = case bb of
   AtomicArrayStore obj index expr _ -> Just [ChildObject obj, ChildExpr index, ChildExpr expr]
   AllocBox obj expr _ -> Just [ChildObject obj, ChildExpr expr]
   FreeBox obj expr _ -> Just [ChildObject obj, ChildExpr expr]
+  DequeTake obj expr _ -> Just [ChildObject obj, ChildExpr expr]
+  DequePut _ obj expr _ -> Just [ChildObject obj, ChildExpr expr]
+  DequeExchange _ obj expr out _ -> Just [ChildObject obj, ChildExpr expr, ChildExpr out]
   ReturnBlock mExpr _ -> Just (map ChildExpr (maybeToList mExpr))
   ContinueBlock expr _ -> Just [ChildExpr expr]
   RebootBlock _ -> Just []

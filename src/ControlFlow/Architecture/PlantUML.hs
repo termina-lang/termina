@@ -184,7 +184,9 @@ genTargetResource currentDepth targetId = do
             Nothing ->
                 case M.lookup targetId (atomics progArch) of
                     Nothing -> case M.lookup targetId (atomicArrays progArch) of
-                        Nothing -> throwError $ "Resource " <> T.pack targetId <> " not found."
+                        Nothing -> case M.lookup targetId (deques progArch) of
+                            Nothing -> throwError $ "Resource " <> T.pack targetId <> " not found."
+                            Just deque -> genDeque deque
                         Just atomicArray -> do
                             genAtomicArray atomicArray
                     Just atomic -> do
@@ -228,6 +230,15 @@ genAtomicArray (TPAtomicArray atomicArrayId ty size _ _) = do
     -- | Insert the new participant
     ST.modify $ \s -> s {
         participants = M.insert atomicArrayId cmp (participants s)
+    }
+
+genDeque :: TPDeque a -> PlantUMLCmpGenMonad a ()
+genDeque (TPDeque dequeId ty size _ _) = do
+    let cmp = PlantUMLCmpComponent dequeId
+            (Just $ "Deque&#60;" <> showText ty <> "; " <> showText size <> "&#62;") (Just $ PlantUMLColorName "Plum")
+    -- | Insert the new participant
+    ST.modify $ \s -> s {
+        participants = M.insert dequeId cmp (participants s)
     }
 
 genChannel :: TPChannel a -> PlantUMLCmpGenMonad a ()

@@ -214,6 +214,16 @@ checkTerminaType loc (TAtomicArrayAccess ty s) =
     TConstSubtype _ -> return ();
     _ -> throwError $ annotateError loc EExpressionNotConstant
   }
+checkTerminaType loc (TDequeAccess ty) =
+  checkTerminaType loc ty >>
+  unless (boxTy ty) (throwError $ annotateError loc (EDequeInvalidType ty))
+checkTerminaType loc (TDeque ty s) =
+  checkTerminaType loc ty >>
+  unless (boxTy ty) (throwError $ annotateError loc (EDequeInvalidType ty)) >>
+  getExprType s >>= \case {
+    TConstSubtype _ -> return ();
+    _ -> throwError $ annotateError loc EExpressionNotConstant
+  }
 checkTerminaType loc (TAtomic ty) = 
   checkTerminaType loc ty >>
   catchExpectedNum loc EAtomicInvalidType (intTyOrFail loc ty)
@@ -596,7 +606,30 @@ typeMemberFunctionCall ann ak obj_ty ident args =
               return (([builtinParameter "element" ty] , [typed_element]), TUnit)
             _ -> throwError $ annotateError ann (EOutboundPortSendInvalidNumArgs (fromIntegral $ length args))
         _ -> throwError $ annotateError ann $ EOutboundPortInvalidProcedure ident
+    TAccessPort (TDequeAccess ty_deque) -> do
+      when (ak == Immutable) (throwError $ annotateError ann EInvalidAccessToProcedureFromImmutableSelfReference)
+      let opt = builtinParameter "opt" (TReference Mutable (TOption (TBoxSubtype ty_deque)))
+          box = builtinParameter "element" (TBoxSubtype ty_deque)
+      case ident of
+        "take" -> typeBuiltinArgs "take" [opt]
+        "put" -> typeBuiltinArgs "put" [box]
+        "put_front" -> typeBuiltinArgs "put_front" [box]
+        "try_put" -> typeBuiltinArgs "try_put" [box, builtinParameter "rejected" (paramType opt)]
+        "replace" -> typeBuiltinArgs "replace" [box, builtinParameter "evicted" (paramType opt)]
+        _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     ty -> throwError $ annotateError ann (EMemberFunctionCallInvalidType ty)
+
+  where
+
+    -- | Types the arguments of a built-in procedure against its parameters
+    typeBuiltinArgs procName ps
+      | length args < length ps = throwError $ annotateError ann (EProcedureCallMissingArgs (procName, ps, Builtin) (fromIntegral (length args)))
+      | length args > length ps = throwError $ annotateError ann (EProcedureCallExtraArgs (procName, ps, Builtin) (fromIntegral (length args)))
+      | otherwise = do
+          typed_args <- zipWithM (\(p, idx) e ->
+            catchMismatch ann (EProcedureCallArgTypeMismatch (procName, p, Builtin) idx)
+              (typeExpression (Just (paramType p)) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
+          return ((ps, typed_args), TUnit)
 
 ----------------------------------------
 -- These functions are useful:
@@ -738,6 +771,21 @@ typeTypeSpecifier loc typeObj ts@(TSDefinedType "Pool" [typeParam, sizeParam]) =
     TypeParamSize s -> typeExpression (Just (TConstSubtype TUSize)) typeObj s
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
   return $ TPool tyTypeParam tySizeParam
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "Deque" [typeParam, sizeParam]) = do
+  tyTypeParam <- case typeParam of
+    TypeParamIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeParamTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+  tySizeParam <- case sizeParam of
+    TypeParamIdentifier ident ->  typeExpression (Just (TConstSubtype TUSize)) typeObj (AccessObject (Variable ident loc))
+    TypeParamSize s -> typeExpression (Just (TConstSubtype TUSize)) typeObj s
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+  return $ TDeque tyTypeParam tySizeParam
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "DequeAccess" [typeParam]) =
+  case typeParam of
+    TypeParamIdentifier ident -> TDequeAccess <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeParamTypeSpec ts' -> TDequeAccess <$> typeTypeSpecifier loc typeObj ts'
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
 typeTypeSpecifier loc typeObj (TSArray ts s) = do
   ty <- typeTypeSpecifier loc typeObj ts
   arraySize <- catchMismatch loc EArrayIndexNotUSize 
@@ -1615,6 +1663,12 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty fann) (FieldPortConnection 
             -- We will check the size of the atomic array when we are performing the const propagation.
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty portSize glbSize)
           _ -> throwError $ annotateError pann $ EAtomicArrayAccessPortConnectionInvalidGlobal sid
+      TAccessPort (TDequeAccess ty) ->
+        case gentry of
+          LocatedElement (GGlob (TDeque ty' _)) _ -> do
+            catchMismatch pann (EDequeAccessPortConnectionDequeTypeMismatch sid ty) (sameTyOrError pann ty ty')
+            return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildDequeConnAnn pann ty)
+          _ -> throwError $ annotateError pann $ EDequeAccessPortConnectionInvalidGlobal sid
       TAccessPort ifaceTy@(TInterface _ iface) -> do
         -- | Get the interface definition
         getGlobalTypeDef pann iface >>=

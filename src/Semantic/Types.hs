@@ -66,6 +66,9 @@ data ConnectionSeman a =
     (TerminaType a)
     -- | Size of the connected pool
     (Expression a)
+  | APDequeConnTy
+    -- | Type specifier of the boxes of the connected deque
+    (TerminaType a)
   -- | Sink port connection
   | SPConnTy
     -- | Type specifier of the connected event emitter
@@ -231,6 +234,9 @@ buildAccessPortConnAnn loc ifaceTy ts procs = SemanticAnn (STy (PortConnection (
 
 buildPoolConnAnn :: Location -> TerminaType SemanticAnn -> Expression SemanticAnn -> SemanticAnn
 buildPoolConnAnn loc ts s = SemanticAnn (STy (PortConnection (APPoolConnTy ts s))) loc
+
+buildDequeConnAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
+buildDequeConnAnn loc ts = SemanticAnn (STy (PortConnection (APDequeConnTy ts))) loc
 
 buildAtomicConnAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
 buildAtomicConnAnn loc ts = SemanticAnn (STy (PortConnection (APAtomicConnTy ts))) loc

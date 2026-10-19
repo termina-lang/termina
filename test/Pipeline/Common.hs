@@ -346,6 +346,7 @@ runChecks files progArch =
               , runCheckChannelConnections progArch
               , runCheckResourceUsage progArch
               , runCheckPoolUsage progArch
+              , runCheckDequeConnections progArch
               , runCheckTaskPriorities progArch
               , runCheckSystemExceptAction progArch
               , runCheckBoxSources progArch ]

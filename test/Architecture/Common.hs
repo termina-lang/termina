@@ -15,7 +15,7 @@ import Lowering (runLowerModule)
 import ControlFlow.Architecture (runGenArchitecture)
 import ControlFlow.Architecture.Checks
   ( runCheckEmitterConnections, runCheckChannelConnections
-  , runCheckResourceUsage, runCheckPoolUsage, runCheckBoxSources )
+  , runCheckResourceUsage, runCheckPoolUsage, runCheckDequeConnections, runCheckBoxSources )
 import ControlFlow.Architecture.Errors (ArchitectureError)
 import qualified Data.Set as S
 
@@ -37,4 +37,5 @@ architectureError input = case runP (contents topLevel) "test" "" input of
             , runCheckChannelConnections progArch
             , runCheckResourceUsage progArch
             , runCheckPoolUsage progArch
+            , runCheckDequeConnections progArch
             , runCheckBoxSources progArch ]

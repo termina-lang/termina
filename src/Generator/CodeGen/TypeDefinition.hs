@@ -38,6 +38,9 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAtomicAccess {
 genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAtomicArrayAccess {})) _) = do
     cTs <- genType noqual ts
     return [field identifier cTs]
+genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TDequeAccess {})) _) = do
+    cTs <- genType noqual ts
+    return [field identifier cTs]
 genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface RegularInterface _)) (SemanticAnn (FTy (AccessPortField members)) _)) = do
     let cThatField = field thatField (ptr void)
     memberFields <- mapM genInterfaceProcedureField (M.elems members)

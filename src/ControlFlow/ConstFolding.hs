@@ -118,6 +118,9 @@ foldType loc (TArray ty arraySize)= do
 foldType loc (TAtomicArray ty arraySize) = do
   arraySizeValue <- evalConstExpression arraySize
   return (TAtomicArray ty (Constant arraySizeValue (buildExpAnn loc TUSize)))
+foldType loc (TDeque ty capacity) = do
+  capacityValue <- evalConstExpression capacity
+  return (TDeque ty (Constant capacityValue (buildExpAnn loc TUSize)))
 foldType loc (TFixedLocation (TArray ty arraySize)) = do
   arraySizeValue <- evalConstExpression arraySize
   ty' <- foldType loc ty
@@ -181,6 +184,9 @@ foldAnnotation (SemanticAnn (STy (PortConnection (APPoolConnTy ty poolSize))) lo
   poolSizeValue <- evalConstExpression poolSize
   let poolSizeConst = Constant poolSizeValue (buildExpAnn loc TUSize)
   return $ SemanticAnn (STy (PortConnection (APPoolConnTy ty' poolSizeConst))) loc
+foldAnnotation (SemanticAnn (STy (PortConnection (APDequeConnTy ty))) loc) = do
+  ty' <- foldType loc ty
+  return $ SemanticAnn (STy (PortConnection (APDequeConnTy ty'))) loc
 foldAnnotation (SemanticAnn (STy (PortConnection (SPConnTy ty ident))) loc) = do
   ty' <- foldType loc ty
   return $ SemanticAnn (STy (PortConnection (SPConnTy ty' ident))) loc
@@ -598,6 +604,22 @@ foldBasicBlock (FreeBox obj expr ann) = do
   obj' <- foldObject obj
   expr' <- foldExpression expr
   return $ FreeBox obj' expr' ann'
+foldBasicBlock (DequeTake obj expr ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  expr' <- foldExpression expr
+  return $ DequeTake obj' expr' ann'
+foldBasicBlock (DequePut end obj expr ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  expr' <- foldExpression expr
+  return $ DequePut end obj' expr' ann'
+foldBasicBlock (DequeExchange kind obj expr out ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  expr' <- foldExpression expr
+  out' <- foldExpression out
+  return $ DequeExchange kind obj' expr' out' ann'
 foldBasicBlock (ReturnBlock Nothing ann) = do
   ann' <- foldAnnotation ann
   return $ ReturnBlock Nothing ann'
@@ -699,6 +721,11 @@ foldGlobal (Resource ident ty mInitExpr mods ann) = do
   let glbLoc = getLocation ann
   ann' <- foldAnnotation ann
   ty' <- foldType glbLoc ty
+  -- | A take leaves room for one box only if the deque can hold one
+  case ty' of
+    TDeque _ (Constant (I (TInteger 0 _) _) _) ->
+      throwError $ annotateError glbLoc (EDequeWithoutCapacity ident)
+    _ -> return ()
   mInitExpr' <- mapM foldExpression mInitExpr
   return $ Resource ident ty' mInitExpr' mods ann'
 foldGlobal (Task ident ty mInitExpr mods ann) = do

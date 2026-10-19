@@ -475,9 +475,27 @@ genStructAssign loc before level cObj expr = do
                     return $ pre_cr (portFieldObj @= addrOf (res @: cResourceType)) : rest
                 else
                     return $ no_cr (portFieldObj @= addrOf (res @: cResourceType)) : rest
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection fld res (SemanticAnn (STy (PortConnection (APDequeConnTy {}))) _) : xs) = do
+                rest <- genFieldAssignments False xs
+                let portFieldObj = cObj @. fld @: ptr termina__deque_t
+                if before' then
+                    return $ pre_cr (portFieldObj @= addrOf (res @: termina__deque_t)) : rest
+                else
+                    return $ no_cr (portFieldObj @= addrOf (res @: termina__deque_t)) : rest
             genFieldAssignments before' (_ : xs) = genFieldAssignments before' xs
 
     _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show expr
+
+-- | A call to a procedure of the deque behind a port, whose field already
+-- points to the deque
+genDequeCall :: Identifier -> [CType] -> Object SemanticAnn -> [Expression SemanticAnn] -> SemanticAnn
+    -> CGenerator [CCompoundBlockItem]
+genDequeCall procName params obj args ann = do
+    cObj <- genObject obj
+    cArgs <- mapM genExpression args
+    let loc = getLocation ann
+        cDequeExpr = cObj @: getCObjType cObj |>> loc
+    return [pre_cr (termina__deque__procedure procName params @@ (cDequeExpr : cArgs) |>> loc) |>> loc]
 
 genBlocks :: BasicBlock SemanticAnn -> CGenerator [CCompoundBlockItem]
 genBlocks (RegularBlock stmts) = concat <$> traverse genStatement stmts
@@ -520,6 +538,14 @@ genBlocks (FreeBox obj arg ann) = do
     cArg <- genExpression arg
     methodCallExpr <- genPoolMethodCallExpr "free" cObj cArg (buildGenericAnn ann)
     return [pre_cr methodCallExpr |>> getLocation ann]
+genBlocks (DequeTake obj arg ann) =
+    genDequeCall "take" [_const (ptr _Option__box)] obj [arg] ann
+genBlocks (DequePut end obj arg ann) =
+    let procName = case end of { DequeBack -> "put"; DequeFront -> "put_front" } in
+    genDequeCall procName [termina__box_t] obj [arg] ann
+genBlocks (DequeExchange kind obj arg out ann) =
+    let procName = case kind of { DequeTryPut -> "try_put"; DequeReplace -> "replace" } in
+    genDequeCall procName [termina__box_t, _const (ptr _Option__box)] obj [arg, out] ann
 genBlocks (AtomicLoad obj arg ann) = do
     -- Generate the C code for the object
     cObj <- genObject obj

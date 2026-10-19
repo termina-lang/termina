@@ -16,6 +16,8 @@ import Modules.Modules
 import ControlFlow.BoxUsage (runBoxUsageCheck)
 import ControlFlow.VarUsage (runVarUsageCheck)
 import ControlFlow.VarScope (runVarScopeCheck)
+import ControlFlow.DequeUsage (runDequeUsageCheck)
+import ControlFlow.DequeUsage.Errors (DequeUsageError)
 import ControlFlow.SideEffects (runSideEffectCheck)
 import ControlFlow.SideEffects.Errors (SideEffectsError)
 import Configuration.Platform (Platform)
@@ -172,6 +174,9 @@ varUsageCheckModule :: BasicBlocksModule -> Maybe VarUsageError
 varUsageCheckModule =
     runVarUsageCheck . loweredAST . metadata
 
+dequeUsageCheckModules :: LoweredProject -> Maybe DequeUsageError
+dequeUsageCheckModules = listToMaybe . mapMaybe (runDequeUsageCheck . loweredAST . metadata) . M.elems
+
 varScopeCheckModules :: LoweredProject -> Maybe VarScopeError
 varScopeCheckModules = listToMaybe . mapMaybe varScopeCheckModule . M.elems
 
@@ -267,6 +272,9 @@ loweredChecks =
       (const (fmap checkFailure . varUsageCheckModules))
   , Check "Usage checking project modules"
       (const (fmap checkFailure . boxUsageCheckModules))
+    -- | The deque check relies on the boxes it sees moved being well formed.
+  , Check "Deque checking project modules"
+      (const (fmap checkFailure . dequeUsageCheckModules))
     -- | The scope check relies on definite assignment having passed, and a
     -- declaration in too wide a block is the least of the mistakes, so it goes
     -- last.

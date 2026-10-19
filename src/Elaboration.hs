@@ -147,6 +147,9 @@ elabBasicBlock d bb = case bb of
   AtomicArrayStore obj index e ann -> AtomicArrayStore (object obj) (atomicIndex obj index) (expr e) ann
   AllocBox obj e ann -> AllocBox (object obj) (expr e) ann
   FreeBox obj e ann -> FreeBox (object obj) (expr e) ann
+  DequeTake obj e ann -> DequeTake (object obj) (expr e) ann
+  DequePut end obj e ann -> DequePut end (object obj) (expr e) ann
+  DequeExchange kind obj e out ann -> DequeExchange kind (object obj) (expr e) (expr out) ann
   RegularBlock stmts -> RegularBlock (map statement stmts)
   ReturnBlock mExpr ann -> ReturnBlock (expr <$> mExpr) ann
   ContinueBlock e ann -> ContinueBlock (expr e) ann

@@ -50,6 +50,7 @@ data Error =
   | ETimerPeriodNotInTicks Identifier Integer Integer -- ^ Period of a periodic timer that is not a whole number of ticks (timer, period and tick in microseconds)
   | ETimerPeriodTooLong Identifier Integer Integer -- ^ Period of a periodic timer longer than the platform admits (timer, period and maximum in ticks)
   | EInvalidTimerPeriod -- ^ Initializer of a periodic timer without a constant period (internal)
+  | EDequeWithoutCapacity Identifier -- ^ Deque that cannot hold any box (CFE-017)
   deriving Show
 
 type ConstFoldError = AnnotatedError Error Location
@@ -127,6 +128,10 @@ instance Diagnosable Error where
             ("The period of the periodic timer " <> emph (T.pack timer) <> " is " <>
                 emph (T.pack (show ticks)) <> " ticks, but the platform admits at most " <>
                 emph (T.pack (show maxTicks)) <> ".")
+    describe (EDequeWithoutCapacity dequeId) =
+        diagnostic "CFE-017" "deque without capacity"
+            ("The deque " <> emph (T.pack dequeId) <> " has a capacity of 0, but a deque " <>
+                "must be able to hold at least one box.")
     -- | Everything else is a broken invariant of the compiler, which has no code
     -- of its own.
     describe _ = diagnosticWithoutDetail "Internal" "internal error"

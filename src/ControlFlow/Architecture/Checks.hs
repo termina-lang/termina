@@ -1,5 +1,6 @@
 module ControlFlow.Architecture.Checks (
     runCheckPoolUsage,
+    runCheckDequeConnections,
     runCheckResourceUsage,
     runCheckChannelConnections,
     runCheckEmitterConnections,
@@ -19,6 +20,11 @@ runCheckPoolUsage ::
     TerminaProgArch SemanticAnn 
     -> Either ArchitectureError ()
 runCheckPoolUsage = runReader (runExceptT checkPoolUsage)
+
+runCheckDequeConnections ::
+    TerminaProgArch SemanticAnn
+    -> Either ArchitectureError ()
+runCheckDequeConnections = runReader (runExceptT checkDequeConnections)
 
 runCheckResourceUsage :: 
     TerminaProgArch SemanticAnn 

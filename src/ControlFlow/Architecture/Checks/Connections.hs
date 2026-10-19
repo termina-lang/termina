@@ -34,6 +34,35 @@ checkPoolUsage = do
     mapM_ (\(TPPool poolId _ _ _ ann) ->
         when (poolId `M.notMember` resourceSources tp) (throwError $ annotateError (getLocation ann) (EUnusedPool poolId))) . M.elems . pools $ tp
 
+-- | Every deque is connected to exactly one access port, so only the members of
+-- one element touch it, and gets boxes from somewhere other than itself.
+checkDequeConnections :: ConnectionsCheckMonad ()
+checkDequeConnections = do
+    tp <- ask
+    mapM_ (\(TPDeque dequeId _ _ _ ann) ->
+        case M.lookup dequeId (resourceSources tp) of
+            Nothing -> throwError $ annotateError (getLocation ann) (EUnusedDeque dequeId)
+            Just [(owner, port, _)] ->
+                case ownerBoxIOMaps tp owner of
+                    Just ioMaps | null (dequeSources ioMaps port) ->
+                        throwError $ annotateError (getLocation ann) (EUnfilledDeque dequeId owner port)
+                    _ -> return ()
+            Just (conn : prev : _) ->
+                let (_, _, connAnn) = conn
+                    (_, _, prevAnn) = prev in
+                throwError $ annotateError (getLocation connAnn) (ESharedDeque dequeId (getLocation prevAnn))
+            Just [] -> return ()) . M.elems . deques $ tp
+
+    where
+
+        -- | The box maps of the class of a task, a handler or a resource
+        ownerBoxIOMaps tp owner = classBoxIOMaps <$>
+            case (M.lookup owner (tasks tp), M.lookup owner (handlers tp), M.lookup owner (resources tp)) of
+                (Just task, _, _) -> M.lookup (taskClass task) (taskClasses tp)
+                (_, Just handler, _) -> M.lookup (handlerClass handler) (handlerClasses tp)
+                (_, _, Just resource) -> M.lookup (resourceClass resource) (resourceClasses tp)
+                _ -> Nothing
+
 checkTaskPriorities :: ConnectionsCheckMonad ()
 checkTaskPriorities = do
     tp <- ask

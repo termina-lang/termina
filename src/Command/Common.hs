@@ -218,6 +218,17 @@ checkPoolUsage loweredProject progArchitecture =
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
+checkDequeConnections :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
+checkDequeConnections loweredProject progArchitecture =
+  let result = runCheckDequeConnections progArchitecture in
+  case result of
+    Left err ->
+      let sourceFilesMap =
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
+                M.empty loweredProject in
+      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+    Right _ -> return ()
+
 checkProjectBoxSources :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
 checkProjectBoxSources loweredProject progArchitecture =
   let result = runCheckBoxSources progArchitecture in

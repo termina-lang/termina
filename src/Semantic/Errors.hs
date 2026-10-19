@@ -275,6 +275,10 @@ data Error
   | ENoReturnCallInExpression (Identifier, Location) -- ^ Call to a noreturn function inside an expression (SE-224)
   | ENoReturnFunctionReturnType Identifier -- ^ Noreturn function declared with a return type (SE-225)
   | EContinueActionReturnTypeMismatch (Identifier, Location) (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Continued action returns another type than the current one (SE-226)
+  | EDequeInvalidType (TerminaType SemanticAnn) -- ^ Deque of a type a box cannot hold (SE-227)
+  | EDequeAccessPortConnectionInvalidGlobal Identifier -- ^ Invalid deque access port connection (SE-228)
+  | EDequeAccessPortConnectionDequeTypeMismatch Identifier (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Deque type mismatch in deque access port connection (SE-229)
+  | EDequeInitialized -- ^ Deque declared with an initial value (SE-230)
   deriving Show
 
 -- | Why an emitter takes a handler and not a task.
@@ -1048,6 +1052,18 @@ instance Diagnosable Error where
         relatedTo actionPos "the action is defined here" $
         diagnostic "SE-226" "continuation action return type mismatch"
             ("The action \x1b[31m" <> T.pack ident <> "\x1b[0m returns \x1b[31m" <> showText actualTy <> "\x1b[0m, but the action that continues to it returns \x1b[31m" <> showText expectedTy <> "\x1b[0m.\n" <> "The action that a continue reaches returns the result of the whole chain, so both have to return the same type.")
+    describe (EDequeInvalidType ty) =
+        diagnostic "SE-227" "invalid deque type"
+            ("A deque holds boxes, and a box cannot hold an object of type \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe (EDequeAccessPortConnectionInvalidGlobal ident) =
+        diagnostic "SE-228" "invalid deque access port connection"
+            ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to a deque access port.")
+    describe (EDequeAccessPortConnectionDequeTypeMismatch dequeId portTy dequeTy) =
+        diagnostic "SE-229" "deque type mismatch"
+            ("The deque \x1b[31m" <> T.pack dequeId <> "\x1b[0m holds boxes of type \x1b[31m" <> showText dequeTy <> "\x1b[0m but the port expects boxes of type \x1b[31m" <> showText portTy <> "\x1b[0m.")
+    describe EDequeInitialized =
+        diagnostic "SE-230" "deque initialized"
+            "A deque always starts empty, so its declaration takes no initial value."
 
     -- | The two clauses below pick their detail with a case, which the script
     -- that moved the rest of this table does not read, so they were moved by

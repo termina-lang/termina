@@ -337,6 +337,27 @@ termina__pool__free = "termina__pool__free" @:
             termina__box_t
         ]
 
+termina__deque_t :: CType
+termina__deque_t = typeDef deque
+
+termina__deque__init :: CExpression
+termina__deque__init = "termina__deque__init" @:
+    CTFunction void
+        [
+            -- | termina__deque_t * const self
+            _const . ptr $ termina__deque_t,
+            -- | termina__box_t * const items
+            _const . ptr $ termina__box_t,
+            -- | const size_t capacity
+            _const size_t
+        ]
+
+-- | The procedures of a deque, by their name in Termina: take gets an option,
+-- put and put_front a box, and try_put and replace a box and an option
+termina__deque__procedure :: String -> [CType] -> CExpression
+termina__deque__procedure procName params = ("termina__deque__" <> procName) @:
+    CTFunction void (_const (ptr termina__deque_t) : params)
+
 termina__app__init_tasks :: CExpression
 termina__app__init_tasks = "termina__app__init_tasks" @:
     CTFunction void

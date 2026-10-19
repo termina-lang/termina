@@ -272,6 +272,18 @@ instance Annotated TPPool where
   getAnnotation (TPPool _ _ _ _ a) = a
   updateAnnotation (TPPool i t s m _) = TPPool i t s m
 
+data TPDeque a = TPDeque
+    Identifier -- ^ deque identifier
+    (TerminaType a) -- ^ type of the boxes the deque holds
+    (Expression a) -- ^ capacity of the deque
+    QualifiedName -- ^ module that instantiates the deque
+    a -- ^ annontations
+   deriving Show
+
+instance Annotated TPDeque where
+  getAnnotation (TPDeque _ _ _ _ a) = a
+  updateAnnotation (TPDeque i t s m _) = TPDeque i t s m
+
 data TPGlobalConstant a = TPGlobalConstant {
 
     -- | Name of the global constant
@@ -317,6 +329,7 @@ data TerminaProgArch a = TerminaProgArch {
     pools :: Map Identifier (TPPool a),
     atomics :: Map Identifier (TPAtomic a),
     atomicArrays :: Map Identifier (TPAtomicArray a),
+    deques :: Map Identifier (TPDeque a),
 
     -- | Map of all the task classes in the program
     channels :: Map Identifier (TPChannel a),
@@ -340,11 +353,16 @@ data TerminaProgArch a = TerminaProgArch {
 data InOptionBox a =
   InOptionBoxAlloc Identifier a
   | InOptionBoxProcedureCall Identifier Integer a
+  | InOptionBoxDeque Identifier a
+  -- | The box that a try_put did not put into the deque
+  | InOptionBoxRejected (InBox a)
 
 data InBox a =
   InBoxInput Identifier
   | InBoxAlloc Identifier a
   | InBoxProcedureCall Identifier Integer
+  -- | The box was taken from the deque behind a port of the same class
+  | InBoxDeque Identifier
   deriving (Show, Eq, Ord)
 
 data BoxOutputInputMaps a = BoxOutputInputMaps {
@@ -360,7 +378,11 @@ data BoxOutputInputMaps a = BoxOutputInputMaps {
 
   -- | Map between the allocator ports that are used to free a box and the
   -- port from which the box was originated.
-  outBoxFree :: Map Identifier [(a, InBox a)]
+  outBoxFree :: Map Identifier [(a, InBox a)],
+
+  -- | Map between the deques that a box is put into and the port from which
+  -- the box was originated.
+  outBoxDeque :: Map Identifier [(a, InBox a)]
 
 } deriving Show
 

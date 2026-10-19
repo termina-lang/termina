@@ -13,6 +13,32 @@ Patch versions on either side are interchangeable.
 
 ## [Unreleased]
 
+### Added
+
+- Deques, which let a task, a handler or a resource keep boxes from one
+  activation to the next. A deque is declared in `app.fin` as
+  `resource name : Deque<T; N>;`, a queue of up to `N` boxes, and is accessed
+  through a port `access DequeAccess<T>` of the one element connected to it
+  (AE-012, AE-013). `take(&mut opt)` moves the box at the front out into an
+  option, `put(b)` and `put_front(b)` move a box in at the back or the front,
+  `try_put(b, &mut rejected)` gives the box back if the deque is full, and
+  `replace(b, &mut evicted)` takes the box at the front out to make room. The
+  transpiler checks that `put` and `put_front` only happen where the deque has
+  room on every path, also across calls to methods of the same class (DQE-001,
+  DQE-002), that every deque is both filled and taken (DQE-003, DQE-004), and
+  that a deque gets boxes from somewhere other than itself (AE-014).
+  A deque holds a type a box can hold (SE-227), takes no initial value (SE-230)
+  and a capacity of at least one (CFE-017). The architecture check follows a
+  box through the deques it goes through, so a box allocated from one pool and
+  freed to another after being parked is AE-003. The procedures of a deque are
+  in the OSAL, which checks again at run time that a `put` finds room, so this
+  release needs a matching OSAL.
+
+### Fixed
+
+- A box allocated from one pool and freed to another inside a `for` loop
+  compiled without AE-003 and raised a `pool_free` runtime failure.
+
 ## [0.6.0] - 2026-10-15
 
 ### Added

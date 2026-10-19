@@ -100,6 +100,8 @@ genType _qual (TAtomicAccess ts) = do
 genType _qual (TAtomicArrayAccess ts _) = do
     ts' <- genType atomic ts
     return (CTPointer ts' noqual)
+genType _qual (TDeque _ _) = return (CTTypeDef deque noqual)
+genType _qual (TDequeAccess _) = return (CTPointer (CTTypeDef deque noqual) noqual)
 -- | Type of the ports
 genType _qual (TSinkPort {}) = return (CTTypeDef sinkPort noqual)
 genType _qual (TOutPort {}) = return (CTTypeDef outPort noqual)

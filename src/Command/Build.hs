@@ -461,6 +461,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     checkChannelConnections loweredProject programArchitecture
     checkResourceUsage loweredProject programArchitecture
     checkPoolUsage loweredProject programArchitecture
+    checkDequeConnections loweredProject programArchitecture
     checkTaskPriorities loweredProject programArchitecture
     checkSystemExceptAction loweredProject programArchitecture
     checkProjectBoxSources loweredProject programArchitecture

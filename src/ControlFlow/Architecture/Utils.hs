@@ -132,7 +132,8 @@ genResourceUsageGraph progArchitecture = S.toList <$> resDependenciesMap
       let initialMap = M.fromList $
             map (, S.empty) (M.keys (pools progArchitecture)) ++
             map (, S.empty) (M.keys (atomics progArchitecture)) ++
-            map (, S.empty) (M.keys (atomicArrays progArchitecture))
+            map (, S.empty) (M.keys (atomicArrays progArchitecture)) ++
+            map (, S.empty) (M.keys (deques progArchitecture))
           unprotectedResources = M.filter isUnprotected (resources progArchitecture)
           protectedResources = M.filter (not . isUnprotected) (resources progArchitecture)
 
@@ -190,8 +191,9 @@ genResourceLockingsInternal :: TerminaProgArch a -> ResLockingMonad ()
 genResourceLockingsInternal programArchitecture =
   let resIds = M.keys $ resources programArchitecture
       poolIds = M.keys $ pools programArchitecture
-      atomicIds = M.keys (atomics programArchitecture) ++ M.keys (atomicArrays programArchitecture) in
-  mapM_ processResource (resIds ++ poolIds ++ atomicIds)
+      atomicIds = M.keys (atomics programArchitecture) ++ M.keys (atomicArrays programArchitecture)
+      dequeIds = M.keys (deques programArchitecture) in
+  mapM_ processResource (resIds ++ poolIds ++ atomicIds ++ dequeIds)
 
   where
 
@@ -205,8 +207,9 @@ genResourceLockingsInternal programArchitecture =
       case M.lookup resId resLockMap of
         Just resLock -> return resLock
         Nothing ->
-          if isAtomic resId || isUnprotectedResource resId then
-              -- Atomic resources don't need locking
+          if isAtomic resId || isDeque resId || isUnprotectedResource resId then
+              -- Atomic resources don't need locking, and a deque is only
+              -- accessed by the one element connected to it
               let resLock = ResourceLockNone in
               modify (\st ->
                 st { resLockingMap = M.insert resId resLock (resLockingMap st) }) >> return resLock
@@ -235,6 +238,9 @@ genResourceLockingsInternal programArchitecture =
         case M.lookup identifier (atomics programArchitecture) of
             Just _ -> True
             Nothing -> isJust $ M.lookup identifier (atomicArrays programArchitecture)
+
+    isDeque :: Identifier -> Bool
+    isDeque identifier = M.member identifier (deques programArchitecture)
 
     isUnprotectedResource :: Identifier -> Bool
     isUnprotectedResource identifier =
@@ -283,6 +289,7 @@ getGlobDeclModules progArchitecture =
     ++ poolModules
     ++ atomicModules
     ++ atomicArrayModules
+    ++ dequeModules
   where
     taskModules = map taskModule $ M.elems (tasks progArchitecture)
     handlerModules = map handlerModule $ M.elems (handlers progArchitecture)
@@ -290,6 +297,7 @@ getGlobDeclModules progArchitecture =
     poolModules = map poolModule $ M.elems (pools progArchitecture)
     atomicModules = map atomicModule $ M.elems (atomics progArchitecture)
     atomicArrayModules = map atomicArrayModule $ M.elems (atomicArrays progArchitecture)
+    dequeModules = map dequeModule $ M.elems (deques progArchitecture)
 
     -- | This function returns the module name of a pool
     poolModule :: TPPool a -> QualifiedName
@@ -302,6 +310,10 @@ getGlobDeclModules progArchitecture =
     -- | This function returns the module name of an atomic array
     atomicArrayModule :: TPAtomicArray a -> QualifiedName
     atomicArrayModule (TPAtomicArray _ _ _ modName _) = modName
+
+    -- | This function returns the module name of a deque
+    dequeModule :: TPDeque a -> QualifiedName
+    dequeModule (TPDeque _ _ _ modName _) = modName
 
 -- | This function returns the type of an object. The type is extracted from the
 -- object's semantic annotation. The function assumes that the object is well-typed
@@ -410,6 +422,26 @@ getExprBoxName _ = throwError $ annotateError Internal EExpectedBoxSubtype
 getInBox :: InOptionBox a -> InBox a
 getInBox (InOptionBoxAlloc ident ann) = InBoxAlloc ident ann
 getInBox (InOptionBoxProcedureCall ident idx _ann) = InBoxProcedureCall ident idx
+getInBox (InOptionBoxDeque ident _ann) = InBoxDeque ident
+getInBox (InOptionBoxRejected inBox) = inBox
+
+-- | The sources of the boxes that a deque may hold: the boxes put into it, and,
+-- for the ones taken from another deque of the class, the sources of that deque.
+-- A box taken from a deque and put back into it is not a source.
+dequeSources :: BoxOutputInputMaps a -> Identifier -> [(a, InBox a)]
+dequeSources ioMaps deque = go (S.singleton deque) [deque]
+
+    where
+
+        go _ [] = []
+        go visited (s : rest) =
+            let puts = M.findWithDefault [] s (outBoxDeque ioMaps)
+                next = S.toList (S.fromList [s' | (_, InBoxDeque s') <- puts, not (S.member s' visited)])
+                others = [boxPut | boxPut@(_, inBox) <- puts, not (isDequeSource inBox)]
+            in others ++ go (foldr S.insert visited next) (rest ++ next)
+
+        isDequeSource (InBoxDeque _) = True
+        isDequeSource _ = False
 
 getInterruptEmittersToTasks :: TerminaProgArch a -> [TPEmitter a]
 getInterruptEmittersToTasks progArchitecture = foldl (\acc emitter ->

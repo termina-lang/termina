@@ -153,6 +153,17 @@ lowerStatements acc (stmt : xs) =
                                     [msg] -> lowerStatements (SendMessage obj msg ann' : acc) xs
                                     _ -> throwError $ InternalError ("lowerStatements: unexpected number of arguments of procedure " ++ funcName)
                                 _ -> throwError $ InternalError ("lowerStatements: unexpected function name " ++ funcName)
+                        -- | If the object is an access port to a deque, we shall
+                        -- create a new block of the corresponding type
+                        -- (DequeTake, DequePut or DequeExchange)
+                        TAccessPort (TDequeAccess _) -> do
+                            case (funcName, args) of
+                                ("take", [opt]) -> lowerStatements (DequeTake obj opt ann' : acc) xs
+                                ("put", [elemnt]) -> lowerStatements (DequePut DequeBack obj elemnt ann' : acc) xs
+                                ("put_front", [elemnt]) -> lowerStatements (DequePut DequeFront obj elemnt ann' : acc) xs
+                                ("try_put", [elemnt, out]) -> lowerStatements (DequeExchange DequeTryPut obj elemnt out ann' : acc) xs
+                                ("replace", [elemnt, out]) -> lowerStatements (DequeExchange DequeReplace obj elemnt out ann' : acc) xs
+                                _ -> throwError $ InternalError ("lowerStatements: unexpected call to procedure " ++ funcName)
                         _ -> throwError $ InternalError ("lowerStatements: unexpected object type " ++ show obj_ty)
                 -- | We must repeat the same process for dereference member
                 -- function calls.  In this case, the object must be of a

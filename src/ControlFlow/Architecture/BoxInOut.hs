@@ -49,6 +49,13 @@ addIOMapSend outPt sann inBox = do
         Just sends -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxSend = M.insert outPt ((sann, inBox) : sends) (outBoxSend prevIOMap) } } ) 
         Nothing -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxSend = M.insert outPt [(sann, inBox)] (outBoxSend prevIOMap) } } )
 
+addIOMapDeque :: Identifier -> SemanticAnn -> InBox SemanticAnn -> BoxInOutMonad ()
+addIOMapDeque deque sann inBox = do
+    prevIOMap <- ST.gets outputInputMaps
+    case M.lookup deque (outBoxDeque prevIOMap) of
+        Just puts -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxDeque = M.insert deque ((sann, inBox) : puts) (outBoxDeque prevIOMap) } } )
+        Nothing -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxDeque = M.insert deque [(sann, inBox)] (outBoxDeque prevIOMap) } } )
+
 addIOMapProcedureCall :: Identifier -> Identifier -> Integer -> SemanticAnn -> InBox SemanticAnn -> BoxInOutMonad ()
 addIOMapProcedureCall outPt procId argNum sann inBox = do
     let procedureCall = (outPt, procId, argNum)
@@ -82,6 +89,26 @@ inOutBasicBlock (FreeBox obj arg ann) = do
     boxName <- getExprBoxName arg
     boxSource <- ST.gets (fromJust . M.lookup boxName . inBoxMap)
     addIOMapFree outPt ann boxSource
+inOutBasicBlock (DequeTake obj arg ann) = do
+    deque <- getPortName obj
+    optionBox <- getExprOptionBoxName arg
+    addOptionBox optionBox (InOptionBoxDeque deque ann)
+inOutBasicBlock (DequePut _ obj arg ann) = do
+    deque <- getPortName obj
+    boxName <- getExprBoxName arg
+    boxSource <- ST.gets (fromJust . M.lookup boxName . inBoxMap)
+    addIOMapDeque deque ann boxSource
+inOutBasicBlock (DequeExchange kind obj arg out ann) = do
+    deque <- getPortName obj
+    boxName <- getExprBoxName arg
+    boxSource <- ST.gets (fromJust . M.lookup boxName . inBoxMap)
+    addIOMapDeque deque ann boxSource
+    optionBox <- getExprOptionBoxName out
+    -- | A try_put leaves out the box it was given, and a replace one that was
+    -- already in the deque
+    case kind of
+        DequeTryPut -> addOptionBox optionBox (InOptionBoxRejected boxSource)
+        DequeReplace -> addOptionBox optionBox (InOptionBoxDeque deque ann)
 inOutBasicBlock (IfElseBlock bTrue elseIfs bFalse _ann) =
     localInputScope $ mapM_ inOutBasicBlock (blockBody . condIfBody $ bTrue) >> mapM_ (mapM_ inOutBasicBlock) (blockBody . condElseIfBody<$> elseIfs) >> mapM_ (mapM_ inOutBasicBlock . blockBody . condElseBody) bFalse
 inOutBasicBlock (ForLoopBlock _ _ _ _ _ body _) =
@@ -175,7 +202,7 @@ inOutClass (Class _ _ members _ _) = do
 inOutClass _ = return ()
 
 emptyBoxOutputInputMaps :: BoxOutputInputMaps a
-emptyBoxOutputInputMaps = BoxOutputInputMaps M.empty M.empty M.empty
+emptyBoxOutputInputMaps = BoxOutputInputMaps M.empty M.empty M.empty M.empty
 
 emptyBoxInOutState :: BoxInOutState a
 emptyBoxInOutState = BoxInOutState M.empty M.empty emptyBoxOutputInputMaps

@@ -225,10 +225,32 @@ checkBasicBlock (FreeBox obj arg ann)
       let loc = getLocation ann in
       safeMoveBox var loc
     _ -> withLocation (getLocation ann) (throwError EBadFreeArg)
+-- | A take fills an option box as an alloc does, and a put moves the box as a
+-- free does. A try_put or a replace does both, with the option that gets the
+-- box left out.
+checkBasicBlock (DequeTake obj arg ann) = useObject obj >> dequeOptionBox arg ann
+checkBasicBlock (DequePut _ obj arg ann) = useObject obj >> dequeMoveBox arg ann
+checkBasicBlock (DequeExchange _ obj arg out ann) =
+  useObject obj >> dequeOptionBox out ann >> dequeMoveBox arg ann
 checkBasicBlock (RegularBlock stmts) = checkStatements stmts
 -- | Every other block only evaluates the expressions it holds, and none of them
 -- hands over a box other than through a call argument.
 checkBasicBlock block = mapM_ (mapM_ useChild) (simpleBlockChildren block)
+
+-- | The option that a deque operation fills, as the one of an alloc
+dequeOptionBox :: Expression SemanticAnn -> SemanticAnn -> BoxUsageM BoxUsageError ()
+dequeOptionBox arg ann = case arg of
+  ReferenceExpression Mutable (Variable avar _anni) _ann ->
+    allocOptionBox avar (getLocation ann)
+  AccessObject (Variable avar _anni) ->
+    allocOptionBox avar (getLocation ann)
+  _ -> throwError $ annotateError (getLocation ann) EBadAllocArg
+
+-- | The box that a deque operation moves in, as the one of a free
+dequeMoveBox :: Expression SemanticAnn -> SemanticAnn -> BoxUsageM BoxUsageError ()
+dequeMoveBox arg ann = case arg of
+  AccessObject (Variable var _anni) -> safeMoveBox var (getLocation ann)
+  _ -> withLocation (getLocation ann) (throwError EBadFreeArg)
 
 -- General case, not when it is TOption Box
 checkMatchCase :: MatchCase SemanticAnn -> BoxUsageM BoxUsageError ()

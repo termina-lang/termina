@@ -266,6 +266,11 @@ genArchGlobal modName (Resource ident (TPool aty size) _ _ rann) =
     tp {
       pools = M.insert ident (TPPool ident aty size modName rann) (pools tp)
     }
+genArchGlobal modName (Resource ident (TDeque aty size) _ _ rann) =
+  ST.modify $ \tp ->
+    tp {
+      deques = M.insert ident (TPDeque ident aty size modName rann) (deques tp)
+    }
 genArchGlobal _ (Resource {}) = error "Internal error: invalid resource declaration"
 genArchGlobal modName (Handler ident (TGlobal HandlerClass hcls) (Just (StructInitializer assignments _)) modifiers hann) = do
   tpClass <- ST.get >>= \tp -> return $ fromJust (M.lookup hcls (handlerClasses tp))
@@ -341,6 +346,7 @@ emptyTerminaProgArch config = TerminaProgArch {
   pools = M.empty,
   atomics = M.empty,
   atomicArrays = M.empty,
+  deques = M.empty,
   channels = M.empty,
   channelSources = M.empty,
   channelTargets = M.empty,

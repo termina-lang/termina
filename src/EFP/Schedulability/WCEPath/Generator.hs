@@ -196,6 +196,12 @@ genPaths (FreeBox obj _args ann) =
             _ -> error "Unexpected object in FreeBox block when generating WCE paths"
     in
         [WCEPFreeBox outPt (loc2BlockPos . getLocation $ ann) Generated]
+genPaths (DequeTake _obj _args ann) =
+    [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
+genPaths (DequePut _end _obj _args ann) =
+    [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
+genPaths (DequeExchange _kind _obj _args _out ann) =
+    [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
 genPaths (ReturnBlock _ ann) =
     [WCEPReturn (loc2BlockPos . getLocation $ ann) Generated]
 genPaths (ContinueBlock expr ann) =

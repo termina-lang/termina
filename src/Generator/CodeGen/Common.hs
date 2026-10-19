@@ -126,6 +126,13 @@ atomicMethodName mName = "atomic" <:> mName
 poolMemoryArea :: Identifier -> Identifier
 poolMemoryArea identifier = terminafy $ "pool_memory" <::> identifier
 
+deque :: Identifier
+deque = terminafy "deque_t"
+
+-- | The array that holds the boxes of a deque
+dequeItems :: Identifier -> Identifier
+dequeItems identifier = terminafy $ "deque_items" <::> identifier
+
 msgQueueSendMethodName :: Identifier
 msgQueueSendMethodName = terminafy $ "out_port" <::> "send"
 

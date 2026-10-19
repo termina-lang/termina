@@ -12,6 +12,7 @@ import Semantic.Types
 import Utils.Annotations
 import Core.AST
 import qualified Data.Map.Strict as M
+import ControlFlow.Architecture.Utils (dequeSources)
 
 -- | This module provides functionality to verify the correctness of box sources
 -- in a Termina program architecture. It ensures that boxes are allocated, 
@@ -189,12 +190,27 @@ getBoxSourceChannel expectedSource (TPMsgQueue channelId (TBoxSubtype _) _ _ _) 
         Just ss -> mapM_ (getBoxSourceSend expectedSource) ss
 getBoxSourceChannel _ _ = throwError $ annotateError Internal EInvalidChannelConnection
 
+-- | Checks the sources of a box taken from a deque of an element, with the
+-- check for a source of that element.
+checkDequeSources ::
+    BoxOutputInputMaps SemanticAnn
+    -> (SemanticAnn -> InBox SemanticAnn -> BoxSourcesCheckMonad ())
+    -> SemanticAnn
+    -> Identifier
+    -> BoxSourcesCheckMonad ()
+checkDequeSources ioMaps checkSource prevAnn deque =
+    mapM_ (\(ann, inBox) -> checkNextSource (getLocation prevAnn) (checkSource ann inBox)) (dequeSources ioMaps deque)
+
 checkResourceSourceInBox ::
     Identifier -- ^ Expected source of the box
     -> TPResource SemanticAnn -- ^ The name of the resource
     -> SemanticAnn
     -> InBox SemanticAnn
     -> BoxSourcesCheckMonad ()
+checkResourceSourceInBox expectedSource resource prevAnn (InBoxDeque deque) = do
+    progArchitecture <- ask
+    let resourceCls = resourceClasses progArchitecture M.! resourceClass resource
+    checkDequeSources (classBoxIOMaps resourceCls) (checkResourceSourceInBox expectedSource resource) prevAnn deque
 checkResourceSourceInBox expectedSource resource prevAnn (InBoxAlloc port ann) =
     -- We reached a terminal allocator port. Now we only have to get the
     -- allocator source and we are done
@@ -222,6 +238,10 @@ checkTaskSourceInBox ::
     Identifier -- ^ Expected source of the box
     -> TPTask SemanticAnn
     -> SemanticAnn -> InBox SemanticAnn -> BoxSourcesCheckMonad ()
+checkTaskSourceInBox expectedSource task prevAnn (InBoxDeque deque) = do
+    progArchitecture <- ask
+    let taskCls = taskClasses progArchitecture M.! taskClass task
+    checkDequeSources (classBoxIOMaps taskCls) (checkTaskSourceInBox expectedSource task) prevAnn deque
 checkTaskSourceInBox expectedSource task prevAnn (InBoxAlloc port ann) =
     -- We reached a terminal allocator port. Now we only have to get the
     -- allocator source and we are done
@@ -249,6 +269,10 @@ checkHandlerSourceInBox ::
     -> TPHandler SemanticAnn
     -> SemanticAnn -> InBox SemanticAnn
     -> BoxSourcesCheckMonad ()
+checkHandlerSourceInBox expectedSource handler prevAnn (InBoxDeque deque) = do
+    progArchitecture <- ask
+    let handlerCls = handlerClasses progArchitecture M.! handlerClass handler
+    checkDequeSources (classBoxIOMaps handlerCls) (checkHandlerSourceInBox expectedSource handler) prevAnn deque
 checkHandlerSourceInBox expectedSource handler prevAnn (InBoxAlloc port ann) =
     -- We reached a terminal allocator port. Now we only have to get the
     -- allocator source and we are done

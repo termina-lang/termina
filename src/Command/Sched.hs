@@ -728,6 +728,7 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
     checkChannelConnections loweredProject programArchitecture
     checkResourceUsage loweredProject programArchitecture
     checkPoolUsage loweredProject programArchitecture
+    checkDequeConnections loweredProject programArchitecture
     checkTaskPriorities loweredProject programArchitecture
     checkSystemExceptAction loweredProject programArchitecture
     checkProjectBoxSources loweredProject programArchitecture

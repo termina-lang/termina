@@ -83,6 +83,14 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
           Nothing   -> return Nothing
       tyMods <- typeModifiers anns typeGlobalObject mods
       return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
+    -- | Deques, which always start empty
+    TDeque {} -> do
+      exprty <-
+        case mexpr of
+          Just _ -> throwError $ annotateError anns EDequeInitialized
+          Nothing   -> return Nothing
+      tyMods <- typeModifiers anns typeGlobalObject mods
+      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     -- | Atomic variables 
     TAtomic {} -> do
       exprty <-

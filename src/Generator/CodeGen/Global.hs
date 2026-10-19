@@ -9,9 +9,17 @@ import Control.Monad.Except
 import Generator.CodeGen.Common
 import Generator.LanguageC.Embedded
 import Generator.CodeGen.Expression
+import Generator.CodeGen.Types (termina__box_t)
 import Utils.Annotations
 
 genGlobalDecl :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
+genGlobalDecl (GlobalDeclaration (Resource identifier ts@(TDeque _ size) _ _ ann)) = do
+    cTs <- genType noqual ts
+    cSize <- genConstExpression size
+    return [CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec (CTArray termina__box_t cSize))
+       (Just (dequeItems identifier)) Nothing)) (buildDeclarationAnn ann True),
+       CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
+       (Just identifier) Nothing)) (buildDeclarationAnn ann False)]
 genGlobalDecl (GlobalDeclaration (Resource identifier ts _ _ ann)) = do
     cTs <- genType noqual ts
     return [CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
@@ -43,6 +51,14 @@ genGlobalDecl decl = throwError $ InternalError $ "unsupported global declaratio
 
 
 genGlobal :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
+-- | A deque comes with the array that holds its boxes
+genGlobal (GlobalDeclaration (Resource identifier ts@(TDeque _ size) _ _ ann)) = do
+    cTs <- genType noqual ts
+    cSize <- genConstExpression size
+    return [CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec (CTArray termina__box_t cSize))
+        (Just (dequeItems identifier)) Nothing)) (buildDeclarationAnn ann True),
+        CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec cTs)
+        (Just identifier) Nothing)) (buildDeclarationAnn ann False)]
 genGlobal (GlobalDeclaration (Resource identifier ts _ _ ann)) = do
     cTs <- genType noqual ts
     return [CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec cTs)

@@ -243,6 +243,121 @@ spec = do
             ++ "task t : BoxTask = { timer_port <- timer, data_pool0 <-> pool0, data_pool1 <-> pool1 };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-003")
 
+    it "AE-003: mismatched box source through a deque" $ do
+      -- A box allocated from pool0 is parked in a deque by one action and
+      -- freed through pool1 by the other one.
+      let src =
+            "task class BoxTask {\n" ++
+            "    data_pool0 : access Allocator<u32>;\n" ++
+            "    data_pool1 : access Allocator<u32>;\n" ++
+            "    pending : access DequeAccess<u32>;\n" ++
+            "    timer_port : sink TimeVal triggers park;\n" ++
+            "    drain_port : sink TimeVal triggers drain;\n" ++
+            "    action park(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+            "        var ret : Status<i32> = Success;\n" ++
+            "        var old : Option<box u32> = None;\n" ++
+            "        self->pending.take(&mut old);\n" ++
+            "        match old {\n" ++
+            "            case Some(o) => { self->data_pool0.free(o); }\n" ++
+            "            case None => { }\n" ++
+            "        }\n" ++
+            "        var alloc_data : Option<box u32> = None;\n" ++
+            "        self->data_pool0.alloc(&mut alloc_data);\n" ++
+            "        match alloc_data {\n" ++
+            "            case Some(data) => { self->pending.put(data); }\n" ++
+            "            case None => { ret = Failure(0 : i32); }\n" ++
+            "        }\n" ++
+            "        var other_data : Option<box u32> = None;\n" ++
+            "        self->data_pool1.alloc(&mut other_data);\n" ++
+            "        match other_data {\n" ++
+            "            case Some(d) => { self->data_pool1.free(d); }\n" ++
+            "            case None => { }\n" ++
+            "        }\n" ++
+            "        return ret;\n" ++
+            "    }\n" ++
+            "    action drain(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+            "        var ret : Status<i32> = Success;\n" ++
+            "        var old : Option<box u32> = None;\n" ++
+            "        self->pending.take(&mut old);\n" ++
+            "        match old {\n" ++
+            "            case Some(o) => { self->data_pool1.free(o); }\n" ++
+            "            case None => { ret = Failure(0 : i32); }\n" ++
+            "        }\n" ++
+            "        return ret;\n" ++
+            "    }\n" ++
+            "};\n" ++
+            "resource pool0 : Pool<u32; 10>;\n" ++
+            "resource pool1 : Pool<u32; 10>;\n" ++
+            "resource pending_deque : Deque<u32; 1>;\n" ++
+            periodicEmitter "timer" 10 ++
+            periodicEmitter "timer2" 20
+            ++ "#[priority(10)]\n"
+            ++ "task t : BoxTask = { timer_port <- timer, drain_port <- timer2, data_pool0 <-> pool0, data_pool1 <-> pool1, pending <-> pending_deque };\n"
+      compileErrorCode src `shouldBe` Just (pack "AE-003")
+
+    it "AE-012: deque not connected to any access port" $ do
+      let src = timerTaskClass ++ periodicEmitter "timer" 1
+            ++ "resource orphan : Deque<u32; 1>;\n"
+            ++ "#[priority(10)]\n"
+            ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
+      compileErrorCode src `shouldBe` Just (pack "AE-012")
+
+    it "AE-014: deque that only gets back the boxes taken from it" $ do
+      let src =
+            "task class DequeTask {\n" ++
+            "    timer_port : sink TimeVal triggers tick;\n" ++
+            "    pending : access DequeAccess<u32>;\n" ++
+            "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+            "        let ret : Status<i32> = Success;\n" ++
+            "        var old : Option<box u32> = None;\n" ++
+            "        self->pending.take(&mut old);\n" ++
+            "        match old {\n" ++
+            "            case Some(o) => { self->pending.put(o); }\n" ++
+            "            case None => { }\n" ++
+            "        }\n" ++
+            "        return ret;\n" ++
+            "    }\n" ++
+            "};\n" ++
+            "resource pending_deque : Deque<u32; 1>;\n" ++
+            periodicEmitter "timer" 10
+            ++ "#[priority(10)]\n"
+            ++ "task t : DequeTask = { timer_port <- timer, pending <-> pending_deque };\n"
+      compileErrorCode src `shouldBe` Just (pack "AE-014")
+
+    it "AE-013: deque connected to the access ports of two tasks" $ do
+      let src =
+            "task class DequeTask {\n" ++
+            "    timer_port : sink TimeVal triggers tick;\n" ++
+            "    pool : access Allocator<u32>;\n" ++
+            "    pending : access DequeAccess<u32>;\n" ++
+            "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+            "        let ret : Status<i32> = Success;\n" ++
+            "        var old : Option<box u32> = None;\n" ++
+            "        self->pending.take(&mut old);\n" ++
+            "        match old {\n" ++
+            "            case Some(o) => { self->pool.free(o); }\n" ++
+            "            case None => {\n" ++
+            "                var fresh : Option<box u32> = None;\n" ++
+            "                self->pool.alloc(&mut fresh);\n" ++
+            "                match fresh {\n" ++
+            "                    case Some(f) => { self->pending.put(f); }\n" ++
+            "                    case None => { }\n" ++
+            "                }\n" ++
+            "            }\n" ++
+            "        }\n" ++
+            "        return ret;\n" ++
+            "    }\n" ++
+            "};\n" ++
+            "resource pool0 : Pool<u32; 4>;\n" ++
+            "resource shared_deque : Deque<u32; 1>;\n" ++
+            periodicEmitter "timer" 10 ++
+            periodicEmitter "timer2" 20
+            ++ "#[priority(10)]\n"
+            ++ "task t1 : DequeTask = { timer_port <- timer, pool <-> pool0, pending <-> shared_deque };\n"
+            ++ "#[priority(11)]\n"
+            ++ "task t2 : DequeTask = { timer_port <- timer2, pool <-> pool0, pending <-> shared_deque };\n"
+      compileErrorCode src `shouldBe` Just (pack "AE-013")
+
     it "AE-003: mismatched box source inside a for loop" $ do
       -- The same mismatch, with the box allocated and freed in the body of a loop.
       let src =

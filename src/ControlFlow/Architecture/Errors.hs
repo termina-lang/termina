@@ -37,6 +37,9 @@ data Error =
     | EDuplicatedTaskPriority Identifier Integer Identifier Location -- ^ Two tasks with the same priority (AE-009)
     | EExitInSystemExceptAction Identifier Identifier -- ^ Reboot or noreturn call in the action that attends system_except (AE-010)
     | ESendInSystemExceptAction Identifier Identifier -- ^ Send in the action that attends system_except (AE-011)
+    | EUnusedDeque Identifier -- ^ Unused deque (AE-012)
+    | ESharedDeque Identifier Location -- ^ Deque connected to more than one access port (AE-013)
+    | EUnfilledDeque Identifier Identifier Identifier -- ^ Deque that only gets back its own boxes (AE-014)
     deriving Show
 
 type ArchitectureError = AnnotatedError Error Location
@@ -101,6 +104,23 @@ instance Diagnosable Error where
             ("The action " <> emph (T.pack action) <> " of the handler class " <>
                 emph (T.pack cls) <> " attends system_except, and the system reboots once it has run. " <>
                 "A message sent from it would reach a task that never runs.")
+    describe (EUnusedDeque dequeId) =
+        diagnostic "AE-012" "unused deque"
+            ("Deque " <> emph (T.pack dequeId) <>
+                " is not being used by any element. " <>
+                "Every deque must be connected to one access port.")
+    describe (ESharedDeque dequeId prevPos) =
+        relatedTo prevPos "the other connection" $
+            diagnostic "AE-013" "shared deque"
+                ("Deque " <> emph (T.pack dequeId) <>
+                    " is already connected to an access port. " <>
+                    "A deque belongs to the one element connected to it.")
+    describe (EUnfilledDeque dequeId owner port) =
+        diagnostic "AE-014" "deque never filled"
+            ("Deque " <> emph (T.pack dequeId) <> " only gets back the boxes that " <>
+                emph (T.pack owner) <> " takes from it through " <> emph (T.pack port) <>
+                ", so it is always empty. " <>
+                "A deque has to get boxes from a pool, a channel or a procedure.")
     -- | Everything else is a broken invariant of the compiler, which has no code
     -- of its own.
     describe _ = diagnosticWithoutDetail "Internal" "internal error"
