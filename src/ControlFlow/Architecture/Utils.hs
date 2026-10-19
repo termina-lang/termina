@@ -398,6 +398,7 @@ getObjOptionBoxName obj@(Variable name _) = do
   ty <- getObjType obj
   case ty of
     TOption (TBoxSubtype _) -> return name
+    TReference Mutable (TOption (TBoxSubtype _)) -> return name
     _ -> throwError $ annotateError Internal EExpectedOptionBoxType
 getObjOptionBoxName (Dereference expr _) = getObjOptionBoxName expr
 getObjOptionBoxName _ = throwError $ annotateError Internal EExpectedOptionBoxType
@@ -421,9 +422,10 @@ getExprBoxName _ = throwError $ annotateError Internal EExpectedBoxSubtype
 
 getInBox :: InOptionBox a -> InBox a
 getInBox (InOptionBoxAlloc ident ann) = InBoxAlloc ident ann
-getInBox (InOptionBoxProcedureCall ident idx _ann) = InBoxProcedureCall ident idx
+getInBox (InOptionBoxProcedureOut port procId idx ann) = InBoxProcedureOut port procId idx ann
 getInBox (InOptionBoxDeque ident _ann) = InBoxDeque ident
 getInBox (InOptionBoxRejected inBox) = inBox
+getInBox (InOptionBoxSome inBox) = inBox
 
 -- | The sources of the boxes that a deque may hold: the boxes put into it, and,
 -- for the ones taken from another deque of the class, the sources of that deque.

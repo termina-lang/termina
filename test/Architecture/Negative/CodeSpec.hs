@@ -388,3 +388,55 @@ spec = do
             ++ "#[priority(10)]\n"
             ++ "task t : BoxTask = { timer_port <- timer, data_pool0 <-> pool0, data_pool1 <-> pool1 };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-003")
+
+    it "AE-003: mismatched box source through an option-box parameter" $ do
+      -- The procedure of Source fills the option-box with a box from pool0,
+      -- through Inner, on one branch, and with a box from pool1 on the other.
+      -- The task frees every box it gets back to pool0.
+      let src =
+            "interface IGet {\n" ++
+            "    procedure get(&mut self, result : &mut Option<box u32>);\n" ++
+            "};\n" ++
+            "resource class Inner provides IGet {\n" ++
+            "    pool : access Allocator<u32>;\n" ++
+            "    procedure get(&mut self, result : &mut Option<box u32>) {\n" ++
+            "        self->pool.alloc(result);\n" ++
+            "        return;\n" ++
+            "    }\n" ++
+            "};\n" ++
+            "resource class Source provides IGet {\n" ++
+            "    inner : access IGet;\n" ++
+            "    pool : access Allocator<u32>;\n" ++
+            "    procedure get(&mut self, result : &mut Option<box u32>) {\n" ++
+            "        var tmp : Option<box u32> = None;\n" ++
+            "        self->inner.get(&mut tmp);\n" ++
+            "        match tmp {\n" ++
+            "            case Some(b) => { *result = Some(b); }\n" ++
+            "            case None => { self->pool.alloc(result); }\n" ++
+            "        }\n" ++
+            "        return;\n" ++
+            "    }\n" ++
+            "};\n" ++
+            "task class BoxTask {\n" ++
+            "    timer_port : sink TimeVal triggers tick;\n" ++
+            "    src : access IGet;\n" ++
+            "    data_pool : access Allocator<u32>;\n" ++
+            "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+            "        var ret : Status<i32> = Success;\n" ++
+            "        var opt : Option<box u32> = None;\n" ++
+            "        self->src.get(&mut opt);\n" ++
+            "        match opt {\n" ++
+            "            case Some(b) => { self->data_pool.free(b); }\n" ++
+            "            case None => { }\n" ++
+            "        }\n" ++
+            "        return ret;\n" ++
+            "    }\n" ++
+            "};\n" ++
+            "resource pool0 : Pool<u32; 10>;\n" ++
+            "resource pool1 : Pool<u32; 10>;\n" ++
+            "resource inner_res : Inner = { pool <-> pool0 };\n" ++
+            "resource src_res : Source = { inner <-> inner_res, pool <-> pool1 };\n" ++
+            periodicEmitter "timer" 10
+            ++ "#[priority(10)]\n"
+            ++ "task t : BoxTask = { timer_port <- timer, src <-> src_res, data_pool <-> pool0 };\n"
+      compileErrorCode src `shouldBe` Just (pack "AE-003")

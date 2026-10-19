@@ -43,9 +43,15 @@ useArguments e@(AccessObject (Variable ident ann))
     Just (TBoxSubtype _) ->
       let loc = getLocation ann in
       safeMoveBox ident loc
+    -- | An option-box parameter handed on to another procedure, which fills it
+    Just (TReference Mutable (TOption (TBoxSubtype _))) ->
+      allocOptionBox ident (getLocation ann)
     _ -> useExpression e
-useArguments (ReferenceExpression _ (Variable ident _ann) _a) =
-  safeUseVariable ident
+-- | A procedure fills the option-box it is given, as an alloc does
+useArguments (ReferenceExpression _ (Variable ident ann) _a) =
+  case getTypeSemAnn ann of
+    Just (TOption (TBoxSubtype _)) -> allocOptionBox ident (getLocation ann)
+    _ -> safeUseVariable ident
 -- Box variables inside expressions are read as values.
 useArguments e = useExpression e
 
@@ -58,6 +64,8 @@ useObject = walkObject ObjectVisitor
         (throwError $ annotateError loc EExpectedOptionBoxType)
         (\case {
             TOption (TBoxSubtype _) -> moveOptionBox ident loc >> safeUseVariable ident;
+            -- | An option-box parameter is only written
+            TReference Mutable (TOption (TBoxSubtype _)) -> throwError $ annotateError loc (EOptionBoxParamNotFilled ident);
             _ -> safeUseVariable ident
         }) (getTypeSemAnn ann)
     -- A field is not recorded. The set this pass keeps holds the names of the
@@ -111,9 +119,11 @@ checkStatement (AssignmentStmt obj e ann) = do
       -- | We are assigning to an option-box. This can only be done through a
       -- MonadicVariantInitializer.
       case e of 
-        MonadicVariantInitializer None _ -> 
+        MonadicVariantInitializer None _ ->
           case obj of
             Variable ident _ -> initializeOptionBox ident (getLocation ann)
+            -- | Writing None into an option-box parameter fills it
+            Dereference (Variable ident _) _ -> allocOptionBox ident (getLocation ann)
             _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
         MonadicVariantInitializer (Some boxObjExpr) _ -> do
           -- | We need to move the box object 
@@ -125,6 +135,7 @@ checkStatement (AssignmentStmt obj e ann) = do
           -- | And update the option-box as allocated
           case obj of
             Variable ident _ -> allocOptionBox ident (getLocation ann)
+            Dereference (Variable ident _) _ -> allocOptionBox ident (getLocation ann)
             _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
         _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
     _ -> case obj of
@@ -342,7 +353,8 @@ checkClassMember (ClassMethod _ak _ident ps _tyret bret _ann)
   = checkBlock bret
   >> mapM_ (useArraySize . paramType) ps
 checkClassMember (ClassProcedure _ak _ident ps blk ann)
-  = checkBlock blk
+  = mapM_ (returnOptionBoxParam (getLocation ann)) ps
+  >> checkBlock blk
   >> mapM_ (useArraySize . paramType) ps
   >> mapM_ (`defArgumentsProc` getLocation ann) ps
 checkClassMember (ClassViewer _ident ps _tyret bret _ann)

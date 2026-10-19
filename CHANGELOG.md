@@ -34,6 +34,19 @@ Patch versions on either side are interchangeable.
   in the OSAL, which checks again at run time that a `put` finds room, so this
   release needs a matching OSAL.
 
+### Changed
+
+- A procedure parameter of type `&mut Option<box T>` is filled by the
+  procedure, as the option of an `alloc` is. The caller hands it over empty
+  and moves what it gets back (BE-009, BE-010), and the procedure fills it
+  exactly once on every path, with `alloc`, `take`, `try_put`, `replace`,
+  `*result = Some(b)`, `*result = None` or a call to another procedure, and
+  never reads it (BE-013). Before, the procedure got the box in the option on
+  loan and could only read and write its value, and `*result = None` raised
+  an internal error. The architecture check follows a box written into the
+  option back to wherever the procedure got it, so a box from one pool freed
+  by the caller to another is AE-003.
+
 ### Fixed
 
 - A box allocated from one pool and freed to another inside a `for` loop

@@ -42,6 +42,7 @@ data Error
   | EAllocTwice Identifier Location -- ^ Option-box allocated twice (BE-010)
   | EMovedWithoutAlloc Identifier Location -- ^ Option-box moved but not allocated (BE-011)
   | EOptionBoxMatchMissingSomeCase -- ^ Option-box match missing the Some case (BE-012)
+  | EOptionBoxParamNotFilled Identifier -- ^ Option-box parameter read or not filled (BE-013)
   deriving Show
 
 type BoxUsageError = AnnotatedError Error Location
@@ -100,6 +101,11 @@ instance Diagnosable Error where
     describe EOptionBoxMatchMissingSomeCase =
         diagnostic "BE-012" "option-box match missing the Some case"
             "Option-box match is missing Some case."
+    describe (EOptionBoxParamNotFilled ident) =
+        diagnostic "BE-013" "option-box parameter not filled"
+            ("Option-box parameter " <> emph (T.pack ident) <>
+                " enters the procedure empty. It must be filled once on every path, " <>
+                "with alloc, take, None or Some, and it cannot be read.")
     -- | Everything else is a broken invariant of the compiler, which has no code
     -- of its own and is printed as it is shown.
     describe _ = diagnosticWithoutDetail "Internal" "internal error"

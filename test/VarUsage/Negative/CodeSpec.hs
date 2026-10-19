@@ -8,6 +8,7 @@ import VarUsage.Common (boxUsageErrorCode, varUsageErrorCode)
 import VarUsage.Negative.DetailSpec
   ( testVUE001, testVUE002, testBE001, testBE002, testBE003, testBE004, testBE005
   , testBE006, testBE006_1, testBE007, testBE008, testBE009, testBE010, testBE011, testBE012
+  , testBE013
   , testVUE003, testVUE004, testVUE005, testVUE006, testVUE007, testVUE008
   , testVUE006_3 )
 
@@ -32,6 +33,7 @@ boxCases =
   , ("BE-010", "option-box allocated twice", testBE010)
   , ("BE-011", "option-box moved without being allocated", testBE011)
   , ("BE-012", "option-box match missing the Some case", testBE012)
+  , ("BE-013", "option-box parameter read or not filled", testBE013)
   ]
 
 -- | (code, title, source) for the codes raised by the forward pass, which owns

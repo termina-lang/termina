@@ -163,6 +163,66 @@ poolThroughDeque =
   "#[priority(10)]\n" ++
   "task t : DequeTask = { timer_port <- timer, drain_port <- timer2, mypool <-> mypool_res, pending <-> pending_deque };\n"
 
+-- | A box handed to a resource, parked in its deque and written back by
+-- another procedure into an option-box, then freed to the pool it came from:
+-- dual of AE-003 through an option-box parameter.
+poolThroughOptionBoxParam :: String
+poolThroughOptionBoxParam =
+  "interface IStore {\n" ++
+  "    procedure park(&mut self, b : box u32);\n" ++
+  "    procedure fetch(&mut self, result : &mut Option<box u32>);\n" ++
+  "};\n" ++
+  "resource class Store provides IStore {\n" ++
+  "    pending : access DequeAccess<u32>;\n" ++
+  "    pool : access Allocator<u32>;\n" ++
+  "    procedure park(&mut self, b : box u32) {\n" ++
+  "        var rejected : Option<box u32> = None;\n" ++
+  "        self->pending.try_put(b, &mut rejected);\n" ++
+  "        match rejected {\n" ++
+  "            case Some(r) => { self->pool.free(r); }\n" ++
+  "            case None => { }\n" ++
+  "        }\n" ++
+  "        return;\n" ++
+  "    }\n" ++
+  "    procedure fetch(&mut self, result : &mut Option<box u32>) {\n" ++
+  "        self->pending.take(result);\n" ++
+  "        return;\n" ++
+  "    }\n" ++
+  "};\n" ++
+  "task class StoreTask {\n" ++
+  "    timer_port : sink TimeVal triggers park;\n" ++
+  "    drain_port : sink TimeVal triggers drain;\n" ++
+  "    mypool : access Allocator<u32>;\n" ++
+  "    store : access IStore;\n" ++
+  "    action park(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+  "        var ret : Status<i32> = Success;\n" ++
+  "        var b : Option<box u32> = None;\n" ++
+  "        self->mypool.alloc(&mut b);\n" ++
+  "        match b {\n" ++
+  "            case Some(x) => { self->store.park(x); }\n" ++
+  "            case None => { }\n" ++
+  "        }\n" ++
+  "        return ret;\n" ++
+  "    }\n" ++
+  "    action drain(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+  "        var ret : Status<i32> = Success;\n" ++
+  "        var old : Option<box u32> = None;\n" ++
+  "        self->store.fetch(&mut old);\n" ++
+  "        match old {\n" ++
+  "            case Some(o) => { self->mypool.free(o); }\n" ++
+  "            case None => { }\n" ++
+  "        }\n" ++
+  "        return ret;\n" ++
+  "    }\n" ++
+  "};\n" ++
+  periodicEmitter "timer" 1 ++
+  periodicEmitter "timer2" 2 ++
+  "resource mypool_res : Pool<u32; 4>;\n" ++
+  "resource pending_deque : Deque<u32; 4>;\n" ++
+  "resource store_res : Store = { pending <-> pending_deque, pool <-> mypool_res };\n" ++
+  "#[priority(10)]\n" ++
+  "task t : StoreTask = { timer_port <- timer, drain_port <- timer2, mypool <-> mypool_res, store <-> store_res };\n"
+
 spec :: Spec
 spec = describe "Architecture: sound wiring raises no error" $
   mapM_ (\(name, src) -> it name $ architectureError src `shouldSatisfy` isNothing)
@@ -172,4 +232,5 @@ spec = describe "Architecture: sound wiring raises no error" $
     , ("accepts a pool used through an allocator port", poolUsed)
     , ("accepts a box allocated and freed to the same pool inside a loop", poolUsedInLoop)
     , ("accepts a box parked in a deque and freed to the pool it came from", poolThroughDeque)
+    , ("accepts a box written into an option-box parameter and freed to the pool it came from", poolThroughOptionBoxParam)
     ]

@@ -352,15 +352,22 @@ data TerminaProgArch a = TerminaProgArch {
 
 data InOptionBox a =
   InOptionBoxAlloc Identifier a
-  | InOptionBoxProcedureCall Identifier Integer a
+  -- | The box written by a procedure, called through the port, into the
+  -- option-box parameter with the index
+  | InOptionBoxProcedureOut Identifier Identifier Integer a
   | InOptionBoxDeque Identifier a
   -- | The box that a try_put did not put into the deque
   | InOptionBoxRejected (InBox a)
+  -- | The box assigned to the option-box with Some
+  | InOptionBoxSome (InBox a)
 
 data InBox a =
   InBoxInput Identifier
   | InBoxAlloc Identifier a
   | InBoxProcedureCall Identifier Integer
+  -- | The box was written by a procedure, called through the port, into the
+  -- option-box parameter with the index
+  | InBoxProcedureOut Identifier Identifier Integer a
   -- | The box was taken from the deque behind a port of the same class
   | InBoxDeque Identifier
   deriving (Show, Eq, Ord)
@@ -382,13 +389,21 @@ data BoxOutputInputMaps a = BoxOutputInputMaps {
 
   -- | Map between the deques that a box is put into and the port from which
   -- the box was originated.
-  outBoxDeque :: Map Identifier [(a, InBox a)]
+  outBoxDeque :: Map Identifier [(a, InBox a)],
+
+  -- | Map between the option-box parameters of the procedures of the class and
+  -- the port from which the box written into them was originated. The key is
+  -- a tuple with the name of the procedure and the index of the parameter.
+  outBoxProcedureOut :: Map (Identifier, Integer) [(a, InBox a)]
 
 } deriving Show
 
 data BoxInOutState a = BoxInOutState {
     inBoxMap :: M.Map Identifier (InBox a),
     inOptionBoxMap :: M.Map Identifier (InOptionBox a),
+    -- | The option-box parameters of the procedure being walked, with the name
+    -- of the procedure and the index of each one
+    outParamMap :: M.Map Identifier (Identifier, Integer),
     outputInputMaps :: BoxOutputInputMaps a
 }
 

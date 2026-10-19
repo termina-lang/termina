@@ -201,6 +201,27 @@ checkDequeSources ::
 checkDequeSources ioMaps checkSource prevAnn deque =
     mapM_ (\(ann, inBox) -> checkNextSource (getLocation prevAnn) (checkSource ann inBox)) (dequeSources ioMaps deque)
 
+-- | Checks the sources of a box written by a procedure into an option-box
+-- parameter: every box the procedure writes into it, wherever it comes from.
+-- The call is the step of the trace.
+checkProcedureOutSources ::
+    Identifier -- ^ Expected source of the box
+    -> M.Map Identifier (Identifier, SemanticAnn) -- ^ Access port connections of the caller
+    -> SemanticAnn
+    -> Identifier -- ^ The name of the access port
+    -> Identifier -- ^ The name of the procedure
+    -> Integer -- ^ The number of the argument
+    -> SemanticAnn -- ^ The call
+    -> BoxSourcesCheckMonad ()
+checkProcedureOutSources expectedSource apConnections prevAnn port procId argNum callAnn = do
+    progArchitecture <- ask
+    case M.lookup port apConnections >>= flip M.lookup (resources progArchitecture) . fst of
+        Just resource -> do
+            let resourceCls = resourceClasses progArchitecture M.! resourceClass resource
+            forM_ (M.lookup (procId, argNum) (outBoxProcedureOut . classBoxIOMaps $ resourceCls)) $
+                mapM_ (\(_, inBox) -> checkNextSource (getLocation prevAnn) (checkResourceSourceInBox expectedSource resource callAnn inBox))
+        Nothing -> throwError $ annotateError Internal EInvalidResourceConnection
+
 checkResourceSourceInBox ::
     Identifier -- ^ Expected source of the box
     -> TPResource SemanticAnn -- ^ The name of the resource
@@ -211,6 +232,8 @@ checkResourceSourceInBox expectedSource resource prevAnn (InBoxDeque deque) = do
     progArchitecture <- ask
     let resourceCls = resourceClasses progArchitecture M.! resourceClass resource
     checkDequeSources (classBoxIOMaps resourceCls) (checkResourceSourceInBox expectedSource resource) prevAnn deque
+checkResourceSourceInBox expectedSource resource prevAnn (InBoxProcedureOut port procId argNum callAnn) =
+    checkProcedureOutSources expectedSource (resAPConnections resource) prevAnn port procId argNum callAnn
 checkResourceSourceInBox expectedSource resource prevAnn (InBoxAlloc port ann) =
     -- We reached a terminal allocator port. Now we only have to get the
     -- allocator source and we are done
@@ -242,6 +265,8 @@ checkTaskSourceInBox expectedSource task prevAnn (InBoxDeque deque) = do
     progArchitecture <- ask
     let taskCls = taskClasses progArchitecture M.! taskClass task
     checkDequeSources (classBoxIOMaps taskCls) (checkTaskSourceInBox expectedSource task) prevAnn deque
+checkTaskSourceInBox expectedSource task prevAnn (InBoxProcedureOut port procId argNum callAnn) =
+    checkProcedureOutSources expectedSource (taskAPConnections task) prevAnn port procId argNum callAnn
 checkTaskSourceInBox expectedSource task prevAnn (InBoxAlloc port ann) =
     -- We reached a terminal allocator port. Now we only have to get the
     -- allocator source and we are done
@@ -273,6 +298,8 @@ checkHandlerSourceInBox expectedSource handler prevAnn (InBoxDeque deque) = do
     progArchitecture <- ask
     let handlerCls = handlerClasses progArchitecture M.! handlerClass handler
     checkDequeSources (classBoxIOMaps handlerCls) (checkHandlerSourceInBox expectedSource handler) prevAnn deque
+checkHandlerSourceInBox expectedSource handler prevAnn (InBoxProcedureOut port procId argNum callAnn) =
+    checkProcedureOutSources expectedSource (handlerAPConnections handler) prevAnn port procId argNum callAnn
 checkHandlerSourceInBox expectedSource handler prevAnn (InBoxAlloc port ann) =
     -- We reached a terminal allocator port. Now we only have to get the
     -- allocator source and we are done

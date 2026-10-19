@@ -6,7 +6,7 @@ module VarUsage.Negative.DetailSpec
   ( spec
   , testVUE001, testVUE002, testBE001, testBE001_1, testBE002, testBE002_1
   , testBE003, testBE004, testBE005, testBE006, testBE006_1, testBE007, testBE008
-  , testBE009, testBE010, testBE011, testBE012, testVUE004, testVUE004_1
+  , testBE009, testBE010, testBE011, testBE012, testBE013, testVUE004, testVUE004_1
   , testVUE003, testVUE005, testVUE005_1, testVUE005_2, testVUE006, testVUE006_1
   , testVUE006_2, testVUE006_3, testVUE006_4, testVUE006_5, testVUE002_1, testVUE002_2
   , testVUE007, testVUE008
@@ -309,6 +309,84 @@ testBE012 =
   "        return;\n" ++
   "    }\n" ++
   "};\n"
+
+-- A resource procedure that fills the option-box parameter @result@ and owns an
+-- allocator port (@data_pool@). The body is spliced before the final @return@.
+outWrap :: String -> String
+outWrap body =
+  "interface Interface0 {\n" ++
+  "    procedure proc0(&mut self, result : &mut Option<box u32>);\n" ++
+  "};\n" ++
+  "resource class ResourceClass0 provides Interface0 {\n" ++
+  "    data_pool : access Allocator<u32>;\n" ++
+  "    procedure proc0(&mut self, result : &mut Option<box u32>) {\n" ++
+  body ++
+  "        return;\n" ++
+  "    }\n" ++
+  "};\n"
+
+-- A task whose action calls @proc0@ through @src@ with the option-box @opt@.
+-- The body is spliced before the final @return@.
+callerWrap :: String -> String
+callerWrap body =
+  "interface Interface0 {\n" ++
+  "    procedure proc0(&mut self, result : &mut Option<box u32>);\n" ++
+  "};\n" ++
+  "task class TaskClass0 {\n" ++
+  "    timer : sink TimeVal triggers run;\n" ++
+  "    src : access Interface0;\n" ++
+  "    data_pool : access Allocator<u32>;\n" ++
+  "    action run(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+  "        var ret : Status<i32> = Success;\n" ++
+  veDeclOpt ++
+  body ++
+  "        return ret;\n" ++
+  "    }\n" ++
+  "};\n"
+
+veCallProc :: String
+veCallProc = "        self->src.proc0(&mut opt);\n"
+
+veMatchResult :: String
+veMatchResult =
+  "        match result {\n" ++
+  "            case Some(obj) => { *obj = 1 : u32; }\n" ++
+  "            case None => { }\n" ++
+  "        }\n"
+
+-- BE-013: @result@ is read before the procedure fills it.
+testBE013 :: String
+testBE013 = outWrap (veMatchResult ++ "        self->data_pool.alloc(result);\n")
+
+-- BE-013: @result@ is read after the procedure fills it, when it already
+-- belongs to the caller.
+testBE013_1 :: String
+testBE013_1 = outWrap ("        self->data_pool.alloc(result);\n" ++ veMatchResult)
+
+-- BE-010: @result@ is filled twice, by an alloc and by a None.
+testBE010_1 :: String
+testBE010_1 = outWrap ("        self->data_pool.alloc(result);\n        *result = None;\n")
+
+-- BE-005: @result@ is filled only when the condition holds.
+testBE005_1 :: String
+testBE005_1 = outWrap (
+  "        var flag : bool = true;\n" ++
+  "        if (flag) {\n            *result = None;\n        }\n")
+
+-- BE-006: @result@ is filled in the @if@ branch and not in the @else@.
+testBE006_2 :: String
+testBE006_2 = outWrap (
+  "        var flag : bool = true;\n" ++
+  "        if (flag) {\n            *result = None;\n        } else {\n        }\n")
+
+-- BE-010: the caller hands over @opt@ after allocating it, so the procedure
+-- would fill it a second time.
+testBE010_2 :: String
+testBE010_2 = callerWrap (veAlloc ++ veCallProc ++ veMatchMove)
+
+-- BE-009: the caller never moves the box the procedure wrote into @opt@.
+testBE009_1 :: String
+testBE009_1 = callerWrap veCallProc
 
 testVUE004 :: String
 testVUE004 = "interface Interface0 {\n" ++
@@ -635,6 +713,34 @@ spec = do
       runNegativeTestBoxUsage testBE012
         `shouldSatisfy`
           isEOptionBoxMatchMissingSomeCase
+    it "BE-013: option-box parameter read before it is filled" $ do
+      runNegativeTestBoxUsage testBE013
+        `shouldSatisfy`
+          isEOptionBoxParamNotFilled "result"
+    it "BE-013-1: option-box parameter read after it is filled" $ do
+      runNegativeTestBoxUsage testBE013_1
+        `shouldSatisfy`
+          isEOptionBoxParamNotFilled "result"
+    it "BE-010-1: option-box parameter filled twice" $ do
+      runNegativeTestBoxUsage testBE010_1
+        `shouldSatisfy`
+          isEAllocTwice "result"
+    it "BE-005-1: option-box parameter filled in a branch that may not run" $ do
+      runNegativeTestBoxUsage testBE005_1
+        `shouldSatisfy`
+          isEDifferentNewOptionBoxUse "result"
+    it "BE-006-2: option-box parameter filled in one branch only" $ do
+      runNegativeTestBoxUsage testBE006_2
+        `shouldSatisfy`
+          isEMissingOptionBox "result"
+    it "BE-010-2: option-box handed to a procedure after it is allocated" $ do
+      runNegativeTestBoxUsage testBE010_2
+        `shouldSatisfy`
+          isEAllocTwice "opt"
+    it "BE-009-1: option-box filled by a procedure and never moved" $ do
+      runNegativeTestBoxUsage testBE009_1
+        `shouldSatisfy`
+          isEAllocNotMoved "opt"
     it "VUE-004: method does not use self" $ do
       runNegativeTestVarUsage testVUE004
         `shouldSatisfy`
@@ -743,6 +849,9 @@ spec = do
 
     isEOptionBoxMatchMissingSomeCase :: Maybe BE.Error -> Bool
     isEOptionBoxMatchMissingSomeCase = \case Just EOptionBoxMatchMissingSomeCase -> True; _ -> False
+
+    isEOptionBoxParamNotFilled :: Identifier -> Maybe BE.Error -> Bool
+    isEOptionBoxParamNotFilled inIdent = \case Just (EOptionBoxParamNotFilled ident) -> (inIdent == ident); _ -> False
 
     isESelfNotUsed :: Identifier -> Maybe VE.Error -> Bool
     isESelfNotUsed inIdent = \case Just (ESelfNotUsed ident) -> (inIdent == ident); _ -> False

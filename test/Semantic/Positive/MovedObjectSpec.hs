@@ -12,17 +12,17 @@ import Configuration.Platform (Platform(TestPlatform))
 import Data.Text (pack)
 import Test.Hspec
 
--- A resource whose procedure receives a linear option-box, wrapping a varying
--- procedure body. Type-check-only, so box linearity (a later pass) does not
--- interfere; the move check runs in the type checker.
+-- A resource whose procedure receives a reference to an option, wrapping a
+-- varying procedure body. Type-check-only; the move check runs in the type
+-- checker.
 withBoxProc :: String -> String
 withBoxProc body =
     "enum St { A, B };\n" ++
-    "interface I { procedure p(&mut self, data : &mut Option<box u32>); };\n" ++
+    "interface I { procedure p(&mut self, data : &mut Option<u32>); };\n" ++
     "resource class R provides I {\n" ++
     "    local : u32;\n" ++
     "    st : St;\n" ++
-    "    procedure p(&mut self, data : &mut Option<box u32>) {\n" ++
+    "    procedure p(&mut self, data : &mut Option<u32>) {\n" ++
     body ++
     "        return;\n" ++
     "    }\n" ++

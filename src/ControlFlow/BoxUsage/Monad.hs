@@ -6,7 +6,7 @@ module ControlFlow.BoxUsage.Monad (
   runEncapsWithEmptyVars, runMultipleEncapsWithEmptyVars, unionUsed, unifyState,
   unifyStates, defVariableOptionBox, defBox, safeUseVariable,
   initializeOptionBox, moveOptionBox, safeMoveBox, allocOptionBox,
-  defArgumentsProc, runBoxUsage, emptyBoxUsageSt
+  defArgumentsProc, returnOptionBoxParam, runBoxUsage, emptyBoxUsageSt
 ) where
 
 import Lowering.AST 
@@ -215,8 +215,29 @@ defArgumentsProc :: Parameter a -> Location -> BoxUsageM BoxUsageError ()
 defArgumentsProc ps loc
   = case paramType ps of
       TBoxSubtype _ -> defBox (paramIdentifier ps) loc
+      TReference Mutable (TOption (TBoxSubtype _)) -> defOptionBoxParam (paramIdentifier ps)
       -- | A plain parameter is a variable, which the forward pass owns
       _ -> return ()
+
+-- | An option-box parameter is filled by the procedure, as an alloc does, and
+-- the caller moves it once the procedure returns.
+returnOptionBoxParam :: Location -> Parameter a -> BoxUsageM BoxUsageError ()
+returnOptionBoxParam loc ps
+  = case paramType ps of
+      TReference Mutable (TOption (TBoxSubtype _)) -> safeUpdateOptionBox (paramIdentifier ps) (Moved loc)
+      _ -> return ()
+
+-- | The option-box parameter enters the procedure empty, so it must be filled
+-- on every path before anything reads it.
+defOptionBoxParam :: Identifier -> BoxUsageM BoxUsageError ()
+defOptionBoxParam ident =
+  maybe
+    (throwError $ annotateError Internal EVarRedefinition)
+    (\case{
+        Allocated _ -> safeUpdateOptionBox ident (Defined Internal);
+        Moved loc -> throwError $ annotateError loc (EOptionBoxParamNotFilled ident);
+        Defined _ -> throwError $ annotateError Internal EDefinedTwice
+        }) . M.lookup ident =<< ST.gets optionBoxesMap
 
 ----------------------------------------
 -- Run computation and get its result.

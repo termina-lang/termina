@@ -35,6 +35,67 @@ allocAndConsumes = wrap $
   "            case None => { }\n" ++
   "        }\n"
 
+-- | A procedure whose body fills the option-box parameter @result@.
+outWrap :: String -> String
+outWrap body =
+  "interface Interface0 {\n" ++
+  "    procedure proc0(&mut self, data : box u32, result : &mut Option<box u32>);\n" ++
+  "};\n" ++
+  "resource class ResourceClass0 provides Interface0 {\n" ++
+  "    data_pool : access Allocator<u32>;\n" ++
+  "    inner : access Interface0;\n" ++
+  "    procedure proc0(&mut self, data : box u32, result : &mut Option<box u32>) {\n" ++
+  body ++
+  "        return;\n" ++
+  "    }\n" ++
+  "};\n"
+
+-- | The option-box parameter filled by an alloc.
+fillsParamWithAlloc :: String
+fillsParamWithAlloc = outWrap $
+  "        self->data_pool.free(data);\n" ++
+  "        self->data_pool.alloc(result);\n"
+
+-- | The option-box parameter filled with the box parameter on one branch and
+-- with None on the other.
+fillsParamWithSomeOrNone :: String
+fillsParamWithSomeOrNone = outWrap $
+  "        var flag : bool = true;\n" ++
+  "        if (flag) {\n" ++
+  "            *result = Some(data);\n" ++
+  "        } else {\n" ++
+  "            self->data_pool.free(data);\n" ++
+  "            *result = None;\n" ++
+  "        }\n"
+
+-- | The option-box parameter handed on to another procedure, which fills it.
+forwardsParam :: String
+forwardsParam = outWrap $
+  "        self->inner.proc0(data, result);\n"
+
+-- | A caller that hands an empty option-box to a procedure and moves what it
+-- gets back.
+callsProcWithOption :: String
+callsProcWithOption =
+  "interface Interface0 {\n" ++
+  "    procedure proc0(&mut self, result : &mut Option<box u32>);\n" ++
+  "};\n" ++
+  "task class TaskClass0 {\n" ++
+  "    timer : sink TimeVal triggers run;\n" ++
+  "    src : access Interface0;\n" ++
+  "    data_pool : access Allocator<u32>;\n" ++
+  "    action run(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+  "        var ret : Status<i32> = Success;\n" ++
+  "        var opt : Option<box u32> = None;\n" ++
+  "        self->src.proc0(&mut opt);\n" ++
+  "        match opt {\n" ++
+  "            case Some(obj) => { self->data_pool.free(obj); }\n" ++
+  "            case None => { }\n" ++
+  "        }\n" ++
+  "        return ret;\n" ++
+  "    }\n" ++
+  "};\n"
+
 -- | A box consumed (freed) on every branch of an if.
 freesBoxInBothBranches :: String
 freesBoxInBothBranches = wrap $
@@ -165,6 +226,10 @@ spec = do
     mapM_ (\(name, src) -> it name $ runNegativeTestBoxUsage src `shouldSatisfy` isNothing)
     [ ("accepts a box parameter that is freed once", freesBoxParam)
     , ("accepts an option-box allocated and consumed in all branches", allocAndConsumes)
+    , ("accepts an option-box parameter filled by an alloc", fillsParamWithAlloc)
+    , ("accepts an option-box parameter filled with Some or None", fillsParamWithSomeOrNone)
+    , ("accepts an option-box parameter handed on to another procedure", forwardsParam)
+    , ("accepts an option-box filled by a procedure and then moved", callsProcWithOption)
     , ("accepts a box freed on every branch of an if", freesBoxInBothBranches)
     , ("accepts a variable assigned in every branch and read after them", assignsInBothBranches)
     , ("accepts a variable assigned in one branch and read after it", assignsInOneBranch)
