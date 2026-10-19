@@ -49,6 +49,9 @@ Patch versions on either side are interchangeable.
 
 ### Fixed
 
+- A procedure with a parameter of type `Option<box T>`, which moves the
+  option of the caller into the procedure, crashed the transpiler in the
+  architecture check. The check now follows the box through the call.
 - A box allocated from one pool and freed to another inside a `for` loop
   compiled without AE-003 and raised a `pool_free` runtime failure.
 

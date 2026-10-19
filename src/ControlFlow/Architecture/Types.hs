@@ -352,6 +352,9 @@ data TerminaProgArch a = TerminaProgArch {
 
 data InOptionBox a =
   InOptionBoxAlloc Identifier a
+  -- | The option-box received by value by the procedure, as the parameter with
+  -- the index
+  | InOptionBoxProcedureCall Identifier Integer
   -- | The box written by a procedure, called through the port, into the
   -- option-box parameter with the index
   | InOptionBoxProcedureOut Identifier Identifier Integer a

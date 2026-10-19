@@ -422,6 +422,7 @@ getExprBoxName _ = throwError $ annotateError Internal EExpectedBoxSubtype
 
 getInBox :: InOptionBox a -> InBox a
 getInBox (InOptionBoxAlloc ident ann) = InBoxAlloc ident ann
+getInBox (InOptionBoxProcedureCall procId idx) = InBoxProcedureCall procId idx
 getInBox (InOptionBoxProcedureOut port procId idx ann) = InBoxProcedureOut port procId idx ann
 getInBox (InOptionBoxDeque ident _ann) = InBoxDeque ident
 getInBox (InOptionBoxRejected inBox) = inBox

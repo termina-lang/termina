@@ -223,6 +223,41 @@ poolThroughOptionBoxParam =
   "#[priority(10)]\n" ++
   "task t : StoreTask = { timer_port <- timer, drain_port <- timer2, mypool <-> mypool_res, store <-> store_res };\n"
 
+-- | An option-box allocated by a task and moved by value into a procedure,
+-- which frees its box to the pool it came from.
+poolThroughOptionBoxArgument :: String
+poolThroughOptionBoxArgument =
+  "interface ISink {\n" ++
+  "    procedure consume(&mut self, data : Option<box u32>);\n" ++
+  "};\n" ++
+  "resource class Sink provides ISink {\n" ++
+  "    pool : access Allocator<u32>;\n" ++
+  "    procedure consume(&mut self, data : Option<box u32>) {\n" ++
+  "        match data {\n" ++
+  "            case Some(v) => { self->pool.free(v); }\n" ++
+  "            case None => { }\n" ++
+  "        }\n" ++
+  "        return;\n" ++
+  "    }\n" ++
+  "};\n" ++
+  "task class SinkTask {\n" ++
+  "    timer_port : sink TimeVal triggers run;\n" ++
+  "    snk : access ISink;\n" ++
+  "    mypool : access Allocator<u32>;\n" ++
+  "    action run(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+  "        var ret : Status<i32> = Success;\n" ++
+  "        var a : Option<box u32> = None;\n" ++
+  "        self->mypool.alloc(&mut a);\n" ++
+  "        self->snk.consume(a);\n" ++
+  "        return ret;\n" ++
+  "    }\n" ++
+  "};\n" ++
+  periodicEmitter "timer" 1 ++
+  "resource mypool_res : Pool<u32; 4>;\n" ++
+  "resource sink_res : Sink = { pool <-> mypool_res };\n" ++
+  "#[priority(10)]\n" ++
+  "task t : SinkTask = { timer_port <- timer, snk <-> sink_res, mypool <-> mypool_res };\n"
+
 spec :: Spec
 spec = describe "Architecture: sound wiring raises no error" $
   mapM_ (\(name, src) -> it name $ architectureError src `shouldSatisfy` isNothing)
@@ -233,4 +268,5 @@ spec = describe "Architecture: sound wiring raises no error" $
     , ("accepts a box allocated and freed to the same pool inside a loop", poolUsedInLoop)
     , ("accepts a box parked in a deque and freed to the pool it came from", poolThroughDeque)
     , ("accepts a box written into an option-box parameter and freed to the pool it came from", poolThroughOptionBoxParam)
+    , ("accepts an option-box moved into a procedure and freed to the pool it came from", poolThroughOptionBoxArgument)
     ]

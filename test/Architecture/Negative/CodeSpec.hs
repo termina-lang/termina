@@ -440,3 +440,47 @@ spec = do
             ++ "#[priority(10)]\n"
             ++ "task t : BoxTask = { timer_port <- timer, src <-> src_res, data_pool <-> pool0 };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-003")
+
+    it "AE-003: mismatched box source through an option-box argument" $ do
+      -- The task moves an option-box allocated from pool0 into the procedure,
+      -- which frees its box to pool1.
+      let src =
+            "interface ISink {\n" ++
+            "    procedure consume(&mut self, data : Option<box u32>);\n" ++
+            "};\n" ++
+            "resource class Sink provides ISink {\n" ++
+            "    pool : access Allocator<u32>;\n" ++
+            "    procedure consume(&mut self, data : Option<box u32>) {\n" ++
+            "        match data {\n" ++
+            "            case Some(v) => { self->pool.free(v); }\n" ++
+            "            case None => { }\n" ++
+            "        }\n" ++
+            "        return;\n" ++
+            "    }\n" ++
+            "};\n" ++
+            "task class BoxTask {\n" ++
+            "    timer_port : sink TimeVal triggers tick;\n" ++
+            "    snk : access ISink;\n" ++
+            "    data_pool0 : access Allocator<u32>;\n" ++
+            "    data_pool1 : access Allocator<u32>;\n" ++
+            "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+            "        var ret : Status<i32> = Success;\n" ++
+            "        var a : Option<box u32> = None;\n" ++
+            "        self->data_pool0.alloc(&mut a);\n" ++
+            "        self->snk.consume(a);\n" ++
+            "        var b : Option<box u32> = None;\n" ++
+            "        self->data_pool1.alloc(&mut b);\n" ++
+            "        match b {\n" ++
+            "            case Some(x) => { self->data_pool1.free(x); }\n" ++
+            "            case None => { }\n" ++
+            "        }\n" ++
+            "        return ret;\n" ++
+            "    }\n" ++
+            "};\n" ++
+            "resource pool0 : Pool<u32; 10>;\n" ++
+            "resource pool1 : Pool<u32; 10>;\n" ++
+            "resource sink_res : Sink = { pool <-> pool1 };\n" ++
+            periodicEmitter "timer" 10
+            ++ "#[priority(10)]\n"
+            ++ "task t : BoxTask = { timer_port <- timer, snk <-> sink_res, data_pool0 <-> pool0, data_pool1 <-> pool1 };\n"
+      compileErrorCode src `shouldBe` Just (pack "AE-003")
