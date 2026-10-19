@@ -242,3 +242,34 @@ spec = do
             ++ "#[priority(10)]\n"
             ++ "task t : BoxTask = { timer_port <- timer, data_pool0 <-> pool0, data_pool1 <-> pool1 };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-003")
+
+    it "AE-003: mismatched box source inside a for loop" $ do
+      -- The same mismatch, with the box allocated and freed in the body of a loop.
+      let src =
+            "task class BoxTask {\n" ++
+            "    data_pool0 : access Allocator<u32>;\n" ++
+            "    data_pool1 : access Allocator<u32>;\n" ++
+            "    timer_port : sink TimeVal triggers tick;\n" ++
+            "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+            "        var ret : Status<i32> = Success;\n" ++
+            "        for i : usize in 0 : usize .. 3 : usize {\n" ++
+            "            var alloc_data : Option<box u32> = None;\n" ++
+            "            self->data_pool0.alloc(&mut alloc_data);\n" ++
+            "            match alloc_data {\n" ++
+            "                case Some(data) => {\n" ++
+            "                    self->data_pool1.free(data);\n" ++
+            "                }\n" ++
+            "                case None => {\n" ++
+            "                    ret = Failure(0 : i32);\n" ++
+            "                }\n" ++
+            "            }\n" ++
+            "        }\n" ++
+            "        return ret;\n" ++
+            "    }\n" ++
+            "};\n" ++
+            "resource pool0 : Pool<u32; 10>;\n" ++
+            "resource pool1 : Pool<u32; 10>;\n" ++
+            periodicEmitter "timer" 10
+            ++ "#[priority(10)]\n"
+            ++ "task t : BoxTask = { timer_port <- timer, data_pool0 <-> pool0, data_pool1 <-> pool1 };\n"
+      compileErrorCode src `shouldBe` Just (pack "AE-003")

@@ -93,6 +93,31 @@ poolUsed =
   "#[priority(10)]\n" ++
   "task t : PoolTask = { timer_port <- timer, mypool <-> mypool_res };\n"
 
+-- A box allocated and freed to the same pool in the body of a loop: dual of
+-- AE-003 inside a for loop.
+poolUsedInLoop :: String
+poolUsedInLoop =
+  "task class PoolTask {\n" ++
+  "    timer_port : sink TimeVal triggers tick;\n" ++
+  "    mypool : access Allocator<u32>;\n" ++
+  "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+  "        var ret : Status<i32> = Success;\n" ++
+  "        for i : usize in 0 : usize .. 3 : usize {\n" ++
+  "            var b : Option<box u32> = None;\n" ++
+  "            self->mypool.alloc(&mut b);\n" ++
+  "            match b {\n" ++
+  "                case Some(x) => { self->mypool.free(x); }\n" ++
+  "                case None => { }\n" ++
+  "            }\n" ++
+  "        }\n" ++
+  "        return ret;\n" ++
+  "    }\n" ++
+  "};\n" ++
+  periodicEmitter "timer" 1 ++
+  "resource mypool_res : Pool<u32; 4>;\n" ++
+  "#[priority(10)]\n" ++
+  "task t : PoolTask = { timer_port <- timer, mypool <-> mypool_res };\n"
+
 spec :: Spec
 spec = describe "Architecture: sound wiring raises no error" $
   mapM_ (\(name, src) -> it name $ architectureError src `shouldSatisfy` isNothing)
@@ -100,4 +125,5 @@ spec = describe "Architecture: sound wiring raises no error" $
     , ("accepts a channel wired source-to-target", channelWired)
     , ("accepts a resource used through an access port", resourceUsed)
     , ("accepts a pool used through an allocator port", poolUsed)
+    , ("accepts a box allocated and freed to the same pool inside a loop", poolUsedInLoop)
     ]

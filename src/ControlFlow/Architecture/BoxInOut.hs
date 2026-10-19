@@ -84,9 +84,9 @@ inOutBasicBlock (FreeBox obj arg ann) = do
     addIOMapFree outPt ann boxSource
 inOutBasicBlock (IfElseBlock bTrue elseIfs bFalse _ann) =
     localInputScope $ mapM_ inOutBasicBlock (blockBody . condIfBody $ bTrue) >> mapM_ (mapM_ inOutBasicBlock) (blockBody . condElseIfBody<$> elseIfs) >> mapM_ (mapM_ inOutBasicBlock . blockBody . condElseBody) bFalse
-inOutBasicBlock (ForLoopBlock {}) =
-    -- | Inside a for loop, there cannot be any box releasing
-    return ()
+inOutBasicBlock (ForLoopBlock _ _ _ _ _ body _) =
+    -- | Only the boxes born in an iteration can be released in it
+    localInputScope $ mapM_ inOutBasicBlock (blockBody body)
 inOutBasicBlock (MatchBlock eMatch cases mDefaultCase _) = do
     -- | We need to check if we are destroying a box
     eTy <- getExprType eMatch
