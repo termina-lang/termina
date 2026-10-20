@@ -59,6 +59,10 @@ insertMonadicType (TResult ty1 ty2) = do
         st {
           resultTypes = M.insert ty2 (S.singleton (ty1, ty2)) (resultTypes st)
         }
+-- | An array, whether a field, a parameter or a variable, needs the monadic
+-- types of its elements.
+insertMonadicType (TArray ty _) = insertMonadicType ty
+insertMonadicType (TConstSubtype ty) = insertMonadicType ty
 insertMonadicType _ = return ()
 
 mapParameterMonadic ::
