@@ -488,7 +488,7 @@ typeMemberFunctionCall ann ak obj_ty ident args =
                   when (psLen > asLen) (throwError $ annotateError ann (EMemberFunctionCallMissingArgs (ident, ps, getLocation anns) (fromIntegral asLen)))
                   typed_args <- localScope $ zipWithM (\(p, idx) e ->
                     catchMismatch ann (EMemberFunctionCallArgTypeMismatch (ident, p, getLocation anns) idx)
-                      (typeExpression (Just (paramType p)) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
+                      (typeArgument (paramType p) e)) (zip ps [0 :: Integer ..]) args
                   fty <- maybe (throwError $ annotateError Internal EInvalidMemberFunctionTypeAnnotation) return (getTypeSemAnn anns)
                   return ((ps, typed_args), fty)
                 Nothing -> throwError $ annotateError ann (EMemberAccessNotFunction ident)
@@ -511,7 +511,7 @@ typeMemberFunctionCall ann ak obj_ty ident args =
                   when (psLen > asLen) (throwError $ annotateError ann (EProcedureCallMissingArgs (ident, ps, loc) (fromIntegral asLen)))
                   typed_args <- localScope $ zipWithM (\(p, idx) e ->
                     catchMismatch ann (EProcedureCallArgTypeMismatch (ident, p, loc) idx)
-                      (typeExpression (Just (paramType p)) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
+                      (typeArgument (paramType p) e)) (zip ps [0 :: Integer ..]) args
                   return ((ps, typed_args), TUnit)
             );
             _ -> throwError $ annotateError Internal EExpectedInterfaceType
@@ -616,7 +616,7 @@ typeMemberFunctionCall ann ak obj_ty ident args =
       | otherwise = do
           typed_args <- zipWithM (\(p, idx) e ->
             catchMismatch ann (EProcedureCallArgTypeMismatch (procName, p, Builtin) idx)
-              (typeExpression (Just (paramType p)) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
+              (typeArgument (paramType p) e)) (zip ps [0 :: Integer ..]) args
           return ((ps, typed_args), TUnit)
 
 ----------------------------------------
@@ -844,6 +844,17 @@ partTy :: SAST.TerminaType SemanticAnn -> SAST.TerminaType SemanticAnn -> SAST.T
 partTy (TConstSubtype _) ty = TConstSubtype ty
 partTy _ ty = ty
 
+-- | An argument of a call. An enum variant or struct initializer is typed
+-- against the type of the parameter, as the initializer of a declaration is
+-- against the type of the object; it reaches C as a compound literal.
+typeArgument ::
+  SAST.TerminaType SemanticAnn ->
+  Expression ParserAnn ->
+  SemanticMonad (SAST.Expression SemanticAnn)
+typeArgument paramTy e@(EnumVariantInitializer {}) = typeAssignmentExpression paramTy typeRHSObject e
+typeArgument paramTy e@(StructInitializer {}) = typeAssignmentExpression paramTy typeRHSObject e
+typeArgument paramTy e = typeExpression (Just paramTy) typeRHSObject e
+
 typeAssignmentExpression ::
   SAST.TerminaType SemanticAnn ->
   (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn)) ->
@@ -1068,7 +1079,7 @@ typeFunctionCall expectedType ident ps retty funcLocation args ann = do
   when (psLen < asLen) (throwError $ annotateError ann (EFunctionCallExtraArgs (ident, ps, funcLocation) (fromIntegral asLen)))
   when (psLen > asLen) (throwError $ annotateError ann (EFunctionCallMissingArgs (ident, ps, funcLocation) (fromIntegral asLen)))
   typed_args <- localScope $ zipWithM (\(p, idx) e -> catchMismatch ann (EFunctionCallArgTypeMismatch (ident, p, funcLocation) idx)
-      (typeExpression (Just (paramType p)) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
+      (typeArgument (paramType p) e)) (zip ps [0 :: Integer ..]) args
   checkExpectedTy ann expectedType retty
   return $ SAST.FunctionCall ident typed_args expAnn
 

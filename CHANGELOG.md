@@ -34,6 +34,14 @@ Patch versions on either side are interchangeable.
   in the OSAL, which checks again at run time that a `put` finds room, so this
   release needs a matching OSAL.
 
+- An enum variant or struct initializer may be passed as the argument of a
+  call to a function, a method, a viewer or a procedure, as in
+  `self->gpio.write_pin(pin, GPIOPinState::High)`. It is typed against the
+  type of the parameter, as the initializer of a declaration is, and reaches
+  C as a compound literal (`(GPIOPinState){ ... }`). SE-087 now only rejects
+  an enum variant initializer outside a declaration, an assignment or an
+  argument.
+
 ### Changed
 
 - Actions return nothing. The parser no longer accepts a return type on an
@@ -73,6 +81,9 @@ Patch versions on either side are interchangeable.
   left the matched object unused in the generated C, which the C compiler
   reported with `-Wunused-variable`. The object is now discarded with a cast
   to `void`.
+- An `Option` whose only use was as the element of an array, such as a field
+  `[Option<Pin>; 4]`, did not get its C type (`Option__Pin`), and the
+  generated C did not compile.
 
 ## [0.6.0] - 2026-10-15
 

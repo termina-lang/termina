@@ -587,7 +587,7 @@ instance Diagnosable Error where
             ("Action \x1b[31m" <> T.pack ident <> "\x1b[0m requires \x1b[31mone\x1b[0m parameter but you are providing \x1b[31mnone\x1b[0m.\n")
     describe EEnumVariantInitializerInvalidUse =
         diagnostic "SE-087" "invalid use of an enum variant initializer"
-            ("You are trying to use an enum variant initializer in an invalid context.\n" <> "Enum variant initializers can only be used to initialize enum objects.")
+            ("You are trying to use an enum variant initializer in an invalid context.\n" <> "Enum variant initializers can only be used to initialize enum objects or as the arguments of a call.")
     describe (EEnumVariantNotFound enumId variant) =
         diagnostic "SE-088" "enum variant not found"
             ("Enum \x1b[31m" <> T.pack enumId <> "\x1b[0m does not have a variant named \x1b[31m" <> T.pack variant <> "\x1b[0m.")

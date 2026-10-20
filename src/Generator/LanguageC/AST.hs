@@ -271,6 +271,7 @@ data CExpression' a =
     | CExprCall (CExpression' a) [CExpression' a] CType a
     | CExprArrayInitializer [CExpression' a] CType a -- ^ array initializer list { e0, e1, ... }
     | CExprDesignatedInitializer [(Ident, CExpression' a)] CType a -- ^ struct/union initializer { .f0 = e0, .f1 = e1 }
+    | CExprCompoundLiteral (CExpression' a) CType a -- ^ compound literal (T){ ... }, the initializer being one of the two above
     deriving Show
 
 instance Annotated CExpression' where
@@ -290,6 +291,7 @@ instance Annotated CExpression' where
   getAnnotation (CExprCall _ _ _ a) = a
   getAnnotation (CExprArrayInitializer _ _ a) = a
   getAnnotation (CExprDesignatedInitializer _ _ a) = a
+  getAnnotation (CExprCompoundLiteral _ _ a) = a
 
   updateAnnotation (CExprConstant c t _) = CExprConstant c t
   updateAnnotation (CExprValOf o t _) = CExprValOf o t
@@ -307,6 +309,7 @@ instance Annotated CExpression' where
   updateAnnotation (CExprCall e es t _) = CExprCall e es t
   updateAnnotation (CExprArrayInitializer es t _) = CExprArrayInitializer es t
   updateAnnotation (CExprDesignatedInitializer fs t _) = CExprDesignatedInitializer fs t
+  updateAnnotation (CExprCompoundLiteral e t _) = CExprCompoundLiteral e t
 
 getCExprType :: CExpression' a -> CType
 getCExprType (CExprConstant _ t _) = t
@@ -325,6 +328,7 @@ getCExprType (CExprComma _ _ t _) = t
 getCExprType (CExprCall _ _ t _) = t
 getCExprType (CExprArrayInitializer _ t _) = t
 getCExprType (CExprDesignatedInitializer _ t _) = t
+getCExprType (CExprCompoundLiteral _ t _) = t
 
 getCObjType :: CObject' a -> CType
 getCObjType (CVar _ t) = t

@@ -325,6 +325,10 @@ instance CPrint CExpression where
             pe <- pprintPrec 2 e
             return $ pretty "." <> pretty f <+> pretty "=" <+> pe) fields
         return $ braces (space <> align (fillSep (punctuate comma pfields)) <> space)
+    pprintPrec p (CExprCompoundLiteral initializer ty _) = do
+        pinit <- pprintPrec 2 initializer
+        ptype <- pprint ty
+        return $ parenPrec p 25 $ parens ptype <> pinit
 
 prependLine :: Bool -> DocStyle -> DocStyle
 prependLine True doc = line <> doc
