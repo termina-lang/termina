@@ -9,7 +9,7 @@ module VarUsage.Negative.DetailSpec
   , testBE009, testBE010, testBE011, testBE012, testBE013, testVUE004, testVUE004_1
   , testVUE003, testVUE005, testVUE005_1, testVUE005_2, testVUE006, testVUE006_1
   , testVUE006_2, testVUE006_3, testVUE006_4, testVUE006_5, testVUE002_1, testVUE002_2
-  , testVUE007, testVUE008
+  , testVUE002_3, testVUE007, testVUE008
   ) where
 
 import Test.Hspec
@@ -600,6 +600,47 @@ testVUE002_2 = "struct Struct0 {\n" ++
        "\n" ++
        "};\n"
 
+-- | A variable bound by a case and never read, while a procedure checked
+-- before reads a variable of the same name. That read is no read of this one.
+testVUE002_3 :: String
+testVUE002_3 = "enum Enum0 {\n" ++
+       "    Variant0(u8),\n" ++
+       "    Variant1\n" ++
+       "};\n" ++
+       "\n" ++
+       "interface Interface0 {\n" ++
+       "    procedure proc0(&mut self, e : Enum0);\n" ++
+       "    procedure proc1(&mut self, e : Enum0);\n" ++
+       "};\n" ++
+       "\n" ++
+       "resource class ResourceClass0 provides Interface0 {\n" ++
+       "\n" ++
+       "    field0 : u8;\n" ++
+       "\n" ++
+       "    procedure proc0(&mut self, e : Enum0) {\n" ++
+       "        match e {\n" ++
+       "            case Variant0(value) => {\n" ++
+       "                self->field0 = value;\n" ++
+       "            }\n" ++
+       "            case Variant1 => {\n" ++
+       "            }\n" ++
+       "        }\n" ++
+       "        return;\n" ++
+       "    }\n" ++
+       "\n" ++
+       "    procedure proc1(&mut self, e : Enum0) {\n" ++
+       "        match e {\n" ++
+       "            case Variant0(value) => {\n" ++
+       "                self->field0 = self->field0 + 1;\n" ++
+       "            }\n" ++
+       "            case Variant1 => {\n" ++
+       "            }\n" ++
+       "        }\n" ++
+       "        return;\n" ++
+       "    }\n" ++
+       "\n" ++
+       "};\n"
+
 -- | A method that nobody calls, while a field of the class has its name. The
 -- read of the field must not pass for a call to the method.
 testVUE005_2 :: String
@@ -789,6 +830,10 @@ spec = do
       runNegativeTestVarUsage testVUE002_2
         `shouldSatisfy`
           isENotUsed "field0"
+    it "VUE-002: case variable not read while another member reads one of the same name" $ do
+      runNegativeTestVarUsage testVUE002_3
+        `shouldSatisfy`
+          isENotUsed "value"
     it "VUE-005: method never called while a field of the class has its name" $ do
       runNegativeTestVarUsage testVUE005_2
         `shouldSatisfy`

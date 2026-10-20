@@ -65,6 +65,14 @@ Patch versions on either side are interchangeable.
   architecture check. The check now follows the box through the call.
 - A box allocated from one pool and freed to another inside a `for` loop
   compiled without AE-003 and raised a `pool_free` runtime failure.
+- A variable never read went without VUE-002 when another member function of
+  the same class read a variable of the same name. Each body now has its own
+  set of variables read; the fields and member functions used are still
+  counted across the class.
+- A `match` with a single case and no default, whose case binds no variable,
+  left the matched object unused in the generated C, which the C compiler
+  reported with `-Wunused-variable`. The object is now discarded with a cast
+  to `void`.
 
 ## [0.6.0] - 2026-10-15
 

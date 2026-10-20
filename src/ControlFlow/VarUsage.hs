@@ -59,6 +59,10 @@ data VarUsageGlobal = VarUsageGlobal
     -- fields reached through @self->@ and, under the key of
     -- 'memberFunctionKey', the member functions called through @self@.
     readIdents :: S.Set Identifier,
+    -- | Identifiers read in the body being checked. A declaration is judged
+    -- against this set: a local read in another member says nothing about a
+    -- local of the same name here.
+    bodyReads :: S.Set Identifier,
     -- | Objects declared in the body being checked, with the location to blame
     -- if nobody reads them.
     declared :: [(Identifier, Location)],
@@ -78,7 +82,7 @@ data VarUsageGlobal = VarUsageGlobal
 type VarUsageMonad = DataflowM VarUsagePath VarUsageGlobal VarUsageError
 
 emptySt :: DFState VarUsagePath VarUsageGlobal
-emptySt = DFState (VarUsagePath S.empty M.empty) (VarUsageGlobal S.empty [] S.empty [] S.empty)
+emptySt = DFState (VarUsagePath S.empty M.empty) (VarUsageGlobal S.empty S.empty [] S.empty [] S.empty)
 
 -- | Key under which a call to a member function through self is recorded. It
 -- is not a valid identifier, so it cannot clash with the name of a variable.
@@ -132,6 +136,7 @@ markRead ident = do
   reaching <- unreadOf ident
   modifyGlobal (\g -> g {
       readIdents = S.insert ident (readIdents g),
+      bodyReads = S.insert ident (bodyReads g),
       readDefs = S.union reaching (readDefs g)
     })
   modifyPath (\p -> p { unread = M.delete ident (unread p) })
@@ -327,7 +332,7 @@ checkBlock = walkForward transfer
 checkDeclaredAreRead :: VarUsageMonad ()
 checkDeclaredAreRead = do
   global <- getGlobal
-  mapM_ (check (readIdents global)) (declared global)
+  mapM_ (check (bodyReads global)) (declared global)
 
   where
 
@@ -364,13 +369,14 @@ checkDeadStores = do
           else EAssignedValueNotUsed ident
 
 -- | Runs the body of a member or of a function: the objects pending
--- assignment, the declarations and the assignments are its own, the
--- identifiers read are not.
+-- assignment, the declarations, the assignments and the identifiers read in it
+-- are its own; the fields and member functions used are counted across the
+-- whole class.
 checkBody :: [Parameter SemanticAnn] -> Location -> Block SemanticAnn -> VarUsageMonad ()
 checkBody ps loc body = do
   putPath (VarUsagePath S.empty M.empty)
   modifyGlobal (\g -> g {
-      declared = [], readDefs = S.empty, deadStores = [],
+      bodyReads = S.empty, declared = [], readDefs = S.empty, deadStores = [],
       initializers = S.empty
     })
   mapM_ (\p -> markInitialized (paramIdentifier p) loc) (filter (not . isBoxParam) ps)

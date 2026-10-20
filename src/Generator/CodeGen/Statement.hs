@@ -711,7 +711,7 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                             defCaseBlk <- genDefaultCase d
                             let cDefaultCase = (trail_cr . block) defCaseBlk
                             return [pre_cr (_if_else (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr) theCase cDefaultCase) |>> loc']
-                        Nothing -> genMatchCase cObj cTy m
+                        Nothing -> genSoleMatchCase cObj cTy m
                 -- | The first one must add a preceding blank line
                 m@(MatchCase identifier _ _ ann') : xs -> do
                     let loc' = getLocation ann'
@@ -742,7 +742,7 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                             defCaseBlk <- genDefaultCase d
                             let cDefaultCase = (trail_cr . block) defCaseBlk
                             return [pre_cr (_if_else (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr) theCase cDefaultCase) |>> loc']
-                        Nothing -> genMatchCase cObj cTy m
+                        Nothing -> genSoleMatchCase cObj cTy m
                 -- | The first one must add a preceding blank line
                 m@(MatchCase identifier _ _ ann') : xs -> do
                     let loc' = getLocation ann'
@@ -836,6 +836,22 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
             decls <- genMatchCaseParams cObj cParamsStructType c
             cBlk <- concat <$> traverse genBlocks (blockBody blk')
             return $ decls ++ cBlk
+
+        -- | The only case of a match without a default needs no check of the
+        -- variant. When it binds no variable either, nothing reads the matched
+        -- object, so it is discarded with a cast to void.
+        genSoleMatchCase ::
+            CObject -> CType
+            -> MatchCase SemanticAnn
+            -> CGenerator [CCompoundBlockItem]
+        genSoleMatchCase cObj cParamsStructType c@(MatchCase _ _ blk' _) = do
+            decls <- genMatchCaseParams cObj cParamsStructType c
+            cBlk <- concat <$> traverse genBlocks (blockBody blk')
+            let cAnn = internalAnn CGenericAnn
+                discard = CBlockStmt $ CSDo
+                    (CExprCast (CExprValOf cObj (getCObjType cObj) cAnn) (CTVoid noqual) cAnn)
+                    (internalAnn (CStatementAnn True False))
+            return $ (if null decls then [discard] else decls) ++ cBlk
 
         genDefaultCase :: DefaultCase SemanticAnn -> CGenerator [CCompoundBlockItem]
         genDefaultCase (DefaultCase blk' _) = do
