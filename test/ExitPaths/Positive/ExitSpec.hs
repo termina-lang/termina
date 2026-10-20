@@ -22,16 +22,14 @@ goodAction :: String
 goodAction =
   "task class foo {\n" ++
   "    snk : sink u32 triggers action0;\n" ++
-  "    action action1(&priv self, data : u32) -> u32 {\n" ++
-  "        var st : u32 = 0 : u32;\n" ++
-  "        return st;\n" ++
+  "    action action1(&priv self, data : u32) {\n" ++
+  "        return;\n" ++
   "    }\n" ++
-  "    action action0(&priv self, data : u32) -> u32 {\n" ++
+  "    action action0(&priv self, data : u32) {\n" ++
   "        if (data == 0 : u32) {\n" ++
   "            continue self->action1(data);\n" ++
   "        } else {\n" ++
-  "            var st : u32 = data;\n" ++
-  "            return st;\n" ++
+  "            return;\n" ++
   "        }\n" ++
   "    }\n" ++
   "};\n"
@@ -66,7 +64,7 @@ noReturnAction =
   "extern noreturn function jump_to_image(entry : usize);\n" ++
   "task class foo {\n" ++
   "    snk : sink usize triggers action0;\n" ++
-  "    action action0(&priv self, entry : usize) -> Status<i32> {\n" ++
+  "    action action0(&priv self, entry : usize) {\n" ++
   "        jump_to_image(entry);\n" ++
   "    }\n" ++
   "};\n"
@@ -78,12 +76,11 @@ noReturnBranchAction =
   "extern noreturn function jump_to_image(entry : usize);\n" ++
   "task class foo {\n" ++
   "    snk : sink usize triggers action0;\n" ++
-  "    action action0(&priv self, entry : usize) -> Status<i32> {\n" ++
-  "        var st : Status<i32> = Success;\n" ++
+  "    action action0(&priv self, entry : usize) {\n" ++
   "        if (entry != 0) {\n" ++
   "            jump_to_image(entry);\n" ++
   "        }\n" ++
-  "        return st;\n" ++
+  "        return;\n" ++
   "    }\n" ++
   "};\n"
 
@@ -91,12 +88,11 @@ rebootBranchAction :: String
 rebootBranchAction =
   "task class foo {\n" ++
   "    snk : sink usize triggers action0;\n" ++
-  "    action action0(&priv self, entry : usize) -> Status<i32> {\n" ++
-  "        var st : Status<i32> = Success;\n" ++
+  "    action action0(&priv self, entry : usize) {\n" ++
   "        if (entry != 0) {\n" ++
   "            reboot;\n" ++
   "        }\n" ++
-  "        return st;\n" ++
+  "        return;\n" ++
   "    }\n" ++
   "};\n"
 
@@ -104,16 +100,14 @@ continueBranchAction :: String
 continueBranchAction =
   "task class foo {\n" ++
   "    snk : sink u32 triggers action0;\n" ++
-  "    action action1(&priv self, data : u32) -> Status<i32> {\n" ++
-  "        var st : Status<i32> = Success;\n" ++
-  "        return st;\n" ++
+  "    action action1(&priv self, data : u32) {\n" ++
+  "        return;\n" ++
   "    }\n" ++
-  "    action action0(&priv self, data : u32) -> Status<i32> {\n" ++
-  "        var st : Status<i32> = Success;\n" ++
+  "    action action0(&priv self, data : u32) {\n" ++
   "        if (data == 0 : u32) {\n" ++
   "            continue self->action1(data);\n" ++
   "        }\n" ++
-  "        return st;\n" ++
+  "        return;\n" ++
   "    }\n" ++
   "};\n"
 

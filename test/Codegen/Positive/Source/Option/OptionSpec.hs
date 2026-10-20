@@ -14,9 +14,8 @@ test0 = "task class CHousekeeping {\n" ++
         "\n" ++
         "  data_in : sink u32 triggers action0;\n" ++
         "\n" ++
-        "  action action0(&priv self, _data : u32) -> Status<i32> {\n" ++
+        "  action action0(&priv self, _data : u32) {\n" ++
         "\n" ++
-        "    var ret : Status<i32> = Success;\n" ++
         "    var opt : Option<u32> = None;\n" ++
         "\n" ++
         "    opt = Some(0 : u32);\n" ++
@@ -29,7 +28,7 @@ test0 = "task class CHousekeeping {\n" ++
         "        }\n" ++
         "    }\n" ++
         "\n" ++
-        "    return ret;\n" ++
+        "    return;\n" ++
         "  }\n" ++
         "\n" ++
         "};\n"
@@ -60,9 +59,9 @@ spec = do
               "\n" ++
               "void termina__task_entry__CHousekeeping(void * const arg);\n" ++
               "\n" ++
-              "Status__i32 CHousekeeping__action0(const termina__event_t * const termina__ev,\n" ++
-              "                                   void * const termina__this,\n" ++
-              "                                   const uint32_t termina__ignored__data);\n" ++
+              "void CHousekeeping__action0(const termina__event_t * const termina__ev,\n" ++
+              "                            void * const termina__this,\n" ++
+              "                            const uint32_t termina__ignored__data);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints option header file of test0" $ do

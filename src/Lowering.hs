@@ -253,9 +253,9 @@ lowerClassMember (ClassProcedure ak name args body ann) = do
 lowerClassMember (ClassViewer name args retType body ann) = do
     bRet <- lowerBlock body
     return $ ClassViewer name args retType bRet ann
-lowerClassMember (ClassAction ak name param retType body ann) = do
+lowerClassMember (ClassAction ak name param body ann) = do
     bRet <- lowerBlock body
-    return $ ClassAction ak name param retType bRet ann
+    return $ ClassAction ak name param bRet ann
 
 -- | This function translates the type definitions from the semantic AST to the
 -- basic block AST.

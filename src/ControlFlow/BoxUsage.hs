@@ -360,9 +360,9 @@ checkClassMember (ClassProcedure _ak _ident ps blk ann)
 checkClassMember (ClassViewer _ident ps _tyret bret _ann)
   = checkBlock bret
   >> mapM_ (useArraySize . paramType) ps
-checkClassMember (ClassAction _ak _ident Nothing _tyret bret _ann)
+checkClassMember (ClassAction _ak _ident Nothing bret _ann)
   = checkBlock bret
-checkClassMember (ClassAction _ak _ident (Just p) _tyret bret ann)
+checkClassMember (ClassAction _ak _ident (Just p) bret ann)
   = checkBlock bret
   >> mapM_ (`defArgumentsProc` getLocation ann) [p]
 

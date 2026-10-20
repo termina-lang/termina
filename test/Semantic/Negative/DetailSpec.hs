@@ -118,14 +118,13 @@ testSE009 = "\n" ++
        "\n" ++
        "    input : sink u32 triggers action0;\n" ++
        "\n" ++
-       "    action action0(&priv self, data : u32) -> Status<i32> {\n" ++
+       "    action action0(&priv self, data : u32) {\n" ++
        "\n" ++
        "\n" ++
-       "        var status : Status<i32> = Success;\n" ++
        "\n" ++
        "        self->ap.procedure0(data, 100, 200);\n" ++
        "\n" ++
-       "        return status;\n" ++
+       "        return;\n" ++
        "\n" ++
        "    }\n" ++
        "\n" ++
@@ -146,14 +145,13 @@ testSE010 = "\n" ++
        "\n" ++
        "    input : sink u32 triggers action0;\n" ++
        "\n" ++
-       "    action action0(&priv self, data : u32) -> Status<i32> {\n" ++
+       "    action action0(&priv self, data : u32) {\n" ++
        "\n" ++
        "\n" ++
-       "        var status : Status<i32> = Success;\n" ++
        "\n" ++
        "        self->ap.procedure0(data);\n" ++
        "\n" ++
-       "        return status;\n" ++
+       "        return;\n" ++
        "\n" ++
        "    }\n" ++
        "\n" ++
@@ -174,14 +172,13 @@ testSE011 = "\n" ++
        "\n" ++
        "    input : sink u32 triggers action0;\n" ++
        "\n" ++
-       "    action action0(&priv self, data : u32) -> Status<i32> {\n" ++
+       "    action action0(&priv self, data : u32) {\n" ++
        "\n" ++
        "\n" ++
-       "        var status : Status<i32> = Success;\n" ++
        "\n" ++
        "        self->ap.procedure0(100, data);\n" ++
        "\n" ++
-       "        return status;\n" ++
+       "        return;\n" ++
        "\n" ++
        "    }\n" ++
        "\n" ++
@@ -202,13 +199,12 @@ testSE012 = "\n" ++
        "\n" ++
        "    input : sink u32 triggers action0;\n" ++
        "\n" ++
-       "    action action0(&priv self, data : u32) -> Status<i32> {\n" ++
+       "    action action0(&priv self, data : u32) {\n" ++
        "\n" ++
-       "        var status : Status<i32> = Success;\n" ++
        "\n" ++
        "        self->ap.procedure1(data);\n" ++
        "\n" ++
-       "        return status;\n" ++
+       "        return;\n" ++
        "\n" ++
        "    }\n" ++
        "\n" ++
@@ -234,11 +230,10 @@ testSE014 = "interface TMChannelInterface {\n" ++
        "    \n" ++
        "    tm_sent_packets : u32;\n" ++
        "    \n" ++
-       "    action send_packet(&priv self, input : u32) -> Status<i32> {\n" ++
+       "    action send_packet(&priv self, input : u32) {\n" ++
        "\n" ++
-       "        var status : Status<i32> = Success;\n" ++
        "\n" ++
-       "        return status;\n" ++
+       "        return;\n" ++
        "\n" ++
        "    }\n" ++
        "    \n" ++

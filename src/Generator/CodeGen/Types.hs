@@ -8,9 +8,8 @@ import Generator.LanguageC.Embedded
 import Generator.CodeGen.Common
 
 -- | Generic types
-_TimeVal, _Status__i32 :: CType
+_TimeVal :: CType
 _TimeVal = typeDef "TimeVal"
-_Status__i32 = typeDef "Status__i32"
 
 termina__id_t, termina__pool_t, 
     termina__allocator_t,
@@ -121,7 +120,7 @@ timer_handler classId handler = (classId <::> handler) @:
 
 system_init_handler :: Ident -> Ident -> CExpression
 system_init_handler classId handler = (classId <::> handler) @:
-    CTFunction _Status__i32
+    CTFunction void
         [
             _const . ptr $ classId,
             -- | TimeVal current
@@ -287,18 +286,6 @@ termina__except__msg_queue_recv_error = "termina__except__msg_queue_recv_error" 
             _const size_t,
             -- | const termina__error_code_t error_code
             _const termina__error_code_t
-        ]
-
-termina__except__action_failure :: CExpression
-termina__except__action_failure = "termina__except__action_failure" @:
-    CTFunction void
-        [
-            -- | const Exception source
-            _const (typeDef "Exception"),
-            -- | const size_t sink_port_id,
-            _const size_t,
-            -- | const int32_t error_code
-            _const int32_t
         ]
 
 termina__except__runtime_failure :: CExpression

@@ -6,7 +6,7 @@
 -- without a single test turning red.
 --
 -- The second case is the other half of the contract: only a handler may attend
--- this emitter, which the type checker rejects with SE-219. Before that rule
+-- this emitter, which the type checker rejects with SE-214. Before that rule
 -- existed the generator carried a second branch for a task target, unreachable
 -- in practice and broken for as long as it existed.
 module Pipeline.Positive.InitialEventSpec (spec) where
@@ -21,10 +21,9 @@ import Test.Hspec
 bootAction :: String
 bootAction =
     "    boot_ev : sink TimeVal triggers boot;\n" ++
-    "    action boot(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-    "        var ret : Status<i32> = Success;\n" ++
+    "    action boot(&priv self, _t : TimeVal) {\n" ++
     "        self->count = self->count + 1;\n" ++
-    "        return ret;\n" ++
+    "        return;\n" ++
     "    }\n"
 
 -- | An application whose @system_init@ reaches a handler, which is the only
@@ -59,6 +58,6 @@ spec = describe "Full pipeline: the initial event" $ do
         either (expectationFailure . unpack) (goldenC "initial_event_handler")
           (renderMainFileWith systemInitConfig progArch)
 
-  it "SE-219: rejects an initial event attended by a task" $
+  it "SE-214: rejects an initial event attended by a task" $
     compileProjectErrorCodeWith systemInitConfig [("test", taskApp)]
-      `shouldBe` Just (pack "SE-219")
+      `shouldBe` Just (pack "SE-214")

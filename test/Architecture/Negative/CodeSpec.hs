@@ -3,21 +3,13 @@
 -- and 'Architecture.Positive.WiringSpec'.
 module Architecture.Negative.CodeSpec
   ( spec
-  , returnSuccess, timerTaskClass, periodicEmitter
+  , timerTaskClass, periodicEmitter
   ) where
 
 import Pipeline.Common (compileErrorCode)
 
 import Test.Hspec
 import Data.Text (pack)
-
--- A monadic variant ('Success') cannot be returned directly; it must be bound
--- first (otherwise SE-069 fires before we reach the architecture stage). This
--- is the smallest well-formed action body.
-returnSuccess :: String
-returnSuccess =
-    "        let ret : Status<i32> = Success;\n" ++
-    "        return ret;\n"
 
 -- A minimal valid task class triggered by a periodic timer. Reused, with
 -- different wiring, to violate one architecture rule at a time.
@@ -26,9 +18,9 @@ timerTaskClass =
     "task class TimerTask {\n" ++
     "    ticks : u32;\n" ++
     "    timer_port : sink TimeVal triggers timeout;\n" ++
-    "    action timeout(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+    "    action timeout(&priv self, _t : TimeVal) {\n" ++
     "        self->ticks = self->ticks + 1 : u32;\n" ++
-    returnSuccess ++
+    "        return;\n" ++
     "    }\n" ++
     "};\n"
 
@@ -83,10 +75,9 @@ spec = do
             "task class ProducerTask {\n" ++
             "    timer_port : sink TimeVal triggers timeout;\n" ++
             "    out_port : out u32;\n" ++
-            "    action timeout(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-            "        let ret : Status<i32> = Success;\n" ++
+            "    action timeout(&priv self, _t : TimeVal) {\n" ++
             "        self->out_port.send(0 : u32);\n" ++
-            "        return ret;\n" ++
+            "        return;\n" ++
             "    }\n" ++
             "};\n" ++
             periodicEmitter "timer" 1
@@ -101,9 +92,9 @@ spec = do
             "task class ConsumerTask {\n" ++
             "    last : u32;\n" ++
             "    in_port : in u32 triggers handle;\n" ++
-            "    action handle(&priv self, msg : u32) -> Status<i32> {\n" ++
+            "    action handle(&priv self, msg : u32) {\n" ++
             "        self->last = self->last + msg;\n" ++
-            returnSuccess ++
+            "        return;\n" ++
             "    }\n" ++
             "};\n" ++
             "channel chan : MsgQueue<u32; 10>;\n"
@@ -162,9 +153,9 @@ spec = do
             "task class FdirTask {\n" ++
             "    last : u32;\n" ++
             "    reports : in u32 triggers on_report;\n" ++
-            "    action on_report(&priv self, code : u32) -> Status<i32> {\n" ++
+            "    action on_report(&priv self, code : u32) {\n" ++
             "        self->last = self->last + code;\n" ++
-            returnSuccess ++
+            "        return;\n" ++
             "    }\n" ++
             "};\n" ++
             "channel report_chan : MsgQueue<u32; 4>;\n" ++
@@ -201,9 +192,9 @@ spec = do
             "task class ConsumerTask {\n" ++
             "    last : u32;\n" ++
             "    in_port : in u32 triggers handle;\n" ++
-            "    action handle(&priv self, msg : u32) -> Status<i32> {\n" ++
+            "    action handle(&priv self, msg : u32) {\n" ++
             "        self->last = self->last + msg;\n" ++
-            returnSuccess ++
+            "        return;\n" ++
             "    }\n" ++
             "};\n" ++
             "channel chan : MsgQueue<u32; 10>;\n"
@@ -221,8 +212,7 @@ spec = do
             "    data_pool0 : access Allocator<u32>;\n" ++
             "    data_pool1 : access Allocator<u32>;\n" ++
             "    timer_port : sink TimeVal triggers tick;\n" ++
-            "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-            "        var ret : Status<i32> = Success;\n" ++
+            "    action tick(&priv self, _t : TimeVal) {\n" ++
             "        var alloc_data : Option<box u32> = None;\n" ++
             "        self->data_pool0.alloc(&mut alloc_data);\n" ++
             "        match alloc_data {\n" ++
@@ -230,10 +220,9 @@ spec = do
             "                self->data_pool1.free(data);\n" ++
             "            }\n" ++
             "            case None => {\n" ++
-            "                ret = Failure(0 : i32);\n" ++
             "            }\n" ++
             "        }\n" ++
-            "        return ret;\n" ++
+            "        return;\n" ++
             "    }\n" ++
             "};\n" ++
             "resource pool0 : Pool<u32; 10>;\n" ++
@@ -253,8 +242,7 @@ spec = do
             "    pending : access DequeAccess<u32>;\n" ++
             "    timer_port : sink TimeVal triggers park;\n" ++
             "    drain_port : sink TimeVal triggers drain;\n" ++
-            "    action park(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-            "        var ret : Status<i32> = Success;\n" ++
+            "    action park(&priv self, _t : TimeVal) {\n" ++
             "        var old : Option<box u32> = None;\n" ++
             "        self->pending.take(&mut old);\n" ++
             "        match old {\n" ++
@@ -265,7 +253,7 @@ spec = do
             "        self->data_pool0.alloc(&mut alloc_data);\n" ++
             "        match alloc_data {\n" ++
             "            case Some(data) => { self->pending.put(data); }\n" ++
-            "            case None => { ret = Failure(0 : i32); }\n" ++
+            "            case None => { }\n" ++
             "        }\n" ++
             "        var other_data : Option<box u32> = None;\n" ++
             "        self->data_pool1.alloc(&mut other_data);\n" ++
@@ -273,17 +261,16 @@ spec = do
             "            case Some(d) => { self->data_pool1.free(d); }\n" ++
             "            case None => { }\n" ++
             "        }\n" ++
-            "        return ret;\n" ++
+            "        return;\n" ++
             "    }\n" ++
-            "    action drain(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-            "        var ret : Status<i32> = Success;\n" ++
+            "    action drain(&priv self, _t : TimeVal) {\n" ++
             "        var old : Option<box u32> = None;\n" ++
             "        self->pending.take(&mut old);\n" ++
             "        match old {\n" ++
             "            case Some(o) => { self->data_pool1.free(o); }\n" ++
-            "            case None => { ret = Failure(0 : i32); }\n" ++
+            "            case None => { }\n" ++
             "        }\n" ++
-            "        return ret;\n" ++
+            "        return;\n" ++
             "    }\n" ++
             "};\n" ++
             "resource pool0 : Pool<u32; 10>;\n" ++
@@ -307,15 +294,14 @@ spec = do
             "task class DequeTask {\n" ++
             "    timer_port : sink TimeVal triggers tick;\n" ++
             "    pending : access DequeAccess<u32>;\n" ++
-            "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-            "        let ret : Status<i32> = Success;\n" ++
+            "    action tick(&priv self, _t : TimeVal) {\n" ++
             "        var old : Option<box u32> = None;\n" ++
             "        self->pending.take(&mut old);\n" ++
             "        match old {\n" ++
             "            case Some(o) => { self->pending.put(o); }\n" ++
             "            case None => { }\n" ++
             "        }\n" ++
-            "        return ret;\n" ++
+            "        return;\n" ++
             "    }\n" ++
             "};\n" ++
             "resource pending_deque : Deque<u32; 1>;\n" ++
@@ -330,8 +316,7 @@ spec = do
             "    timer_port : sink TimeVal triggers tick;\n" ++
             "    pool : access Allocator<u32>;\n" ++
             "    pending : access DequeAccess<u32>;\n" ++
-            "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-            "        let ret : Status<i32> = Success;\n" ++
+            "    action tick(&priv self, _t : TimeVal) {\n" ++
             "        var old : Option<box u32> = None;\n" ++
             "        self->pending.take(&mut old);\n" ++
             "        match old {\n" ++
@@ -345,7 +330,7 @@ spec = do
             "                }\n" ++
             "            }\n" ++
             "        }\n" ++
-            "        return ret;\n" ++
+            "        return;\n" ++
             "    }\n" ++
             "};\n" ++
             "resource pool0 : Pool<u32; 4>;\n" ++
@@ -365,8 +350,7 @@ spec = do
             "    data_pool0 : access Allocator<u32>;\n" ++
             "    data_pool1 : access Allocator<u32>;\n" ++
             "    timer_port : sink TimeVal triggers tick;\n" ++
-            "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-            "        var ret : Status<i32> = Success;\n" ++
+            "    action tick(&priv self, _t : TimeVal) {\n" ++
             "        for i : usize in 0 : usize .. 3 : usize {\n" ++
             "            var alloc_data : Option<box u32> = None;\n" ++
             "            self->data_pool0.alloc(&mut alloc_data);\n" ++
@@ -375,11 +359,10 @@ spec = do
             "                    self->data_pool1.free(data);\n" ++
             "                }\n" ++
             "                case None => {\n" ++
-            "                    ret = Failure(0 : i32);\n" ++
             "                }\n" ++
             "            }\n" ++
             "        }\n" ++
-            "        return ret;\n" ++
+            "        return;\n" ++
             "    }\n" ++
             "};\n" ++
             "resource pool0 : Pool<u32; 10>;\n" ++
@@ -421,15 +404,14 @@ spec = do
             "    timer_port : sink TimeVal triggers tick;\n" ++
             "    src : access IGet;\n" ++
             "    data_pool : access Allocator<u32>;\n" ++
-            "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-            "        var ret : Status<i32> = Success;\n" ++
+            "    action tick(&priv self, _t : TimeVal) {\n" ++
             "        var opt : Option<box u32> = None;\n" ++
             "        self->src.get(&mut opt);\n" ++
             "        match opt {\n" ++
             "            case Some(b) => { self->data_pool.free(b); }\n" ++
             "            case None => { }\n" ++
             "        }\n" ++
-            "        return ret;\n" ++
+            "        return;\n" ++
             "    }\n" ++
             "};\n" ++
             "resource pool0 : Pool<u32; 10>;\n" ++
@@ -463,8 +445,7 @@ spec = do
             "    snk : access ISink;\n" ++
             "    data_pool0 : access Allocator<u32>;\n" ++
             "    data_pool1 : access Allocator<u32>;\n" ++
-            "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-            "        var ret : Status<i32> = Success;\n" ++
+            "    action tick(&priv self, _t : TimeVal) {\n" ++
             "        var a : Option<box u32> = None;\n" ++
             "        self->data_pool0.alloc(&mut a);\n" ++
             "        self->snk.consume(a);\n" ++
@@ -474,7 +455,7 @@ spec = do
             "            case Some(x) => { self->data_pool1.free(x); }\n" ++
             "            case None => { }\n" ++
             "        }\n" ++
-            "        return ret;\n" ++
+            "        return;\n" ++
             "    }\n" ++
             "};\n" ++
             "resource pool0 : Pool<u32; 10>;\n" ++

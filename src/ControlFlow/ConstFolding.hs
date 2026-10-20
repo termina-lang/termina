@@ -706,11 +706,10 @@ foldTypeDef loc (Class ck classId members provides mods) = do
       mrty' <- mapM (foldType loc) mrty
       body' <- foldBasicBlocks body
       return $ ClassViewer ident params' mrty' body' ann
-    foldClassMember (ClassAction ak ident params rty body ann) = do
+    foldClassMember (ClassAction ak ident params body ann) = do
       params' <- mapM (foldParam loc) params
-      rty' <- mapM (foldType loc) rty
       body' <- foldBasicBlocks body
-      return $ ClassAction ak ident params' rty' body' ann
+      return $ ClassAction ak ident params' body' ann
     
 foldTypeDef _loc (Interface ik ident extends procs mods) = do
   procs' <- mapM foldInterfaceMember procs

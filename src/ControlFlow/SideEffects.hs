@@ -476,7 +476,7 @@ checkClassMember member = case member of
   ClassMethod _ak ident _ps _tyret body _ann -> checkBody ident body
   ClassProcedure _ak ident _ps body _ann     -> checkBody ident body
   ClassViewer ident _ps _tyret body _ann     -> checkBody ident body
-  ClassAction _ak ident _mp _tyret body _ann -> checkBody ident body
+  ClassAction _ak ident _mp body _ann        -> checkBody ident body
   ClassField {}                              -> return ()
 
   where

@@ -870,9 +870,14 @@ genBlocks (ReturnBlock mExpr ann) =
         Just expr -> do
             cExpr <- genExpression expr
             return [pre_cr (_return (Just cExpr)) |>> getLocation ann]
+-- | The continued action runs in place of the rest of the current one, which
+-- then returns, since actions return nothing.
 genBlocks (ContinueBlock expr ann) = do
     cExpr <- genExpression expr
-    return [pre_cr (_return (Just cExpr)) |>> getLocation ann]
+    return [
+            pre_cr cExpr |>> getLocation ann,
+            no_cr (_return Nothing) |>> getLocation ann
+        ]
 genBlocks (RebootBlock ann) = do
     return [pre_cr $ termina__exec__reboot @@ [] |>> getLocation ann]
 genBlocks (NoReturnCall expr ann) = do

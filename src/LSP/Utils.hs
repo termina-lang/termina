@@ -263,7 +263,7 @@ getDocumentSymbols = Prelude.concatMap toDocumentSymbol
       symbol (T.pack name) LSP.SymbolKind_Method (getLocation ann) []
     toClassMemberSymbol (SAST.ClassViewer name _ _ _ ann) =
       symbol (T.pack name) LSP.SymbolKind_Method (getLocation ann) []
-    toClassMemberSymbol (SAST.ClassAction _ name _ _ _ ann) =
+    toClassMemberSymbol (SAST.ClassAction _ name _ _ ann) =
       symbol (T.pack name) LSP.SymbolKind_Method (getLocation ann) []
 
     toInterfaceMemberSymbol :: SAST.InterfaceMember SemanticAnn -> [LSP.DocumentSymbol]

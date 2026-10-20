@@ -1,15 +1,12 @@
 
 #include "test.h"
 
-Status__i32 T__offer(const termina__event_t * const termina__ev,
-                     void * const termina__this,
-                     const TimeVal termina__ignored__t) {
+void T__offer(const termina__event_t * const termina__ev,
+              void * const termina__this, const TimeVal termina__ignored__t) {
     
     (void)termina__ignored__t;
 
     T * self = (T *)termina__this;
-
-    const Status__i32 ret = { ._variant = Status__Success };
 
     Option__box b = { ._variant = Option__None };
 
@@ -67,19 +64,16 @@ Status__i32 T__offer(const termina__event_t * const termina__ev,
 
     }
 
-    return ret;
+    return;
 
 }
 
-Status__i32 T__tick(const termina__event_t * const termina__ev,
-                    void * const termina__this,
-                    const TimeVal termina__ignored__t) {
+void T__tick(const termina__event_t * const termina__ev,
+             void * const termina__this, const TimeVal termina__ignored__t) {
     
     (void)termina__ignored__t;
 
     T * self = (T *)termina__this;
-
-    const Status__i32 ret = { ._variant = Status__Success };
 
     Option__box taken = { ._variant = Option__None };
 
@@ -122,7 +116,7 @@ Status__i32 T__tick(const termina__event_t * const termina__ev,
 
     }
 
-    return ret;
+    return;
 
 }
 
@@ -133,8 +127,6 @@ void termina__task_entry__T(void * const arg) {
     termina__error_code_t status = termina__error__none;
 
     termina__event_t event;
-
-    Status__i32 result;
 
     TimeVal tick__msg_data;
     TimeVal offer__msg_data;
@@ -160,18 +152,7 @@ void termina__task_entry__T(void * const arg) {
                                                           status);
                 }
 
-                result = T__tick(&event, self, tick__msg_data);
-
-                if (result._variant != Status__Success) {
-                    
-                    ExceptSource source;
-                    source._variant = ExceptSource__Task;
-                    source.Task._0 = self->_task_id;
-
-                    termina__except__action_failure(source, T__timer_port,
-                                                    result.Failure._0);
-
-                }
+                T__tick(&event, self, tick__msg_data);
 
                 break;
 
@@ -185,18 +166,7 @@ void termina__task_entry__T(void * const arg) {
                                                           status);
                 }
 
-                result = T__offer(&event, self, offer__msg_data);
-
-                if (result._variant != Status__Success) {
-                    
-                    ExceptSource source;
-                    source._variant = ExceptSource__Task;
-                    source.Task._0 = self->_task_id;
-
-                    termina__except__action_failure(source, T__offer_port,
-                                                    result.Failure._0);
-
-                }
+                T__offer(&event, self, offer__msg_data);
 
                 break;
 

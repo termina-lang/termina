@@ -9,11 +9,10 @@ task class TaskClass0 {
 
     snk0 : sink u32 triggers action0;
 
-    action action0(&priv self, input : Interface0) -> Status<i32> {
+    action action0(&priv self, input : Interface0) {
 
-        var ret : Status<i32> = Success;
 
-        return ret;
+        return;
 
     }
 

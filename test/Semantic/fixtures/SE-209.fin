@@ -1,18 +1,6 @@
-interface IFoo {
-    procedure get(&mut self, r : &mut u32);
-};
-
-resource class FooRes provides IFoo {
-
-    value : u32;
-
-    viewer peek(&self) -> u32 {
-        return self->value;
-    }
-
-    procedure get(&mut self, r : &mut u32) {
-        *r = self->value;
-        return;
-    }
-
-};
+function test0() {
+    var foo : f32 = 0.0 : f32;
+    var bar : f32 = 1.0 : f32;
+    var b : bool = (foo % bar) == (foo % bar);
+    return;
+}

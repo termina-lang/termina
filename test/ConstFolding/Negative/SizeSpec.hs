@@ -146,11 +146,10 @@ spec = do
                 "task class CTask {\n" ++
                 "    timer_port : sink TimeVal triggers tick;\n" ++
                 "    store : access IStore;\n" ++
-                "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+                "    action tick(&priv self, _t : TimeVal) {\n" ++
                 "        let small : [u8; n] = [0 : u8; n];\n" ++
-                "        let ret : Status<i32> = Success;\n" ++
                 "        self->store.put(&small);\n" ++
-                "        return ret;\n" ++
+                "        return;\n" ++
                 "    }\n" ++
                 "};"
       compileErrorCode src `shouldBe` Just (pack "CFE-012")

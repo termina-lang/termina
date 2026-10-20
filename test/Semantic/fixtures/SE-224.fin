@@ -1,6 +1,5 @@
-extern noreturn function jump_to_image(entry : usize);
+struct Msg {
+    n : u32;
+};
 
-function start(entry : usize) -> u32 {
-    let ret : u32 = jump_to_image(entry);
-    return ret;
-}
+resource deque0 : Deque<Msg; 4> = {};

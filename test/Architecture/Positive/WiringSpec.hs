@@ -23,17 +23,15 @@ channelWired =
   "task class ProducerTask {\n" ++
   "    timer_port : sink TimeVal triggers tick;\n" ++
   "    out_port : out u32;\n" ++
-  "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-  "        let ret : Status<i32> = Success;\n" ++
+  "    action tick(&priv self, _t : TimeVal) {\n" ++
   "        self->out_port.send(0 : u32);\n" ++
-  "        return ret;\n" ++
+  "        return;\n" ++
   "    }\n" ++
   "};\n" ++
   "task class ConsumerTask {\n" ++
   "    in_port : in u32 triggers handle;\n" ++
-  "    action handle(&priv self, _m : u32) -> Status<i32> {\n" ++
-  "        let ret : Status<i32> = Success;\n" ++
-  "        return ret;\n" ++
+  "    action handle(&priv self, _m : u32) {\n" ++
+  "        return;\n" ++
   "    }\n" ++
   "};\n" ++
   periodicEmitter "timer" 1 ++
@@ -59,11 +57,10 @@ resourceUsed =
   "task class UserTask {\n" ++
   "    timer_port : sink TimeVal triggers tick;\n" ++
   "    foo : access IFoo;\n" ++
-  "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-  "        var ret : Status<i32> = Success;\n" ++
+  "    action tick(&priv self, _t : TimeVal) {\n" ++
   "        var v : u32 = 0 : u32;\n" ++
   "        self->foo.get(&mut v);\n" ++
-  "        return ret;\n" ++
+  "        return;\n" ++
   "    }\n" ++
   "};\n" ++
   periodicEmitter "timer" 1 ++
@@ -77,15 +74,14 @@ poolUsed =
   "task class PoolTask {\n" ++
   "    timer_port : sink TimeVal triggers tick;\n" ++
   "    mypool : access Allocator<u32>;\n" ++
-  "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-  "        var ret : Status<i32> = Success;\n" ++
+  "    action tick(&priv self, _t : TimeVal) {\n" ++
   "        var b : Option<box u32> = None;\n" ++
   "        self->mypool.alloc(&mut b);\n" ++
   "        match b {\n" ++
   "            case Some(x) => { self->mypool.free(x); }\n" ++
   "            case None => { }\n" ++
   "        }\n" ++
-  "        return ret;\n" ++
+  "        return;\n" ++
   "    }\n" ++
   "};\n" ++
   periodicEmitter "timer" 1 ++
@@ -100,8 +96,7 @@ poolUsedInLoop =
   "task class PoolTask {\n" ++
   "    timer_port : sink TimeVal triggers tick;\n" ++
   "    mypool : access Allocator<u32>;\n" ++
-  "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-  "        var ret : Status<i32> = Success;\n" ++
+  "    action tick(&priv self, _t : TimeVal) {\n" ++
   "        for i : usize in 0 : usize .. 3 : usize {\n" ++
   "            var b : Option<box u32> = None;\n" ++
   "            self->mypool.alloc(&mut b);\n" ++
@@ -110,7 +105,7 @@ poolUsedInLoop =
   "                case None => { }\n" ++
   "            }\n" ++
   "        }\n" ++
-  "        return ret;\n" ++
+  "        return;\n" ++
   "    }\n" ++
   "};\n" ++
   periodicEmitter "timer" 1 ++
@@ -128,8 +123,7 @@ poolThroughDeque =
   "    drain_port : sink TimeVal triggers drain;\n" ++
   "    mypool : access Allocator<u32>;\n" ++
   "    pending : access DequeAccess<u32>;\n" ++
-  "    action park(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-  "        var ret : Status<i32> = Success;\n" ++
+  "    action park(&priv self, _t : TimeVal) {\n" ++
   "        var old : Option<box u32> = None;\n" ++
   "        self->pending.take(&mut old);\n" ++
   "        match old {\n" ++
@@ -143,17 +137,16 @@ poolThroughDeque =
   "                }\n" ++
   "            }\n" ++
   "        }\n" ++
-  "        return ret;\n" ++
+  "        return;\n" ++
   "    }\n" ++
-  "    action drain(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-  "        var ret : Status<i32> = Success;\n" ++
+  "    action drain(&priv self, _t : TimeVal) {\n" ++
   "        var old : Option<box u32> = None;\n" ++
   "        self->pending.take(&mut old);\n" ++
   "        match old {\n" ++
   "            case Some(o) => { self->mypool.free(o); }\n" ++
   "            case None => { }\n" ++
   "        }\n" ++
-  "        return ret;\n" ++
+  "        return;\n" ++
   "    }\n" ++
   "};\n" ++
   periodicEmitter "timer" 1 ++
@@ -194,25 +187,23 @@ poolThroughOptionBoxParam =
   "    drain_port : sink TimeVal triggers drain;\n" ++
   "    mypool : access Allocator<u32>;\n" ++
   "    store : access IStore;\n" ++
-  "    action park(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-  "        var ret : Status<i32> = Success;\n" ++
+  "    action park(&priv self, _t : TimeVal) {\n" ++
   "        var b : Option<box u32> = None;\n" ++
   "        self->mypool.alloc(&mut b);\n" ++
   "        match b {\n" ++
   "            case Some(x) => { self->store.park(x); }\n" ++
   "            case None => { }\n" ++
   "        }\n" ++
-  "        return ret;\n" ++
+  "        return;\n" ++
   "    }\n" ++
-  "    action drain(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-  "        var ret : Status<i32> = Success;\n" ++
+  "    action drain(&priv self, _t : TimeVal) {\n" ++
   "        var old : Option<box u32> = None;\n" ++
   "        self->store.fetch(&mut old);\n" ++
   "        match old {\n" ++
   "            case Some(o) => { self->mypool.free(o); }\n" ++
   "            case None => { }\n" ++
   "        }\n" ++
-  "        return ret;\n" ++
+  "        return;\n" ++
   "    }\n" ++
   "};\n" ++
   periodicEmitter "timer" 1 ++
@@ -244,12 +235,11 @@ poolThroughOptionBoxArgument =
   "    timer_port : sink TimeVal triggers run;\n" ++
   "    snk : access ISink;\n" ++
   "    mypool : access Allocator<u32>;\n" ++
-  "    action run(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-  "        var ret : Status<i32> = Success;\n" ++
+  "    action run(&priv self, _t : TimeVal) {\n" ++
   "        var a : Option<box u32> = None;\n" ++
   "        self->mypool.alloc(&mut a);\n" ++
   "        self->snk.consume(a);\n" ++
-  "        return ret;\n" ++
+  "        return;\n" ++
   "    }\n" ++
   "};\n" ++
   periodicEmitter "timer" 1 ++

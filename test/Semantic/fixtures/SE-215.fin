@@ -1,5 +1,3 @@
-function test0() {
-    var foo : f32 = 0.0 : f32;
-    var b : bool = (0 % foo) == (0 % foo);
-    return;
+function test0(a : i32, n : u8) -> i32 {
+    return a << n;
 }

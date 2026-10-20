@@ -11,11 +11,10 @@ task class TaskClass0 {
 
     snk0 : sink u32 triggers action0;
 
-    action action0(&priv self, input : u32) -> Result {
+    action action0(&priv self, input : u32) {
 
-        var ret : Result = Result::Ok;
 
-        return ret;
+        return;
 
     }
 

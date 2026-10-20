@@ -14,11 +14,10 @@ task class foo {
 
     }
 
-    action action0(&priv self, data : u32) -> Status<i32> {
+    action action0(&priv self, data : u32) {
 
-        var st : Status<i32> = Success;
 
-        return st;
+        return;
 
     }
 

@@ -57,10 +57,10 @@ getProcedures = foldl' (\acc member ->
 getActions :: [ClassMember a] -> M.Map Identifier (TPFunction a)
 getActions = foldl' (\acc member ->
   case member of
-    ClassAction _ak identifier Nothing rty blk ann ->
-      M.insert identifier (TPFunction identifier [] rty blk ann) acc
-    ClassAction _ak identifier (Just param) rty blk ann ->
-      M.insert identifier (TPFunction identifier [param] rty blk ann) acc
+    ClassAction _ak identifier Nothing blk ann ->
+      M.insert identifier (TPFunction identifier [] Nothing blk ann) acc
+    ClassAction _ak identifier (Just param) blk ann ->
+      M.insert identifier (TPFunction identifier [param] Nothing blk ann) acc
     _ -> acc
   ) M.empty
 
@@ -473,7 +473,7 @@ getPeriodicTimersToTasks progArchitecture = foldl (\acc emitter ->
     ) [] (getConnectedEmitters progArchitecture)
 
 -- | Returns the value of the "priority" modifier. The type checker rejects a
--- task without one (SE-222) and the constant folding leaves its value as a
+-- task without one (SE-217) and the constant folding leaves its value as a
 -- literal.
 getPriority :: TPTask a -> TInteger
 getPriority = getPriority' . taskModifiers

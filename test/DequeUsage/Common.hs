@@ -13,15 +13,13 @@ taskProgram body =
     "    drain_port : sink TimeVal triggers drain;\n" ++
     "    pool : access Allocator<Msg>;\n" ++
     "    pending : access DequeAccess<Msg>;\n" ++
-    "    action park(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-    "        let ret : Status<i32> = Success;\n" ++
+    "    action park(&priv self, _t : TimeVal) {\n" ++
     body ++
-    "        return ret;\n" ++
+    "        return;\n" ++
     "    }\n" ++
-    "    action drain(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-    "        let ret : Status<i32> = Success;\n" ++
+    "    action drain(&priv self, _t : TimeVal) {\n" ++
     drain ++
-    "        return ret;\n" ++
+    "        return;\n" ++
     "    }\n" ++
     "};\n" ++
     "resource pool_res : Pool<Msg; 4>;\n" ++
@@ -56,11 +54,10 @@ resourceProgram methods body =
     "task class T {\n" ++
     "    timer_port : sink TimeVal triggers tick;\n" ++
     "    holder : access IHolder;\n" ++
-    "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-    "        let ret : Status<i32> = Success;\n" ++
+    "    action tick(&priv self, _t : TimeVal) {\n" ++
     "        self->holder.flush();\n" ++
     "        self->holder.clear();\n" ++
-    "        return ret;\n" ++
+    "        return;\n" ++
     "    }\n" ++
     "};\n" ++
     "resource pool_res : Pool<Msg; 4>;\n" ++

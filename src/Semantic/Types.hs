@@ -145,8 +145,8 @@ kClassMember (ClassProcedure ak idx ps _blk ann) =
   ClassProcedure ak idx ps EmptyBlock ann
 kClassMember (ClassViewer idx ps mty _blk ann) =
   ClassViewer idx ps mty EmptyBlock ann
-kClassMember (ClassAction ak idx ps ty _blk ann) =
-  ClassAction ak idx ps ty EmptyBlock ann
+kClassMember (ClassAction ak idx ps _blk ann) =
+  ClassAction ak idx ps EmptyBlock ann
 
 ----------------------------------------
 -- Subtyping.

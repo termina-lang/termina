@@ -8,13 +8,12 @@ task class TaskClass0 {
 
     }
 
-    action action0(&priv self, input : u32) -> Status<i32> {
+    action action0(&priv self, input : u32) {
 
-        var ret : Status<i32> = Success;
 
         self->viewer0(input, 10 : u16);
 
-        return ret;
+        return;
 
     }
 

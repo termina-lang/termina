@@ -113,8 +113,8 @@ elaborateElement ps element = case element of
         ClassProcedure ak ident params <$> body' body <*> pure ann
       ClassViewer ident params mRet body ann ->
         ClassViewer ident params mRet <$> body' body <*> pure ann
-      ClassAction ak ident mParam ret body ann ->
-        ClassAction ak ident mParam ret <$> body' body <*> pure ann
+      ClassAction ak ident mParam body ann ->
+        ClassAction ak ident mParam <$> body' body <*> pure ann
 
     interfaceMember (InterfaceProcedure ak ident params modifiers ann) =
       InterfaceProcedure ak ident params <$> mapM modifier modifiers <*> pure ann

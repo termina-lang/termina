@@ -12,14 +12,13 @@ task class TaskClass0 {
 
     input : sink u32 triggers action0;
 
-    action action0(&priv self, data : u32) -> Status<i32> {
+    action action0(&priv self, data : u32) {
 
 
-        var ret : Status<i32> = Success;
 
         self->ap.procedure0(data);
 
-        return ret;
+        return;
 
     }
 

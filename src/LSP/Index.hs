@@ -145,7 +145,7 @@ indexModule program =
         memberOf owner (SAST.ClassMethod _ ident _ _ _ ann) = [((owner, ident), getLocation ann)]
         memberOf owner (SAST.ClassProcedure _ ident _ _ ann) = [((owner, ident), getLocation ann)]
         memberOf owner (SAST.ClassViewer ident _ _ _ ann) = [((owner, ident), getLocation ann)]
-        memberOf owner (SAST.ClassAction _ ident _ _ _ ann) = [((owner, ident), getLocation ann)]
+        memberOf owner (SAST.ClassAction _ ident _ _ ann) = [((owner, ident), getLocation ann)]
 
         elemRefs :: SAST.AnnASTElement SemanticAnn -> [Entry]
         elemRefs (SAST.Function _ params _ body _ _) = blockRefs (paramsEnv params) body
@@ -172,7 +172,7 @@ indexModule program =
             blockRefs (memberEnv ann params) body
         classMemberRefs (SAST.ClassViewer _ params _ body ann) =
             blockRefs (memberEnv ann params) body
-        classMemberRefs (SAST.ClassAction _ _ mparam _ body ann) =
+        classMemberRefs (SAST.ClassAction _ _ mparam body ann) =
             blockRefs (memberEnv ann (maybe [] (: []) mparam)) body
 
 -- | The parameters of a body, which are in scope from its first statement.

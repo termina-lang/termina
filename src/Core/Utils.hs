@@ -595,16 +595,16 @@ findClassViewerOrMethod i
     }
   )
 
-findClassAction :: Identifier -> [ ClassMember' ty blk a ] -> Maybe (Maybe (Parameter' ty a), Maybe (ty a), a)
+findClassAction :: Identifier -> [ ClassMember' ty blk a ] -> Maybe (Maybe (Parameter' ty a), a)
 findClassAction i
   =  fmap
   (\case {
-    ClassAction _ _ param rty _ a -> (param, rty, a);
+    ClassAction _ _ param _ a -> (param, a);
     _ -> error "Impossible after find"
     })
   .
   L.find (\case{
-    ClassAction _ ident _ _ _ _ -> (ident == i);
+    ClassAction _ ident _ _ _ -> (ident == i);
     _ -> False})
 
 className :: ClassMember' ty blk a -> Identifier
@@ -612,4 +612,4 @@ className (ClassField e)                = fieldIdentifier e
 className (ClassMethod _ mIdent _ _ _ _)    = mIdent
 className (ClassProcedure _ pIdent _ _ _) = pIdent
 className (ClassViewer vIdent _ _ _ _)  = vIdent
-className (ClassAction _ aIdent _ _ _ _)  = aIdent
+className (ClassAction _ aIdent _ _ _)  = aIdent

@@ -17,7 +17,6 @@ import Semantic.Errors
 -- Semantic Monad
 import Semantic.Monad
 import qualified Data.Map.Strict as M
-import Data.Maybe (fromMaybe)
 
 ----------------------------------------
 -- Libaries and stuff
@@ -293,17 +292,6 @@ checkEmitterDataType loc "SystemInit" ty =
 checkEmitterDataType loc "SystemExcept" ty =
   unless (sameTy ty (TEnum "Exception")) (throwError $ annotateError loc (EInvalidSystemExceptEmitterType ty))
 checkEmitterDataType _ _ _ = throwError $ annotateError Internal EInvalidEmitterClass
-
-checkEmitterActionReturnType :: Location -> Identifier -> Identifier -> SAST.TerminaType SemanticAnn -> SemanticMonad ()
-checkEmitterActionReturnType loc "Interrupt" action ty =
-  unless (sameTy ty (TStatus TInt32)) (throwError $ annotateError loc (EInvalidInterruptActionReturnType action ty))
-checkEmitterActionReturnType loc "PeriodicTimer" action ty =
-  unless (sameTy ty (TStatus TInt32)) (throwError $ annotateError loc (EInvalidPeriodicTimerActionReturnType action ty))
-checkEmitterActionReturnType loc "SystemInit" action ty =
-  unless (sameTy ty (TStatus TInt32)) (throwError $ annotateError loc (EInvalidSystemInitActionReturnType action ty))
-checkEmitterActionReturnType loc "SystemExcept" action ty =
-  unless (sameTy ty TUnit) (throwError $ annotateError loc (EInvalidSystemExceptActionReturnType action ty))
-checkEmitterActionReturnType _ _ _ _ = throwError $ annotateError Internal EInvalidEmitterClass
 
 -- | The third axis of the per-emitter table, beside the type of the payload and
 -- the return type of the action: which kind of entity may attend the emitter.
@@ -1589,40 +1577,23 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection Inb
     \gentry ->
     case fty of
       TSinkPort ty action -> do
-        (targetKind, targetCls, rty) <- case tyDef of
-          (TGlobal kind clsId, _) -> (kind, clsId,) <$> getActionReturnType clsId action
+        (targetKind, targetCls) <- case tyDef of
+          (TGlobal kind clsId, _) -> return (kind, clsId)
           _ -> throwError $ annotateError Internal EExpectedClassType
         case gentry of
           LocatedElement  (GGlob ets@(TGlobal EmitterClass clsId)) _ -> do
             checkEmitterDataType pann clsId ty
-            checkEmitterActionReturnType pann clsId action rty
             checkEmitterTargetClass pann clsId targetKind targetCls
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets action)
           _ -> throwError $ annotateError pann $ ESinkPortConnectionInvalidGlobal sid
-      TInPort ty action  -> do
-        rty <- case tyDef of
-          (TGlobal _ clsId, _) -> getActionReturnType clsId action
-          _ -> throwError $ annotateError Internal EExpectedClassType
+      TInPort ty action  ->
         case gentry of
           LocatedElement (GGlob cts@(TMsgQueue ty' _)) _ -> do
             catchMismatch pann (EInboundPortConnectionMsgQueueTypeMismatch sid ty) (sameTyOrError pann ty ty')
-            unless (sameTy rty (TStatus TInt32)) (throwError $ annotateError pann (EInvalidMsgQueueActionReturnType action rty))
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildInPortConnAnn pann cts action)
           _ -> throwError $ annotateError pann $ EInboundPortConnectionInvalidObject sid
       ty -> throwError $ annotateError pann (EFieldNotSinkOrInboundPort fid ty)
   else throwError $ annotateError pann (EFieldValueAssignmentUnknownFields tyDef [pid])
-
-  where
-
-    getActionReturnType :: Identifier -> Identifier -> SemanticMonad (SAST.TerminaType SemanticAnn)
-    getActionReturnType clsId action = do
-      getGlobalTypeDef pann clsId >>=
-        \case
-          LocatedElement (Class _ _ members _ _) _ -> 
-            case findClassAction action members of
-              Just (_, rty, _) -> return (fromMaybe TUnit rty)
-              Nothing -> throwError $ annotateError Internal EExpectedClassType
-          _ -> throwError $ annotateError Internal EExpectedClassType
 
 typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection OutboundPortConnection pid sid pann) =
   if fid == pid

@@ -229,7 +229,7 @@ genInitEmitters progArchitecture = do
                                 ]
                             ]
                     Nothing -> throwError $ InternalError $ "Invalid connection for interrupt: " ++ show targetEntity
-        -- | Only a handler can attend system_except (SE-219)
+        -- | Only a handler can attend system_except (SE-214)
         genEmitterConnection (TPSystemExceptEmitter systemExcept _) = do
             emitterId <- genDefineEmitterIdLabel systemExcept
             (targetEntity, targetPort) <- case M.lookup systemExcept (emitterTargets progArchitecture) of

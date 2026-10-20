@@ -5,7 +5,7 @@ task class foo {
 
     out_prt : out u32;
 
-    action action1(&priv self, data : u32) -> Status<i32> {
+    action action1(&priv self, data : u32) {
 
         self->out_prt.send(data);
 

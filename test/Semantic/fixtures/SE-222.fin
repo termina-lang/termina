@@ -1,14 +1,21 @@
+struct Msg {
+    n : u32;
+};
+
 task class TaskClass0 {
 
-    in_port : in u32 triggers handle;
+    pending : access DequeAccess<Msg>;
 
-    action handle(&priv self, _msg : u32) -> Status<i32> {
-        let ret : Status<i32> = Success;
-        return ret;
+    snk0 : sink u32 triggers action0;
+
+    action action0(&priv self, input : u32) {
+
+
+        return;
+
     }
 
 };
 
-channel chan : MsgQueue<u32; 10>;
-
-task task0 : TaskClass0 = { in_port <- chan };
+resource pool0 : Pool<Msg; 4>;
+task task0 : TaskClass0 = { pending <-> pool0, snk0 <- irq_1 };

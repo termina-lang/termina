@@ -107,10 +107,9 @@ spec = do
                 "    timer_port : sink TimeVal triggers park;\n" ++
                 "    pool : access Allocator<Msg>;\n" ++
                 "    pending : access DequeAccess<Msg>;\n" ++
-                "    action park(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-                "        let ret : Status<i32> = Success;\n" ++
+                "    action park(&priv self, _t : TimeVal) {\n" ++
                 alloc "b" "self->pending.put(b);" ++
-                "        return ret;\n" ++
+                "        return;\n" ++
                 "    }\n" ++
                 "};\n" ++
                 "resource pool_res : Pool<Msg; 4>;\n" ++

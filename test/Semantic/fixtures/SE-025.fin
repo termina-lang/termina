@@ -12,11 +12,10 @@ task class TaskClass0 {
 
     }
 
-    action action0(&priv self, _data : u32) -> Result {
+    action action0(&priv self, _data : u32) {
 
-        var ret : Result = Result::Ok;
 
-        return ret;
+        return;
 
     }
 

@@ -8,11 +8,10 @@ resource class TMChannel provides TMChannelInterface {
     
     tm_sent_packets : u32;
     
-    action send_packet(&priv self, input : u32) -> Result {
+    action send_packet(&priv self, input : u32) {
 
-        var ret : Result = Result::Ok;
 
-        return ret;
+        return;
 
     }
     

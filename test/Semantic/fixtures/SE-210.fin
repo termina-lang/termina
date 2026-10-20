@@ -1,17 +1,5 @@
-interface IFoo {
-    procedure get(&mut self, r : &mut u32);
-};
-
-resource class FooRes provides IFoo {
-
-    value : u32;
-
-    procedure get(&mut self, r : &mut u32) {
-        *r = self->value;
-        return;
-    }
-
-};
-
-#[unprotected]
-resource foo : FooRes = { value = 0 };
+function test0() {
+    var foo : f32 = 0.0 : f32;
+    var b : bool = (0 % foo) == (0 % foo);
+    return;
+}

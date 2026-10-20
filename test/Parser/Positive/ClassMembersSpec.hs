@@ -38,10 +38,10 @@ spec = describe "Parser: class members" $ do
     , ("many params", "procedure p(&mut self, x : u32, y : u32);")
     ]
 
-  describe "actions (0 or 1 param, with and without return type)" $ table classActionParser "ClassAction"
-    [ ("no param",  "action a(&priv self) -> u32 { return 0 : u32; }")
-    , ("one param", "action a(&priv self, x : u32) -> u32 { return x; }")
-    , ("one param, no return", "action a(&priv self, x : Exception) { return; }")
+  describe "actions (0 or 1 param)" $ table classActionParser "ClassAction"
+    [ ("no param",  "action a(&priv self) { return; }")
+    , ("one param", "action a(&priv self, x : u32) { return; }")
+    , ("one param of an enum type", "action a(&priv self, x : Exception) { return; }")
     ]
 
   describe "viewers" $ table classViewerParser "ClassViewer"

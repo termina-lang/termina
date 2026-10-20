@@ -84,15 +84,14 @@ callsProcWithOption =
   "    timer : sink TimeVal triggers run;\n" ++
   "    src : access Interface0;\n" ++
   "    data_pool : access Allocator<u32>;\n" ++
-  "    action run(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-  "        var ret : Status<i32> = Success;\n" ++
+  "    action run(&priv self, _t : TimeVal) {\n" ++
   "        var opt : Option<box u32> = None;\n" ++
   "        self->src.proc0(&mut opt);\n" ++
   "        match opt {\n" ++
   "            case Some(obj) => { self->data_pool.free(obj); }\n" ++
   "            case None => { }\n" ++
   "        }\n" ++
-  "        return ret;\n" ++
+  "        return;\n" ++
   "    }\n" ++
   "};\n"
 

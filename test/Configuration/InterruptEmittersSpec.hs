@@ -46,10 +46,10 @@ interruptEmitters plt =
 
 spec :: Spec
 spec = describe "Platforms: interrupt emitters" $
-  mapM_ (\(name, plt) -> do
+  mapM_ (\(pltName, plt) -> do
     let irqs = interruptEmitters plt
         irqMap = getPlatformInterruptMap plt
-    it (name ++ " registers each interrupt under its own name") $
+    it (pltName ++ " registers each interrupt under its own name") $
       filter (uncurry (/=)) irqs `shouldBe` []
-    it (name ++ " has a vector for each interrupt") $
+    it (pltName ++ " has a vector for each interrupt") $
       filter ((`M.notMember` irqMap) . snd) irqs `shouldBe` []) platforms

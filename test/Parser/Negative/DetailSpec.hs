@@ -46,6 +46,10 @@ spec = describe "Parser stage: error detail" $ do
     moduleStageError "function f() -> { return; }" `shouldSatisfy` \case
       Just (AnnotatedError (EParseError _) _) -> True
       _ -> False
+  it "PE-001 rejects an action with a return type" $
+    moduleStageError "task class T { s : sink u32 triggers a; action a(&priv self, x : u32) -> u32 { return x; } };" `shouldSatisfy` \case
+      Just (AnnotatedError (EParseError _) _) -> True
+      _ -> False
   it "PE-004 carries the detected import cycle" $
     parserStageError [("pkg/a", modA), ("pkg/b", modB)] `shouldSatisfy` \case
       Just (AnnotatedError (EImportedFilesLoop deps) _) -> not (null deps)

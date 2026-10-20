@@ -27,7 +27,7 @@ Patch versions on either side are interchangeable.
   room on every path, also across calls to methods of the same class (DQE-001,
   DQE-002), that every deque is both filled and taken (DQE-003, DQE-004), and
   that a deque gets boxes from somewhere other than itself (AE-014).
-  A deque holds a type a box can hold (SE-227), takes no initial value (SE-230)
+  A deque holds a type a box can hold (SE-221), takes no initial value (SE-224)
   and a capacity of at least one (CFE-017). The architecture check follows a
   box through the deques it goes through, so a box allocated from one pool and
   freed to another after being parked is AE-003. The procedures of a deque are
@@ -36,6 +36,17 @@ Patch versions on either side are interchangeable.
 
 ### Changed
 
+- Actions return nothing. The parser no longer accepts a return type on an
+  action, the task loop calls the action without checking a status, and
+  `EActionFailure` and `ExceptSource` leave `Exception`. An action that used
+  to end in `Failure` rebooted the system through `system_except`; an error
+  the application cannot recover from goes to its FDIR task instead.
+  `Status<i32>` is no longer a type of the OSAL prelude and is generated like
+  any other status type where the application uses it. The return types that
+  each kind of action had to have (SE-193 to SE-197) and the check on the
+  type of a continued action (SE-226) are gone, and the semantic error codes
+  are renumbered without gaps: SE-198 to SE-225 become SE-193 to SE-220, and
+  SE-227 to SE-230 become SE-221 to SE-224.
 - A procedure parameter of type `&mut Option<box T>` is filled by the
   procedure, as the option of an `alloc` is. The caller hands it over empty
   and moves what it gets back (BE-009, BE-010), and the procedure fills it

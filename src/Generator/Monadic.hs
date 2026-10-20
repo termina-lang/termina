@@ -30,9 +30,6 @@ insertMonadicType (TOption ty) =
     st {
       optionTypes = S.insert ty (optionTypes st)
     } 
--- | We do not need to insert the TInt32 type in the status types because it is
--- already defined by the operating system abstraction layer.
-insertMonadicType (TStatus TInt32) = return ()
 insertMonadicType (TStatus ty) =
   ST.modify $ \st ->
     st {
@@ -131,16 +128,12 @@ mapClassMemberMonadic (ClassViewer _ params maybeRet blkRet _) =
   mapM_ mapParameterMonadic params >>
   -- | Get the monadic types types from the block return type
   mapM_ mapStatementMonadic (blockBody blkRet)
-mapClassMemberMonadic (ClassAction _ _ Nothing ret blkRet _) =
-  -- | Get the monadic types types from the return type
-  mapMaybeMonadic ret >>
+mapClassMemberMonadic (ClassAction _ _ Nothing blkRet _) =
   -- | Get the monadic types types from the block return type
   mapM_ mapStatementMonadic (blockBody blkRet)
-mapClassMemberMonadic (ClassAction _ _ (Just param) ret blkRet _) =
+mapClassMemberMonadic (ClassAction _ _ (Just param) blkRet _) =
   -- | Get the monadic types types from the parameter
   mapParameterMonadic param >>
-  -- | Get the monadic types types from the return type
-  mapMaybeMonadic ret >>
   -- | Get the monadic types types from the block return type
   mapM_ mapStatementMonadic (blockBody blkRet)
 

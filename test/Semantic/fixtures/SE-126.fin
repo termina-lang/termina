@@ -23,13 +23,12 @@ task class TaskClass0 {
 
     snk0 : sink TimeVal triggers action0;
 
-    action action0(&priv self, input : TimeVal) -> Status<i32> {
+    action action0(&priv self, input : TimeVal) {
 
-        var ret : Status<i32> = Success;
 
         self->field0.proc0(0);
 
-        return ret;
+        return;
 
     }
 

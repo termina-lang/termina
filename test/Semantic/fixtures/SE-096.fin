@@ -25,13 +25,12 @@ task class TaskClass0 {
 
     snk0 : sink [u32; 10] triggers action0;
 
-    action action0(&priv self, input : u32) -> Result {
+    action action0(&priv self, input : u32) {
 
-        var ret : Result = Result::Ok;
 
         self->ap0.proc0(input);
 
-        return ret;
+        return;
 
     }
 

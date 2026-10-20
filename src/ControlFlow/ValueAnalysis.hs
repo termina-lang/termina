@@ -1028,7 +1028,7 @@ checkClassMember className (ClassViewer member _ps _mTy body _ann) =
 -- | An action answers its task or handler and a procedure answers a port, so
 -- neither is called by a name this pass can resolve. Their bodies are walked
 -- for the conditions in them, and whatever summary they leave nobody reads.
-checkClassMember className (ClassAction _ak member _mp _tyret body _ann) =
+checkClassMember className (ClassAction _ak member _mp body _ann) =
   checkReturning (memberName className member) body
 checkClassMember className (ClassProcedure _ak member _ps body _ann) =
   checkReturning (memberName className member) body

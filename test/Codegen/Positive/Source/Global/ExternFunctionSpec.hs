@@ -21,7 +21,7 @@ test2 = "extern noreturn function jump_to_image(entry : usize);\n" ++
         "\n" ++
         "handler class Loader {\n" ++
         "    snk : sink usize triggers load;\n" ++
-        "    action load(&priv self, entry : usize) -> Status<i32> {\n" ++
+        "    action load(&priv self, entry : usize) {\n" ++
         "        jump_to_image(entry);\n" ++
         "    }\n" ++
         "};"
@@ -44,8 +44,8 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "Status__i32 Loader__load(const termina__event_t * const termina__ev,\n" ++
-              "                         void * const termina__this, const size_t entry) {\n" ++
+              "void Loader__load(const termina__event_t * const termina__ev,\n" ++
+              "                  void * const termina__this, const size_t entry) {\n" ++
               "    \n" ++
               "    (void)termina__ev;\n" ++
               "\n" ++

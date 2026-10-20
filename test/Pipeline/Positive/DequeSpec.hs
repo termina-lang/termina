@@ -19,8 +19,7 @@ dequeApp =
     "    offer_port : sink TimeVal triggers offer;\n" ++
     "    pool : access Allocator<Msg>;\n" ++
     "    pending : access DequeAccess<Msg>;\n" ++
-    "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-    "        let ret : Status<i32> = Success;\n" ++
+    "    action tick(&priv self, _t : TimeVal) {\n" ++
     "        var taken : Option<box Msg> = None;\n" ++
     "        self->pending.take(&mut taken);\n" ++
     "        match taken {\n" ++
@@ -44,10 +43,9 @@ dequeApp =
     "                }\n" ++
     "            }\n" ++
     "        }\n" ++
-    "        return ret;\n" ++
+    "        return;\n" ++
     "    }\n" ++
-    "    action offer(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-    "        let ret : Status<i32> = Success;\n" ++
+    "    action offer(&priv self, _t : TimeVal) {\n" ++
     "        var b : Option<box Msg> = None;\n" ++
     "        self->pool.alloc(&mut b);\n" ++
     "        match b {\n" ++
@@ -74,7 +72,7 @@ dequeApp =
     "            }\n" ++
     "            case None => { }\n" ++
     "        }\n" ++
-    "        return ret;\n" ++
+    "        return;\n" ++
     "    }\n" ++
     "};\n" ++
     "resource pool_res : Pool<Msg; 4>;\n" ++

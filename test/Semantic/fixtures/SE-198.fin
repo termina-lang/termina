@@ -1,0 +1,13 @@
+task class TaskClass0 {
+
+    snk0 : sink TimeVal triggers action0;
+
+    viewer peek(&self, b : box u32) -> u32 {
+        return 0 : u32;
+    }
+
+    action action0(&priv self, _input : TimeVal) {
+        return;
+    }
+
+};

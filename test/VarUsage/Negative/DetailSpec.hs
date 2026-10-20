@@ -336,11 +336,10 @@ callerWrap body =
   "    timer : sink TimeVal triggers run;\n" ++
   "    src : access Interface0;\n" ++
   "    data_pool : access Allocator<u32>;\n" ++
-  "    action run(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-  "        var ret : Status<i32> = Success;\n" ++
+  "    action run(&priv self, _t : TimeVal) {\n" ++
   veDeclOpt ++
   body ++
-  "        return ret;\n" ++
+  "        return;\n" ++
   "    }\n" ++
   "};\n"
 
@@ -422,10 +421,9 @@ testVUE004_1 = "task class TaskClass0 {\n" ++
        "        return value;\n" ++
        "    }\n" ++
        "\n" ++
-       "    action action0(&priv self, input : u32) -> Status<i32> {\n" ++
-       "        var ret : Status<i32> = Success;\n" ++
+       "    action action0(&priv self, input : u32) {\n" ++
        "        self->field0 = self->viewer0(input);\n" ++
-       "        return ret;\n" ++
+       "        return;\n" ++
        "    }\n" ++
        "\n" ++
        "};\n"
@@ -435,9 +433,8 @@ testVUE003 = "task class TaskClass0 {\n" ++
        "\n" ++
        "    snk0 : sink u32 triggers action0;\n" ++
        "\n" ++
-       "    action action0(&priv self, _input : u32) -> Status<i32> {\n" ++
-       "        var ret : Status<i32> = Success;\n" ++
-       "        return ret;\n" ++
+       "    action action0(&priv self, _input : u32) {\n" ++
+       "        return;\n" ++
        "    }\n" ++
        "\n" ++
        "};\n"
@@ -476,10 +473,9 @@ testVUE005_1 = "task class TaskClass0 {\n" ++
        "        return self->field0;\n" ++
        "    }\n" ++
        "\n" ++
-       "    action action0(&priv self, input : u32) -> Status<i32> {\n" ++
-       "        var ret : Status<i32> = Success;\n" ++
+       "    action action0(&priv self, input : u32) {\n" ++
        "        self->field0 = input;\n" ++
-       "        return ret;\n" ++
+       "        return;\n" ++
        "    }\n" ++
        "\n" ++
        "};\n"

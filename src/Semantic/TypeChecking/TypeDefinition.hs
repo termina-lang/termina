@@ -344,22 +344,20 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
                   return (ps_ty, typed_bret)
               let newVw = SAST.ClassViewer mIdent ps_ty mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
               return (newVw : prevMembers)
-            ClassAction ak mIdent param mts mbody mann -> do
-              mty <- mapM (typeTypeSpecifier mann typeGlobalObject >=>
-                  (\ty -> checkReturnType mann ty >> return ty)) mts
+            ClassAction ak mIdent param mbody mann -> do
               param_ty <- mapM (typeActionParameter mann) param
               typed_bret <- localScope $ do
                   insertLocalImmutObj mann "self" (TReference ak (TGlobal kind ident))
                   mapM_ (\p_ty -> insertLocalImmutObj (getLocation (paramAnnotation p_ty)) (paramIdentifier p_ty) (paramType p_ty)) param_ty
-                  typeBlock mty mbody
-              let newAct = SAST.ClassAction ak mIdent param_ty mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
+                  typeBlock Nothing mbody
+              let newAct = SAST.ClassAction ak mIdent param_ty typed_bret (buildExpAnn mann TUnit)
               return (newAct : prevMembers)
         ) [] topSortOrder
     -- Check that the sink and in ports are well defined, i.e., that the actions
     -- triggered by the ports are defined in the class.
     let ty_action_map = foldl (\accumulatedActions m ->
           case m of
-              ClassAction _ act mty _ _ actann  -> M.insert act (mty, getLocation actann) accumulatedActions
+              ClassAction _ act mparam _ actann  -> M.insert act (mparam, getLocation actann) accumulatedActions
               _ -> accumulatedActions) M.empty fnChecked
     mapM_ (checkTriggeredAction ty_action_map) ty_fls
       
@@ -450,7 +448,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts, _methods, viewers) prov
   -- A resource must not have any actions
   case acts of
     [] -> return ()
-    (ClassAction _ actionId _ _ _ ann):_  ->
+    (ClassAction _ actionId _ _ ann):_  ->
         throwError $ annotateError ann (EResourceClassAction (clsId, anns) actionId)
     _ -> throwError (annotateError Internal EMalformedClassTyping)
   case viewers of
@@ -574,7 +572,7 @@ checkClassKind anns clsId TaskClass (_fs, prcs, acts, methods, _viewers) provide
   -- A task must implement at least one action
   when (null acts) (throwError $ annotateError anns (ETaskClassNoActions clsId))
   mapM_ (\case {
-    ClassAction ak ident _ _ _ ann -> checkMemberFunctionAccessKind ann TaskClass ak ident;
+    ClassAction ak ident _ _ ann -> checkMemberFunctionAccessKind ann TaskClass ak ident;
     _ -> return ();
   }) acts
 checkClassKind anns clsId HandlerClass (fs, prcs, acts, methods, _viewers) provides = do
@@ -594,14 +592,14 @@ checkClassKind anns clsId HandlerClass (fs, prcs, acts, methods, _viewers) provi
   -- A handler must implement only one action
   case acts of
     [] -> throwError $ annotateError anns (EHandlerClassNoAction clsId)
-    [ClassAction _ _actionId _ _ _ _ann] -> return ()
-    ClassAction _ _ _ _ _ prevActAnn : ClassAction _ _ _ _ _ otherActAnn : _  ->
+    [ClassAction _ _actionId _ _ _ann] -> return ()
+    ClassAction _ _ _ _ prevActAnn : ClassAction _ _ _ _ otherActAnn : _  ->
         throwError $ annotateError otherActAnn (EHandlerClassMultipleActions clsId prevActAnn)
     _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- A handler must have one single sink port and cannot define any in ports
   checkHandlerPorts Nothing fs
   mapM_ (\case {
-    ClassAction ak ident _ _ _ ann -> checkMemberFunctionAccessKind ann HandlerClass ak ident;
+    ClassAction ak ident _ _ ann -> checkMemberFunctionAccessKind ann HandlerClass ak ident;
     _ -> return ();
   }) acts
 

@@ -321,7 +321,7 @@ checkExitPathClassMember (ClassProcedure _ak _name _args (Block body _) ann) =
     void $ setMustExit >> checkBlockPaths (getLocation ann) (reverse body)
 checkExitPathClassMember (ClassViewer _name _args _retType (Block body _) ann) =
     void $ setMustExit >> checkBlockPaths (getLocation ann) (reverse body)
-checkExitPathClassMember (ClassAction _ak _name _param _retType (Block body _) ann) = 
+checkExitPathClassMember (ClassAction _ak _name _param (Block body _) ann) =
     void $ setMustExit >> checkActionPaths (getLocation ann) (reverse body)
 
 checkExitPathTypeDef :: TypeDef SemanticAnn -> BBPathsCheck ()

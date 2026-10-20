@@ -16,14 +16,13 @@ task class TaskClass {
 
     port0 : in u32 triggers action0;
 
-    action action0(&priv self, input : u32) -> Status<i32> {
+    action action0(&priv self, input : u32) {
 
 
-        var ret : Status<i32> = Success;
 
         foo(&mut self->field0, input);
 
-        return ret;
+        return;
 
 
     }

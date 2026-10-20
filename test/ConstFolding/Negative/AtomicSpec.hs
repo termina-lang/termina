@@ -15,10 +15,9 @@ atomicProgram extraConsts portSize body =
     "task class T {\n" ++
     "    timer_port : sink TimeVal triggers tick;\n" ++
     "    arr_port : access AtomicArrayAccess<u32; " ++ portSize ++ ">;\n" ++
-    "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+    "    action tick(&priv self, _t : TimeVal) {\n" ++
     body ++
-    "        let ret : Status<i32> = Success;\n" ++
-    "        return ret;\n" ++
+    "        return;\n" ++
     "    }\n" ++
     "};\n" ++
     "emitter timer : PeriodicTimer = { period = {tv_sec = 1, tv_usec = 0} };\n" ++

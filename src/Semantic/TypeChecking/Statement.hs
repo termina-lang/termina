@@ -324,7 +324,7 @@ typeStatement rTy (ReturnStmt retExpression anns) =
       return $ SAST.ReturnStmt (Just typed_e) (buildExpAnn anns ts)
     (Just ty, Nothing) -> throwError $ annotateError anns $ EReturnValueExpected ty
     (Nothing, Just _) -> throwError $ annotateError anns EReturnValueNotUnit
-typeStatement retTy (ContinueStmt contE anns) =
+typeStatement _ (ContinueStmt contE anns) =
   case contE of
     MemberFunctionCall obj ident args ann -> do
       obj_typed <- typeRHSObject obj
@@ -343,16 +343,6 @@ typeStatement retTy (ContinueStmt contE anns) =
 
   where
 
-    -- | The continued action returns the result of the whole chain, so it
-    -- returns the same type as the action that continues to it.
-    sameReturnType :: ParserAnn -> Identifier -> Location -> Maybe (SAST.TerminaType SemanticAnn) -> SemanticMonad (SAST.TerminaType SemanticAnn)
-    sameReturnType ann ident loc rty = do
-      let expectedTy = fromMaybe TUnit retTy
-          actionTy = fromMaybe TUnit rty
-      unless (sameTy expectedTy actionTy) $
-        throwError $ annotateError ann (EContinueActionReturnTypeMismatch (ident, loc) expectedTy actionTy)
-      return actionTy
-
     typeActionCall ::
       ParserAnn
       -> SAST.TerminaType SemanticAnn -- ^ type of the object
@@ -369,18 +359,16 @@ typeStatement retTy (ContinueStmt contE anns) =
                 Just _ -> throwError $ annotateError ann (EContinueInvalidMethodOrViewerCall ident)
                 Nothing ->
                   case findClassAction ident cls of
-                    Just (Just param@(Parameter _ ty _), rty, SemanticAnn _ loc) -> do
-                        actionTy <- sameReturnType ann ident loc rty
+                    Just (Just param@(Parameter _ ty _), SemanticAnn _ loc) ->
                         case args of
                           [arg] -> do
                             typed_arg <- typeExpression (Just ty) typeRHSObject arg
-                            return (([param], [typed_arg]), actionTy)
+                            return (([param], [typed_arg]), TUnit)
                           [] -> throwError $ annotateError ann (EContinueActionMissingArgs (ident, loc))
                           _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [param], loc) (fromIntegral (length args)))
-                    Just (Nothing, rty, SemanticAnn _ loc) -> do
-                      actionTy <- sameReturnType ann ident loc rty
+                    Just (Nothing, SemanticAnn _ loc) ->
                       case args of
-                        [] -> return (([], []), actionTy)
+                        [] -> return (([], []), TUnit)
                         _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [], loc) (fromIntegral (length args)))
                     -- This should not happen, since the expression has been 
                     -- type-checked before and the method should have been found.

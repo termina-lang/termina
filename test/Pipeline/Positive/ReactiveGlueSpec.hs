@@ -32,11 +32,10 @@ reactiveApp =
     "task class UserTask {\n" ++
     "    timer_port : sink TimeVal triggers tick;\n" ++
     "    foo : access IFoo;\n" ++
-    "    action tick(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
-    "        var ret : Status<i32> = Success;\n" ++
+    "    action tick(&priv self, _t : TimeVal) {\n" ++
     "        var v : u32 = 0 : u32;\n" ++
     "        self->foo.get(&mut v);\n" ++
-    "        return ret;\n" ++
+    "        return;\n" ++
     "    }\n" ++
     "};\n" ++
     "emitter timer : PeriodicTimer = { period = {tv_sec = 1, tv_usec = 0} };\n" ++

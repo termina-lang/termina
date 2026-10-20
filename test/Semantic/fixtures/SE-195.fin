@@ -1,11 +1,12 @@
 task class TaskClass0 {
 
-    snk0 : sink TimeVal triggers action0;
+    snk0 : sink u32 triggers missing_action;
 
-    action action0(&priv self, _input : TimeVal) -> u32 {
-        return 0 : u32;
+    action action0(&priv self, _input : u32) {
+        return;
     }
 
 };
 
-task task0 : TaskClass0 = { snk0 <- system_init };
+emitter timer0 : PeriodicTimer = { period = { tv_sec = 10, tv_usec = 0 } };
+task task0 : TaskClass0 = { snk0 <- timer0 };

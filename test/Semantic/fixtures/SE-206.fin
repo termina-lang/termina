@@ -1,14 +1,12 @@
-interface IFoo {
-    procedure get(&mut self, r : &mut u32);
-};
+task class TaskClass0 {
 
-resource class FooRes provides IFoo {
+    snk0 : sink TimeVal triggers action0;
 
-    value : u32;
-
-    procedure get(&self, r : &mut u32) {
-        *r = self->value;
+    action action0(&mut self, _input : TimeVal) {
         return;
     }
 
 };
+
+emitter timer0 : PeriodicTimer = { period = { tv_sec = 10, tv_usec = 0 } };
+task task0 : TaskClass0 = { snk0 <- timer0 };

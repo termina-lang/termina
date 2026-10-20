@@ -242,7 +242,7 @@ genClassMemberWCEPs className (ClassProcedure _ak ident _params blk _) =
     zipWith (\pathName path -> 
         WCEPath className ident pathName path Generated) 
         ["path" ++ show idx | idx <- [(0 :: Integer) ..]] (reverse <$> wcePaths)
-genClassMemberWCEPs className (ClassAction _ak ident _param _mrty blk _) =
+genClassMemberWCEPs className (ClassAction _ak ident _param blk _) =
     let wcePaths = genWCEPaths [] (blockBody blk) in
     zipWith (\pathName path -> 
         WCEPath className ident pathName path Generated) 

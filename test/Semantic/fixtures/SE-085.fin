@@ -25,17 +25,16 @@ task class TaskClass0 {
 
     snk0 : sink u32 triggers action0;
 
-    action action1(&priv self, input : u32) -> Status<i32> {
+    action action1(&priv self, input : u32) {
 
-        var ret : Status<i32> = Success;
 
         self->ap0.proc0(input);
 
-        return ret;
+        return;
 
     }
 
-    action action0(&priv self, input : u32) -> Status<i32> {
+    action action0(&priv self, input : u32) {
 
         continue self->action1(input, 10);
 

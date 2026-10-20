@@ -83,17 +83,8 @@ stdlibGlobalEnv outBufSize inBufSize =
     ("Interrupt", LocatedElement (GType (Class EmitterClass "Interrupt" [] [] [])) Internal),
     ("PeriodicTimer", LocatedElement (GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (TStruct "TimeVal") (buildExpAnn Internal (TStruct "TimeVal")))] [] [])) Internal),
     ("SysPrintBase", LocatedElement (GType (Enum "SysPrintBase" [EnumVariant "Decimal" [], EnumVariant "Hexadecimal" []] [])) Internal),
-    ("ExceptSource", LocatedElement (GType (Enum "ExceptSource" [EnumVariant "Task" [TUSize], EnumVariant "Handler" [TUSize]] [])) Internal),
     ("MutexProtocol", LocatedElement (GType (Enum "MutexProtocol" [EnumVariant "Ceiling" [TUInt32]] [])) Internal),
     ("Exception", LocatedElement (GType (Enum "Exception" [
-      -- | Action failure
-      EnumVariant "EActionFailure" [
-        -- | Source of the exception
-        TEnum "ExceptSource", 
-        -- | ID of the source port
-        TUSize, 
-        -- | Error code returned by the action
-        TInt32],
       -- | Error sending a message to a message queue
       EnumVariant "EMsgQueueSendError" [
         -- | ID of the message queue

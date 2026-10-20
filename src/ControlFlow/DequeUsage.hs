@@ -231,7 +231,7 @@ dequeOperations members = foldr addBlock (S.empty, S.empty) (concatMap memberBlo
     memberBlocks = \case
       ClassMethod _ _ _ _ body _ -> allBlocks body
       ClassProcedure _ _ _ body _ -> allBlocks body
-      ClassAction _ _ _ _ body _ -> allBlocks body
+      ClassAction _ _ _ body _ -> allBlocks body
       _ -> []
 
     allBlocks (Block bbs _) = concatMap nested bbs
@@ -274,7 +274,7 @@ checkClass members
         map snd found ++ go (M.insert m summary summaries) rest
       ClassProcedure _ p _ body _ ->
         map snd (findings (walkBody summaries (unknownEntry p deques) body)) ++ go summaries rest
-      ClassAction _ a _ _ body _ ->
+      ClassAction _ a _ body _ ->
         map snd (findings (walkBody summaries (unknownEntry a deques) body)) ++ go summaries rest
       _ -> go summaries rest
 

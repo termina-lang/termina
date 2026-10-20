@@ -1,9 +1,15 @@
-// malloc names a function of the standard library of C, so the generated code
-// would declare an object over a name that belongs to the implementation.
-function allocate_one() -> u32 {
+task class TaskClass0 {
 
-    var malloc : u32 = 0;
+    in_port : in u32 triggers handle;
 
-    return malloc;
+    action handle(&priv self, _msg : u32) {
+        return;
+    }
 
-}
+};
+
+channel chan : MsgQueue<u32; 10>;
+
+#[priority(10)]
+#[priority(11)]
+task task0 : TaskClass0 = { in_port <- chan };

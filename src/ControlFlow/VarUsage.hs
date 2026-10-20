@@ -391,7 +391,7 @@ checkClassMember (ClassMethod _ak ident ps _tyret body ann) =
   checkSelfBody (ESelfNotUsed ident) (getLocation ann) (checkBody ps (getLocation ann) body)
 checkClassMember (ClassViewer ident ps _tyret body ann) =
   checkSelfBody (ESelfNotUsed ident) (getLocation ann) (checkBody ps (getLocation ann) body)
-checkClassMember (ClassAction _ak ident mp _tyret body ann) =
+checkClassMember (ClassAction _ak ident mp body ann) =
   checkSelfBody (EActionSelfNotUsed ident) (getLocation ann)
     (checkBody (maybe [] (: []) mp) (getLocation ann) body)
 checkClassMember (ClassProcedure _ak ident ps body ann) =

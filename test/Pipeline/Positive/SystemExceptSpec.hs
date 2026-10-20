@@ -7,7 +7,7 @@
 -- handler.
 --
 -- The second case is the other half of the contract: only a handler may attend
--- this emitter, which the type checker rejects with SE-219.
+-- this emitter, which the type checker rejects with SE-214.
 module Pipeline.Positive.SystemExceptSpec (spec) where
 
 import Pipeline.Common
@@ -58,6 +58,6 @@ spec = describe "Full pipeline: the system exception" $ do
         either (expectationFailure . unpack) (goldenC "system_except_handler")
           (renderMainFileWith systemExceptConfig progArch)
 
-  it "SE-219: rejects a system exception attended by a task" $
+  it "SE-214: rejects a system exception attended by a task" $
     compileProjectErrorCodeWith systemExceptConfig [("test", taskApp)]
-      `shouldBe` Just (pack "SE-219")
+      `shouldBe` Just (pack "SE-214")
