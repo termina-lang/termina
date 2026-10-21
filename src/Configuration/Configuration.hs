@@ -91,14 +91,10 @@ data TerminaConfig =
     outputFolder :: !FilePath,
     efpFolder :: !FilePath,
     profile :: !ProjectProfile,
-    enableSystemInit :: !Bool,
-    enableSystemPort :: !Bool,
     sysPrintOutputBufferSize :: !Integer,
     sysReadInputBufferSize :: !Integer,
     microsecondsPerTick :: !Integer,
-    enableSystemExcept :: !Bool,
     builder :: !ProjectBuilder,
-    platformFlags :: !PlatformFlags,
     externConfig :: !ExternConfig
   } deriving (Eq, Show)
 
@@ -111,15 +107,11 @@ instance FromJSON TerminaConfig where
     o .:   "source-modules" <*>
     o .:   "output-folder"  <*>
     o .:?  "efp-folder" .!= "efp" <*>
-    o .:?  "profile" .!= Release <*>         
-    o .:?  "enable-system-init" .!= False <*>
-    o .:?  "enable-system-port" .!= False <*>
+    o .:?  "profile" .!= Release <*>
     o .:?  "sys-print-output-buffer-size" .!= defaultSysPrintOutputBufferSize <*>
     o .:?  "sys-read-input-buffer-size"  .!= defaultSysReadInputBufferSize <*>
     (o .:?  "microseconds-per-tick" .!= defaultMicrosecondsPerTick >>= tickLength) <*>
-    o .:?  "enable-system-except" .!= False <*>
     o .:   "builder" <*>
-    o .:?  "platform-flags" .!= defaultPlatformFlags <*>
     o .:?  "extern" .!= emptyExternConfig
 
     where
@@ -140,14 +132,10 @@ instance ToJSON TerminaConfig where
             prjOutputFolder
             prjEFPFolder
             prjProfile
-            prjEnableSystemInit
-            prjEnableSystemPort
             prjSysPrintOutputBufferSize
             prjSysReadInputBufferSize
             prjMicrosecondsPerTick
-            prjEnableSystemExcept
             prjBuilder
-            prjPlatformFlags
             prjExternConfig
         ) = object $ [
             "name" .= prjName,
@@ -159,20 +147,10 @@ instance ToJSON TerminaConfig where
             <> case prjProfile of
                 Debug -> ["profile" .= prjProfile]
                 _ -> []
-            -- We only serialize the enable-system-init flag if it is different from the default value
-            <> if prjEnableSystemInit then ["enable-system-init" .= prjEnableSystemInit] else []
-            <> if prjEnableSystemPort then ["enable-system-port" .= prjEnableSystemPort] else []
             <> if prjSysPrintOutputBufferSize /= defaultSysPrintOutputBufferSize then ["sys-print-output-buffer-size" .= prjSysPrintOutputBufferSize] else []
             <> if prjSysReadInputBufferSize  /= defaultSysReadInputBufferSize then ["sys-read-input-buffer-size"  .= prjSysReadInputBufferSize]  else []
             <> if prjMicrosecondsPerTick /= defaultMicrosecondsPerTick then ["microseconds-per-tick" .= prjMicrosecondsPerTick] else []
-            <> if prjEnableSystemExcept then ["enable-system-except" .= prjEnableSystemExcept] else []
             <> if prjBuilder /= None then ["builder" .= prjBuilder] else []
-            -- We only serialize the platform flags corresponding to the selected platform
-            <> case prjPlatform of
-                "rtems5-leon3sf-nexysa7"    -> ["platform-flags" .= object ["rtems5-leon3sf-nexysa7"    .= rtems5_leon3sf_nexysa7    prjPlatformFlags]]
-                "freertos10-stm32l432-nucleol432kc" -> ["platform-flags" .= object ["freertos10-stm32l432-nucleol432kc" .= freertos10_stm32l432_nucleol432kc prjPlatformFlags]]
-                "rtems6-zynq7000-pynqz2" -> ["platform-flags" .= object ["rtems6-zynq7000-pynqz2" .= rtems6_zynq7000_pynqz2 prjPlatformFlags]]
-                _ -> []
             <> ["extern" .= prjExternConfig | prjExternConfig /= emptyExternConfig]
 
 defaultConfig :: String -> Platform -> TerminaConfig
@@ -183,13 +161,9 @@ defaultConfig projectName plt = TerminaConfig {
     outputFolder = "output",
     efpFolder = "efp",
     profile = Release,
-    enableSystemInit = False,
-    enableSystemPort = False,
     sysPrintOutputBufferSize = defaultSysPrintOutputBufferSize,
     sysReadInputBufferSize = defaultSysReadInputBufferSize,
     microsecondsPerTick = defaultMicrosecondsPerTick,
-    enableSystemExcept = False,
     builder = Make,
-    platformFlags = defaultPlatformFlags,
     externConfig = emptyExternConfig
 }

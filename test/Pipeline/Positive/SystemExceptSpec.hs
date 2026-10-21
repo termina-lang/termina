@@ -49,15 +49,15 @@ taskApp =
 spec :: Spec
 spec = describe "Full pipeline: the system exception" $ do
 
-  case runFullProjectAppWith systemExceptConfig [("test", handlerApp)] of
+  case runFullProjectApp [("test", handlerApp)] of
     Left err ->
       it "builds an application whose system_except reaches a handler" $
         expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
     Right (progArch, _) ->
       it "registers the handler as a connection handed to the runtime" $
         either (expectationFailure . unpack) (goldenC "system_except_handler")
-          (renderMainFileWith systemExceptConfig progArch)
+          (renderMainFile progArch)
 
   it "SE-214: rejects a system exception attended by a task" $
-    compileProjectErrorCodeWith systemExceptConfig [("test", taskApp)]
+    compileProjectErrorCode [("test", taskApp)]
       `shouldBe` Just (pack "SE-214")

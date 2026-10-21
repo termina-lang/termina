@@ -137,7 +137,7 @@ genArchitecture loweredProject initialTerminaProgram orderedDependencies = do
   where
 
     genArchitecture' :: TerminaProgArch SemanticAnn -> [QualifiedName] -> IO (TerminaProgArch SemanticAnn)
-    genArchitecture' tp [] = pure tp
+    genArchitecture' tp [] = pure (pruneUnconnectedSystemElements tp)
     genArchitecture' tp (m:ms) = do
       let typedModule = loweredAST . metadata $ loweredProject M.! m
       let result = runGenArchitecture tp m typedModule

@@ -12,7 +12,7 @@ import Configuration.Platform (Platform(TestPlatform))
 import Configuration.Configuration (defaultConfig)
 import Generator.Environment (getPlatformInitialGlobalEnv, getPlatformInitialProgram)
 import Lowering (runLowerModule)
-import ControlFlow.Architecture (runGenArchitecture)
+import ControlFlow.Architecture (runGenArchitecture, pruneUnconnectedSystemElements)
 import ControlFlow.Architecture.Checks
   ( runCheckEmitterConnections, runCheckChannelConnections
   , runCheckResourceUsage, runCheckPoolUsage, runCheckDequeConnections, runCheckBoxSources )
@@ -32,7 +32,7 @@ architectureError input = case runP (contents topLevel) "test" "" input of
         Left err -> error $ "Basic Blocks error: " ++ show err
         Right bb -> case runGenArchitecture initialProg "test" bb of
           Left err -> Just err
-          Right progArch -> either Just (const Nothing) $ sequence_
+          Right rawProgArch -> let progArch = pruneUnconnectedSystemElements rawProgArch in either Just (const Nothing) $ sequence_
             [ runCheckEmitterConnections progArch
             , runCheckChannelConnections progArch
             , runCheckResourceUsage progArch

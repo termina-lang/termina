@@ -2,15 +2,8 @@
 
 module Configuration.Platform where
 
-import Data.Yaml
-import qualified Data.Aeson.Key as K
-import qualified Data.Aeson.KeyMap as KM
 import qualified Data.Map.Strict as M
 import Core.AST (Identifier)
-import Configuration.Platform.RTEMS5LEON3SFNEXYSA7
-import Configuration.Platform.POSIXGCC
-import Configuration.Platform.FreeRTOS10STM32L432NUCLEOL432KC
-import Configuration.Platform.RTEMS6ZYNQ7000PYNQZ2
 
 data Platform =
     POSIXGCC
@@ -87,16 +80,10 @@ maxTimerPeriodTicks FreeRTOS10STM32L432NUCLEOL432KC = Just 0xFFFFFFFF
 maxTimerPeriodTicks RTEMS6ZYNQ7000PYNQZ2            = Just 0xFFFFFFFF
 maxTimerPeriodTicks TestPlatform                    = Just 0xFFFFFFFF
 
-data PlatformFlags = PlatformFlags {
-    rtems5_leon3sf_nexysa7        :: RTEMS5LEON3SFNEXYSA7Flags,
-    posix_gcc                :: POSIXGCCFlags,
-    freertos10_stm32l432_nucleol432kc   :: FreeRTOS10STM32L432NUCLEOL432KCFlags,
-    rtems6_zynq7000_pynqz2   :: RTEMS6ZYNQ7000PYNQZ2Flags
-} deriving (Eq, Show)
-
 -- | The interrupts the platform exposes, each one with the vector it is wired
 -- to. It lives here, beside the rest of what the transpiler knows about a
--- target, so that a single file answers what a platform is.
+-- target, so that a single file answers what a platform is. Every one of them
+-- is declared in the program, and the application connects the ones it uses.
 getPlatformInterruptMap :: Platform -> M.Map Identifier Integer
 getPlatformInterruptMap POSIXGCC =
     M.fromList [("kbd_irq", 0)]
@@ -244,48 +231,12 @@ interruptTableSize plt =
         [] -> 0
         vectors -> maximum vectors + 1
 
-defaultPlatformFlags :: PlatformFlags
-defaultPlatformFlags = PlatformFlags {
-    rtems5_leon3sf_nexysa7      = defaultRTEMS5LEON3SFNEXYSA7Flags,
-    posix_gcc              = defaultPOSIXGCCFlags,
-    freertos10_stm32l432_nucleol432kc = defaultFreeRTOS10STM32L432NUCLEOL432KCFlags,
-    rtems6_zynq7000_pynqz2 = defaultRTEMS6ZYNQ7000PYNQZ2Flags
-}
-
-instance FromJSON PlatformFlags where
-  parseJSON (Object o) = do
-    -- | A key that names no platform would be ignored, and the flags under it
-    -- would be lost without a word
-    mapM_ (\key -> case checkPlatform (K.toString key) of
-        Nothing -> fail $ "Unknown platform \"" ++ K.toString key ++ "\" in the platform flags"
-        Just _ -> return ()) (KM.keys o)
-    PlatformFlags <$>
-      o .:? "rtems5-leon3sf-nexysa7"      .!= defaultRTEMS5LEON3SFNEXYSA7Flags <*>
-      o .:? "posix-gcc"              .!= defaultPOSIXGCCFlags <*>
-      o .:? "freertos10-stm32l432-nucleol432kc" .!= defaultFreeRTOS10STM32L432NUCLEOL432KCFlags <*>
-      o .:? "rtems6-zynq7000-pynqz2" .!= defaultRTEMS6ZYNQ7000PYNQZ2Flags
-  parseJSON _ = fail "Expected configuration object"
-
 instance Show Platform where
     show POSIXGCC = "posix-gcc"
     show RTEMS5LEON3SFNEXYSA7 = "rtems5-leon3sf-nexysa7"
     show FreeRTOS10STM32L432NUCLEOL432KC = "freertos10-stm32l432-nucleol432kc"
     show RTEMS6ZYNQ7000PYNQZ2 = "rtems6-zynq7000-pynqz2"
     show TestPlatform = "test-platform"
-
-instance ToJSON PlatformFlags where
-    toJSON (
-        PlatformFlags
-            flagsRTEMS5LEON3SFNEXYSA7
-            flagsPOSIXGCC
-            flagsFreeRTOS10STM32L432NUCLEOL432KC
-            flagsRTEMS6ZYNQ7000PYNQZ2
-        ) = object [
-            "rtems5-leon3sf-nexysa7"      .= flagsRTEMS5LEON3SFNEXYSA7,
-            "posix-gcc"              .= flagsPOSIXGCC,
-            "freertos10-stm32l432-nucleol432kc" .= flagsFreeRTOS10STM32L432NUCLEOL432KC,
-            "rtems6-zynq7000-pynqz2" .= flagsRTEMS6ZYNQ7000PYNQZ2
-        ]
 
 checkPlatform :: String -> Maybe Platform
 checkPlatform "posix-gcc" = Just POSIXGCC

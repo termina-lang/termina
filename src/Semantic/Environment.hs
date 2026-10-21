@@ -228,6 +228,12 @@ systemEntryGlobalEnv =
     ("system_entry", LocatedElement (GGlob (TGlobal ResourceClass "SystemEntry")) Internal)
   ]
 
+-- | The system emitters and the system resource are declared in every
+-- program; the ones the application does not connect are dropped from the
+-- architecture.
+systemGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
+systemGlobalEnv = sysInitGlobalEnv ++ systemEntryGlobalEnv ++ sysExceptGlobalEnv
+
 makeInitialGlobalEnv :: Maybe TerminaConfig -> Platform -> [(Identifier, LocatedElement (GEntry SemanticAnn))] -> Environment
 makeInitialGlobalEnv (Just config) plt pltEnvironment =
   let 
@@ -235,19 +241,11 @@ makeInitialGlobalEnv (Just config) plt pltEnvironment =
       stdlibGlobalEnv (sysPrintOutputBufferSize config) (sysReadInputBufferSize config),
       -- | The platform specific environment. It should declare its own SystemAPI interface.
       pltEnvironment,
-      [
-        env | enableSystemInit config, env <- sysInitGlobalEnv
-      ],
-      [
-        env | enableSystemPort config, env <- systemEntryGlobalEnv
-      ],
-      [
-        env | enableSystemExcept config, env <- sysExceptGlobalEnv
-      ]]
+      systemGlobalEnv]
   in
   makeEnvironment (M.fromList globalEnv) plt
 makeInitialGlobalEnv Nothing plt pltEnvironment =
-  let globalEnv = mconcat [stdlibGlobalEnv defaultSysPrintOutputBufferSize defaultSysReadInputBufferSize, pltEnvironment]
+  let globalEnv = mconcat [stdlibGlobalEnv defaultSysPrintOutputBufferSize defaultSysReadInputBufferSize, pltEnvironment, systemGlobalEnv]
   in
   makeEnvironment (M.fromList globalEnv) plt
 

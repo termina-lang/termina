@@ -71,7 +71,7 @@ loadSingleModule filePath = do
 
 typeSingleModule :: ParsedModule -> IO TypedModule
 typeSingleModule parsedModule = do
-    let config = (\c -> c{ enableSystemInit = True, enableSystemPort = True }) $ defaultConfig "test" TestPlatform
+    let config = defaultConfig "test" TestPlatform
         result = runTypeChecking (makeInitialGlobalEnv (Just config) TestPlatform []) (typeTerminaModule (S.singleton (qualifiedName parsedModule)) . parsedAST . metadata $ parsedModule)
     case result of
         (Left err) ->

@@ -3,17 +3,12 @@ module Pipeline.Common
   , runFullProjectBuild
   , runChecksReport
   , runFullProjectApp
-  , runFullProjectAppWith
   , runTypedModule
-  , systemInitConfig
-  , systemExceptConfig
   , renderMainFile
-  , renderMainFileWith
   , renderInitFile
   , buildAndRenderModule
   , compileErrorCode
   , compileProjectErrorCode
-  , compileProjectErrorCodeWith
   , compileErrorMessage
   , compileProjectErrorMessage
   , Failure(..)
@@ -58,7 +53,7 @@ import Modules.Utils (buildModuleName)
 import Parser.Errors (Error(..), ParsingErrors)
 import Utils.Annotations (QualifiedName, annotateError, Location(Internal))
 
-import ControlFlow.Architecture (runGenArchitecture)
+import ControlFlow.Architecture (runGenArchitecture, pruneUnconnectedSystemElements)
 import ControlFlow.Architecture.Types (TerminaProgArch)
 import ControlFlow.Architecture.Checks
 import ControlFlow.ConstFolding (runConstFolding, constFoldModule)
@@ -114,9 +109,7 @@ runFullProjectApp ::
   -> Either Failure (TerminaProgArch SemanticAnn, [(QualifiedName, AnnotatedProgram SemanticAnn)])
 runFullProjectApp = runFullProjectAppWith configParams
 
--- | 'runFullProjectApp' under a given configuration, for the glue that only
--- exists when a feature is switched on. The system-init emitter is one:
--- 'systemInitConfig' turns it on so an application can connect @system_init@.
+-- | 'runFullProjectApp' under a given configuration.
 runFullProjectAppWith ::
   TerminaConfig
   -> [(QualifiedName, String)]
@@ -333,7 +326,7 @@ genProjectArchitecture cfg files loweredProject = go (initialProg cfg)
 
   where
 
-    go tp [] = Right tp
+    go tp [] = Right (pruneUnconnectedSystemElements tp)
     go tp (m:ms) =
       case runGenArchitecture tp m (loweredAST . metadata $ loweredProject M.! m) of
         Left err -> Left (failure files err)
@@ -362,16 +355,6 @@ renderModule cfg eModule =
 
 configParams :: TerminaConfig
 configParams = defaultConfig "test" TestPlatform
-
--- | The configuration a project needs to connect @system_init@, which the
--- default leaves switched off.
-systemInitConfig :: TerminaConfig
-systemInitConfig = configParams { enableSystemInit = True }
-
--- | The configuration a project needs to connect @system_except@, which the
--- default leaves switched off.
-systemExceptConfig :: TerminaConfig
-systemExceptConfig = configParams { enableSystemExcept = True }
 
 initialEnv :: TerminaConfig -> Environment
 initialEnv cfg = makeInitialGlobalEnv (Just cfg) TestPlatform

@@ -1,5 +1,6 @@
 module ControlFlow.Architecture (
-    runGenArchitecture, emptyTerminaProgArch, getGlobDeclModules
+    runGenArchitecture, emptyTerminaProgArch, getGlobDeclModules,
+    pruneUnconnectedSystemElements
 ) where
 
 import ControlFlow.Architecture.Types
@@ -14,7 +15,6 @@ import Semantic.Types
 import Utils.Annotations
 import qualified Data.Map.Strict as M
 import ControlFlow.Architecture.BoxInOut
-import Configuration.Configuration
 
 type ArchitectureMonad = ExceptT ArchitectureError (ST.State (TerminaProgArch SemanticAnn))
 
@@ -327,11 +327,12 @@ genArchElement _ (ExternFunction {}) = return ()
 genArchElement modName (GlobalDeclaration glb) = genArchGlobal modName glb
 genArchElement _ (TypeDefinition typeDef ann) = genArchTypeDef ann typeDef
 
-emptyTerminaProgArch :: TerminaConfig -> TerminaProgArch SemanticAnn
-emptyTerminaProgArch config = TerminaProgArch {
-  emitters = M.fromList $
-    [("system_init", TPSystemInitEmitter "system_init" (SemanticAnn (GTy (TGlobal EmitterClass "SystemInit")) Internal)) | enableSystemInit config] ++
-    [("system_except", TPSystemExceptEmitter "system_except" (SemanticAnn (GTy (TGlobal EmitterClass "SystemExcept")) Internal)) | enableSystemExcept config],
+emptyTerminaProgArch :: TerminaProgArch SemanticAnn
+emptyTerminaProgArch = TerminaProgArch {
+  emitters = M.fromList [
+    ("system_init", TPSystemInitEmitter "system_init" (SemanticAnn (GTy (TGlobal EmitterClass "SystemInit")) Internal)),
+    ("system_except", TPSystemExceptEmitter "system_except" (SemanticAnn (GTy (TGlobal EmitterClass "SystemExcept")) Internal))
+  ],
   functions = M.empty,
   globalConstants = M.empty,
   emitterTargets = M.empty,
@@ -340,9 +341,9 @@ emptyTerminaProgArch config = TerminaProgArch {
   handlerClasses = M.empty,
   handlers = M.empty,
   resourceClasses = M.empty,
-  resources = if enableSystemPort config then M.fromList [
+  resources = M.fromList [
     ("system_entry", TPResource "system_entry" "SystemEntry" M.empty [] Nothing (SemanticAnn (GTy (TGlobal ResourceClass "SystemEntry")) Internal))
-  ] else M.empty,
+  ],
   pools = M.empty,
   atomics = M.empty,
   atomicArrays = M.empty,
@@ -352,6 +353,27 @@ emptyTerminaProgArch config = TerminaProgArch {
   channelTargets = M.empty,
   resourceSources = M.empty
 }
+
+-- | Every program starts with the emitters of the platform and of the system
+-- and with the system resource. The ones the application does not connect are
+-- dropped once all its modules have been read, so they are neither checked nor
+-- generated.
+pruneUnconnectedSystemElements :: TerminaProgArch a -> TerminaProgArch a
+pruneUnconnectedSystemElements tp = tp {
+    emitters = M.filterWithKey keepEmitter (emitters tp),
+    resources = M.filterWithKey keepResource (resources tp)
+  }
+
+  where
+
+    keepEmitter ident emitter = not (isSystemEmitter emitter) || ident `M.member` emitterTargets tp
+
+    isSystemEmitter (TPInterruptEmitter {}) = True
+    isSystemEmitter (TPSystemInitEmitter {}) = True
+    isSystemEmitter (TPSystemExceptEmitter {}) = True
+    isSystemEmitter (TPPeriodicTimerEmitter {}) = False
+
+    keepResource ident _ = ident /= "system_entry" || ident `M.member` resourceSources tp
 
 runGenArchitecture ::
   TerminaProgArch SemanticAnn

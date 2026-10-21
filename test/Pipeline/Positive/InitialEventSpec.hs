@@ -49,15 +49,15 @@ taskApp =
 spec :: Spec
 spec = describe "Full pipeline: the initial event" $ do
 
-  case runFullProjectAppWith systemInitConfig [("test", handlerApp)] of
+  case runFullProjectApp [("test", handlerApp)] of
     Left err ->
       it "builds an application whose system_init reaches a handler" $
         expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
     Right (progArch, _) ->
       it "emits the initial event as a connection handed to the runtime" $
         either (expectationFailure . unpack) (goldenC "initial_event_handler")
-          (renderMainFileWith systemInitConfig progArch)
+          (renderMainFile progArch)
 
   it "SE-214: rejects an initial event attended by a task" $
-    compileProjectErrorCodeWith systemInitConfig [("test", taskApp)]
+    compileProjectErrorCode [("test", taskApp)]
       `shouldBe` Just (pack "SE-214")
