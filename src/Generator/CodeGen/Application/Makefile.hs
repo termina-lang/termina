@@ -85,7 +85,7 @@ genMakefile params loweredProject mExtern =
             MRule "clean" [] [
                 MakeCommand False [MFragment "@echo Cleaning up"],
                 MakeCommand False [MFragment
-                    (if hasExtern then "@$(RM) $(OBJS) $(EXTERN_OBJS) $(DEPS) $(TARGET)" else "@$(RM) $(OBJS) $(DEPS) $(TARGET)")]
+                    (if hasExtern then "@$(RM) $(OBJS) $(EXTERN_OBJS) $(DEPS) $(TARGET) $(TARGET).map" else "@$(RM) $(OBJS) $(DEPS) $(TARGET) $(TARGET).map")]
             ],
             MRule "dist-clean" ["clean"] [
                 MakeCommand False [MFragment "@echo Mr. Proper is cleaning up"],
