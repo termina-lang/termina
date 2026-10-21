@@ -580,7 +580,10 @@ genMainFile mName progArchitecture = do
 
     return $ CSourceFile mName $ [
             -- #include <termina.h>
-            includeTermina
+            includeTermina,
+            -- | The identifiers of the deployment. The OSAL API does not
+            -- include config.h, so that the modules do not depend on it.
+            CPPDirective (CPPInclude False "config.h") (internalAnn (CPPDirectiveAnn False))
         ] ++ includes
         ++ cPoolMemoryAreas
         ++ initTasks ++ initHandlers ++ initEmitters ++ initMutexes ++ initPools ++ initMessageQueues

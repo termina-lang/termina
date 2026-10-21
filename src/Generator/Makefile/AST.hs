@@ -10,6 +10,7 @@ data MVariableType =
     MSimple
     | MRecursive
     | MAppend
+    | MConditional -- ^ Assigned only when not set before, e.g., by the environment
   deriving (Show)
 
 data MakeStatement = 

@@ -100,27 +100,6 @@ genVariantForPort ::
     -> Identifier -> CGenerator Identifier
 genVariantForPort taskCls port = return $ taskCls <::> port
 
-genVariantsForTaskPorts :: TPClass SemanticAnn -> CGenerator [CFileItem]
-genVariantsForTaskPorts tpClass@(TPClass classId _ _ _ _ _ _ _ _ _ _ _ _) =
-    genDefineVariantsForPorts ports
-    where
-
-        ports = M.keys (sinkPorts tpClass) ++ M.keys (inputPorts tpClass)
-
-        genDefineVariantsForPorts :: [Identifier] -> CGenerator [CFileItem]
-        genDefineVariantsForPorts [] = return []
-        genDefineVariantsForPorts (port : xs) = do
-            this_variant <- genVariantForPort classId port
-            rest <- genDefineVariantsForPorts' xs 1
-            return $ pre_cr (_define this_variant (Just [show (0 :: Integer)])) : rest
-
-        genDefineVariantsForPorts' :: [Identifier] -> Integer -> CGenerator [CFileItem]
-        genDefineVariantsForPorts' [] _ = return []
-        genDefineVariantsForPorts' (port : xs) value = do
-            rest <- genDefineVariantsForPorts' xs (value + 1)
-            this_variant <- genVariantForPort classId port
-            return $ _define this_variant (Just [show value]) : rest
-
 genPoolMemoryArea :: Bool -> TPPool SemanticAnn -> CGenerator CFileItem
 genPoolMemoryArea before (TPPool identifier ts size _ _) = do
     cSize <- genConstExpression size

@@ -71,7 +71,7 @@ genInitFile mName prjprogs = do
                     trail_cr . block $
                         items ++ [pre_cr (_return Nothing)]
             ]
-    return $ CSourceFile mName (includeTermina : includes ++ initFunction)
+    return $ CSourceFile mName (includeTermina : includeConfig : includes ++ initFunction)
 
     where
         globals = map (\(mn, elems) -> (mn, [g | (GlobalDeclaration g) <- elems])) prjprogs
@@ -82,6 +82,10 @@ genInitFile mName prjprogs = do
         initFunctionName = terminafy $ "app" <::> "init_globals"
 
         includeTermina = CPPDirective (CPPInclude True ("termina" <.> "h")) (internalAnn (CPPDirectiveAnn True))
+
+        -- | The identifiers of the deployment. The OSAL API does not include
+        -- config.h, so that the modules do not depend on it.
+        includeConfig = CPPDirective (CPPInclude False ("config" <.> "h")) (internalAnn (CPPDirectiveAnn False))
 
         -- Generate include preprocessor directives for the modules
         genIncludes :: [QualifiedName] -> [CFileItem]

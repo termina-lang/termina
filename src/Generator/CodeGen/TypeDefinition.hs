@@ -12,6 +12,7 @@ import qualified Data.Map.Strict as M
 import Utils.Annotations
 import Generator.LanguageC.Embedded
 import Control.Monad (zipWithM, foldM)
+import Data.List (sort)
 import Generator.CodeGen.Application.Utils
 import Generator.CodeGen.Types
 import Generator.CodeGen.Expression
@@ -382,7 +383,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
                         return $ pre_cr $ struct identifier [enumField, unionField] [] |>> getLocation ann
 genTypeDefinitionDecl (TypeDefinition (Interface RegularInterface _identifier _extends _procs _mods) _ann) = return []
 
-genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _members _provides modifiers) ann) = do
+genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier members _provides modifiers) ann) = do
     -- | Classify class members into fields and functions.
     (fields, functions) <- classifyClassMembers cls
     structModifiers <- mapM genAttribute (filterStructModifiers modifiers)
@@ -409,13 +410,27 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
     case clsKind of
         TaskClass -> do
             cTaskFunction <- genTaskFunctionDeclaration
-            return $ [pre_cr (struct identifier structFields structModifiers |>> getLocation ann), cTaskFunction]
+            cPortDefines <- genPortDefines
+            return $ cPortDefines ++ [pre_cr (struct identifier structFields structModifiers |>> getLocation ann), cTaskFunction]
                 ++ cFunctions
         _ ->
             return $ pre_cr (struct identifier structFields structModifiers |>> getLocation ann)
                 : cFunctions
 
     where
+
+        -- | Index of each sink and in port of a task class, which tags the
+        -- events of its queue. Sink ports first, then in ports, each group by
+        -- name. They belong to the class and go in its header, so that the C
+        -- of a module does not depend on the deployment.
+        genPortDefines :: CGenerator [CFileItem]
+        genPortDefines = do
+            let ports = sort [port | ClassField (FieldDefinition port (TSinkPort {}) _) <- members]
+                    ++ sort [port | ClassField (FieldDefinition port (TInPort {}) _) <- members]
+            variants <- mapM (genVariantForPort identifier) ports
+            return $ case zipWith (\v idx -> _define v (Just [show idx])) variants [0 :: Integer ..] of
+                [] -> []
+                (first : rest) -> pre_cr first : rest
 
         genTaskFunctionDeclaration :: CGenerator CFileItem
         genTaskFunctionDeclaration = do

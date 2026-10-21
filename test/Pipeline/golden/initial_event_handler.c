@@ -1,5 +1,6 @@
 
 #include <termina.h>
+#include "config.h"
 
 #include "test.h"
 

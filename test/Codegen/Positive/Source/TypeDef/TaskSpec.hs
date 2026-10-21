@@ -66,6 +66,8 @@ spec = do
               "    _Bool urgent;\n" ++
               "} Message;\n" ++
               "\n" ++
+              "#define CHousekeeping__timer 0\n" ++
+              "\n" ++
               "typedef struct {\n" ++
               "    termina__id_t _task_id;\n" ++
               "    termina__id_t _task_msg_queue_id;\n" ++

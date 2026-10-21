@@ -30,7 +30,6 @@ genConfigFile ::
     -> CGenerator CFile
 genConfigFile mName config progArchitecture = do
     let progTasks = M.elems $ tasks progArchitecture
-        taskClss = taskClasses progArchitecture
         periodicTimers = M.filter (\case { TPPeriodicTimerEmitter {} -> True; _ -> False }) (emitters progArchitecture)
         progPools = M.elems $ pools progArchitecture
 
@@ -42,7 +41,6 @@ genConfigFile mName config progArchitecture = do
     sinkPortMessageQueues <- getSinkPortMessageQueues progArchitecture
     taskMessageQueues <- getTasksMessageQueues progArchitecture (sinkPortMessageQueues ++ channelMessageQueues)
 
-    cVariantsForTaskPorts <- concat <$> traverse genVariantsForTaskPorts (M.elems taskClss)
     cEmitterDefines <- genDefineEmitterId (M.keys $ emitters progArchitecture)
     cMutexDefines <- genDefineMutexId (M.keys mutexes)
     cTaskDefines <- genDefineTaskId (M.keys $ tasks progArchitecture)
@@ -59,8 +57,7 @@ genConfigFile mName config progArchitecture = do
     return $ CHeaderFile mName $ [
             _ifndef "CONFIG_H__",
             _define "CONFIG_H__" Nothing
-        ] ++ cVariantsForTaskPorts
-        ++ cEmitterDefines
+        ] ++ cEmitterDefines
         ++ cMutexDefines
         ++ cTaskDefines
         ++ cHandlerDefines
@@ -87,8 +84,6 @@ genConfigFile mName config progArchitecture = do
         -- before it resets. Absent means release, so a build that says nothing
         -- gets the behaviour of the target.
         ([pre_cr $ _define "TERMINA__PROFILE__DEBUG" Nothing | profile config == Debug]) ++
-        ([pre_cr $ _define "TERMINA__SYS_PRINT__OUTPUT_BUFFER_SIZE" (Just [show $ sysPrintOutputBufferSize config]) | sysPrintOutputBufferSize config /= defaultSysPrintOutputBufferSize]) ++
-        ([pre_cr $ _define "TERMINA__SYS_READ__INPUT_BUFFER_SIZE" (Just [show $ sysReadInputBufferSize config]) | sysReadInputBufferSize config /= defaultSysReadInputBufferSize]) ++
         [
             pre_cr _endif
         ]

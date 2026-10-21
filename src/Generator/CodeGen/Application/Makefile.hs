@@ -23,10 +23,12 @@ genMakefile params loweredProject mExtern =
         MakeBlock [
             MVariable MSimple "PROJECT_NAME" [MFragment . T.unpack . name $ params],
             MVariable MSimple "PLATFORM" [MFragment . T.unpack . platform $ params],
-            MVariable MSimple "TERMINA_OSAL_DIR" [MFragment "/opt/termina-osal"],
+            -- | TERMINA_OSAL_DIR from the environment of make, else the
+            -- default installation path.
+            MVariable MConditional "TERMINA_OSAL_DIR" [MFragment "/opt/termina/osal"],
             MVariable MSimple "TERMINA_PROFILE"
                 [MFragment (case profile params of { Debug -> "debug"; Release -> "release" })]
-        ],
+        ]] ++ bufferSizeFlags ++ [
         MakeBlock [
             MInclude True $ "$(TERMINA_OSAL_DIR)" </> "platform" </> "$(PLATFORM)" </> "platform" <.> "mk"
         ],
@@ -104,6 +106,17 @@ genMakefile params loweredProject mExtern =
         sourceFolders = foldr (S.insert . takeDirectory) S.empty $ M.keys loweredProject
 
         hasExtern = maybe False (const True) mExtern
+
+        -- | The buffer sizes of sys_print and sys_read appear in the headers of
+        -- the OSAL API, so every module sees them. They belong to the project
+        -- and go as flags, not in config.h, which belongs to the deployment.
+        bufferSizeFlags = case
+                [MVariable MAppend "CFLAGS" [MFragment $ "-DTERMINA__SYS_PRINT__OUTPUT_BUFFER_SIZE=" ++ show (sysPrintOutputBufferSize params)]
+                    | sysPrintOutputBufferSize params /= defaultSysPrintOutputBufferSize]
+                ++ [MVariable MAppend "CFLAGS" [MFragment $ "-DTERMINA__SYS_READ__INPUT_BUFFER_SIZE=" ++ show (sysReadInputBufferSize params)]
+                    | sysReadInputBufferSize params /= defaultSysReadInputBufferSize] of
+            [] -> []
+            flags -> [MakeBlock flags]
 
         -- | The C of the project is linked into a single relocatable object in
         -- which only the extern functions stay global. How it is linked and

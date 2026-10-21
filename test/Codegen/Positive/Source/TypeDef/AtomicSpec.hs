@@ -49,6 +49,8 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
+              "#define CHousekeeping__timer 0\n" ++
+              "\n" ++
               "typedef struct {\n" ++
               "    termina__id_t _task_id;\n" ++
               "    termina__id_t _task_msg_queue_id;\n" ++
@@ -138,6 +140,8 @@ spec = do
               "#define TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
+              "\n" ++
+              "#define CHousekeeping__timer 0\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    termina__id_t _task_id;\n" ++
