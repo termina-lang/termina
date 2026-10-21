@@ -450,10 +450,10 @@ shiftWidth plt (TConstSubtype ty) = shiftWidth plt ty
 shiftWidth _ _ = error "shiftWidth: not an integer type"
 
 -- | Range of the priority of a task, the same on every target. A lower number
--- is a higher priority.
+-- is a higher priority. 254 belongs to the task of the test harness.
 minTaskPriority, maxTaskPriority :: Integer
 minTaskPriority = 1
-maxTaskPriority = 254
+maxTaskPriority = 253
 
 getTypeIdentifier :: TypeDef' ty expr blk a -> Identifier
 getTypeIdentifier (Struct ident _ _)        = ident

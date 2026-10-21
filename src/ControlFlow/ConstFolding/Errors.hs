@@ -113,10 +113,12 @@ instance Diagnosable Error where
     describe (ETaskPriorityOutOfRange task priority) =
         diagnostic "CFE-014" "task priority out of range"
             ("The priority of the task " <> emph (T.pack task) <> " is " <>
-                emph (T.pack (show priority)) <> ", but it must be between " <>
+                emph (T.pack (show priority)) <> ". Priorities " <>
+                T.pack (show (minTaskPriority - 1)) <> ", " <>
+                T.pack (show (maxTaskPriority + 1)) <> " and 255 are reserved, " <>
+                "so it must be between " <>
                 emph (T.pack (show minTaskPriority)) <> " and " <>
-                emph (T.pack (show maxTaskPriority)) <> ".\n" <>
-                "Priority 0 is reserved for the runtime and 255 for the idle task.")
+                emph (T.pack (show maxTaskPriority)) <> ".")
     describe (ETimerPeriodNotInTicks timer period tick) =
         diagnostic "CFE-015" "timer period not a whole number of ticks"
             ("The period of the periodic timer " <> emph (T.pack timer) <> " is " <>

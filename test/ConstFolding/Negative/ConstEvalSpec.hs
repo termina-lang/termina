@@ -115,6 +115,13 @@ spec = do
              ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
       compileErrorCode src `shouldBe` Just (pack "CFE-014")
 
+    it "CFE-014: task priority reserved for the test harness" $ do
+      let src = timerTaskClass
+             ++ periodicEmitter "timer" 1
+             ++ "#[priority(254)]\n"
+             ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
+      compileErrorCode src `shouldBe` Just (pack "CFE-014")
+
     it "CFE-014: task priority out of range after folding a constant" $ do
       let src = "constexpr base : u32 = 250 : u32;\n"
              ++ timerTaskClass
