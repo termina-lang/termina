@@ -116,7 +116,7 @@ genMakefile params loweredProject mExtern =
                     MakeCommand False [MFragment "$(info EXPANDED_CROSS=$(CROSS))"],
                     MakeCommand False [MFragment "$(info OSAL_SRCS=$(wildcard $(OSAL_SRCS)))"],
                     MakeCommand False [MFragment "$(info CC_VERSION=$(shell $(CC) --version 2>/dev/null | head -n 1))"],
-                    MakeCommand False [MFragment "$(foreach v,$(filter TERMINA_%,$(.VARIABLES)),$(info VAR $(v)=$($(v))))"]
+                    MakeCommand False [MFragment "$(foreach v,$(.VARIABLES),$(if $(findstring $$($(v)),$(value CROSS)),$(info VAR $(v)=$($(v)))))"]
                 ],
             MRule "$(TARGET)" ["$(OBJS)"] [
                 MakeCommand False [MFragment "@echo Linking $@"],
@@ -162,7 +162,7 @@ genMakefile params loweredProject mExtern =
         deliverableVariables = [
             "R", "TERMINA_OSAL_DIR", "TERMINA_PROJECT_DIR", "CC", "AS", "LD", "OBJCOPY", "NM", "OBJDUMP",
             "TERMINA_EXTERN_LIBC", "CFLAGS", "CPPFLAGS", "ASMFLAGS", "LDFLAGS", "SRCS",
-            "EXTERN_SRCS", "EXTERN_LIBS", "EXTERN_SYMBOLS"]
+            "EXTERN_SRCS", "EXTERN_LIBS", "EXTERN_SYMBOLS", "DEPS"]
 
         -- | The buffer sizes of sys_print and sys_read appear in the headers of
         -- the OSAL API, so every module sees them. They belong to the project

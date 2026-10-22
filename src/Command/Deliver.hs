@@ -6,7 +6,8 @@
 -- platform. It is built and checked against the binary built from the C with
 -- the #line pragmas.
 module Command.Deliver (
-    deliverCmdArgsParser, deliverCommand, DeliverCmdArgs
+    deliverCmdArgsParser, deliverCommand, DeliverCmdArgs,
+    dependencies, inFolder, pathsIn, relocate, toolchainVariables
 ) where
 
 import Command.Build
@@ -29,7 +30,7 @@ import qualified Data.ByteString.Lazy as BL
 import Data.Char (isSpace)
 import Data.List (intercalate, isPrefixOf, isSuffixOf, sortOn, nub, sort)
 import qualified Data.Map.Strict as M
-import Data.Maybe (isJust, mapMaybe)
+import Data.Maybe (isJust)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Data.Version (versionBranch)
@@ -100,38 +101,50 @@ deliverDeployment chatty manifest archive withTrace deployment = do
     info <- deliverableInfo label built
     let value key = M.findWithDefault "" key info
         list key = words (value key)
-        osalDir = value "TERMINA_OSAL_DIR"
-        outDir = value "R"
+        osalDir = dropTrailingPathSeparator (value "TERMINA_OSAL_DIR")
+        outDir = dropTrailingPathSeparator (value "R")
         relocated = relocate (deliverableSubstitutions info)
-        fromOutput = map (makeRelative outDir)
-    when (null osalDir || null outDir) $
-      die . errorMessage $ "make gave no folder of the OSAL or of the output for " ++ label
+    -- | The values of make are lists separated by spaces, and the paths in
+    -- them are rewritten by their folder, so both folders must be absolute
+    -- and have no spaces
+    forM_ [("TERMINA_OSAL_DIR", osalDir), ("the output folder", outDir)] $ \(what, dir) ->
+      unless (isAbsolute dir && not (any isSpace dir)) $
+        die . errorMessage $ what ++ " must be an absolute path without spaces to deliver " ++ label ++ ": \"" ++ dir ++ "\""
+    forM_ (toolchainVariables info) $ \var ->
+      unless (M.member ("VAR " ++ var) info) $
+        die . errorMessage $ "make gave no value of " ++ var ++ ", which CROSS names, for " ++ label
+    let fromOutput paths = forM paths $ \p ->
+          if inFolder outDir p
+            then return (relativeTo outDir p)
+            else die . errorMessage $ "the build of " ++ label ++ " names a file outside its output folder: " ++ p
     exists <- doesDirectoryExist folder
     when exists (removeDirectoryRecursive folder)
     createDirectoryIfMissing True folder
     -- | The plain C of the deployment, which is what the build with the #line
     -- pragmas compiles without them
-    let sources = fromOutput (list "SRCS")
-        externSrcs = fromOutput (list "EXTERN_SRCS")
-        externLibs = fromOutput (list "EXTERN_LIBS")
+    sources <- fromOutput (list "SRCS")
+    externSrcs <- fromOutput (list "EXTERN_SRCS")
+    externLibs <- fromOutput (list "EXTERN_LIBS")
     headers <- map (makeRelative plain) . filter ((== ".h") . takeExtension) <$> filesUnder (plain </> "include")
-    let projectFiles = sources ++ headers ++ externSrcs ++ externLibs
-    forM_ projectFiles $ \file -> copyInto (plain </> file) (folder </> file)
+    forM_ (sources ++ headers ++ externSrcs ++ externLibs) $ \file -> copyInto (plain </> file) (folder </> file)
     -- | The files of the OSAL that the build opens, as the dependency files
-    -- list them, and those named in the flags, such as a linker script
-    depFiles <- filter ((== ".d") . takeExtension) <$> filesUnder (built </> "bin")
-    opened <- concatMap dependencies <$> mapM readFile depFiles
-    named <- filterM doesFileExist (mapMaybe (fromOsal osalDir) (list "CFLAGS" ++ list "LDFLAGS"))
+    -- of its objects list them, and those named in the flags, such as a
+    -- linker script. Each one goes to the same path under "osal", so the
+    -- compiler of the deliverable finds it as the one of the build did.
+    depFiles <- filterM doesFileExist (list "DEPS")
+    opened <- concatMap (dependencies . T.unpack) <$> mapM TIO.readFile depFiles
+    named <- filterM doesFileExist (filter (inFolder osalDir) (concatMap pathsIn (list "CFLAGS" ++ list "LDFLAGS")))
     let osalSources = list "OSAL_SRCS"
         externScript = [osalDir </> "tools" </> "extern" </> "link.sh" | not (null externSrcs && null externLibs)]
-        osalUsed = nub . sort . filter (inOsal osalDir) . map collapse $ osalSources ++ opened ++ named ++ externScript
+        osalUsed = nub . sort . filter (inFolder osalDir) $ osalSources ++ opened ++ named ++ externScript
     licenses <- licenseFiles osalDir osalUsed
-    let osalFiles = map (makeRelative osalDir) (osalUsed ++ licenses)
-    forM_ osalFiles $ \file -> copyInto (osalDir </> file) (folder </> "osal" </> file)
+    forM_ (map (relativeTo osalDir) (osalUsed ++ licenses)) $ \file -> copyInto (osalDir </> file) (folder </> "osal" </> file)
     let makefile = runMakefilePrinter $
             genDeliverableMakefile config info (map relocated osalSources) sources
                 externSrcs externLibs (testModules config modules)
     TIO.writeFile (folder </> "Makefile") makefile
+    -- | The files delivered, as they are on disk
+    delivered <- map (makeRelative folder) <$> filesUnder folder
     -- | Build the deliverable and compare its binary with the one of the C
     -- with the #line pragmas, both without debugging information
     runMake label folder []
@@ -145,7 +158,6 @@ deliverDeployment chatty manifest archive withTrace deployment = do
                 ++ h2 ++ " in " ++ folder ++ ", " ++ h1 ++ " in " ++ built ++ ")"
         _ -> die . errorMessage $ "the binaries of " ++ label ++ " have no hashes to compare (is " ++ value "OBJCOPY" ++ " installed?)"
     -- | provenance.json of the deliverable
-    let delivered = sort ("Makefile" : projectFiles ++ map ("osal" </>) osalFiles)
     fileHashes <- mapM (\f -> (f,) <$> sha256File (folder </> f)) delivered
     osalVersion <- readOsalVersion osalDir
     let objectOf qname = "bin" </> "src" </> qname <.> "o"
@@ -180,10 +192,10 @@ deliverDeployment chatty manifest archive withTrace deployment = do
           archiveFile = outputFolderName </> "deliverable" </> archiveName <.> "tar" <.> "gz"
           mapFile = binary <.> "map"
       hasMap <- doesFileExist (folder </> mapFile)
-      let contents = map (\f -> (f, folder </> f, f == "osal" </> "tools" </> "extern" </> "link.sh")) ("provenance.json" : delivered)
-            ++ [(binary, folder </> binary, True)]
-            ++ [(mapFile, folder </> mapFile, False) | hasMap]
-            ++ [("trace" </> T.unpack (name config), built </> binary, True) | withTrace]
+      let contents = map (\f -> (f, folder </> f)) ("provenance.json" : delivered)
+            ++ [(binary, folder </> binary)]
+            ++ [(mapFile, folder </> mapFile) | hasMap]
+            ++ [("trace" </> T.unpack (name config), built </> binary) | withTrace]
       writeArchive archiveFile archiveName contents
       when chatty (putStrLn . debugMessage $ "Archive written to \"" ++ archiveFile ++ "\"")
 
@@ -204,7 +216,7 @@ deliverableInfo label folder = do
 deliverableSubstitutions :: M.Map String String -> [(String, String)]
 deliverableSubstitutions info =
     sortOn (negate . length . fst) $
-        [(value "R", ""), (value "TERMINA_OSAL_DIR", "osal")]
+        [(dropTrailingPathSeparator (value "R"), ""), (dropTrailingPathSeparator (value "TERMINA_OSAL_DIR"), "osal")]
         ++ [ (v, "$(" ++ var ++ ")") | var <- toolchainVariables info, let v = value ("VAR " ++ var), not (null v) ]
 
   where
@@ -226,23 +238,49 @@ toolchainVariables info = nub (references (M.findWithDefault "" "CROSS" info))
     references (_ : rest) = references rest
     references [] = []
 
--- | Replace the paths of a token. A path is replaced when the token is that
--- path or names something inside it; the output folder becomes the folder of
--- the deliverable itself.
+-- | The parts of a word of a value of make: a word is cut after each "=" and
+-- ",", as in -Wl,-Map=<file>, and each part may start with an option of one
+-- letter, as in -I<folder> or -T<file>.
+wordParts :: String -> [String]
+wordParts s = case break (`elem` partDelimiters) s of
+    (part, delimiter : rest) -> (part ++ [delimiter]) : wordParts rest
+    (part, []) -> [part]
+
+partDelimiters :: String
+partDelimiters = "=,"
+
+-- | A part without its delimiter, split into its option and its path.
+splitPart :: String -> (String, String, String)
+splitPart part =
+    let (body, delimiter) = break (`elem` partDelimiters) part in
+    case body of
+        ('-' : c : rest) | c /= '-' -> (['-', c], rest, delimiter)
+        _ -> ("", body, delimiter)
+
+-- | The paths that a word names.
+pathsIn :: String -> [FilePath]
+pathsIn word = [ path | part <- wordParts word, let (_, path, _) = splitPart part, not (null path) ]
+
+-- | Replace the paths of a word. A path is replaced by the longest folder of
+-- the substitutions that it is or that it lies in; the output folder becomes
+-- the folder of the deliverable itself.
 relocate :: [(String, String)] -> String -> String
-relocate substitutions token = foldl step token substitutions
+relocate substitutions = concatMap relocatePart . wordParts
 
   where
 
-    step tok (old, new)
-      | null old = tok
-      | tok == old = if null new then "." else new
-      | otherwise = replace (old ++ "/") (if null new then "" else new ++ "/") tok
+    relocatePart part =
+      let (option, path, delimiter) = splitPart part in
+      option ++ relocatePath path ++ delimiter
 
-    replace old new s@(c : rest)
-      | old `isPrefixOf` s = new ++ replace old new (drop (length old) s)
-      | otherwise = c : replace old new rest
-    replace _ _ [] = []
+    relocatePath path =
+      case [ (old, new) | (old, new) <- sortOn (negate . length . fst) substitutions, not (null old), old == path || inFolder old path ] of
+        [] -> path
+        (old, new) : _ ->
+          let rest = relativeTo old path in
+          if null new
+            then (if null rest then "." else rest)
+            else (if null rest then new else new </> rest)
 
 -- | The flat Makefile of the deliverable: the toolchain, the flags and the
 -- explicit list of sources, resolved for the platform and the profile.
@@ -348,7 +386,7 @@ genDeliverableMakefile config info osalSources sources externSrcs externLibs tes
         let cross = value "EXPANDED_CROSS" in
         if not (null cross) && cross `isPrefixOf` tool
             then "$(CROSS)" ++ drop (length cross) tool
-            else tool
+            else unwords (map (relocate substitutions) (words tool))
 
     hasExtern = not (null externSrcs && null externLibs)
 
@@ -389,7 +427,8 @@ testModules config modules =
     [ qname | isTestBuild config, (qname, source) <- modules, take 1 (splitDirectories source) == ["tests"] ]
 
 -- | The files that a dependency file of make lists as prerequisites. Lines
--- are continued with a backslash, and spaces in a path are escaped with one.
+-- are continued with a backslash, spaces and "#" in a path are escaped with
+-- one, and "$" is written "$$".
 dependencies :: String -> [FilePath]
 dependencies = concatMap prerequisites . lines . joinLines
 
@@ -413,36 +452,36 @@ dependencies = concatMap prerequisites . lines . joinLines
         [] -> []
         s' -> let (p, rest) = path s' in p : paths rest
 
-    path ('\\' : c : rest) | isSpace c = let (p, r) = path rest in (c : p, r)
+    path ('\\' : c : rest) | isSpace c || c == '#' = let (p, r) = path rest in (c : p, r)
+    path ('$' : '$' : rest) = let (p, r) = path rest in ('$' : p, r)
     path (c : rest) | isSpace c = ([], rest)
                     | otherwise = let (p, r) = path rest in (c : p, r)
     path [] = ([], [])
 
--- | Remove the "." and ".." components of a path, without looking at the
--- file system.
-collapse :: FilePath -> FilePath
-collapse p = joinPath (reverse (foldl step [] (splitDirectories p)))
+-- | Whether a path lies inside a folder, as it is written. The path may
+-- climb with "..", as in src/../include/<file>, as long as it does not leave
+-- the folder; it is copied with the same components into the deliverable,
+-- so its compiler opens it as the one of the build did.
+inFolder :: FilePath -> FilePath -> Bool
+inFolder folder path =
+    addTrailingPathSeparator folder `isPrefixOf` path
+    && all (>= 0) (scanl depth 0 (splitDirectories (drop (length (addTrailingPathSeparator folder)) path)))
 
   where
 
-    step acc "." = acc
-    step (prev : acc) ".." | prev /= ".." && prev /= "/" = acc
-    step acc c = c : acc
+    depth d ".." = d - 1
+    depth d "." = d
+    depth d _ = d + 1 :: Int
 
-inOsal :: FilePath -> FilePath -> Bool
-inOsal osalDir file = (addTrailingPathSeparator osalDir) `isPrefixOf` file
-
--- | The path of the OSAL that a flag names, as in -T<file>.
-fromOsal :: FilePath -> String -> Maybe FilePath
-fromOsal osalDir tok = case T.breakOn (T.pack (addTrailingPathSeparator osalDir)) (T.pack tok) of
-    (_, rest) | T.null rest -> Nothing
-              | otherwise -> Just (T.unpack rest)
+-- | A path inside a folder, relative to it and as it is written.
+relativeTo :: FilePath -> FilePath -> FilePath
+relativeTo folder = dropWhile isPathSeparator . drop (length folder)
 
 -- | The licenses that go with the files of the OSAL: the one of the OSAL,
 -- and the one of each vendored project from which a file is taken.
 licenseFiles :: FilePath -> [FilePath] -> IO [FilePath]
 licenseFiles osalDir used = do
-    let vendored = nub [ osalDir </> "vendor" </> v | f <- used, ("vendor" : v : _ : _) <- [splitDirectories (makeRelative osalDir f)] ]
+    let vendored = nub [ osalDir </> "vendor" </> v | f <- used, ("vendor" : v : _ : _) <- [splitDirectories (relativeTo osalDir f)] ]
     concat <$> mapM licensesIn (osalDir : vendored)
 
   where
@@ -492,13 +531,14 @@ terminaVersion :: String
 terminaVersion = intercalate "." (map show (take 3 (versionBranch version)))
 
 -- | Pack the files into a .tar.gz under a folder of the given name. Every
--- entry has the same time and no owner, so the same files give the same
--- archive.
-writeArchive :: FilePath -> FilePath -> [(FilePath, FilePath, Bool)] -> IO ()
+-- entry has the same time and no owner, and is executable when its file is,
+-- so the same files give the same archive.
+writeArchive :: FilePath -> FilePath -> [(FilePath, FilePath)] -> IO ()
 writeArchive archiveFile root contents = do
-    entries <- forM contents $ \(path, source, isExecutable) -> do
+    entries <- forM contents $ \(path, source) -> do
       tarPath <- either (die . errorMessage . (("cannot archive " ++ path ++ ": ") ++)) return
         (Tar.toTarPath False (root </> path))
+      isExecutable <- executable <$> getPermissions source
       content <- BL.readFile source
       return (Tar.fileEntry tarPath content) {
         Tar.entryPermissions = if isExecutable then Tar.executableFilePermissions else Tar.ordinaryFilePermissions
