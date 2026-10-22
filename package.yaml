@@ -51,6 +51,10 @@ dependencies:
 - async
 - process
 - temporary
+# Archive and hashes of the deliverable
+- tar
+- zlib
+- cryptohash-sha256
 
 ghc-options:
 - -Wall

@@ -105,6 +105,19 @@ genMakefile params loweredProject mExtern =
                     "printf '%s %s\\n' $$($(TERMINA_SHA256) < $$o.stripped | cut -c 1-64) $${o#$R/}; $(RM) $$o.stripped; done > $(TARGET_DIR_NAME)/stripped.sha256;",
                     "else echo $(OBJCOPY) not found: the objects are not hashed; fi"]]
             ],
+            -- | The resolved values that termina deliver writes into the flat
+            -- Makefile of the deliverable, one per line. CROSS goes
+            -- unexpanded, so that it keeps the variable of the toolchain.
+            MRule ".PHONY" ["deliverable-info"] [],
+            MRule "deliverable-info" [] $
+                map (\v -> MakeCommand False [MFragment $ "$(info " ++ v ++ "=$(" ++ v ++ "))"]) deliverableVariables
+                ++ [
+                    MakeCommand False [MFragment "$(info CROSS=$(value CROSS))"],
+                    MakeCommand False [MFragment "$(info EXPANDED_CROSS=$(CROSS))"],
+                    MakeCommand False [MFragment "$(info OSAL_SRCS=$(wildcard $(OSAL_SRCS)))"],
+                    MakeCommand False [MFragment "$(info CC_VERSION=$(shell $(CC) --version 2>/dev/null | head -n 1))"],
+                    MakeCommand False [MFragment "$(foreach v,$(filter TERMINA_%,$(.VARIABLES)),$(info VAR $(v)=$($(v))))"]
+                ],
             MRule "$(TARGET)" ["$(OBJS)"] [
                 MakeCommand False [MFragment "@echo Linking $@"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
@@ -145,6 +158,11 @@ genMakefile params loweredProject mExtern =
             , "tests" `elem` take 1 (splitDirectories (fullPath m)) ]
 
         hasExtern = maybe False (const True) mExtern
+
+        deliverableVariables = [
+            "R", "TERMINA_OSAL_DIR", "TERMINA_PROJECT_DIR", "CC", "AS", "LD", "OBJCOPY", "NM", "OBJDUMP",
+            "TERMINA_EXTERN_LIBC", "CFLAGS", "CPPFLAGS", "ASMFLAGS", "LDFLAGS", "SRCS",
+            "EXTERN_SRCS", "EXTERN_LIBS", "EXTERN_SYMBOLS"]
 
         -- | The buffer sizes of sys_print and sys_read appear in the headers of
         -- the OSAL API, so every module sees them. They belong to the project

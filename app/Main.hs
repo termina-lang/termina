@@ -6,6 +6,7 @@ import Data.Version (versionBranch)
 import Paths_termina (version)
 import Command.New
 import Command.Build
+import Command.Deliver
 import Command.Try
 import Command.LSP
 import Command.Sched
@@ -14,6 +15,7 @@ data Command =
     New NewCmdArgs
     | Generate BuildCmdArgs
     | Build BuildCmdArgs
+    | Deliver DeliverCmdArgs
     | Try TryCmdArgs
     | LSP LSPCmdArgs
     | Sched SchedCmdArgs
@@ -30,6 +32,10 @@ generateCommandParser = Generate
 buildCommandParser :: Parser Command
 buildCommandParser = Build
     <$> buildCmdArgsParser
+
+deliverCommandParser :: Parser Command
+deliverCommandParser = Deliver
+    <$> deliverCmdArgsParser
 
 schedCommandParser :: Parser Command
 schedCommandParser = Sched
@@ -48,7 +54,8 @@ commandParser = subparser
   ( command "new" (info newCommandParser ( progDesc "Setup a new project" ))
  <> command "generate" (info generateCommandParser ( progDesc "Generate the C code and the Makefile of the project" ))
  <> command "build" (info buildCommandParser ( progDesc "Generate and compile the project" ))
- <> command "try" (info tryCommandParser ( progDesc "Translate a single file" ))
+ <> command "deliver" (info deliverCommandParser ( progDesc "Build the self-contained deliverable of the project" ))
+ <> command "try"(info tryCommandParser ( progDesc "Translate a single file" ))
  <> command "lsp" (info lspCommandParser ( progDesc "Start language server" ))
  <> command "sched" (info schedCommandParser ( progDesc "Generate scheduling models" ))
   )
@@ -67,6 +74,7 @@ main = do
         New cmdargs -> newCommand cmdargs
         Generate cmdargs -> generateCommand cmdargs
         Build cmdargs -> buildCommand cmdargs
+        Deliver cmdargs -> deliverCommand cmdargs
         Try cmdargs -> tryCommand cmdargs
         LSP cmdargs -> lspCommand cmdargs
         Sched cmdargs -> schedCommand cmdargs

@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Command.Build (
-    buildCmdArgsParser, buildCommand, generateCommand, BuildCmdArgs
+    buildCmdArgsParser, buildCommand, generateCommand, BuildCmdArgs(..),
+    Selection(..), selectDeployments, buildDeployment, announce, runMake
 ) where
 
 import Configuration.Configuration
@@ -357,24 +358,32 @@ buildCommand args = do
     deployments <- selectedDeployments args
     forM_ deployments $ \deployment -> do
       announce deployments ("Building " ++ deploymentLabel deployment)
-      modules <- generateDeployment args deployment
-      let config = deploymentConfig deployment
-      runMake deployment config []
-      runMake deployment config ["-s", "stripped-hashes"]
-      writeProvenance config modules
+      void (buildDeployment args deployment)
+
+-- | Generate a deployment, run make on the folder of its C with the #line
+-- pragmas and write its provenance.json. It gives the modules of the
+-- deployment with their source files.
+buildDeployment :: BuildCmdArgs -> Deployment -> IO [(QualifiedName, FilePath)]
+buildDeployment args deployment = do
+    modules <- generateDeployment args deployment
+    let config = deploymentConfig deployment
+    runMake (deploymentLabel deployment) (outputFolder config) []
+    runMake (deploymentLabel deployment) (outputFolder config) ["-s", "stripped-hashes"]
+    writeProvenance config modules
+    return modules
 
 -- | Say which deployment comes next when there are several.
 announce :: [Deployment] -> String -> IO ()
 announce deployments msg = when (length deployments > 1) (putStrLn . infoMessage $ msg)
 
-runMake :: Deployment -> TerminaConfig -> [String] -> IO ()
-runMake deployment config targets = do
-    let folder = outputFolder config
+-- | Run make on a folder, for the deployment that the label names.
+runMake :: String -> FilePath -> [String] -> IO ()
+runMake label folder targets = do
     result <- try (rawSystem "make" (["-C", folder] ++ targets))
     case result of
         Left err -> die . errorMessage $ "Could not run make: " ++ show (err :: IOException)
         Right ExitSuccess -> return ()
-        Right (ExitFailure _) -> die . errorMessage $ "make failed for " ++ deploymentLabel deployment ++ " in " ++ folder
+        Right (ExitFailure _) -> die . errorMessage $ "make failed for " ++ label ++ " in " ++ folder
 
 -- | Write provenance.json of a build: its binary and each module, where its
 -- source comes from, with the SHA-256 of their objects without debugging
