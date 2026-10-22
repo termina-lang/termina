@@ -423,9 +423,11 @@ data Deployment = Deployment {
   } deriving (Eq, Show)
 
 -- | The configuration of a deployment, in the form the rest of the transpiler
--- reads.
-configFor :: Manifest -> T.Text -> Platform -> ProjectProfile -> Maybe Integer -> FilePath -> TerminaConfig
-configFor manifest binaryName plt prf tick output = TerminaConfig {
+-- reads. The application is built into the "app" folder of the output and its
+-- binary takes the name of the project; each test on each of its platforms
+-- into "tests/<name>/<platform>", and its binary takes the name of the test.
+configFor :: Manifest -> DeploymentKind -> Platform -> ProjectProfile -> Maybe Integer -> TerminaConfig
+configFor manifest kind plt prf tick = TerminaConfig {
     name = binaryName,
     platform = T.pack (show plt),
     sourceModulesFolder = "src",
@@ -435,19 +437,26 @@ configFor manifest binaryName plt prf tick output = TerminaConfig {
     sysPrintOutputBufferSize = manifestPrintBufSize manifest,
     sysReadInputBufferSize = manifestReadBufSize manifest,
     microsecondsPerTick = fromMaybe defaultMicrosecondsPerTick tick,
-    builder = outputBuilder (manifestOutput manifest)
+    builder = outputBuilder (manifestOutput manifest),
+    deploymentKind = kind
   }
 
--- | The application, or nothing in a library. It is built into the "app"
--- folder of the output.
+  where
+
+    root = outputRoot (manifestOutput manifest)
+
+    (binaryName, output) = case kind of
+        ApplicationBuild -> (projectName (manifestProject manifest), root </> "app")
+        TestBuild testName -> (testName, root </> "tests" </> T.unpack testName </> show plt)
+
+-- | The application, or nothing in a library.
 appDeployment :: Manifest -> Maybe Deployment
 appDeployment manifest =
     case manifestNature manifest of
         Library _ -> Nothing
         Application app -> Just Deployment {
             deploymentLabel = "the application",
-            deploymentConfig = configFor manifest (projectName (manifestProject manifest)) (appPlatform app) (appProfile app)
-                (appMicrosecondsPerTick app) (outputRoot (manifestOutput manifest) </> "app"),
+            deploymentConfig = configFor manifest ApplicationBuild (appPlatform app) (appProfile app) (appMicrosecondsPerTick app),
             deploymentPlatform = appPlatform app,
             deploymentMainFolder = appFolder,
             deploymentMainModule = appFilename,
@@ -486,11 +495,10 @@ testDeployment manifest testName entry plt prf = Deployment {
     testFolder = "tests" </> T.unpack testName
 
 -- | The configuration of a test on one of its platforms, built with the given
--- profile. A test without its own tick takes the one of the application, and
--- its binary takes its name.
+-- profile. A test without its own tick takes the one of the application.
 testConfig :: Manifest -> T.Text -> TestEntry -> Platform -> ProjectProfile -> TerminaConfig
 testConfig manifest testName entry plt prf =
-    configFor manifest testName plt prf tick output
+    configFor manifest (TestBuild testName) plt prf tick
 
   where
 
@@ -498,8 +506,6 @@ testConfig manifest testName entry plt prf =
         (Just t, _) -> Just t
         (Nothing, Application app) -> appMicrosecondsPerTick app
         (Nothing, Library _) -> Nothing
-
-    output = outputRoot (manifestOutput manifest) </> "tests" </> T.unpack testName </> show plt
 
 -- | The manifest of a new library, which exports one prefix.
 newLibraryManifest :: String -> String -> String

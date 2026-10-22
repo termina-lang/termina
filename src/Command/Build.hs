@@ -40,7 +40,8 @@ import Semantic.Environment
 import qualified Data.Set as S
 import Generator.CodeGen.Application.Status (runGenStatusHeaderFile)
 import Generator.CodeGen.Application.Result (runGenResultHeaderFile)
-import System.Environment
+import Data.Aeson (object, (.=))
+import Data.Aeson.Encode.Pretty (Config(..), defConfig, encodePretty', keyOrder)
 import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
 import EFP.Schedulability.WCEPath.Printer
 import Command.Common
@@ -243,41 +244,8 @@ genModules params plt initialMonadicTypes loweredProject =
 
     printModule :: MonadicTypes -> ElaboratedModule -> IO MonadicTypes
     printModule currentMonadicTypes bbModule = do
-      let destinationPath = outputFolder params
-          sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
-          headerFile = destinationPath </> "include" </> qualifiedName bbModule <.> "h"
-      sourceFileExists <- doesFileExist sourceFile
-      -- | Get the modification time of the transpiler itself
-      exePath <- getExecutablePath
-      exeModificationTime <- getModificationTime exePath
-      terminaYamlModificationTime <- getModificationTime "termina.yaml"
-      if sourceFileExists
-        then do
-          sourceFileTime <- getModificationTime sourceFile
-          depChanged <- changedDependendencies loweredProject sourceFileTime (visibleModules bbModule)
-          if sourceFileTime > modificationTime bbModule &&
-             sourceFileTime > exeModificationTime &&
-             sourceFileTime > terminaYamlModificationTime &&
-             not depChanged
-            then return ()
-          else do
-            printSource bbModule
-      else do
-        printSource bbModule
-      headerFileExists <- doesFileExist headerFile
-      if headerFileExists
-        then do
-          headerFileTime <- getModificationTime headerFile
-          depChanged <- changedDependendencies loweredProject headerFileTime (visibleModules bbModule)
-          if headerFileTime > modificationTime bbModule &&
-             headerFileTime > exeModificationTime &&
-             headerFileTime > terminaYamlModificationTime &&
-             not depChanged
-            then return currentMonadicTypes
-          else do
-            printHeader currentMonadicTypes bbModule
-        else do
-          printHeader currentMonadicTypes bbModule
+      printSource bbModule
+      printHeader currentMonadicTypes bbModule
 
     printSource :: ElaboratedModule -> IO ()
     printSource bbModule = do
@@ -286,9 +254,7 @@ genModules params plt initialMonadicTypes loweredProject =
           tAST = elaboratedAST . metadata $ bbModule
       case runGenSourceFile params plt (qualifiedName bbModule) tAST of
         Left err -> die. errorMessage $ show err
-        Right cSourceFile -> do
-          createDirectoryIfMissing True (takeDirectory sourceFile)
-          TIO.writeFile sourceFile $ runCPrinter (profile params == Debug) cSourceFile
+        Right cSourceFile -> writeIfChanged sourceFile $ runCPrinter (lineDirectives params) cSourceFile
 
     printHeader :: MonadicTypes -> ElaboratedModule -> IO MonadicTypes
     printHeader currentMonadicTypes bbModule = do
@@ -299,128 +265,44 @@ genModules params plt initialMonadicTypes loweredProject =
         Left err -> die . errorMessage $ show err
         Right (cHeaderFile, newMonadicTypes) -> do
           let headerFile = destinationPath </> "include" </> qualifiedName bbModule <.> "h"
-          createDirectoryIfMissing True (takeDirectory headerFile)
-          TIO.writeFile headerFile $ runCPrinter (profile params == Debug) cHeaderFile
+          writeIfChanged headerFile $ runCPrinter (lineDirectives params) cHeaderFile
           return newMonadicTypes
 
-genInitFile :: TerminaConfig -> Platform -> ElaboratedProject -> QualifiedName -> IO ()
-genInitFile params plt loweredProject appModName = do
-  let appModule = loweredProject M.! appModName
-  initFileExists <- doesFileExist initFile
-  if initFileExists then do
-    initFileTime <- getModificationTime initFile
-    exePath <- getExecutablePath
-    exeModificationTime <- getModificationTime exePath
-    terminaYamlModificationTime <- getModificationTime "termina.yaml"
-    depChanged <- changedDependendencies loweredProject initFileTime (visibleModules appModule)
-    unless (initFileTime > modificationTime appModule &&
-      initFileTime > exeModificationTime &&
-      initFileTime > terminaYamlModificationTime &&
-      not depChanged) runGenInitFile'
-  else
-    runGenInitFile'
+genInitFile :: TerminaConfig -> Platform -> ElaboratedProject -> IO ()
+genInitFile params plt loweredProject = do
+  let initFile = outputFolder params </> "init" <.> "c"
+      projectModules = M.toList $ elaboratedAST . metadata <$> loweredProject
+  case runGenInitFile params plt initFile projectModules of
+    Left err -> die . errorMessage $ show err
+    Right cInitFile -> writeIfChanged initFile $ runCPrinter False cInitFile
+
+-- | The headers of the option, status and result types, each when the project
+-- uses one of them. A header that is not generated is not expected in the
+-- output folder.
+genMonadicHeaderFiles :: TerminaConfig -> Platform -> MonadicTypes -> IO [FilePath]
+genMonadicHeaderFiles params plt monadicTypes = do
+  option <- gen "option" usesOptions runGenOptionHeaderFile
+  status <- gen "status" usesStatus runGenStatusHeaderFile
+  result <- gen "result" usesResults runGenResultHeaderFile
+  return (option ++ status ++ result)
 
   where
 
-    destinationPath = outputFolder params
+    gen headerName needed generator
+      | not needed = return []
+      | otherwise = do
+          let file = outputFolder params </> "include" </> headerName <.> "h"
+          case generator params plt file monadicTypes of
+            Left err -> die . errorMessage $ show err
+            Right cFile -> writeIfChanged file (runCPrinter (lineDirectives params) cFile) >> return [file]
 
-    initFile = destinationPath </> "init" <.> "c"
+    notStructOrEnum (TStruct _) = False
+    notStructOrEnum (TEnum _) = False
+    notStructOrEnum _ = True
 
-    runGenInitFile' :: IO ()
-    runGenInitFile' = do
-      let projectModules = M.toList $ elaboratedAST . metadata <$> loweredProject
-      case runGenInitFile params plt initFile projectModules of
-        Left err -> die . errorMessage $ show err
-        Right cInitFile -> do
-          createDirectoryIfMissing True (takeDirectory initFile)
-          TIO.writeFile initFile $ runCPrinter False cInitFile
-
-
-genOptionHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> LoweredProject -> QualifiedName -> IO ()
-genOptionHeaderFile params plt monadicTypes loweredProject appModName = do
-  let appModule = loweredProject M.! appModName
-  optionFileExists <- doesFileExist optionFile
-  if optionFileExists then do
-    optionFileTime <- getModificationTime optionFile
-    exePath <- getExecutablePath
-    exeModificationTime <- getModificationTime exePath
-    terminaYamlModificationTime <- getModificationTime "termina.yaml"
-    depChanged <- changedDependendencies loweredProject optionFileTime (visibleModules appModule)
-    unless (optionFileTime > modificationTime appModule &&
-      optionFileTime > exeModificationTime &&
-      optionFileTime > terminaYamlModificationTime &&
-      not depChanged) runGenOptionHeaderFile'
-  else
-    runGenOptionHeaderFile'
-
-  where
-
-    destinationPath = outputFolder params
-
-    optionFile = destinationPath </> "include" </> "option" <.> "h"
-
-    runGenOptionHeaderFile' :: IO ()
-    runGenOptionHeaderFile' = do
-      case runGenOptionHeaderFile params plt optionFile monadicTypes of
-        Left err -> die . errorMessage $ show err
-        Right cOptionsFile -> TIO.writeFile optionFile $ runCPrinter (profile params == Debug) cOptionsFile
-
-genStatusHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> LoweredProject -> QualifiedName -> IO ()
-genStatusHeaderFile params plt monadicTypes loweredProject appModName = do
-  let appModule = loweredProject M.! appModName
-  statusFileExists <- doesFileExist statusFile
-  if statusFileExists then do
-    statusFileTime <- getModificationTime statusFile
-    exePath <- getExecutablePath
-    exeModificationTime <- getModificationTime exePath
-    terminaYamlModificationTime <- getModificationTime "termina.yaml"
-    depChanged <- changedDependendencies loweredProject statusFileTime (visibleModules appModule)
-    unless (statusFileTime > modificationTime appModule &&
-      statusFileTime > exeModificationTime &&
-      statusFileTime > terminaYamlModificationTime &&
-      not depChanged) runGenStatusHeaderFile'
-  else
-    runGenStatusHeaderFile'
-
-  where
-
-    destinationPath = outputFolder params
-
-    statusFile = destinationPath </> "include" </> "status" <.> "h"
-
-    runGenStatusHeaderFile' :: IO ()
-    runGenStatusHeaderFile' = case runGenStatusHeaderFile params plt statusFile monadicTypes of
-      Left err -> die . errorMessage $ show err
-      Right cOptionsFile -> TIO.writeFile statusFile $ runCPrinter (profile params == Debug) cOptionsFile
-
-genResultHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> LoweredProject -> QualifiedName -> IO ()
-genResultHeaderFile params plt monadicTypes loweredProject appModName = do
-  let appModule = loweredProject M.! appModName
-  resultFileExists <- doesFileExist resultFile
-  if resultFileExists then do
-    resultFileTime <- getModificationTime resultFile
-    exePath <- getExecutablePath
-    exeModificationTime <- getModificationTime exePath
-    terminaYamlModificationTime <- getModificationTime "termina.yaml"
-    depChanged <- changedDependendencies loweredProject resultFileTime (visibleModules appModule)
-    unless (resultFileTime > modificationTime appModule &&
-      resultFileTime > exeModificationTime &&
-      resultFileTime > terminaYamlModificationTime &&
-      not depChanged) runGenResultHeaderFile'
-  else
-    runGenResultHeaderFile'
-
-  where
-
-    destinationPath = outputFolder params
-
-    resultFile = destinationPath </> "include" </> "result" <.> "h"
-
-    runGenResultHeaderFile' :: IO ()
-    runGenResultHeaderFile' =
-      case runGenResultHeaderFile params plt resultFile monadicTypes of
-        Left err -> die . errorMessage $ show err
-        Right cOptionsFile -> TIO.writeFile resultFile $ runCPrinter (profile params == Debug) cOptionsFile
+    usesOptions = not . S.null . S.filter notStructOrEnum . optionTypes $ monadicTypes
+    usesStatus = not . S.null . S.filter notStructOrEnum . statusTypes $ monadicTypes
+    usesResults = not . S.null . S.unions . M.elems . M.filterWithKey (\k _ -> notStructOrEnum k) . resultTypes $ monadicTypes
 
 -- | The deployments that the arguments select.
 selectedDeployments :: BuildCmdArgs -> IO [Deployment]
@@ -466,7 +348,7 @@ generateCommand args = do
     deployments <- selectedDeployments args
     forM_ deployments $ \deployment -> do
       announce deployments ("Generating " ++ deploymentLabel deployment)
-      generateDeployment args deployment
+      void (generateDeployment args deployment)
 
 -- | Command handler for the "build" command: it generates each deployment
 -- and runs make on its output folder
@@ -475,23 +357,63 @@ buildCommand args = do
     deployments <- selectedDeployments args
     forM_ deployments $ \deployment -> do
       announce deployments ("Building " ++ deploymentLabel deployment)
-      generateDeployment args deployment
-      runMake deployment
+      modules <- generateDeployment args deployment
+      runMake deployment []
+      runMake deployment ["-s", "stripped-hashes"]
+      writeProvenance deployment modules
 
 -- | Say which deployment comes next when there are several.
 announce :: [Deployment] -> String -> IO ()
 announce deployments msg = when (length deployments > 1) (putStrLn . infoMessage $ msg)
 
-runMake :: Deployment -> IO ()
-runMake deployment = do
+runMake :: Deployment -> [String] -> IO ()
+runMake deployment targets = do
     let folder = outputFolder (deploymentConfig deployment)
-    result <- try (rawSystem "make" ["-C", folder])
+    result <- try (rawSystem "make" (["-C", folder] ++ targets))
     case result of
         Left err -> die . errorMessage $ "Could not run make: " ++ show (err :: IOException)
         Right ExitSuccess -> return ()
         Right (ExitFailure _) -> die . errorMessage $ "make failed for " ++ deploymentLabel deployment
 
-generateDeployment :: BuildCmdArgs -> Deployment -> IO ()
+-- | Write provenance.json of a deployment: each module, where its source
+-- comes from, and the SHA-256 of its object without debugging information,
+-- which the Makefile leaves in bin/modules.sha256.
+writeProvenance :: Deployment -> [(QualifiedName, FilePath)] -> IO ()
+writeProvenance deployment modules = do
+    let config = deploymentConfig deployment
+        folder = outputFolder config
+        hashesFile = folder </> "bin" </> "modules.sha256"
+    hashesExist <- doesFileExist hashesFile
+    hashes <- if hashesExist
+        then M.fromList . concatMap (toPair . words) . lines <$> readFile hashesFile
+        else return M.empty
+    let objectOf qname = "bin" </> "src" </> qname <.> "o"
+        originOf source = if take 1 (splitDirectories source) == ["tests"] then "test" else "project" :: String
+        moduleEntry (qname, source) = object [
+            "module" .= map (\c -> if c == '/' then '.' else c) qname,
+            "origin" .= originOf source,
+            "source" .= source,
+            "object" .= objectOf qname,
+            "stripped-sha256" .= M.lookup (objectOf qname) hashes
+          ]
+        provenance = object [
+            "name" .= name config,
+            "deployment" .= (if isTestBuild config then "test" else "app" :: String),
+            "platform" .= platform config,
+            "profile" .= profile config,
+            "modules" .= map moduleEntry modules
+          ]
+    BL.writeFile (folder </> "provenance" <.> "json") $
+      encodePretty' defConfig { confCompare = keyOrder ["name", "deployment", "platform", "profile", "modules", "module", "origin", "source", "object"] } provenance
+
+  where
+
+    toPair [hash, path] = [(normalise path, hash)]
+    toPair _ = []
+
+-- | Generate the C and the Makefile of a deployment. It gives the modules of
+-- the deployment with their source files.
+generateDeployment :: BuildCmdArgs -> Deployment -> IO [(QualifiedName, FilePath)]
 generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _) deployment = do
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
@@ -564,24 +486,17 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _) 
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
     genModules config plt monadicTypes elaboratedProject
-    genInitFile config plt elaboratedProject (qualifiedName appModule)
-    genPlatformCode config plt loweredProject (qualifiedName appModule) programArchitecture mExtern
+    genInitFile config plt elaboratedProject
+    genPlatformCode config plt loweredProject programArchitecture mExtern
     genChecksReportFile config loweredProject checksReports
-    unless (S.null (S.filter (\case {
-        TStruct _ -> False;
-        TEnum _ -> False;
-        _ -> True;
-        }) . optionTypes $ monadicTypes)) $ genOptionHeaderFile config plt monadicTypes loweredProject (qualifiedName appModule)
-    unless (S.null (S.filter (\case {
-        TStruct _ -> False;
-        TEnum _ -> False;
-        _ -> True;
-        }) . statusTypes $ monadicTypes)) $ genStatusHeaderFile config plt monadicTypes loweredProject (qualifiedName appModule)
-    unless (S.null (S.unions . M.elems . M.filterWithKey (\k _ -> case k of {
-        TStruct _ -> False;
-        TEnum _ -> False;
-        _ -> True;
-        }) . resultTypes $ monadicTypes)) $ genResultHeaderFile config plt monadicTypes loweredProject (qualifiedName appModule)
+    monadicHeaders <- genMonadicHeaderFiles config plt monadicTypes
+    -- | The C of a module that is no longer in the project would still be
+    -- compiled and linked
+    let out = outputFolder config
+        moduleNames = M.keys elaboratedProject
+    removeStaleFiles (out </> "src") [".c"] [out </> "src" </> m <.> "c" | m <- moduleNames]
+    removeStaleFiles (out </> "include") [".h"]
+      ([out </> "include" </> m <.> "h" | m <- moduleNames] ++ [out </> "include" </> "config" <.> "h"] ++ monadicHeaders)
     when genTransactionalWCEPs $
       when chatty (putStrLn . debugMessage $ "Generating transactional worst-case execution paths") >>
       genTWCEPFiles config loweredProject
@@ -591,3 +506,4 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _) 
         when chatty (putStrLn . debugMessage $ "Generating component diagram") >>
         genComponentDiagramFile config programArchitecture param
     when chatty (putStrLn . debugMessage $ "Build completed successfully")
+    return [(qualifiedName m, fullPath m) | m <- M.elems elaboratedProject]

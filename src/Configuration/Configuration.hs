@@ -7,6 +7,9 @@ module Configuration.Configuration (
     ProjectProfile(..),
     ProjectBuilder(..),
     defaultConfig,
+    DeploymentKind(..),
+    isTestBuild,
+    lineDirectives,
     defaultSysPrintOutputBufferSize,
     defaultSysReadInputBufferSize,
     defaultMicrosecondsPerTick,
@@ -96,8 +99,26 @@ data TerminaConfig =
     sysPrintOutputBufferSize :: !Integer,
     sysReadInputBufferSize :: !Integer,
     microsecondsPerTick :: !Integer,
-    builder :: !ProjectBuilder
+    builder :: !ProjectBuilder,
+    deploymentKind :: !DeploymentKind
   } deriving (Eq, Show)
+
+-- | What a deployment builds. What a test needs and the application does not
+-- is derived from it.
+data DeploymentKind =
+    ApplicationBuild
+    | TestBuild !T.Text -- ^ The name of the test
+  deriving (Eq, Show)
+
+isTestBuild :: TerminaConfig -> Bool
+isTestBuild config = case deploymentKind config of
+  TestBuild _ -> True
+  ApplicationBuild -> False
+
+-- | Whether the generated C carries #line pragmas that point to the .fin: in
+-- the debug profile, and in a test whatever its profile
+lineDirectives :: TerminaConfig -> Bool
+lineDirectives config = profile config == Debug || isTestBuild config
 
 defaultConfig :: String -> Platform -> TerminaConfig
 defaultConfig projectName plt = TerminaConfig {
@@ -110,5 +131,6 @@ defaultConfig projectName plt = TerminaConfig {
     sysPrintOutputBufferSize = defaultSysPrintOutputBufferSize,
     sysReadInputBufferSize = defaultSysReadInputBufferSize,
     microsecondsPerTick = defaultMicrosecondsPerTick,
-    builder = Make
+    builder = Make,
+    deploymentKind = ApplicationBuild
 }

@@ -42,8 +42,7 @@ import Semantic.Environment (DeclaredEnv, declaredNames)
 import Utils.Graph (TopSortError(..), topSortFromDepList)
 import Utils.Errors (ErrorMessage(toText, errorIdent))
 import Modules.Utils
-import Data.Time (UTCTime)
-import Control.Monad (when)
+import Control.Monad (forM_, unless, when)
 import Data.Maybe (listToMaybe, mapMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -86,15 +85,33 @@ getVisibleModules prevModsMap importedMods =
 projectDeclaredNames :: ParsedProject -> DeclaredEnv
 projectDeclaredNames = M.unions . fmap (declaredNames . parsedAST . metadata) . M.elems
 
-changedDependendencies :: M.Map QualifiedName (TerminaModuleData a) -> UTCTime -> [QualifiedName] -> IO Bool
-changedDependendencies _ _ [] = return False
-changedDependendencies loweredProject t (x:xs) = do
-  let dep = loweredProject M.! x
-      depModTime = modificationTime dep
-  if depModTime > t then 
-    return True
-  else
-    changedDependendencies loweredProject t xs
+-- | Write a generated file only when its content changes, so that make does
+-- not compile again what is the same.
+writeIfChanged :: FilePath -> T.Text -> IO ()
+writeIfChanged path content = do
+  exists <- doesFileExist path
+  same <- if exists then (== content) <$> TIO.readFile path else return False
+  unless same $ do
+    createDirectoryIfMissing True (takeDirectory path)
+    TIO.writeFile path content
+
+-- | Remove the generated files of a folder that the deployment no longer
+-- generates, such as the C of a module that has been deleted.
+removeStaleFiles :: FilePath -> [String] -> [FilePath] -> IO ()
+removeStaleFiles folder extensions expected = do
+  exists <- doesDirectoryExist folder
+  when exists $ do
+    files <- listFilesRecursive folder
+    forM_ files $ \f ->
+      when (takeExtension f `elem` extensions && f `notElem` expected) (removeFile f)
+
+  where
+
+    listFilesRecursive dir = do
+      entries <- map (dir </>) <$> listDirectory dir
+      concat <$> mapM (\e -> do
+        isDir <- doesDirectoryExist e
+        if isDir then listFilesRecursive e else return [e]) entries
 
 -- | The folder, among the source folders of a deployment, that holds a
 -- module. The layout check guarantees that at most one holds it.

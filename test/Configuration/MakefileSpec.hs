@@ -14,6 +14,9 @@ import Test.Hspec
 makefileFor :: TerminaConfig -> String
 makefileFor config = T.unpack . runMakefilePrinter $ genMakefile config M.empty Nothing
 
+testIn :: ProjectProfile -> TerminaConfig
+testIn prf = (defaultConfig "test" TestPlatform) { profile = prf, deploymentKind = TestBuild (T.pack "hk") }
+
 spec :: Spec
 spec = describe "Makefile: project configuration" $ do
 
@@ -32,3 +35,13 @@ spec = describe "Makefile: project configuration" $ do
       [ "CFLAGS+=-DTERMINA__SYS_PRINT__OUTPUT_BUFFER_SIZE=512\n"
       , "CFLAGS+=-DTERMINA__SYS_READ__INPUT_BUFFER_SIZE=64\n"
       ]
+
+  it "adds the debugging information to a test in release" $
+    makefileFor (testIn Release) `shouldContain` "CFLAGS+=-g\n"
+
+  it "leaves the flags of the profile to a test in debug and to the application" $ do
+    makefileFor (testIn Debug) `shouldNotContain` "CFLAGS+=-g\n"
+    makefileFor (defaultConfig "test" TestPlatform) `shouldNotContain` "CFLAGS+=-g\n"
+
+  it "deletes the target of a recipe that fails" $
+    makefileFor (defaultConfig "test" TestPlatform) `shouldContain` ".DELETE_ON_ERROR:"

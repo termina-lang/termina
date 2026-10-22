@@ -9,6 +9,7 @@ import qualified Data.Text as T
 import Configuration.Configuration
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
+import Modules.Modules (TerminaModuleData(fullPath))
 
 
 genMakefile :: TerminaConfig -> LoweredProject -> Maybe ExternBuild -> Makefile
@@ -31,6 +32,9 @@ genMakefile params loweredProject mExtern =
         ]] ++ bufferSizeFlags ++ [
         MakeBlock [
             MInclude True $ "$(TERMINA_OSAL_DIR)" </> "platform" </> "$(PLATFORM)" </> "platform" <.> "mk"
+        ]] ++ testDebugFlags ++ [
+        MakeBlock [
+            MVariable MConditional "TERMINA_SHA256" [MFragment "$(if $(shell command -v sha256sum 2>/dev/null),sha256sum,shasum -a 256)"]
         ],
         MakeBlock [
             MVariable MSimple "TARGET_DIR_NAME" [MFragment "$R/bin"],
@@ -44,14 +48,15 @@ genMakefile params loweredProject mExtern =
         ],
         MakeBlock $ 
             MVariable MAppend "SRCS" [MFunction "wildcard" [MFragment "$R/*.c"]] :
-            map (\srcFolder -> MVariable MAppend "SRCS" [MFunction "wildcard" [MFragment $ "$R/src/" </> srcFolder </> "*.c"]]) (S.toList sourceFolders)
+            map (\srcFolder -> MVariable MAppend "SRCS" [MFunction "wildcard" [MFragment $ normalise ("$R/src/" </> srcFolder </> "*.c")]]) (S.toList sourceFolders)
         ] ++ externVariables ++ [
         MakeBlock $ [
             MVariable MAppend "OBJS" [MFunction "patsubst"
                 [MFragment "%.c", MFragment "%.o", MFunction "patsubst"
                     [MFragment "%.s", MFragment "%.o", MFunction "patsubst"
                         [MFragment "$(TERMINA_OSAL_DIR)/%", MFragment "$(TARGET_DIR_NAME)/termina/%", MFunction "wildcard" [MFragment "$(OSAL_SRCS)"]]]]],
-            MVariable MAppend "OBJS" [MFunction "patsubst" [MFragment "%.c", MFragment "%.o", MFunction "patsubst" [MFragment "$R/%", MFragment "$(TARGET_DIR_NAME)/%", MFragment "$(SRCS)"]]]
+            MVariable MAppend "OBJS" [MFunction "patsubst" [MFragment "%.c", MFragment "%.o", MFunction "patsubst" [MFragment "$R/%", MFragment "$(TARGET_DIR_NAME)/%", MFragment "$(SRCS)"]]],
+            MVariable MSimple "MODULE_OBJS" [MFunction "patsubst" [MFragment "$R/%.c", MFragment "$(TARGET_DIR_NAME)/%.o", MFunction "filter" [MFragment "$R/src/%", MFragment "$(SRCS)"]]]
         ] ++ [MVariable MAppend "OBJS" [MFragment "$(EXTERN_OBJ)"] | hasExtern],
         MakeBlock [
             MVariable MAppend "CPPFLAGS" [MFunction "patsubst" [MFragment "%", MFragment "-iquote %", MFragment "$(PROJECT_INCLUDE_DIRS)"]],
@@ -63,6 +68,9 @@ genMakefile params loweredProject mExtern =
         ],
         MakeBlock $ [
             MRule "all" ["$(TARGET)"] [],
+            -- | A recipe that fails leaves no target that make would take as
+            -- up to date
+            MRule ".DELETE_ON_ERROR" [] [],
             MRule "$(TARGET_DIR_NAME)/termina/%.o" ["$(TERMINA_OSAL_DIR)/%.s"] [
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
@@ -77,6 +85,17 @@ genMakefile params loweredProject mExtern =
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
                 MakeCommand False [MFragment "@$(CC) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
+            ]] ++ testModuleFlags ++ [
+            -- | The SHA-256 of each module object without its debugging
+            -- information, which the build writes into provenance.json
+            MRule ".PHONY" ["stripped-hashes"] [],
+            MRule "stripped-hashes" ["$(MODULE_OBJS)"] [
+                MakeCommand False [MFragment "@$(RM) $(TARGET_DIR_NAME)/modules.sha256"],
+                MakeCommand False [MFragment $ unwords [
+                    "@if command -v $(OBJCOPY) >/dev/null 2>&1; then",
+                    "for o in $(MODULE_OBJS); do $(OBJCOPY) --strip-debug $$o $$o.stripped || exit 1;",
+                    "printf '%s %s\\n' $$($(TERMINA_SHA256) < $$o.stripped | cut -c 1-64) $${o#$R/}; $(RM) $$o.stripped; done > $(TARGET_DIR_NAME)/modules.sha256;",
+                    "else echo $(OBJCOPY) not found: the module objects are not hashed; fi"]]
             ],
             MRule "$(TARGET)" ["$(OBJS)"] [
                 MakeCommand False [MFragment "@echo Linking $@"],
@@ -104,6 +123,19 @@ genMakefile params loweredProject mExtern =
     where
 
         sourceFolders = foldr (S.insert . takeDirectory) S.empty $ M.keys loweredProject
+
+        -- | The release profile has no debugging information, and a test needs
+        -- it to give the line of each check
+        testDebugFlags = [MakeBlock [MVariable MAppend "CFLAGS" [MFragment "-g"]]
+            | isTestBuild params, profile params == Release]
+
+        -- | The modules of the test itself, in its folder, keep each call as a
+        -- call, so the return address of a check points to its line
+        testModuleFlags =
+            [ MRule ("$(TARGET_DIR_NAME)" </> "src" </> qname <.> "o") ["CFLAGS+=-fno-optimize-sibling-calls"] []
+            | isTestBuild params
+            , (qname, m) <- M.toList loweredProject
+            , "tests" `elem` take 1 (splitDirectories (fullPath m)) ]
 
         hasExtern = maybe False (const True) mExtern
 
