@@ -98,12 +98,11 @@ emptyAppModuleContent projectName = unlines [
 manifestFile :: FilePath
 manifestFile = "termina" <.> "yaml"
 
--- | Content of the .gitignore of a new project: the binaries the build leaves
--- in the folder of each deployment. The generated C code is kept under version
--- control.
-gitignoreContent :: FilePath -> String
-gitignoreContent output = unlines [
-        "/" ++ output ++ "/**/bin/",
+-- | Content of the .gitignore of a new project: the whole output, which the
+-- transpiler generates again from the project and the deliverable keeps.
+gitignoreContent :: String
+gitignoreContent = unlines [
+        "/" ++ outputFolderName ++ "/",
         ".DS_Store"
     ]
 
@@ -285,7 +284,7 @@ newCommand (NewProject project mPltName kind vcs vscode chatty) = do
     when chatty (putStrLn . debugMessage $ "Creating project output directory: " ++ outputFolderPath)
     createDirectory outputFolderPath
     when chatty (putStrLn . debugMessage $ "Creating .gitignore")
-    writeFile (project </> ".gitignore") (gitignoreContent (outputFolder config))
+    writeFile (project </> ".gitignore") gitignoreContent
     when vscode $ do
         when chatty (putStrLn . debugMessage $ "Creating the VS Code configuration")
         createDirectory (project </> ".devcontainer")
