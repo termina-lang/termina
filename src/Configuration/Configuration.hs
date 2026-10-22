@@ -96,8 +96,7 @@ data TerminaConfig =
     sysPrintOutputBufferSize :: !Integer,
     sysReadInputBufferSize :: !Integer,
     microsecondsPerTick :: !Integer,
-    builder :: !ProjectBuilder,
-    externConfig :: !ExternConfig
+    builder :: !ProjectBuilder
   } deriving (Eq, Show)
 
 defaultConfig :: String -> Platform -> TerminaConfig
@@ -111,6 +110,5 @@ defaultConfig projectName plt = TerminaConfig {
     sysPrintOutputBufferSize = defaultSysPrintOutputBufferSize,
     sysReadInputBufferSize = defaultSysReadInputBufferSize,
     microsecondsPerTick = defaultMicrosecondsPerTick,
-    builder = Make,
-    externConfig = emptyExternConfig
+    builder = Make
 }

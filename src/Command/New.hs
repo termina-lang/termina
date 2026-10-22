@@ -76,10 +76,11 @@ manifestFile :: FilePath
 manifestFile = "termina" <.> "yaml"
 
 -- | Content of the .gitignore of a new project: the binaries the build leaves
--- in the output folder. The generated C code is kept under version control.
+-- in the folder of each deployment. The generated C code is kept under version
+-- control.
 gitignoreContent :: FilePath -> String
 gitignoreContent output = unlines [
-        "/" ++ output ++ "/bin/",
+        "/" ++ output ++ "/**/bin/",
         ".DS_Store"
     ]
 
@@ -172,15 +173,15 @@ launchContent project output plt =
                 "}"
             ]
 
-tasksContent :: FilePath -> String
-tasksContent output = unlines [
+tasksContent :: String
+tasksContent = unlines [
         "{",
         "    \"version\": \"2.0.0\",",
         "    \"tasks\": [",
         "        {",
         "            \"label\": \"termina: build\",",
         "            \"type\": \"shell\",",
-        "            \"command\": \"termina build && make -C " ++ output ++ "\",",
+        "            \"command\": \"termina build\",",
         "            \"options\": { \"cwd\": \"${workspaceFolder}\" },",
         "            \"group\": { \"kind\": \"build\", \"isDefault\": true },",
         "            \"problemMatcher\": []",
@@ -258,7 +259,7 @@ newCommand (NewCmdArgs project pltName vcs vscode chatty) = do
         createDirectory (project </> ".devcontainer")
         writeFile (project </> ".devcontainer" </> "devcontainer.json") (devcontainerContent project)
         createDirectory (project </> ".vscode")
-        writeFile (project </> ".vscode" </> "launch.json") (launchContent project (outputFolder config) plt)
-        writeFile (project </> ".vscode" </> "tasks.json") (tasksContent (outputFolder config))
+        writeFile (project </> ".vscode" </> "launch.json") (launchContent project (outputFolder config </> "app") plt)
+        writeFile (project </> ".vscode" </> "tasks.json") tasksContent
     when (vcs == VcsGit) (initRepository chatty project)
     when chatty (putStrLn . debugMessage $ "Project created successfully")

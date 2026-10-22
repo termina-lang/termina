@@ -685,10 +685,10 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
     createDirectoryIfMissing True outputIncludeFolder
     -- | Load the main application module
     when chatty (putStrLn . debugMessage $ "Loading application's main module: \"" ++ appFolder </> appFilename <.> "fin" ++ "\"")
-    appModule <- loadTerminaModule appFilename appFolder (sourceModulesFolder config)
+    appModule <- loadTerminaModule appFolder appFilename [sourceModulesFolder config]
     -- | Load the project
     when chatty (putStrLn . debugMessage $ "Loading project modules")
-    parsedModules <- loadModules (importedModules appModule) (sourceModulesFolder config)
+    parsedModules <- loadModules (importedModules appModule) [sourceModulesFolder config]
     let parsedProject = M.insert (qualifiedName appModule) appModule parsedModules
     -- | Detect any possible loops in the project
     when chatty (putStrLn . debugMessage $ "Ordering project modules")

@@ -144,6 +144,11 @@ spec = describe "Manifest" $ do
       -- app/other.fin, src/top.fin, src/Obdh, tests/extra undeclared, tests/hk missing
       length errors `shouldBe` 5
 
+    it "rejects a module of a test with the name of one of the project" $ do
+      errors <- withProject "shadow" ["app/app.fin", "src/util/maths.fin", "tests/hk/test.fin", "tests/hk/src/util/maths.fin"] testsYaml
+        (\root m -> checkLayout root m)
+      errors `shouldBe` ["tests/hk/src/util/maths.fin: the project has a module with the same name in src/"]
+
     it "rejects an app/ folder in a library" $ do
       errors <- withProject "lib" ["app/app.fin"] (project ++ output ++ "exports:\n  - drivers\n")
         (\root m -> checkLayout root m)

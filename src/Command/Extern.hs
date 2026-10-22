@@ -19,6 +19,7 @@ import Modules.Modules
 
 import Control.Monad
 import qualified Data.ByteString as BS
+import Data.List (nub, (\\))
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -37,44 +38,58 @@ data ExternBuild = ExternBuild {
 externFolder :: FilePath
 externFolder = "extern"
 
--- | Check the "extern" section of the manifest against the "extern" folder
--- and copy the files that the selected platform needs to the output folder.
--- A project with no C returns Nothing.
-prepareExtern :: TerminaConfig -> IO (Maybe ExternBuild)
-prepareExtern config = do
-  let ExternConfig srcs libs = externConfig config
-  folderExists <- doesDirectoryExist externFolder
-  presentSources <- if folderExists then listCSources externFolder else return []
+-- | Check each "extern" section of the manifest against its folder, the one
+-- of the project and, in a test, the one of the test, and copy the files that
+-- the selected platform needs to the output folder. A file that both folders
+-- have would overwrite the other in the output folder, so it is an error. A
+-- deployment with no C returns Nothing.
+prepareExtern :: TerminaConfig -> [(FilePath, ExternConfig)] -> IO (Maybe ExternBuild)
+prepareExtern config folders = do
+  checked <- mapM (\(folder, extern) -> map (folder,) <$> checkExtern config folder extern) folders
+  let files = concat checked
+      relFiles = map snd files
+  forM_ (relFiles \\ nub relFiles) $ \file ->
+    die . errorMessage $ "The extern file \"" ++ file ++ "\" is in more than one extern folder of the deployment"
+  copyExtern (outputFolder config </> externFolder) files
+  let srcs = filter ((== ".c") . takeExtension) relFiles
+      libs = filter ((== ".a") . takeExtension) relFiles
+  if null relFiles
+    then return Nothing
+    else return . Just $ ExternBuild srcs libs
+
+-- | Check the "extern" section against its folder, and give the files that
+-- the selected platform needs, relative to the folder.
+checkExtern :: TerminaConfig -> FilePath -> ExternConfig -> IO [FilePath]
+checkExtern config externFolderPath (ExternConfig srcs libs) = do
+  folderExists <- doesDirectoryExist externFolderPath
+  presentSources <- if folderExists then listCSources externFolderPath else return []
   -- | Every source of the folder is listed, so that no C is left uncompiled
   forM_ presentSources $ \src ->
     unless (src `elem` srcs) $
-      die . errorMessage $ "The C source \"" ++ externFolder </> src ++ "\" is not listed in the \"extern\" section of \"termina.yaml\""
+      die . errorMessage $ "The C source \"" ++ externFolderPath </> src ++ "\" is not listed in its \"extern\" section of \"termina.yaml\""
   forM_ srcs $ \src -> do
     unless (takeExtension src == ".c") $
       die . errorMessage $ "The extern source \"" ++ src ++ "\" is not a C source file"
-    exists <- doesFileExist (externFolder </> src)
+    exists <- doesFileExist (externFolderPath </> src)
     unless exists $
-      die . errorMessage $ "The extern source \"" ++ externFolder </> src ++ "\" does not exist"
+      die . errorMessage $ "The extern source \"" ++ externFolderPath </> src ++ "\" does not exist"
   forM_ (M.toList libs) $ \(pltName, pltLibs) -> do
     when (checkPlatform (T.unpack pltName) == Nothing) $
       die . errorMessage $ "Unknown platform \"" ++ T.unpack pltName ++ "\" in the extern libraries"
     forM_ pltLibs $ \lib -> do
       unless (takeExtension lib == ".a") $
         die . errorMessage $ "The extern library \"" ++ lib ++ "\" is not a static library"
-      exists <- doesFileExist (externFolder </> lib)
+      exists <- doesFileExist (externFolderPath </> lib)
       unless exists $
-        die . errorMessage $ "The extern library \"" ++ externFolder </> lib ++ "\" does not exist"
+        die . errorMessage $ "The extern library \"" ++ externFolderPath </> lib ++ "\" does not exist"
   -- | The libraries of a project are tied to the platforms they were compiled
   -- for, so a project that has some has to have them for the selected one
   pltLibs <- if M.null libs
     then return []
     else case M.lookup (platform config) libs of
       Just ls -> return ls
-      Nothing -> die . errorMessage $ "The project provides no extern libraries for the platform \"" ++ T.unpack (platform config) ++ "\""
-  copyExtern (outputFolder config </> externFolder) (srcs ++ pltLibs)
-  if null srcs && null pltLibs
-    then return Nothing
-    else return . Just $ ExternBuild srcs pltLibs
+      Nothing -> die . errorMessage $ "The folder \"" ++ externFolderPath ++ "\" provides no extern libraries for the platform \"" ++ T.unpack (platform config) ++ "\""
+  return (srcs ++ pltLibs)
 
 -- | The C sources under a folder, as paths relative to it.
 listCSources :: FilePath -> IO [FilePath]
@@ -91,13 +106,15 @@ listCSources root = go ""
           then go relEntry
           else return [relEntry | takeExtension entry == ".c"])
 
--- | Copy the files to the output folder. A file is written only when its
--- content changed, so that its date only moves when it has to, and the files
--- of the output folder that are no longer listed are removed.
-copyExtern :: FilePath -> [FilePath] -> IO ()
-copyExtern destination files = do
-  forM_ files $ \file -> do
-    let source = externFolder </> file
+-- | Copy the files, each one given by its folder and its path relative to it,
+-- to the output folder. A file is written only when its content changed, so
+-- that its date only moves when it has to, and the files of the output folder
+-- that are no longer listed are removed.
+copyExtern :: FilePath -> [(FilePath, FilePath)] -> IO ()
+copyExtern destination folderFiles = do
+  let files = map snd folderFiles
+  forM_ folderFiles $ \(folder, file) -> do
+    let source = folder </> file
         target = destination </> file
     content <- BS.readFile source
     targetExists <- doesFileExist target

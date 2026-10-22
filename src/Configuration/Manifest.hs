@@ -20,7 +20,11 @@ module Configuration.Manifest (
     parseManifest,
     decodeManifestFile,
     checkLayout,
+    Deployment(..),
+    appDeployment,
     appConfig,
+    defaultTestProfile,
+    testDeployment,
     testConfig,
     newApplicationManifest
 ) where
@@ -321,9 +325,30 @@ checkLayout root manifest = do
     testsErrors <- checkTests
     srcErrors <- checkSources "src"
     testSrcErrors <- concat <$> mapM (\t -> checkSources ("tests" </> T.unpack t </> "src")) (M.keys (manifestTests manifest))
-    return (appErrors ++ testsErrors ++ srcErrors ++ testSrcErrors)
+    shadowErrors <- concat <$> mapM (checkShadowing . T.unpack) (M.keys (manifestTests manifest))
+    return (appErrors ++ testsErrors ++ srcErrors ++ testSrcErrors ++ shadowErrors)
 
   where
+
+    -- | A module of a test with the name of a module of the project would
+    -- leave one of the two out of the build.
+    checkShadowing t = do
+        let testSrc = "tests" </> t </> "src"
+        modules <- finFiles testSrc
+        clashes <- filterM (\m -> doesFileExist (root </> "src" </> m)) modules
+        return [testSrc </> m ++ ": the project has a module with the same name in src/" | m <- clashes]
+
+    finFiles dir = do
+        exists <- doesDirectoryExist (root </> dir)
+        if not exists then return [] else go dir ""
+      where
+        go base rel = do
+            entries <- visible <$> listDirectory (root </> base </> rel)
+            concat <$> forM entries (\e -> do
+                let relEntry = if null rel then e else rel </> e
+                isDir <- doesDirectoryExist (root </> base </> relEntry)
+                if isDir then go base relEntry
+                    else return [relEntry | takeExtension e == ".fin"])
 
     visible = filter (not . ("." `isPrefixOf`))
 
@@ -377,11 +402,27 @@ checkLayout root manifest = do
             else return [path ++ ": the names of modules are lowercase snake_case"
                 | takeExtension e == ".fin", not (isSnakeCase (dropExtension e))]
 
+-- | What the build of one deployment needs: the application, or a test on one
+-- of its platforms.
+data Deployment = Deployment {
+    -- | How messages name the deployment
+    deploymentLabel :: !String,
+    deploymentConfig :: !TerminaConfig,
+    deploymentPlatform :: !Platform,
+    -- | Folder and name of the module that wires the deployment
+    deploymentMainFolder :: !FilePath,
+    deploymentMainModule :: !FilePath,
+    -- | Folders where the imported modules are looked up
+    deploymentSources :: ![FilePath],
+    -- | Folders of C, each one with its section of the manifest
+    deploymentExterns :: ![(FilePath, ExternConfig)]
+  } deriving (Eq, Show)
+
 -- | The configuration of a deployment, in the form the rest of the transpiler
 -- reads.
-deploymentConfig :: Manifest -> Platform -> ProjectProfile -> Maybe Integer -> FilePath -> ExternConfig -> TerminaConfig
-deploymentConfig manifest plt prf tick output extern = TerminaConfig {
-    name = projectName (manifestProject manifest),
+configFor :: Manifest -> T.Text -> Platform -> ProjectProfile -> Maybe Integer -> FilePath -> TerminaConfig
+configFor manifest binaryName plt prf tick output = TerminaConfig {
+    name = binaryName,
     platform = T.pack (show plt),
     sourceModulesFolder = "src",
     outputFolder = output,
@@ -390,23 +431,62 @@ deploymentConfig manifest plt prf tick output extern = TerminaConfig {
     sysPrintOutputBufferSize = manifestPrintBufSize manifest,
     sysReadInputBufferSize = manifestReadBufSize manifest,
     microsecondsPerTick = fromMaybe defaultMicrosecondsPerTick tick,
-    builder = outputBuilder (manifestOutput manifest),
-    externConfig = extern
+    builder = outputBuilder (manifestOutput manifest)
   }
+
+-- | The application, or nothing in a library. It is built into the "app"
+-- folder of the output.
+appDeployment :: Manifest -> Maybe Deployment
+appDeployment manifest =
+    case manifestNature manifest of
+        Library _ -> Nothing
+        Application app -> Just Deployment {
+            deploymentLabel = "the application",
+            deploymentConfig = configFor manifest (projectName (manifestProject manifest)) (appPlatform app) (appProfile app)
+                (appMicrosecondsPerTick app) (outputRoot (manifestOutput manifest) </> "app"),
+            deploymentPlatform = appPlatform app,
+            deploymentMainFolder = appFolder,
+            deploymentMainModule = appFilename,
+            deploymentSources = ["src"],
+            deploymentExterns = [("extern", manifestExtern manifest)]
+          }
 
 -- | The configuration of the application, or nothing in a library.
 appConfig :: Manifest -> Maybe TerminaConfig
-appConfig manifest =
+appConfig = fmap deploymentConfig . appDeployment
+
+-- | The profile of a test when the run does not choose one: the one of the
+-- application, and debug in a library.
+defaultTestProfile :: Manifest -> ProjectProfile
+defaultTestProfile manifest =
     case manifestNature manifest of
-        Library _ -> Nothing
-        Application app -> Just $ deploymentConfig manifest (appPlatform app) (appProfile app)
-            (appMicrosecondsPerTick app) (outputRoot (manifestOutput manifest)) (manifestExtern manifest)
+        Application app -> appProfile app
+        Library _ -> Debug
+
+-- | A test on one of its platforms, built with the given profile. Its modules
+-- are looked up in the "src" of the project and in its own, and its C is the
+-- one of the project plus its own.
+testDeployment :: Manifest -> T.Text -> TestEntry -> Platform -> ProjectProfile -> Deployment
+testDeployment manifest testName entry plt prf = Deployment {
+    deploymentLabel = "the test " ++ T.unpack testName ++ " on " ++ show plt,
+    deploymentConfig = testConfig manifest testName entry plt prf,
+    deploymentPlatform = plt,
+    deploymentMainFolder = testFolder,
+    deploymentMainModule = "test",
+    deploymentSources = ["src", testFolder </> "src"],
+    deploymentExterns = [("extern", manifestExtern manifest), (testFolder </> "extern", testExtern entry)]
+  }
+
+  where
+
+    testFolder = "tests" </> T.unpack testName
 
 -- | The configuration of a test on one of its platforms, built with the given
--- profile. A test without its own tick takes the one of the application.
+-- profile. A test without its own tick takes the one of the application, and
+-- its binary takes its name.
 testConfig :: Manifest -> T.Text -> TestEntry -> Platform -> ProjectProfile -> TerminaConfig
 testConfig manifest testName entry plt prf =
-    deploymentConfig manifest plt prf tick output (manifestExtern manifest)
+    configFor manifest testName plt prf tick output
 
   where
 

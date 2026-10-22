@@ -12,6 +12,7 @@ import Command.Sched
 
 data Command =
     New NewCmdArgs
+    | Generate BuildCmdArgs
     | Build BuildCmdArgs
     | Try TryCmdArgs
     | LSP LSPCmdArgs
@@ -21,6 +22,10 @@ data Command =
 newCommandParser :: Parser Command
 newCommandParser = New
     <$> newCmdArgsParser
+
+generateCommandParser :: Parser Command
+generateCommandParser = Generate
+    <$> buildCmdArgsParser
 
 buildCommandParser :: Parser Command
 buildCommandParser = Build
@@ -41,7 +46,8 @@ lspCommandParser = LSP
 commandParser :: Parser Command
 commandParser = subparser
   ( command "new" (info newCommandParser ( progDesc "Setup a new project" ))
- <> command "build" (info buildCommandParser ( progDesc "Build current project" ))
+ <> command "generate" (info generateCommandParser ( progDesc "Generate the C code and the Makefile of the project" ))
+ <> command "build" (info buildCommandParser ( progDesc "Generate and compile the project" ))
  <> command "try" (info tryCommandParser ( progDesc "Translate a single file" ))
  <> command "lsp" (info lspCommandParser ( progDesc "Start language server" ))
  <> command "sched" (info schedCommandParser ( progDesc "Generate scheduling models" ))
@@ -59,6 +65,7 @@ main = do
             <> header "termina: a domain-specific language for real-time critical systems" )
     case cmd of
         New cmdargs -> newCommand cmdargs
+        Generate cmdargs -> generateCommand cmdargs
         Build cmdargs -> buildCommand cmdargs
         Try cmdargs -> tryCommand cmdargs
         LSP cmdargs -> lspCommand cmdargs

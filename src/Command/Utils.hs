@@ -96,23 +96,16 @@ changedDependendencies loweredProject t (x:xs) = do
   else
     changedDependendencies loweredProject t xs
 
-getModuleImports :: Maybe FilePath -> PAST.TerminaModule ParserAnn -> IO (Either ParsingErrors [ModuleDependency])
-getModuleImports (Just srcPath) m =
-    mapM buildAndTest (modules m) <&> sequence
-    where
+-- | The folder, among the source folders of a deployment, that holds a
+-- module. The layout check guarantees that at most one holds it.
+findModuleRoot :: [FilePath] -> QualifiedName -> IO (Maybe FilePath)
+findModuleRoot [] _ = return Nothing
+findModuleRoot (root : roots) qname = do
+    exists <- doesFileExist (root </> qname <.> "fin")
+    if exists then return (Just root) else findModuleRoot roots qname
 
-        buildAndTest :: PAST.ModuleImport ParserAnn -> IO (Either ParsingErrors ModuleDependency)
-        buildAndTest (ModuleImport modName ann) = do
-            let mname = buildModuleName ann modName
-            case mname of
-                Left err -> return $ Left err
-                Right qname -> do
-                    let importedPath = srcPath </> qname <.> "fin"
-                    exists <- doesFileExist importedPath
-                    if exists
-                        then return $ Right (ModuleDependency qname ann)
-                        else
-                            return $ Left (annotateError ann (EImportedFileNotFound importedPath))
+getModuleImports :: Maybe FilePath -> PAST.TerminaModule ParserAnn -> IO (Either ParsingErrors [ModuleDependency])
+getModuleImports (Just srcPath) m = getModuleImportsFrom [srcPath] m
 getModuleImports Nothing m =
     case modules m of
         [] -> return $ Right []
@@ -122,6 +115,25 @@ getModuleImports Nothing m =
                 Left err -> return $ Left err
                 Right qname -> do
                     return $ Left (annotateError ann (EImportedFileNotFound (qname <.> "fin")))
+
+-- | The modules a module imports, each one looked up in the source folders of
+-- the deployment.
+getModuleImportsFrom :: [FilePath] -> PAST.TerminaModule ParserAnn -> IO (Either ParsingErrors [ModuleDependency])
+getModuleImportsFrom roots m =
+    mapM buildAndTest (modules m) <&> sequence
+    where
+
+        buildAndTest :: PAST.ModuleImport ParserAnn -> IO (Either ParsingErrors ModuleDependency)
+        buildAndTest (ModuleImport modName ann) = do
+            let mname = buildModuleName ann modName
+            case mname of
+                Left err -> return $ Left err
+                Right qname -> do
+                    mRoot <- findModuleRoot roots qname
+                    case mRoot of
+                        Just _ -> return $ Right (ModuleDependency qname ann)
+                        Nothing ->
+                            return $ Left (annotateError ann (EImportedFileNotFound (head (roots ++ ["."]) </> qname <.> "fin")))
 
 boxUsageCheckModules :: LoweredProject -> Maybe BoxUsageError
 boxUsageCheckModules = check . M.elems

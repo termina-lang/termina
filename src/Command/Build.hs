@@ -1,11 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Command.Build (
-    buildCmdArgsParser, buildCommand, BuildCmdArgs
+    buildCmdArgsParser, buildCommand, generateCommand, BuildCmdArgs
 ) where
 
 import Configuration.Configuration
+import Configuration.Manifest
 import Command.Utils
+import Control.Exception (IOException, try)
+import Data.Maybe (fromMaybe, isJust)
+import System.Process (rawSystem)
 import Command.Types
 
 import qualified Options.Applicative as O
@@ -57,15 +61,26 @@ data CmpDiagramParam =
    deriving Show
 
 
--- | Data type for the "new" command arguments
+-- | The deployments a command works on
+data Selection =
+    SelectApp
+    | SelectTest String
+    | SelectTests
+    | SelectAll
+    deriving Show
+
+-- | Data type for the "generate" and "build" command arguments
 data BuildCmdArgs =
     BuildCmdArgs
         Bool -- ^ Verbose mode
         Bool -- ^ Generate transactional worst-case execution paths
         (Maybe CmpDiagramParam)
+        Selection
+        (Maybe Platform) -- ^ Only the tests on this platform
+        (Maybe ProjectProfile) -- ^ Profile of the tests
     deriving Show
 
--- | Parser for the "new" command arguments
+-- | Parser for the "generate" and "build" command arguments
 buildCmdArgsParser :: O.Parser BuildCmdArgs
 buildCmdArgsParser = BuildCmdArgs
     <$> O.switch (O.long "verbose"
@@ -74,8 +89,29 @@ buildCmdArgsParser = BuildCmdArgs
     <*> O.switch (O.long "gen-transactional-wceps"
         <> O.help "Generate transactional worst-case execution paths")
     <*> O.optional paramParser
+    <*> selectionParser
+    <*> O.optional (O.option (O.maybeReader checkPlatform)
+          ( O.long "platform"
+          <> O.metavar "PLATFORM"
+          <> O.help "Only the tests on this platform"))
+    <*> O.optional (O.option (O.eitherReader readProfile)
+          ( O.long "profile"
+          <> O.metavar "debug|release"
+          <> O.help "Profile of the tests (default: the one of the application, debug in a library)"))
 
   where
+
+    selectionParser :: O.Parser Selection
+    selectionParser =
+          (SelectTest <$> O.strOption (O.long "test" <> O.metavar "NAME" <> O.help "One test, on every platform of its list"))
+      O.<|> O.flag' SelectTests (O.long "tests" <> O.help "Every test")
+      O.<|> O.flag' SelectAll (O.long "all" <> O.help "The application and every test")
+      O.<|> pure SelectApp
+
+    readProfile :: String -> Either String ProjectProfile
+    readProfile "debug" = Right Debug
+    readProfile "release" = Right Release
+    readProfile other = Left $ "Unknown profile: " ++ other ++ " (use debug or release)"
 
     paramParser :: O.Parser CmpDiagramParam
     paramParser =
@@ -386,23 +422,84 @@ genResultHeaderFile params plt monadicTypes loweredProject appModName = do
         Left err -> die . errorMessage $ show err
         Right cOptionsFile -> TIO.writeFile resultFile $ runCPrinter (profile params == Debug) cOptionsFile
 
--- | Command handler for the "build" command
-buildCommand :: BuildCmdArgs -> IO ()
-buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
+-- | The deployments that the arguments select.
+selectedDeployments :: BuildCmdArgs -> IO [Deployment]
+selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
-    -- | Read the termina.yaml file
-    config <- loadConfig >>= either dieWithErrors return
-    -- | Decode the selected platform field
-    plt <- maybe (die . errorMessage $ "Unsupported platform: \"" ++ show (platform config) ++ "\"") return $ checkPlatform (T.unpack (platform config))
+    manifest <- loadManifest >>= either dieWithErrors return
+    either (die . errorMessage) return $ selectDeployments manifest selection mPlatform mProfile
+
+selectDeployments :: Manifest -> Selection -> Maybe Platform -> Maybe ProjectProfile -> Either String [Deployment]
+selectDeployments manifest selection mPlatform mProfile =
+    case selection of
+        SelectApp
+            | isJust mPlatform || isJust mProfile ->
+                Left "--platform and --profile select the platforms and the profile of tests: use them with --test, --tests or --all"
+            | otherwise -> maybe (Left noApp) (Right . pure) (appDeployment manifest)
+        SelectTest testName ->
+            case M.lookup (T.pack testName) tests of
+                Nothing -> Left $ "the manifest declares no test " ++ testName
+                Just entry -> case testOn (T.pack testName, entry) of
+                    [] -> Left $ "the test " ++ testName ++ " does not run on " ++ maybe "" show mPlatform
+                    ds -> Right ds
+        SelectTests -> nonEmpty (concatMap testOn (M.toList tests))
+        SelectAll -> nonEmpty (maybe [] pure (appDeployment manifest) ++ concatMap testOn (M.toList tests))
+
+  where
+
+    tests = manifestTests manifest
+
+    prf = fromMaybe (defaultTestProfile manifest) mProfile
+
+    testOn (testName, entry) =
+        [ testDeployment manifest testName entry plt prf
+        | plt <- testPlatforms entry, maybe True (== plt) mPlatform ]
+
+    noApp = "the project is a library and has no application: build its tests with --test, --tests or --all"
+
+    nonEmpty [] = Left "no deployment to build"
+    nonEmpty ds = Right ds
+
+-- | Command handler for the "generate" command
+generateCommand :: BuildCmdArgs -> IO ()
+generateCommand args = do
+    deployments <- selectedDeployments args
+    forM_ deployments $ \deployment -> do
+      announce deployments ("Generating " ++ deploymentLabel deployment)
+      generateDeployment args deployment
+
+-- | Command handler for the "build" command: it generates each deployment
+-- and runs make on its output folder
+buildCommand :: BuildCmdArgs -> IO ()
+buildCommand args = do
+    deployments <- selectedDeployments args
+    forM_ deployments $ \deployment -> do
+      announce deployments ("Building " ++ deploymentLabel deployment)
+      generateDeployment args deployment
+      runMake deployment
+
+-- | Say which deployment comes next when there are several.
+announce :: [Deployment] -> String -> IO ()
+announce deployments msg = when (length deployments > 1) (putStrLn . infoMessage $ msg)
+
+runMake :: Deployment -> IO ()
+runMake deployment = do
+    let folder = outputFolder (deploymentConfig deployment)
+    result <- try (rawSystem "make" ["-C", folder])
+    case result of
+        Left err -> die . errorMessage $ "Could not run make: " ++ show (err :: IOException)
+        Right ExitSuccess -> return ()
+        Right (ExitFailure _) -> die . errorMessage $ "make failed for " ++ deploymentLabel deployment
+
+generateDeployment :: BuildCmdArgs -> Deployment -> IO ()
+generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _) deployment = do
+    let config = deploymentConfig deployment
+        plt = deploymentPlatform deployment
+        sources = deploymentSources deployment
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
-    -- | Check that the files are in place
-    existSourceFolder <- doesDirectoryExist (sourceModulesFolder config)
-    unless existSourceFolder (die . errorMessage $ "Source folder \"" ++ sourceModulesFolder config ++ "\" does not exist")
-    existAppFolder <- doesDirectoryExist appFolder
-    unless existAppFolder (die . errorMessage $ "Application folder \"" ++ appFolder ++ "\" does not exist")
-    -- | Check the C of the project and copy it to the output folder
-    when chatty (putStrLn . debugMessage $ "Checking the extern C of the project")
-    mExtern <- prepareExtern config
+    -- | Check the C of the deployment and copy it to the output folder
+    when chatty (putStrLn . debugMessage $ "Checking the extern C of the deployment")
+    mExtern <- prepareExtern config (deploymentExterns deployment)
     -- | Create output header and source folder if it does not exist
     let outputSrcFolder = outputFolder config </> "src"
     let outputIncludeFolder = outputFolder config </> "include"
@@ -410,12 +507,13 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     createDirectoryIfMissing True outputSrcFolder
     when chatty (putStrLn . debugMessage $ "Creating output include folder (if missing): \"" ++ outputIncludeFolder ++ "\"")
     createDirectoryIfMissing True outputIncludeFolder
-    -- | Load the main application module
-    when chatty (putStrLn . debugMessage $ "Loading application's main module: \"" ++ appFolder </> appFilename <.> "fin" ++ "\"")
-    appModule <- loadTerminaModule appFilename appFolder (sourceModulesFolder config)
+    -- | Load the module that wires the deployment
+    let mainModulePath = deploymentMainFolder deployment </> deploymentMainModule deployment <.> "fin"
+    when chatty (putStrLn . debugMessage $ "Loading the main module: \"" ++ mainModulePath ++ "\"")
+    appModule <- loadTerminaModule (deploymentMainFolder deployment) (deploymentMainModule deployment) sources
     -- | Load the project
     when chatty (putStrLn . debugMessage $ "Loading project modules")
-    parsedModules <- loadModules (importedModules appModule) (sourceModulesFolder config)
+    parsedModules <- loadModules (importedModules appModule) sources
     let parsedProject = M.insert (qualifiedName appModule) appModule parsedModules
     -- | Detect any possible loops in the project
     when chatty (putStrLn . debugMessage $ "Ordering project modules")

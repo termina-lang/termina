@@ -41,10 +41,10 @@ loadTerminaModule ::
   FilePath
   -- | Path of the file to load
   -> FilePath
-  -- | Path of the source folder that stores the imported modules
-  -> FilePath
+  -- | Source folders that store the imported modules
+  -> [FilePath]
   -> IO ParsedModule
-loadTerminaModule root filePath srcPath = do
+loadTerminaModule root filePath srcPaths = do
   let fullP = root </> filePath <.> "fin"
   -- read it
   src_code <- TE.decodeUtf8 <$> BS.readFile fullP
@@ -57,7 +57,7 @@ loadTerminaModule root filePath srcPath = do
       in
       TIO.putStrLn (toText pErr fileMap) >> exitFailure
     Right term -> do
-      mimports <- getModuleImports (Just srcPath) term
+      mimports <- getModuleImportsFrom srcPaths term
       case mimports of
         Left err ->
           let fileMap = M.singleton fullP src_code in
@@ -68,9 +68,9 @@ loadTerminaModule root filePath srcPath = do
 -- | Load the modules of the project
 loadModules
   :: [ModuleDependency]
-  -> FilePath
+  -> [FilePath]
   -> IO ParsedProject
-loadModules imported srcPath = do
+loadModules imported srcPaths = do
   -- | Load and parse the project.
   -- The main application module has been already loaded. We need to load the
   -- rest of the modules.
@@ -90,7 +90,8 @@ loadModules imported srcPath = do
     then loadModules' fsLoaded fss
     -- Import and load it.
     else do
-      loadedModule <- loadTerminaModule srcPath qname srcPath
+      srcPath <- maybe (die . errorMessage $ "Module " ++ qname ++ " not found") return =<< findModuleRoot srcPaths qname
+      loadedModule <- loadTerminaModule srcPath qname srcPaths
       let deps = importedModules loadedModule
       loadModules'
         (M.insert qname loadedModule fsLoaded)
