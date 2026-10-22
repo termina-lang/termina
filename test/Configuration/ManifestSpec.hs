@@ -8,7 +8,7 @@ import Configuration.Platform
 
 import Control.Monad (forM_)
 import qualified Data.ByteString.Char8 as BS
-import Data.Either (isRight)
+import Data.Either (isLeft, isRight)
 import Data.List (isInfixOf)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
@@ -161,3 +161,31 @@ spec = describe "Manifest" $ do
 
   it "writes a manifest for a new application that it reads back" $
     parsed (newApplicationManifest "demo" POSIXGCC) `shouldSatisfy` isRight
+
+  it "writes a manifest for a new library that it reads back" $
+    fmap manifestNature (parsed (newLibraryManifest "my-lib" "my_lib"))
+      `shouldBe` Right (Library [Prefix [T.pack "my_lib"]])
+
+  describe "new tests" $ do
+
+    let nexys = project ++ app
+
+    it "runs a new test on the host and on the platform of the application" $
+      fmap defaultTestPlatforms (parsed nexys) `shouldBe` Right [POSIXGCC, RTEMS5LEON3SFNEXYSA7]
+
+    it "adds a tests section at the end when there is none" $
+      addTestEntry nexys "hk" [POSIXGCC] 10
+        `shouldBe` Right (nexys ++ "\ntests:\n  hk:\n    platforms: [posix-gcc]\n    timeout: 10\n")
+
+    it "adds the entry at the end of the tests section, keeping the rest" $ do
+      let original = project ++ "tests:   # unit tests\n    old:\n        platforms: [posix-gcc]\n        timeout: 5\n\n# the application\n" ++ app
+      addTestEntry original "hk" [POSIXGCC] 10
+        `shouldBe` Right (project ++ "tests:   # unit tests\n    old:\n        platforms: [posix-gcc]\n        timeout: 5\n"
+          ++ "    hk:\n        platforms: [posix-gcc]\n        timeout: 10\n\n# the application\n" ++ app)
+
+    it "gives a manifest that reads back with the new test" $
+      (addTestEntry nexys "hk" [POSIXGCC, RTEMS5LEON3SFNEXYSA7] 10 >>= parsed) `shouldSatisfy`
+        either (const False) (M.member (T.pack "hk") . manifestTests)
+
+    it "refuses a tests section in flow style" $
+      addTestEntry (project ++ app ++ "tests: {}\n") "hk" [POSIXGCC] 10 `shouldSatisfy` isLeft

@@ -26,14 +26,18 @@ module Configuration.Manifest (
     defaultTestProfile,
     testDeployment,
     testConfig,
-    newApplicationManifest
+    newApplicationManifest,
+    newLibraryManifest,
+    defaultTestPlatforms,
+    addTestEntry,
+    isSnakeCase
 ) where
 
 import Control.Monad
 import qualified Data.Aeson.Key as K
 import qualified Data.Aeson.KeyMap as KM
 import Data.Char (isAsciiLower, isDigit)
-import Data.List (isPrefixOf, nub, sort, (\\))
+import Data.List (intercalate, isPrefixOf, nub, sort, (\\))
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
@@ -496,6 +500,65 @@ testConfig manifest testName entry plt prf =
         (Nothing, Library _) -> Nothing
 
     output = outputRoot (manifestOutput manifest) </> "tests" </> T.unpack testName </> show plt
+
+-- | The manifest of a new library, which exports one prefix.
+newLibraryManifest :: String -> String -> String
+newLibraryManifest projectNameStr prefix = unlines [
+        "project:",
+        "  name: " ++ projectNameStr,
+        "  version: 0.1.0",
+        "  manifest-version: " ++ show (maximum knownManifestVersions),
+        "",
+        "exports:",
+        "  - " ++ prefix
+    ]
+
+-- | The platforms of a new test: the host, and the platform of the
+-- application when it is another one, so that the test passes on both.
+defaultTestPlatforms :: Manifest -> [Platform]
+defaultTestPlatforms manifest =
+    case manifestNature manifest of
+        Application app | appPlatform app /= POSIXGCC -> [POSIXGCC, appPlatform app]
+        _ -> [POSIXGCC]
+
+-- | Add the entry of a test at the end of the "tests" section of the text of
+-- a manifest, or in a new section at the end of the text. The rest of the
+-- text is kept as it is, comments included.
+addTestEntry :: String -> String -> [Platform] -> Integer -> Either String String
+addTestEntry original testName plts timeout =
+    case break (isSectionLine "tests") ls of
+        (_, []) -> Right $ unlines (ls ++ ["", "tests:"] ++ entry "  ")
+        (before, header : rest)
+            | not (isBlockHeader header) -> Left "the tests section of termina.yaml is not written in block style"
+            | otherwise ->
+                let (block, after) = break startsSection rest
+                    (content, blanks) = splitTrailingBlanks block
+                    unit = case filter (not . all (== ' ')) content of
+                        (l : _) -> takeWhile (== ' ') l
+                        [] -> "  "
+                in Right $ unlines (before ++ [header] ++ content ++ entry unit ++ blanks ++ after)
+
+  where
+
+    ls = lines original
+
+    entry unit = [
+        unit ++ testName ++ ":",
+        unit ++ unit ++ "platforms: [" ++ intercalate ", " (map show plts) ++ "]",
+        unit ++ unit ++ "timeout: " ++ show timeout
+      ]
+
+    isSectionLine key l = (key ++ ":") `isPrefixOf` l
+
+    isBlockHeader l = all (== ' ') (takeWhile (/= '#') (drop (length ("tests:" :: String)) l))
+
+    startsSection (c : _) = c /= ' '
+    startsSection [] = False
+
+    splitTrailingBlanks block =
+        let rev = reverse block
+            (blanks, content) = span (all (== ' ')) rev
+        in (reverse content, reverse blanks)
 
 -- | The manifest of a new application.
 newApplicationManifest :: String -> Platform -> String
