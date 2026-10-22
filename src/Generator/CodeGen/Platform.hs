@@ -30,10 +30,8 @@ genPlatformCode params plt loweredProject progArchitecture mExtern = do
     Left err -> die . errorMessage $ show err
     Right cConfigFile -> writeIfChanged configFile $ runCPrinter (lineDirectives params) cConfigFile
 
-  case builder params of
-    None -> return ()
-    Make -> writeIfChanged (destinationPath </> "Makefile") $
-      runMakefilePrinter (genMakefile params loweredProject mExtern)
+  writeIfChanged (destinationPath </> "Makefile") $
+    runMakefilePrinter (genMakefile params loweredProject mExtern)
 
   where
 

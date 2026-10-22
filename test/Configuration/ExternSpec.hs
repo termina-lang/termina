@@ -18,7 +18,6 @@ import Test.Hspec
 manifest :: String -> BS.ByteString
 manifest extra = BS.pack $
   "project:\n  name: test\n  version: 0.1.0\n  manifest-version: 1\n" ++
-  "output:\n  folder: output\n  builder: make\n" ++
   "app:\n  platform: rtems5-leon3sf-nexysa7\n  profile: release\n" ++
   extra
 

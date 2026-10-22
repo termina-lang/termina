@@ -14,9 +14,6 @@ import Test.Hspec
 makefileFor :: TerminaConfig -> String
 makefileFor config = T.unpack . runMakefilePrinter $ genMakefile config M.empty Nothing
 
-testIn :: ProjectProfile -> TerminaConfig
-testIn prf = (defaultConfig "test" TestPlatform) { profile = prf, deploymentKind = TestBuild (T.pack "hk") }
-
 spec :: Spec
 spec = describe "Makefile: project configuration" $ do
 
@@ -36,12 +33,12 @@ spec = describe "Makefile: project configuration" $ do
       , "CFLAGS+=-DTERMINA__SYS_READ__INPUT_BUFFER_SIZE=64\n"
       ]
 
-  it "adds the debugging information to a test in release" $
-    makefileFor (testIn Release) `shouldContain` "CFLAGS+=-g\n"
-
-  it "leaves the flags of the profile to a test in debug and to the application" $ do
-    makefileFor (testIn Debug) `shouldNotContain` "CFLAGS+=-g\n"
-    makefileFor (defaultConfig "test" TestPlatform) `shouldNotContain` "CFLAGS+=-g\n"
+  it "names the files of the project relative to its folder in the debugging information" $
+    mapM_ (\line -> makefileFor (defaultConfig "test" TestPlatform) { outputFolder = "output/tests/hk/posix-gcc" } `shouldContain` line)
+      [ "TERMINA_PROJECT_DIR:=$(abspath $R/../../../..)\n"
+      , "CFLAGS+=-ffile-prefix-map=$(TERMINA_PROJECT_DIR)=.\n"
+      , "@cd $(TERMINA_PROJECT_DIR) && $(CC) $(CFLAGS)"
+      ]
 
   it "deletes the target of a recipe that fails" $
     makefileFor (defaultConfig "test" TestPlatform) `shouldContain` ".DELETE_ON_ERROR:"

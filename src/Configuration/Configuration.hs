@@ -5,16 +5,16 @@ module Configuration.Configuration (
     ExternConfig(..),
     emptyExternConfig,
     ProjectProfile(..),
-    ProjectBuilder(..),
     defaultConfig,
     DeploymentKind(..),
     isTestBuild,
-    lineDirectives,
     defaultSysPrintOutputBufferSize,
     defaultSysReadInputBufferSize,
     defaultMicrosecondsPerTick,
     appFolder,
-    appFilename
+    appFilename,
+    outputFolderName,
+    efpFolderName
 ) where
 
 import qualified Data.Text as T
@@ -66,6 +66,13 @@ appFolder, appFilename :: FilePath
 appFolder = "app"
 appFilename = "app"
 
+-- | Folders of the generated output and of the files of the schedulability
+-- analysis, both in the project and fixed like the rest of its layout. The
+-- generated C in the output is kept under version control.
+outputFolderName, efpFolderName :: FilePath
+outputFolderName = "output"
+efpFolderName = "efp"
+
 instance FromJSON ProjectProfile where
     parseJSON (String "debug") = return Debug
     parseJSON (String "release") = return Release
@@ -74,17 +81,6 @@ instance FromJSON ProjectProfile where
 instance ToJSON ProjectProfile where
     toJSON Debug = String "debug"
     toJSON Release = String "release"
-
-data ProjectBuilder = None | Make deriving (Eq, Show)
-
-instance FromJSON ProjectBuilder where
-    parseJSON (String "none") = return None
-    parseJSON (String "make") = return Make
-    parseJSON _ = fail "Expected builder type"
-
-instance ToJSON ProjectBuilder where
-    toJSON None = String "none"
-    toJSON Make = String "make"
 
 -- | The configuration of one deployment, the application or a test on one
 -- platform, which "Configuration.Manifest" derives from "termina.yaml"
@@ -99,8 +95,10 @@ data TerminaConfig =
     sysPrintOutputBufferSize :: !Integer,
     sysReadInputBufferSize :: !Integer,
     microsecondsPerTick :: !Integer,
-    builder :: !ProjectBuilder,
-    deploymentKind :: !DeploymentKind
+    deploymentKind :: !DeploymentKind,
+    -- | Whether the generated C carries #line pragmas that point to the .fin.
+    -- Without them it is broken to the usual width, the plain C.
+    lineDirectives :: !Bool
   } deriving (Eq, Show)
 
 -- | What a deployment builds. What a test needs and the application does not
@@ -115,22 +113,17 @@ isTestBuild config = case deploymentKind config of
   TestBuild _ -> True
   ApplicationBuild -> False
 
--- | Whether the generated C carries #line pragmas that point to the .fin: in
--- the debug profile, and in a test whatever its profile
-lineDirectives :: TerminaConfig -> Bool
-lineDirectives config = profile config == Debug || isTestBuild config
-
 defaultConfig :: String -> Platform -> TerminaConfig
 defaultConfig projectName plt = TerminaConfig {
     name = T.pack projectName,
     platform = T.pack $ show plt,
     sourceModulesFolder = "src",
-    outputFolder = "output",
-    efpFolder = "efp",
+    outputFolder = outputFolderName,
+    efpFolder = efpFolderName,
     profile = Release,
     sysPrintOutputBufferSize = defaultSysPrintOutputBufferSize,
     sysReadInputBufferSize = defaultSysReadInputBufferSize,
     microsecondsPerTick = defaultMicrosecondsPerTick,
-    builder = Make,
-    deploymentKind = ApplicationBuild
+    deploymentKind = ApplicationBuild,
+    lineDirectives = False
 }

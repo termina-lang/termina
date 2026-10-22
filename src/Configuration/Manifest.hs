@@ -12,7 +12,6 @@ module Configuration.Manifest (
     Prefix(..),
     Dependency(..),
     GitDependency(..),
-    OutputConfig(..),
     AppDeployment(..),
     TestEntry(..),
     knownManifestVersions,
@@ -61,7 +60,6 @@ data Manifest = Manifest {
     manifestNature :: !Nature,
     manifestDependencies :: ![Dependency],
     manifestOverrides :: ![GitDependency],
-    manifestOutput :: !OutputConfig,
     manifestPrintBufSize :: !Integer,
     manifestReadBufSize :: !Integer,
     manifestExtern :: !ExternConfig,
@@ -99,12 +97,6 @@ data GitDependency = GitDependency {
 
 data Dependency = DepGit !GitDependency | DepPath !FilePath
   deriving (Eq, Show)
-
-data OutputConfig = OutputConfig {
-    outputRoot :: !FilePath,
-    outputEfpFolder :: !FilePath,
-    outputBuilder :: !ProjectBuilder
-  } deriving (Eq, Show)
 
 data AppDeployment = AppDeployment {
     appPlatform :: !Platform,
@@ -179,7 +171,7 @@ isSnakeCase [] = False
 
 manifestParser :: Value -> Parser Manifest
 manifestParser = withObject "manifest" $ \o -> do
-    onlyFields "the manifest" ["project", "exports", "dependencies", "overrides", "output",
+    onlyFields "the manifest" ["project", "exports", "dependencies", "overrides",
         "sys-print-output-buffer-size", "sys-read-input-buffer-size", "extern", "app", "tests"] o
     project <- o .: "project" >>= projectParser
     mExports <- o .:? "exports"
@@ -192,7 +184,6 @@ manifestParser = withObject "manifest" $ \o -> do
     Manifest project nature
         <$> (o .:? "dependencies" .!= [] >>= mapM dependencyParser)
         <*> (o .:? "overrides" .!= [] >>= mapM gitDependencyParser)
-        <*> (o .:? "output" >>= maybe (return defaultOutputConfig) outputParser)
         <*> (o .:? "sys-print-output-buffer-size" .!= defaultSysPrintOutputBufferSize >>= positive "sys-print-output-buffer-size")
         <*> (o .:? "sys-read-input-buffer-size" .!= defaultSysReadInputBufferSize >>= positive "sys-read-input-buffer-size")
         <*> (o .:? "extern" >>= maybe (return emptyExternConfig) externParser)
@@ -249,22 +240,6 @@ gitDependencyParser = withObject "dependency" $ \o -> do
     unless ("https://" `T.isPrefixOf` url) $
         fail $ "the repository " ++ T.unpack url ++ " is not an https:// URL"
     GitDependency url <$> o .: "rev"
-
--- | The output of a manifest without an "output" section.
-defaultOutputConfig :: OutputConfig
-defaultOutputConfig = OutputConfig "output" "efp" Make
-
-outputParser :: Value -> Parser OutputConfig
-outputParser = withObject "output" $ \o -> do
-    onlyFields "output" ["folder", "efp-folder", "builder"] o
-    builderName <- o .:? "builder" .!= "make"
-    bld <- case builderName :: T.Text of
-        "make" -> return Make
-        other -> fail $ "unknown builder \"" ++ T.unpack other ++ "\" (known: make)"
-    OutputConfig
-        <$> o .:? "folder" .!= outputRoot defaultOutputConfig
-        <*> o .:? "efp-folder" .!= outputEfpFolder defaultOutputConfig
-        <*> pure bld
 
 platformParser :: T.Text -> Parser Platform
 platformParser pltName =
@@ -419,7 +394,10 @@ data Deployment = Deployment {
     -- | Folders where the imported modules are looked up
     deploymentSources :: ![FilePath],
     -- | Folders of C, each one with its section of the manifest
-    deploymentExterns :: ![(FilePath, ExternConfig)]
+    deploymentExterns :: ![(FilePath, ExternConfig)],
+    -- | The C without #line pragmas of the deployment, for static analysis
+    -- and for delivery
+    deploymentPlainConfig :: !TerminaConfig
   } deriving (Eq, Show)
 
 -- | The configuration of a deployment, in the form the rest of the transpiler
@@ -432,37 +410,46 @@ configFor manifest kind plt prf tick = TerminaConfig {
     platform = T.pack (show plt),
     sourceModulesFolder = "src",
     outputFolder = output,
-    efpFolder = outputEfpFolder (manifestOutput manifest),
+    efpFolder = efpFolderName,
     profile = prf,
     sysPrintOutputBufferSize = manifestPrintBufSize manifest,
     sysReadInputBufferSize = manifestReadBufSize manifest,
     microsecondsPerTick = fromMaybe defaultMicrosecondsPerTick tick,
-    builder = outputBuilder (manifestOutput manifest),
-    deploymentKind = kind
+    deploymentKind = kind,
+    lineDirectives = True
   }
 
   where
 
-    root = outputRoot (manifestOutput manifest)
-
     (binaryName, output) = case kind of
-        ApplicationBuild -> (projectName (manifestProject manifest), root </> "app")
-        TestBuild testName -> (testName, root </> "tests" </> T.unpack testName </> show plt)
+        ApplicationBuild -> (projectName (manifestProject manifest), outputFolderName </> "app")
+        TestBuild testName -> (testName, outputFolderName </> "tests" </> T.unpack testName </> show plt)
 
 -- | The application, or nothing in a library.
 appDeployment :: Manifest -> Maybe Deployment
 appDeployment manifest =
     case manifestNature manifest of
         Library _ -> Nothing
-        Application app -> Just Deployment {
+        Application app ->
+          let config = configFor manifest ApplicationBuild (appPlatform app) (appProfile app) (appMicrosecondsPerTick app)
+          in Just Deployment {
             deploymentLabel = "the application",
-            deploymentConfig = configFor manifest ApplicationBuild (appPlatform app) (appProfile app) (appMicrosecondsPerTick app),
+            deploymentConfig = config,
             deploymentPlatform = appPlatform app,
             deploymentMainFolder = appFolder,
             deploymentMainModule = appFilename,
             deploymentSources = ["src"],
-            deploymentExterns = [("extern", manifestExtern manifest)]
+            deploymentExterns = [("extern", manifestExtern manifest)],
+            deploymentPlainConfig = plainConfigFor config
           }
+
+-- | The configuration of the plain C of a deployment, which goes to the same
+-- folder under "plain" in the output: "plain/app", "plain/tests/<name>/<platform>".
+plainConfigFor :: TerminaConfig -> TerminaConfig
+plainConfigFor config = config {
+    lineDirectives = False,
+    outputFolder = outputFolderName </> "plain" </> makeRelative outputFolderName (outputFolder config)
+  }
 
 -- | The configuration of the application, or nothing in a library.
 appConfig :: Manifest -> Maybe TerminaConfig
@@ -482,15 +469,18 @@ defaultTestProfile manifest =
 testDeployment :: Manifest -> T.Text -> TestEntry -> Platform -> ProjectProfile -> Deployment
 testDeployment manifest testName entry plt prf = Deployment {
     deploymentLabel = "the test " ++ T.unpack testName ++ " on " ++ show plt,
-    deploymentConfig = testConfig manifest testName entry plt prf,
+    deploymentConfig = config,
     deploymentPlatform = plt,
     deploymentMainFolder = testFolder,
     deploymentMainModule = "test",
     deploymentSources = ["src", testFolder </> "src"],
-    deploymentExterns = [("extern", manifestExtern manifest), (testFolder </> "extern", testExtern entry)]
+    deploymentExterns = [("extern", manifestExtern manifest), (testFolder </> "extern", testExtern entry)],
+    deploymentPlainConfig = plainConfigFor config
   }
 
   where
+
+    config = testConfig manifest testName entry plt prf
 
     testFolder = "tests" </> T.unpack testName
 

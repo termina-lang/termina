@@ -32,9 +32,16 @@ genMakefile params loweredProject mExtern =
         ]] ++ bufferSizeFlags ++ [
         MakeBlock [
             MInclude True $ "$(TERMINA_OSAL_DIR)" </> "platform" </> "$(PLATFORM)" </> "platform" <.> "mk"
-        ]] ++ testDebugFlags ++ [
+        ],
         MakeBlock [
             MVariable MConditional "TERMINA_SHA256" [MFragment "$(if $(shell command -v sha256sum 2>/dev/null),sha256sum,shasum -a 256)"]
+        ],
+        -- | The compiler runs from the folder of the project, and the
+        -- debugging information names its files relative to it, as the #line
+        -- pragmas do, so the debugger finds them wherever the project is
+        MakeBlock [
+            MVariable MSimple "TERMINA_PROJECT_DIR" [MFunction "abspath" [MFragment $ "$R" </> projectRoot]],
+            MVariable MAppend "CFLAGS" [MFragment "-ffile-prefix-map=$(TERMINA_PROJECT_DIR)=."]
         ],
         MakeBlock [
             MVariable MSimple "TARGET_DIR_NAME" [MFragment "$R/bin"],
@@ -74,28 +81,29 @@ genMakefile params loweredProject mExtern =
             MRule "$(TARGET_DIR_NAME)/termina/%.o" ["$(TERMINA_OSAL_DIR)/%.s"] [
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
-                MakeCommand False [MFragment "@$(AS) $(ASMFLAGS) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
+                MakeCommand False [MFragment "@cd $(TERMINA_PROJECT_DIR) && $(AS) $(ASMFLAGS) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
             ],
             MRule "$(TARGET_DIR_NAME)/termina/%.o" ["$(TERMINA_OSAL_DIR)/%.c"] [
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
-                MakeCommand False [MFragment "@$(CC) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
+                MakeCommand False [MFragment "@cd $(TERMINA_PROJECT_DIR) && $(CC) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
             ],
             MRule "$(TARGET_DIR_NAME)/%.o" ["$(R)/%.c"] [
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
-                MakeCommand False [MFragment "@$(CC) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
+                MakeCommand False [MFragment "@cd $(TERMINA_PROJECT_DIR) && $(CC) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
             ]] ++ testModuleFlags ++ [
-            -- | The SHA-256 of each module object without its debugging
-            -- information, which the build writes into provenance.json
+            -- | The SHA-256 of the binary and of each module object without
+            -- their debugging information, which the build writes into
+            -- provenance.json
             MRule ".PHONY" ["stripped-hashes"] [],
-            MRule "stripped-hashes" ["$(MODULE_OBJS)"] [
-                MakeCommand False [MFragment "@$(RM) $(TARGET_DIR_NAME)/modules.sha256"],
+            MRule "stripped-hashes" ["$(TARGET)", "$(MODULE_OBJS)"] [
+                MakeCommand False [MFragment "@$(RM) $(TARGET_DIR_NAME)/stripped.sha256"],
                 MakeCommand False [MFragment $ unwords [
                     "@if command -v $(OBJCOPY) >/dev/null 2>&1; then",
-                    "for o in $(MODULE_OBJS); do $(OBJCOPY) --strip-debug $$o $$o.stripped || exit 1;",
-                    "printf '%s %s\\n' $$($(TERMINA_SHA256) < $$o.stripped | cut -c 1-64) $${o#$R/}; $(RM) $$o.stripped; done > $(TARGET_DIR_NAME)/modules.sha256;",
-                    "else echo $(OBJCOPY) not found: the module objects are not hashed; fi"]]
+                    "for o in $(TARGET) $(MODULE_OBJS); do $(OBJCOPY) --strip-debug $$o $$o.stripped || exit 1;",
+                    "printf '%s %s\\n' $$($(TERMINA_SHA256) < $$o.stripped | cut -c 1-64) $${o#$R/}; $(RM) $$o.stripped; done > $(TARGET_DIR_NAME)/stripped.sha256;",
+                    "else echo $(OBJCOPY) not found: the objects are not hashed; fi"]]
             ],
             MRule "$(TARGET)" ["$(OBJS)"] [
                 MakeCommand False [MFragment "@echo Linking $@"],
@@ -124,10 +132,9 @@ genMakefile params loweredProject mExtern =
 
         sourceFolders = foldr (S.insert . takeDirectory) S.empty $ M.keys loweredProject
 
-        -- | The release profile has no debugging information, and a test needs
-        -- it to give the line of each check
-        testDebugFlags = [MakeBlock [MVariable MAppend "CFLAGS" [MFragment "-g"]]
-            | isTestBuild params, profile params == Release]
+        -- | The folder of the project seen from the output folder of the
+        -- deployment, which is always inside it
+        projectRoot = joinPath (map (const "..") (splitDirectories (outputFolder params)))
 
         -- | The modules of the test itself, in its folder, keep each call as a
         -- call, so the return address of a check points to its line

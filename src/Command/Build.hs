@@ -351,38 +351,39 @@ generateCommand args = do
       void (generateDeployment args deployment)
 
 -- | Command handler for the "build" command: it generates each deployment
--- and runs make on its output folder
+-- and runs make on the folder of its C with the #line pragmas
 buildCommand :: BuildCmdArgs -> IO ()
 buildCommand args = do
     deployments <- selectedDeployments args
     forM_ deployments $ \deployment -> do
       announce deployments ("Building " ++ deploymentLabel deployment)
       modules <- generateDeployment args deployment
-      runMake deployment []
-      runMake deployment ["-s", "stripped-hashes"]
-      writeProvenance deployment modules
+      let config = deploymentConfig deployment
+      runMake deployment config []
+      runMake deployment config ["-s", "stripped-hashes"]
+      writeProvenance config modules
 
 -- | Say which deployment comes next when there are several.
 announce :: [Deployment] -> String -> IO ()
 announce deployments msg = when (length deployments > 1) (putStrLn . infoMessage $ msg)
 
-runMake :: Deployment -> [String] -> IO ()
-runMake deployment targets = do
-    let folder = outputFolder (deploymentConfig deployment)
+runMake :: Deployment -> TerminaConfig -> [String] -> IO ()
+runMake deployment config targets = do
+    let folder = outputFolder config
     result <- try (rawSystem "make" (["-C", folder] ++ targets))
     case result of
         Left err -> die . errorMessage $ "Could not run make: " ++ show (err :: IOException)
         Right ExitSuccess -> return ()
-        Right (ExitFailure _) -> die . errorMessage $ "make failed for " ++ deploymentLabel deployment
+        Right (ExitFailure _) -> die . errorMessage $ "make failed for " ++ deploymentLabel deployment ++ " in " ++ folder
 
--- | Write provenance.json of a deployment: each module, where its source
--- comes from, and the SHA-256 of its object without debugging information,
--- which the Makefile leaves in bin/modules.sha256.
-writeProvenance :: Deployment -> [(QualifiedName, FilePath)] -> IO ()
-writeProvenance deployment modules = do
-    let config = deploymentConfig deployment
-        folder = outputFolder config
-        hashesFile = folder </> "bin" </> "modules.sha256"
+-- | Write provenance.json of a build: its binary and each module, where its
+-- source comes from, with the SHA-256 of their objects without debugging
+-- information, which the Makefile leaves in bin/stripped.sha256.
+writeProvenance :: TerminaConfig -> [(QualifiedName, FilePath)] -> IO ()
+writeProvenance config modules = do
+    let folder = outputFolder config
+        hashesFile = folder </> "bin" </> "stripped.sha256"
+        binary = "bin" </> T.unpack (name config)
     hashesExist <- doesFileExist hashesFile
     hashes <- if hashesExist
         then M.fromList . concatMap (toPair . words) . lines <$> readFile hashesFile
@@ -401,10 +402,14 @@ writeProvenance deployment modules = do
             "deployment" .= (if isTestBuild config then "test" else "app" :: String),
             "platform" .= platform config,
             "profile" .= profile config,
+            "binary" .= object [
+                "path" .= binary,
+                "stripped-sha256" .= M.lookup binary hashes
+              ],
             "modules" .= map moduleEntry modules
           ]
     BL.writeFile (folder </> "provenance" <.> "json") $
-      encodePretty' defConfig { confCompare = keyOrder ["name", "deployment", "platform", "profile", "modules", "module", "origin", "source", "object"] } provenance
+      encodePretty' defConfig { confCompare = keyOrder ["name", "deployment", "platform", "profile", "binary", "modules", "path", "module", "origin", "source", "object"] } provenance
 
   where
 
@@ -419,16 +424,6 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _) 
         plt = deploymentPlatform deployment
         sources = deploymentSources deployment
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
-    -- | Check the C of the deployment and copy it to the output folder
-    when chatty (putStrLn . debugMessage $ "Checking the extern C of the deployment")
-    mExtern <- prepareExtern config (deploymentExterns deployment)
-    -- | Create output header and source folder if it does not exist
-    let outputSrcFolder = outputFolder config </> "src"
-    let outputIncludeFolder = outputFolder config </> "include"
-    when chatty (putStrLn . debugMessage $ "Creating output source folder (if missing): \"" ++ outputSrcFolder ++ "\"")
-    createDirectoryIfMissing True outputSrcFolder
-    when chatty (putStrLn . debugMessage $ "Creating output include folder (if missing): \"" ++ outputIncludeFolder ++ "\"")
-    createDirectoryIfMissing True outputIncludeFolder
     -- | Load the module that wires the deployment
     let mainModulePath = deploymentMainFolder deployment </> deploymentMainModule deployment <.> "fin"
     when chatty (putStrLn . debugMessage $ "Loading the main module: \"" ++ mainModulePath ++ "\"")
@@ -483,20 +478,23 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _) 
     checkTaskPriorities loweredProject programArchitecture
     checkSystemExceptAction loweredProject programArchitecture
     checkProjectBoxSources loweredProject programArchitecture
-    -- | Generate the code
-    when chatty (putStrLn . debugMessage $ "Generating code")
-    genModules config plt monadicTypes elaboratedProject
-    genInitFile config plt elaboratedProject
-    genPlatformCode config plt loweredProject programArchitecture mExtern
+    -- | Generate the code with the #line pragmas and the plain C
+    forM_ [deploymentConfig deployment, deploymentPlainConfig deployment] $ \outConfig -> do
+      when chatty (putStrLn . debugMessage $ "Generating code into \"" ++ outputFolder outConfig ++ "\"")
+      -- | Check the C of the deployment and copy it to the output folder
+      mExtern <- prepareExtern outConfig (deploymentExterns deployment)
+      genModules outConfig plt monadicTypes elaboratedProject
+      genInitFile outConfig plt elaboratedProject
+      genPlatformCode outConfig plt loweredProject programArchitecture mExtern
+      monadicHeaders <- genMonadicHeaderFiles outConfig plt monadicTypes
+      -- | The C of a module that is no longer in the project would still be
+      -- compiled and linked
+      let out = outputFolder outConfig
+          moduleNames = M.keys elaboratedProject
+      removeStaleFiles (out </> "src") [".c"] [out </> "src" </> m <.> "c" | m <- moduleNames]
+      removeStaleFiles (out </> "include") [".h"]
+        ([out </> "include" </> m <.> "h" | m <- moduleNames] ++ [out </> "include" </> "config" <.> "h"] ++ monadicHeaders)
     genChecksReportFile config loweredProject checksReports
-    monadicHeaders <- genMonadicHeaderFiles config plt monadicTypes
-    -- | The C of a module that is no longer in the project would still be
-    -- compiled and linked
-    let out = outputFolder config
-        moduleNames = M.keys elaboratedProject
-    removeStaleFiles (out </> "src") [".c"] [out </> "src" </> m <.> "c" | m <- moduleNames]
-    removeStaleFiles (out </> "include") [".h"]
-      ([out </> "include" </> m <.> "h" | m <- moduleNames] ++ [out </> "include" </> "config" <.> "h"] ++ monadicHeaders)
     when genTransactionalWCEPs $
       when chatty (putStrLn . debugMessage $ "Generating transactional worst-case execution paths") >>
       genTWCEPFiles config loweredProject
