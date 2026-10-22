@@ -23,7 +23,8 @@ import ControlFlow.SideEffects.Errors (SideEffectsError)
 import Configuration.Platform (Platform)
 import ControlFlow.ExitPaths
 import Configuration.Configuration
-import Data.Yaml
+import Configuration.Manifest
+import Data.List (intercalate)
 import System.Directory
 import Utils.Annotations
 import ControlFlow.ExitPaths.Errors (PathsCheckError)
@@ -46,7 +47,7 @@ import Control.Monad (when)
 import Data.Maybe (listToMaybe, mapMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import System.Exit (exitFailure)
+import System.Exit (die, exitFailure)
 
 -- | Error message formatter
 -- Prints error messages in the form "[error] <message>"
@@ -303,14 +304,26 @@ runLoweredChecks chatty plt loweredProject = mapM_ runOne loweredChecks
         Nothing -> return ()
         Just failure -> TIO.putStrLn (failureMessage failure sourceFilesMap) >> exitFailure
 
--- | Load "termina.yaml" configuration file
-loadConfig :: (MonadIO m) => m (Either ParseException TerminaConfig)
-loadConfig =
-    liftIO $ decodeFileEither "termina.yaml"
+-- | Load "termina.yaml" and check the folders of the project against it. The
+-- error holds every problem found, one per line.
+loadManifest :: (MonadIO m) => m (Either String Manifest)
+loadManifest = liftIO $ do
+    result <- decodeManifestFile "termina.yaml"
+    case result of
+        Left err -> return (Left ("termina.yaml: " ++ err))
+        Right manifest -> do
+            layoutErrors <- checkLayout "." manifest
+            return $ if null layoutErrors then Right manifest else Left (intercalate "\n" layoutErrors)
 
-serializeConfig :: (MonadIO m) => FilePath -> TerminaConfig -> m ()
-serializeConfig filePath config = do
-    liftIO $ encodeFile (filePath </> "termina" <.> "yaml") config
+-- | Print each line of the error as an error and stop.
+dieWithErrors :: String -> IO a
+dieWithErrors = die . intercalate "\n" . map errorMessage . lines
+
+-- | The configuration of the application of the project.
+loadConfig :: (MonadIO m) => m (Either String TerminaConfig)
+loadConfig = do
+    result <- loadManifest
+    return $ result >>= maybe (Left "the project is a library and has no application") Right . appConfig
 
 sortProjectDepsOrLoop
   :: ProjectDependencies

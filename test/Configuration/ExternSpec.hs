@@ -3,6 +3,7 @@
 module Configuration.ExternSpec (spec) where
 
 import Configuration.Configuration
+import Configuration.Manifest
 import Configuration.Platform (Platform(TestPlatform))
 import Command.Extern (ExternBuild(..))
 import Generator.CodeGen.Application.Makefile (genMakefile)
@@ -16,15 +17,13 @@ import Test.Hspec
 
 manifest :: String -> BS.ByteString
 manifest extra = BS.pack $
-  "name: test\n" ++
-  "platform: rtems5-leon3sf-nexysa7\n" ++
-  "source-modules: src\n" ++
-  "output-folder: output\n" ++
-  "builder: make\n" ++
+  "project:\n  name: test\n  version: 0.1.0\n  manifest-version: 1\n" ++
+  "output:\n  folder: output\n  builder: make\n" ++
+  "app:\n  platform: rtems5-leon3sf-nexysa7\n  profile: release\n" ++
   extra
 
 parsedExtern :: BS.ByteString -> Maybe ExternConfig
-parsedExtern = either (const Nothing) (Just . externConfig) . decodeEither'
+parsedExtern = either (const Nothing) (either (const Nothing) (Just . manifestExtern) . parseManifest) . decodeEither'
 
 spec :: Spec
 spec = describe "Manifest: extern section" $ do

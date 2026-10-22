@@ -1,0 +1,431 @@
+{-# LANGUAGE OverloadedStrings #-}
+
+-- | The manifest of a project, "termina.yaml": what the project is, what it
+-- produces (a library with "exports" or an application with "app/"), what it
+-- depends on, and the deployments it builds (the application and the tests).
+module Configuration.Manifest (
+    Manifest(..),
+    ProjectInfo(..),
+    Assurance(..),
+    Standard(..),
+    Nature(..),
+    Prefix(..),
+    Dependency(..),
+    GitDependency(..),
+    OutputConfig(..),
+    AppDeployment(..),
+    TestEntry(..),
+    knownManifestVersions,
+    defaultTestLogSize,
+    parseManifest,
+    decodeManifestFile,
+    checkLayout,
+    appConfig,
+    testConfig,
+    newApplicationManifest
+) where
+
+import Control.Monad
+import qualified Data.Aeson.Key as K
+import qualified Data.Aeson.KeyMap as KM
+import Data.Char (isAsciiLower, isDigit)
+import Data.List (isPrefixOf, nub, sort, (\\))
+import qualified Data.Map.Strict as M
+import Data.Maybe (fromMaybe)
+import qualified Data.Text as T
+import Data.Yaml
+import System.Directory
+import System.FilePath
+
+import Configuration.Configuration
+import Configuration.Platform
+
+-- | The versions of the format of the manifest that this transpiler reads.
+knownManifestVersions :: [Int]
+knownManifestVersions = [1]
+
+-- | Bytes of the record of results of a test when its entry does not say.
+defaultTestLogSize :: Integer
+defaultTestLogSize = 8192
+
+data Manifest = Manifest {
+    manifestProject :: !ProjectInfo,
+    manifestNature :: !Nature,
+    manifestDependencies :: ![Dependency],
+    manifestOverrides :: ![GitDependency],
+    manifestOutput :: !OutputConfig,
+    manifestPrintBufSize :: !Integer,
+    manifestReadBufSize :: !Integer,
+    manifestExtern :: !ExternConfig,
+    manifestTests :: !(M.Map T.Text TestEntry)
+  } deriving (Eq, Show)
+
+data ProjectInfo = ProjectInfo {
+    projectName :: !T.Text,
+    projectVersion :: !T.Text,
+    projectManifestVersion :: !Int,
+    projectAssurance :: ![Assurance]
+  } deriving (Eq, Show)
+
+data Standard = ECSSEST40 | DO178C
+  deriving (Eq, Show)
+
+data Assurance = Assurance {
+    assuranceStandard :: !Standard,
+    assuranceLevel :: !Char
+  } deriving (Eq, Show)
+
+-- | A namespace prefix that a library owns, such as "drivers.gaisler".
+newtype Prefix = Prefix [T.Text]
+  deriving (Eq, Show)
+
+-- | A project is a library, with "exports" and no "app/", or an application,
+-- with "app/" and no "exports".
+data Nature = Library ![Prefix] | Application !AppDeployment
+  deriving (Eq, Show)
+
+data GitDependency = GitDependency {
+    gitUrl :: !T.Text,
+    gitRev :: !T.Text
+  } deriving (Eq, Show)
+
+data Dependency = DepGit !GitDependency | DepPath !FilePath
+  deriving (Eq, Show)
+
+data OutputConfig = OutputConfig {
+    outputRoot :: !FilePath,
+    outputEfpFolder :: !FilePath,
+    outputBuilder :: !ProjectBuilder
+  } deriving (Eq, Show)
+
+data AppDeployment = AppDeployment {
+    appPlatform :: !Platform,
+    appProfile :: !ProjectProfile,
+    appMicrosecondsPerTick :: !(Maybe Integer)
+  } deriving (Eq, Show)
+
+data TestEntry = TestEntry {
+    testPlatforms :: ![Platform],
+    testTimeout :: !Integer,
+    testLogSize :: !Integer,
+    testMicrosecondsPerTick :: !(Maybe Integer),
+    testExtern :: !ExternConfig,
+    testDependencies :: ![Dependency],
+    testOverrides :: ![GitDependency]
+  } deriving (Eq, Show)
+
+-- | Parse a manifest. The version of the format is checked first, so that a
+-- manifest of another version is rejected for its version and not for the
+-- first field this transpiler does not know.
+parseManifest :: Value -> Either String Manifest
+parseManifest v = do
+    ver <- parseEither manifestVersion v
+    unless (ver `elem` knownManifestVersions) $
+        Left $ "manifest-version " ++ show ver ++ " is not supported by this version of termina (supported: "
+            ++ unwords (map show knownManifestVersions) ++ ")"
+    parseEither manifestParser v
+
+  where
+
+    manifestVersion :: Value -> Parser Int
+    manifestVersion = withObject "manifest" $ \o -> do
+        mProject <- o .:? "project"
+        mVersion <- maybe (return Nothing) (withObject "project" (.:? "manifest-version")) mProject
+        maybe (fail "the manifest has no project.manifest-version") return mVersion
+
+decodeManifestFile :: FilePath -> IO (Either String Manifest)
+decodeManifestFile path = do
+    result <- decodeFileEither path
+    return $ case result of
+        Left err -> Left (prettyPrintParseException err)
+        Right v -> parseManifest v
+
+-- | Fail on a field that the object does not admit, suggesting the admitted
+-- one closest to it.
+onlyFields :: String -> [K.Key] -> Object -> Parser ()
+onlyFields what allowed o =
+    case filter (`notElem` allowed) (KM.keys o) of
+        [] -> return ()
+        (k : _) -> fail $ "unknown field \"" ++ K.toString k ++ "\" in " ++ what ++ suggestion (K.toString k)
+
+  where
+
+    suggestion field =
+        case [a | a <- map K.toString allowed, editDistance field a <= 2] of
+            (a : _) -> ", did you mean \"" ++ a ++ "\"?"
+            [] -> ""
+
+editDistance :: String -> String -> Int
+editDistance a b = last (foldl step [0 .. length a] b)
+
+  where
+
+    step prev@(p : ps) c = scanl compute (p + 1) (zip3 a prev ps)
+      where compute left (ca, diag, up) = minimum [up + 1, left + 1, diag + fromEnum (ca /= c)]
+    step [] _ = []
+
+-- | Lowercase snake_case, the form of every segment of a module name.
+isSnakeCase :: String -> Bool
+isSnakeCase (c : cs) = isAsciiLower c && all (\x -> isAsciiLower x || isDigit x || x == '_') cs
+isSnakeCase [] = False
+
+manifestParser :: Value -> Parser Manifest
+manifestParser = withObject "manifest" $ \o -> do
+    onlyFields "the manifest" ["project", "exports", "dependencies", "overrides", "output",
+        "sys-print-output-buffer-size", "sys-read-input-buffer-size", "extern", "app", "tests"] o
+    project <- o .: "project" >>= projectParser
+    mExports <- o .:? "exports"
+    mApp <- o .:? "app"
+    nature <- case (mExports, mApp) of
+        (Just _, Just _) -> fail "a project has either exports (a library) or app (an application), not both"
+        (Nothing, Nothing) -> fail "a project needs either exports (a library) or app (an application)"
+        (Just exports, Nothing) -> Library <$> mapM prefixParser exports
+        (Nothing, Just app) -> Application <$> appParser app
+    Manifest project nature
+        <$> (o .:? "dependencies" .!= [] >>= mapM dependencyParser)
+        <*> (o .:? "overrides" .!= [] >>= mapM gitDependencyParser)
+        <*> (o .:? "output" >>= maybe (return defaultOutputConfig) outputParser)
+        <*> (o .:? "sys-print-output-buffer-size" .!= defaultSysPrintOutputBufferSize >>= positive "sys-print-output-buffer-size")
+        <*> (o .:? "sys-read-input-buffer-size" .!= defaultSysReadInputBufferSize >>= positive "sys-read-input-buffer-size")
+        <*> (o .:? "extern" >>= maybe (return emptyExternConfig) externParser)
+        <*> (o .:? "tests" .!= M.empty >>= M.traverseWithKey testParser)
+
+projectParser :: Value -> Parser ProjectInfo
+projectParser = withObject "project" $ \o -> do
+    onlyFields "project" ["name", "version", "manifest-version", "assurance"] o
+    ProjectInfo
+        <$> o .: "name"
+        <*> o .: "version"
+        <*> o .: "manifest-version"
+        <*> (o .:? "assurance" .!= [] >>= mapM assuranceParser >>= noRepeatedStandard)
+
+  where
+
+    noRepeatedStandard assurances = do
+        let standards = map assuranceStandard assurances
+        when (length (nub standards) /= length standards) $
+            fail "a standard appears twice in project.assurance"
+        return assurances
+
+assuranceParser :: Value -> Parser Assurance
+assuranceParser = withObject "assurance" $ \o -> do
+    onlyFields "an assurance entry" ["standard", "level"] o
+    standard <- o .: "standard"
+    level <- o .: "level"
+    case (standard :: T.Text, T.unpack level) of
+        ("ecss-e-st-40", [l]) | l `elem` ['A' .. 'D'] -> return (Assurance ECSSEST40 l)
+        ("do-178c", [l]) | l `elem` ['A' .. 'E'] -> return (Assurance DO178C l)
+        ("ecss-e-st-40", _) -> fail $ "the level of ecss-e-st-40 is a criticality from A to D, not " ++ T.unpack level
+        ("do-178c", _) -> fail $ "the level of do-178c is a DAL from A to E, not " ++ T.unpack level
+        _ -> fail $ "unknown standard \"" ++ T.unpack standard ++ "\" (known: ecss-e-st-40, do-178c)"
+
+prefixParser :: T.Text -> Parser Prefix
+prefixParser txt =
+    let segments = T.splitOn "." txt in
+    if all (isSnakeCase . T.unpack) segments
+        then return (Prefix segments)
+        else fail $ "the export \"" ++ T.unpack txt ++ "\" is not a module prefix (lowercase snake_case segments separated by dots)"
+
+dependencyParser :: Value -> Parser Dependency
+dependencyParser = withObject "dependency" $ \o ->
+    if KM.member "path" o
+        then do
+            onlyFields "a path dependency" ["path"] o
+            DepPath <$> o .: "path"
+        else DepGit <$> gitDependencyParser (Object o)
+
+gitDependencyParser :: Value -> Parser GitDependency
+gitDependencyParser = withObject "dependency" $ \o -> do
+    onlyFields "a git dependency" ["git", "rev"] o
+    url <- o .: "git"
+    unless ("https://" `T.isPrefixOf` url) $
+        fail $ "the repository " ++ T.unpack url ++ " is not an https:// URL"
+    GitDependency url <$> o .: "rev"
+
+-- | The output of a manifest without an "output" section.
+defaultOutputConfig :: OutputConfig
+defaultOutputConfig = OutputConfig "output" "efp" Make
+
+outputParser :: Value -> Parser OutputConfig
+outputParser = withObject "output" $ \o -> do
+    onlyFields "output" ["folder", "efp-folder", "builder"] o
+    builderName <- o .:? "builder" .!= "make"
+    bld <- case builderName :: T.Text of
+        "make" -> return Make
+        other -> fail $ "unknown builder \"" ++ T.unpack other ++ "\" (known: make)"
+    OutputConfig
+        <$> o .:? "folder" .!= outputRoot defaultOutputConfig
+        <*> o .:? "efp-folder" .!= outputEfpFolder defaultOutputConfig
+        <*> pure bld
+
+platformParser :: T.Text -> Parser Platform
+platformParser pltName =
+    maybe (fail $ "unsupported platform \"" ++ T.unpack pltName ++ "\"") return (checkPlatform (T.unpack pltName))
+
+profileParser :: T.Text -> Parser ProjectProfile
+profileParser "debug" = return Debug
+profileParser "release" = return Release
+profileParser other = fail $ "unknown profile \"" ++ T.unpack other ++ "\" (known: debug, release)"
+
+-- | The length of the tick, which has to divide 1000000 exactly because the
+-- runtime derives the ticks per second from it.
+tickParser :: Maybe Integer -> Parser (Maybe Integer)
+tickParser Nothing = return Nothing
+tickParser (Just ticks) =
+    if ticks > 0 && 1000000 `mod` ticks == 0
+        then return (Just ticks)
+        else fail "microseconds-per-tick must divide 1000000 exactly"
+
+positive :: String -> Integer -> Parser Integer
+positive what n = if n > 0 then return n else fail $ what ++ " must be positive"
+
+externParser :: Value -> Parser ExternConfig
+externParser v = do
+    withObject "extern" (onlyFields "extern" ["sources", "libraries"]) v
+    parseJSON v
+
+appParser :: Value -> Parser AppDeployment
+appParser = withObject "app" $ \o -> do
+    onlyFields "app" ["platform", "profile", "microseconds-per-tick"] o
+    AppDeployment
+        <$> (o .: "platform" >>= platformParser)
+        <*> (o .: "profile" >>= profileParser)
+        <*> (o .:? "microseconds-per-tick" >>= tickParser)
+
+testParser :: T.Text -> Value -> Parser TestEntry
+testParser testName v = do
+    let what = "test " ++ T.unpack testName
+    unless (isSnakeCase (T.unpack testName)) $
+        fail $ "the test name \"" ++ T.unpack testName ++ "\" is not lowercase snake_case"
+    withObject what (\o -> do
+        onlyFields what ["platforms", "timeout", "test-log-size",
+            "microseconds-per-tick", "extern", "dependencies", "overrides"] o
+        platformNames <- o .: "platforms"
+        when (null platformNames) $ fail $ what ++ " has no platforms"
+        when (length (nub platformNames) /= length platformNames) $
+            fail $ what ++ " lists a platform twice"
+        TestEntry
+            <$> mapM platformParser platformNames
+            <*> (o .: "timeout" >>= positive "timeout")
+            <*> (o .:? "test-log-size" .!= defaultTestLogSize >>= positive "test-log-size")
+            <*> (o .:? "microseconds-per-tick" >>= tickParser)
+            <*> (o .:? "extern" >>= maybe (return emptyExternConfig) externParser)
+            <*> (o .:? "dependencies" .!= [] >>= mapM dependencyParser)
+            <*> (o .:? "overrides" .!= [] >>= mapM gitDependencyParser)) v
+
+-- | Check the folders of the project against the manifest, and collect every
+-- mismatch so that all of them are reported at once.
+checkLayout :: FilePath -> Manifest -> IO [String]
+checkLayout root manifest = do
+    appErrors <- checkApp
+    testsErrors <- checkTests
+    srcErrors <- checkSources "src"
+    testSrcErrors <- concat <$> mapM (\t -> checkSources ("tests" </> T.unpack t </> "src")) (M.keys (manifestTests manifest))
+    return (appErrors ++ testsErrors ++ srcErrors ++ testSrcErrors)
+
+  where
+
+    visible = filter (not . ("." `isPrefixOf`))
+
+    checkApp = do
+        hasApp <- doesDirectoryExist (root </> appFolder)
+        case manifestNature manifest of
+            Library _ ->
+                return ["a library, with exports, cannot have an app/ folder" | hasApp]
+            Application _ | not hasApp ->
+                return ["the manifest has an app section but there is no app/ folder"]
+            Application _ -> do
+                entries <- visible <$> listDirectory (root </> appFolder)
+                let appFile = appFilename <.> "fin"
+                return $ ["app/ has no " ++ appFile | appFile `notElem` entries]
+                    ++ ["app/" ++ e ++ ": app/ may only contain " ++ appFile | e <- entries, e /= appFile]
+
+    checkTests = do
+        hasTests <- doesDirectoryExist (root </> "tests")
+        entries <- if hasTests then sort . visible <$> listDirectory (root </> "tests") else return []
+        let declared = map T.unpack (M.keys (manifestTests manifest))
+        entryErrors <- forM entries $ \e -> do
+            isDir <- doesDirectoryExist (root </> "tests" </> e)
+            hasTestFile <- doesFileExist (root </> "tests" </> e </> "test.fin")
+            return $ if not isDir
+                then ["tests/" ++ e ++ " is not a folder"]
+                else ["tests/" ++ e ++ " has no test.fin" | not hasTestFile]
+                    ++ ["tests/" ++ e ++ " is not declared in the tests section of the manifest" | e `notElem` declared]
+        return $ concat entryErrors
+            ++ ["the test " ++ t ++ " has no folder tests/" ++ t | t <- declared \\ entries]
+
+    -- | No module directly under the folder, and every segment of a module
+    -- name in lowercase snake_case.
+    checkSources dir = do
+        exists <- doesDirectoryExist (root </> dir)
+        if not exists then return [] else do
+            entries <- visible <$> listDirectory (root </> dir)
+            topErrors <- forM entries $ \e -> do
+                isDir <- doesDirectoryExist (root </> dir </> e)
+                return [dir </> e ++ ": a module cannot live directly under " ++ dir ++ "/" | not isDir && takeExtension e == ".fin"]
+            nameErrors <- concat <$> mapM (checkNames dir) entries
+            return (concat topErrors ++ nameErrors)
+
+    checkNames parent e = do
+        let path = parent </> e
+        isDir <- doesDirectoryExist (root </> path)
+        if isDir
+            then do
+                children <- visible <$> listDirectory (root </> path)
+                rest <- concat <$> mapM (checkNames path) children
+                return $ [path ++ ": the folders of modules are lowercase snake_case" | not (isSnakeCase e)] ++ rest
+            else return [path ++ ": the names of modules are lowercase snake_case"
+                | takeExtension e == ".fin", not (isSnakeCase (dropExtension e))]
+
+-- | The configuration of a deployment, in the form the rest of the transpiler
+-- reads.
+deploymentConfig :: Manifest -> Platform -> ProjectProfile -> Maybe Integer -> FilePath -> ExternConfig -> TerminaConfig
+deploymentConfig manifest plt prf tick output extern = TerminaConfig {
+    name = projectName (manifestProject manifest),
+    platform = T.pack (show plt),
+    sourceModulesFolder = "src",
+    outputFolder = output,
+    efpFolder = outputEfpFolder (manifestOutput manifest),
+    profile = prf,
+    sysPrintOutputBufferSize = manifestPrintBufSize manifest,
+    sysReadInputBufferSize = manifestReadBufSize manifest,
+    microsecondsPerTick = fromMaybe defaultMicrosecondsPerTick tick,
+    builder = outputBuilder (manifestOutput manifest),
+    externConfig = extern
+  }
+
+-- | The configuration of the application, or nothing in a library.
+appConfig :: Manifest -> Maybe TerminaConfig
+appConfig manifest =
+    case manifestNature manifest of
+        Library _ -> Nothing
+        Application app -> Just $ deploymentConfig manifest (appPlatform app) (appProfile app)
+            (appMicrosecondsPerTick app) (outputRoot (manifestOutput manifest)) (manifestExtern manifest)
+
+-- | The configuration of a test on one of its platforms, built with the given
+-- profile. A test without its own tick takes the one of the application.
+testConfig :: Manifest -> T.Text -> TestEntry -> Platform -> ProjectProfile -> TerminaConfig
+testConfig manifest testName entry plt prf =
+    deploymentConfig manifest plt prf tick output (manifestExtern manifest)
+
+  where
+
+    tick = case (testMicrosecondsPerTick entry, manifestNature manifest) of
+        (Just t, _) -> Just t
+        (Nothing, Application app) -> appMicrosecondsPerTick app
+        (Nothing, Library _) -> Nothing
+
+    output = outputRoot (manifestOutput manifest) </> "tests" </> T.unpack testName </> show plt
+
+-- | The manifest of a new application.
+newApplicationManifest :: String -> Platform -> String
+newApplicationManifest projectNameStr plt = unlines [
+        "project:",
+        "  name: " ++ projectNameStr,
+        "  version: 0.1.0",
+        "  manifest-version: " ++ show (maximum knownManifestVersions),
+        "",
+        "app:",
+        "  platform: " ++ show plt,
+        "  profile: release"
+    ]

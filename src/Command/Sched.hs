@@ -667,9 +667,7 @@ schedCommand :: SchedCmdArgs -> IO ()
 schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT writeMAST reduction) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
     -- | Read the termina.yaml file
-    config <- loadConfig >>= either (
-            \err -> TIO.putStrLn (T.pack $ show err) >> exitFailure
-          ) return
+    config <- loadConfig >>= either dieWithErrors return
     -- | Decode the selected platform field
     plt <- maybe (die . errorMessage $ "Unsupported platform: \"" ++ show (platform config) ++ "\"") return $ checkPlatform (T.unpack $ platform config)
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")

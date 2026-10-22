@@ -3,6 +3,7 @@
 module Configuration.Configuration (
     TerminaConfig(..),
     ExternConfig(..),
+    emptyExternConfig,
     ProjectProfile(..),
     ProjectBuilder(..),
     defaultConfig,
@@ -82,7 +83,8 @@ instance ToJSON ProjectBuilder where
     toJSON None = String "none"
     toJSON Make = String "make"
 
--- | Data type for the "termina.yaml" configuration file
+-- | The configuration of one deployment, the application or a test on one
+-- platform, which "Configuration.Manifest" derives from "termina.yaml"
 data TerminaConfig =
   TerminaConfig {
     name :: !T.Text,
@@ -97,61 +99,6 @@ data TerminaConfig =
     builder :: !ProjectBuilder,
     externConfig :: !ExternConfig
   } deriving (Eq, Show)
-
--- | Instance for parsing the "termina.yaml" configuration file
-instance FromJSON TerminaConfig where
-  parseJSON (Object o) =
-    TerminaConfig <$>
-    o .:   "name"           <*>
-    o .:   "platform"       <*>
-    o .:   "source-modules" <*>
-    o .:   "output-folder"  <*>
-    o .:?  "efp-folder" .!= "efp" <*>
-    o .:?  "profile" .!= Release <*>
-    o .:?  "sys-print-output-buffer-size" .!= defaultSysPrintOutputBufferSize <*>
-    o .:?  "sys-read-input-buffer-size"  .!= defaultSysReadInputBufferSize <*>
-    (o .:?  "microseconds-per-tick" .!= defaultMicrosecondsPerTick >>= tickLength) <*>
-    o .:   "builder" <*>
-    o .:?  "extern" .!= emptyExternConfig
-
-    where
-
-      tickLength ticks =
-        if ticks > 0 && 1000000 `mod` ticks == 0
-          then return ticks
-          else fail "microseconds-per-tick must divide 1000000 exactly"
-
-  parseJSON _ = fail "Expected configuration object"
-
-instance ToJSON TerminaConfig where
-    toJSON (
-        TerminaConfig 
-            prjName 
-            prjPlatform
-            prjSourceModulesFolder
-            prjOutputFolder
-            prjEFPFolder
-            prjProfile
-            prjSysPrintOutputBufferSize
-            prjSysReadInputBufferSize
-            prjMicrosecondsPerTick
-            prjBuilder
-            prjExternConfig
-        ) = object $ [
-            "name" .= prjName,
-            "platform" .= prjPlatform,
-            "source-modules" .= prjSourceModulesFolder,
-            "output-folder" .= prjOutputFolder,
-            "efp-folder" .= prjEFPFolder
-        ]   -- We only serialize the profile if it is different from the default value
-            <> case prjProfile of
-                Debug -> ["profile" .= prjProfile]
-                _ -> []
-            <> if prjSysPrintOutputBufferSize /= defaultSysPrintOutputBufferSize then ["sys-print-output-buffer-size" .= prjSysPrintOutputBufferSize] else []
-            <> if prjSysReadInputBufferSize  /= defaultSysReadInputBufferSize then ["sys-read-input-buffer-size"  .= prjSysReadInputBufferSize]  else []
-            <> if prjMicrosecondsPerTick /= defaultMicrosecondsPerTick then ["microseconds-per-tick" .= prjMicrosecondsPerTick] else []
-            <> if prjBuilder /= None then ["builder" .= prjBuilder] else []
-            <> ["extern" .= prjExternConfig | prjExternConfig /= emptyExternConfig]
 
 defaultConfig :: String -> Platform -> TerminaConfig
 defaultConfig projectName plt = TerminaConfig {

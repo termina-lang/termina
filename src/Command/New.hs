@@ -6,6 +6,7 @@ import Options.Applicative
 import Control.Exception (IOException, try)
 import Control.Monad
 import Configuration.Configuration
+import Configuration.Manifest (newApplicationManifest)
 import Command.Utils
 import System.FilePath
 import System.Exit
@@ -70,6 +71,9 @@ emptyAppModuleContent projectName = unlines [
         "// Main application module of project " ++ projectName,
         ""
     ]
+
+manifestFile :: FilePath
+manifestFile = "termina" <.> "yaml"
 
 -- | Content of the .gitignore of a new project: the binaries the build leaves
 -- in the output folder. The generated C code is kept under version control.
@@ -232,13 +236,13 @@ newCommand (NewCmdArgs project pltName vcs vscode chatty) = do
     createDirectory project
     -- | Create project default structure
     let config = defaultConfig project plt
-    let configFile = project </> "termina" <.> "yaml"
+    let configFile = project </> manifestFile
     let appFolderPath = project </> appFolder
     let appModulePath = appFolderPath </> appFilename <.> "fin"
     let sourceModulesFolderPath = project </> sourceModulesFolder config
     let outputFolderPath = project </> outputFolder config
     when chatty (putStrLn . debugMessage $ "Creating project configuration file: " ++ configFile)
-    serializeConfig project config
+    writeFile configFile (newApplicationManifest project plt)
     when chatty (putStrLn . debugMessage $ "Creating project source modules directory: " ++ sourceModulesFolderPath)
     createDirectory sourceModulesFolderPath
     when chatty (putStrLn . debugMessage $ "Creating project application directory: " ++ appFolderPath)
