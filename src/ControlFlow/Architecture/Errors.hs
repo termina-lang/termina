@@ -41,6 +41,7 @@ data Error =
     | EUnusedDeque Identifier -- ^ Unused deque (AE-012)
     | ESharedDeque Identifier Location -- ^ Deque connected to more than one access port (AE-013)
     | EUnfilledDeque Identifier Identifier Identifier -- ^ Deque that only gets back its own boxes (AE-014)
+    | EActivationCycle Identifier [(Identifier, Identifier)] -- ^ Response to an event that reaches an action it has already run (AE-015)
     deriving Show
 
 type ArchitectureError = AnnotatedError Error Location
@@ -122,6 +123,11 @@ instance Diagnosable Error where
                 emph (T.pack owner) <> " takes from it through " <> emph (T.pack port) <>
                 ", so it is always empty. " <>
                 "A deque has to get boxes from a pool, a channel or a procedure.")
+    describe (EActivationCycle emitterId cycleSteps) =
+        diagnostic "AE-015" "cycle in the response to an event"
+            ("The response to " <> emph (T.pack emitterId) <> " reaches an action that is already in its chain of activations: " <>
+                T.intercalate " -> " [emph (T.pack (entity ++ "." ++ action)) | (entity, action) <- cycleSteps] <>
+                ". The chain of activations triggered by an event must be acyclic.")
     -- | Everything else is a broken invariant of the compiler, which has no code
     -- of its own.
     describe EUnsupportedTestElement =

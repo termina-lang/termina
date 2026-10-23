@@ -6,7 +6,8 @@ module ControlFlow.Architecture.Checks (
     runCheckEmitterConnections,
     runCheckBoxSources,
     runCheckTaskPriorities,
-    runCheckSystemExceptAction
+    runCheckSystemExceptAction,
+    runCheckActivationCycles
 ) where
 import Semantic.Types
 import ControlFlow.Architecture.Types
@@ -55,3 +56,8 @@ runCheckSystemExceptAction ::
     TerminaProgArch SemanticAnn
     -> Either ArchitectureError ()
 runCheckSystemExceptAction = runReader (runExceptT checkSystemExceptAction)
+
+runCheckActivationCycles ::
+    TerminaProgArch SemanticAnn
+    -> Either ArchitectureError ()
+runCheckActivationCycles = runReader (runExceptT checkActivationCycles)

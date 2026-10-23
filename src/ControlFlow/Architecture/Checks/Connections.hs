@@ -112,6 +112,79 @@ checkSystemExceptAction = do
         forbidden (ForLoopBlock _ _ _ _ _ blk _) = forbiddenIn (blockBody blk)
         forbidden _ = []
 
+-- | The response to an event ends. From the action that each emitter
+-- triggers, the check follows every message that an action sends, to the
+-- action that the in port of the receiving task triggers, and every continue,
+-- to the next action of the same task, and fails when a chain reaches an
+-- action that is already on it. A send or a continue in a branch that never
+-- runs counts as well, since the check reads the code and does not run it.
+checkActivationCycles :: ConnectionsCheckMonad ()
+checkActivationCycles = do
+    tp <- ask
+    forM_ (M.toList (emitterTargets tp)) $ \(emitterId, (target, port, ann)) ->
+        forM_ (sinkAction tp target port) $ \action ->
+            walk tp emitterId [] ((target, action), getLocation ann)
+
+    where
+
+        -- | The chain so far, from the event on, and the next action with the
+        -- location of what sets it off, which closes the cycle when the action
+        -- is already on the chain
+        walk :: TerminaProgArch SemanticAnn -> Identifier -> [(Identifier, Identifier)]
+            -> ((Identifier, Identifier), Location) -> ConnectionsCheckMonad ()
+        walk tp emitterId chain (step@(entity, action), loc) =
+            case dropWhile (/= step) chain of
+                [] -> forM_ (nextSteps tp entity action) $ walk tp emitterId (chain ++ [step])
+                cycleSteps -> throwError $ annotateError loc (EActivationCycle emitterId (cycleSteps ++ [step]))
+
+        sinkAction tp entity port = do
+            cls <- entityClass tp entity
+            snd <$> M.lookup port (sinkPorts cls)
+
+        -- | The actions that run next after an action, each with the location
+        -- of the send or the continue that sets it off
+        nextSteps tp entity action =
+            case entityClass tp entity >>= M.lookup action . classActions of
+                Nothing -> []
+                Just (TPFunction _ _ _ (Block body _) _) ->
+                    concatMap (follow tp entity) (blocksIn body)
+
+        follow tp entity (SendMessage obj _ ann) =
+            [ ((receiver, nextAction), getLocation ann)
+            | Right port <- [getPortName obj]
+            , Just (channel, _) <- [M.lookup port (outputConnections tp entity)]
+            , Just (receiver, inPort, _) <- [M.lookup channel (channelTargets tp)]
+            , Just cls <- [entityClass tp receiver]
+            , Just (_, nextAction) <- [M.lookup inPort (inputPorts cls)] ]
+        follow _ entity (ContinueBlock (MemberFunctionCall _ nextAction _ _) ann) = [((entity, nextAction), getLocation ann)]
+        follow _ entity (ContinueBlock (DerefMemberFunctionCall _ nextAction _ _) ann) = [((entity, nextAction), getLocation ann)]
+        follow _ _ _ = []
+
+        -- | Every block of a body, those inside branches and loops included
+        blocksIn = concatMap (\blk -> blk : nested blk)
+
+        nested (IfElseBlock (CondIf _ ifBlk _) elseIfs mElse _) =
+            blocksIn (blockBody ifBlk)
+            ++ concat [blocksIn (blockBody blk) | CondElseIf _ blk _ <- elseIfs]
+            ++ maybe [] (blocksIn . blockBody . condElseBody) mElse
+        nested (MatchBlock _ cases mDefault _) =
+            concat [blocksIn (blockBody blk) | MatchCase _ _ blk _ <- cases]
+            ++ maybe [] (\(DefaultCase blk _) -> blocksIn (blockBody blk)) mDefault
+        nested (ForLoopBlock _ _ _ _ _ blk _) = blocksIn (blockBody blk)
+        nested _ = []
+
+        entityClass tp entity =
+            case (M.lookup entity (tasks tp), M.lookup entity (handlers tp)) of
+                (Just task, _) -> M.lookup (taskClass task) (taskClasses tp)
+                (_, Just handler) -> M.lookup (handlerClass handler) (handlerClasses tp)
+                _ -> Nothing
+
+        outputConnections tp entity =
+            case (M.lookup entity (tasks tp), M.lookup entity (handlers tp)) of
+                (Just task, _) -> taskOutputPortConns task
+                (_, Just handler) -> handlerOutputPortConns handler
+                _ -> M.empty
+
 checkResourceUsage :: ConnectionsCheckMonad ()
 checkResourceUsage = do
     tp <- ask

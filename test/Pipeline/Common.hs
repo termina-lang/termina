@@ -349,6 +349,7 @@ runChecks files progArch =
               , runCheckDequeConnections progArch
               , runCheckTaskPriorities progArch
               , runCheckSystemExceptAction progArch
+              , runCheckActivationCycles progArch
               , runCheckBoxSources progArch ]
 
 renderModule :: TerminaConfig -> ElaboratedModule -> Either Failure Text

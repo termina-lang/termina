@@ -486,6 +486,7 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _) 
     checkDequeConnections loweredProject programArchitecture
     checkTaskPriorities loweredProject programArchitecture
     checkSystemExceptAction loweredProject programArchitecture
+    checkActivationCycles loweredProject programArchitecture
     checkProjectBoxSources loweredProject programArchitecture
     -- | Generate the code with the #line pragmas and the plain C
     forM_ [deploymentConfig deployment, deploymentPlainConfig deployment] $ \outConfig -> do

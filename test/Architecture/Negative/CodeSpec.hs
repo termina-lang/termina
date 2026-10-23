@@ -24,6 +24,25 @@ timerTaskClass =
     "    }\n" ++
     "};\n"
 
+-- | A task class that sends on its out port each message it receives, and,
+-- when it starts, a first one on each timeout.
+relayClass :: String -> Bool -> String
+relayClass name starts =
+    "task class " ++ name ++ " {\n" ++
+    (if starts then "    start_port : sink TimeVal triggers start;\n" else "") ++
+    "    msg_in : in u32 triggers on_msg;\n" ++
+    "    msg_out : out u32;\n" ++
+    (if starts then
+        "    action start(&priv self, _t : TimeVal) {\n" ++
+        "        self->msg_out.send(0 : u32);\n" ++
+        "        return;\n" ++
+        "    }\n" else "") ++
+    "    action on_msg(&priv self, v : u32) {\n" ++
+    "        self->msg_out.send(v);\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "};\n"
+
 periodicEmitter :: String -> Integer -> String
 periodicEmitter name secs =
     "emitter " ++ name ++ " : PeriodicTimer = { period = {tv_sec = " ++
@@ -175,6 +194,62 @@ spec = do
             "    }\n" ++
             "};\n" ++
             "handler fault_handler : FaultHandler = { faults = 0, except_port <- system_except };\n"
+      compileErrorCode src `shouldBe` Nothing
+
+    it "AE-015: two tasks that keep sending messages to each other" $ do
+      let src = relayClass "Starter" True
+             ++ relayClass "Relay" False
+             ++ periodicEmitter "timer" 1
+             ++ "channel to_relay : MsgQueue<u32; 1>;\n"
+             ++ "channel to_starter : MsgQueue<u32; 1>;\n"
+             ++ "#[priority(10)]\n"
+             ++ "task starter : Starter = { start_port <- timer, msg_in <- to_starter, msg_out -> to_relay };\n"
+             ++ "#[priority(11)]\n"
+             ++ "task relay : Relay = { msg_in <- to_relay, msg_out -> to_starter };\n"
+      compileErrorCode src `shouldBe` Just (pack "AE-015")
+
+    it "AE-015: a task that sends messages to itself" $ do
+      let src = relayClass "Starter" True
+             ++ periodicEmitter "timer" 1
+             ++ "channel loop_chan : MsgQueue<u32; 1>;\n"
+             ++ "#[priority(10)]\n"
+             ++ "task starter : Starter = { start_port <- timer, msg_in <- loop_chan, msg_out -> loop_chan };\n"
+      compileErrorCode src `shouldBe` Just (pack "AE-015")
+
+    it "accepts a response that reaches a task through two paths" $ do
+      -- The starter sends to two relays, and both send to the same sink task:
+      -- the sink task runs twice, but the response ends.
+      let src = "task class FanOut {\n"
+             ++ "    start_port : sink TimeVal triggers start;\n"
+             ++ "    out_a : out u32;\n"
+             ++ "    out_b : out u32;\n"
+             ++ "    action start(&priv self, _t : TimeVal) {\n"
+             ++ "        self->out_a.send(1 : u32);\n"
+             ++ "        self->out_b.send(2 : u32);\n"
+             ++ "        return;\n"
+             ++ "    }\n"
+             ++ "};\n"
+             ++ relayClass "Relay" False
+             ++ "task class SinkTask {\n"
+             ++ "    last : u32;\n"
+             ++ "    msg_in : in u32 triggers on_msg;\n"
+             ++ "    action on_msg(&priv self, v : u32) {\n"
+             ++ "        self->last = self->last + v;\n"
+             ++ "        return;\n"
+             ++ "    }\n"
+             ++ "};\n"
+             ++ periodicEmitter "timer" 1
+             ++ "channel to_a : MsgQueue<u32; 1>;\n"
+             ++ "channel to_b : MsgQueue<u32; 1>;\n"
+             ++ "channel to_sink : MsgQueue<u32; 2>;\n"
+             ++ "#[priority(10)]\n"
+             ++ "task fan_out : FanOut = { start_port <- timer, out_a -> to_a, out_b -> to_b };\n"
+             ++ "#[priority(11)]\n"
+             ++ "task relay_a : Relay = { msg_in <- to_a, msg_out -> to_sink };\n"
+             ++ "#[priority(12)]\n"
+             ++ "task relay_b : Relay = { msg_in <- to_b, msg_out -> to_sink };\n"
+             ++ "#[priority(13)]\n"
+             ++ "task collector : SinkTask = { last = 0, msg_in <- to_sink };\n"
       compileErrorCode src `shouldBe` Nothing
 
     it "AE-009: two tasks with the same priority" $ do
