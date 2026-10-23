@@ -212,6 +212,7 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
 typeTypeDefinition _ (Interface SystemInterface ident _ _ _ ) = throwError $ annotateError Internal (ESystemInterfaceDefinition ident)
 
 typeTypeDefinition ann (Class kind ident members provides mds_ts) =
+  when (kind == TestClass) (onlyInTest ann ("test class " ++ ident)) >>
   foldM
     (\(fs, prcs, mths, vws, acts, cases) cl ->
         case cl of

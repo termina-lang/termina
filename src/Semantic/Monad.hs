@@ -119,6 +119,13 @@ checkReservedName loc ident = do
     Nothing -> return ()
     Just reservedBy -> throwError $ annotateError loc $ EReservedIdentifier ident reservedBy
 
+-- | Reject, outside a test, what only a test may use. The argument names it
+-- in the message.
+onlyInTest :: Location -> String -> SemanticMonad ()
+onlyInTest loc what = do
+  isTest <- gets testProgram
+  unless isTest $ throwError $ annotateError loc (ETestOnly what)
+
 moveObject :: Location -> Object a -> SemanticMonad ()
 moveObject loc obj = 
   let objectHash = getMovedHash obj

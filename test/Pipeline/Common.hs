@@ -8,6 +8,7 @@ module Pipeline.Common
   , renderInitFile
   , buildAndRenderModule
   , compileErrorCode
+  , compileTestErrorCode
   , compileProjectErrorCode
   , compileErrorMessage
   , compileProjectErrorMessage
@@ -32,7 +33,7 @@ import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import Semantic.Environment (makeInitialGlobalEnv, Environment, addDeclaredNames)
 import Semantic.Types (SemanticAnn)
 
-import Configuration.Configuration (defaultConfig, TerminaConfig (..))
+import Configuration.Configuration (defaultConfig, TerminaConfig (..), DeploymentKind (..))
 import Configuration.Platform (Platform(TestPlatform))
 import Generator.Environment
     (getPlatformInitialGlobalEnv, getPlatformInitialProgram)
@@ -235,6 +236,12 @@ compileErrorCode input = compileProjectErrorCode [("test", input)]
 -- | Multi-module variant of 'compileErrorCode'.
 compileProjectErrorCode :: [(QualifiedName, String)] -> Maybe Text
 compileProjectErrorCode = compileProjectErrorCodeWith configParams
+
+-- | 'compileErrorCode' for the deployment of a test, the only one that may
+-- use test classes, test instances and the components of a unit test.
+compileTestErrorCode :: String -> Maybe Text
+compileTestErrorCode input =
+  compileProjectErrorCodeWith configParams { deploymentKind = TestBuild (pack "test") } [("test", input)]
 
 -- | 'compileProjectErrorCode' under a given configuration, for an error that
 -- only a project with a feature switched on can reach.

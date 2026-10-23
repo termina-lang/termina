@@ -1,6 +1,6 @@
 module Semantic.Positive.TestClassSpec (spec) where
 
-import Semantic.Common (typeCheckErrorOn)
+import Semantic.Common (typeCheckTestErrorOn)
 import Configuration.Platform (Platform(TestPlatform))
 
 import Data.Text (pack)
@@ -79,10 +79,10 @@ spec :: Spec
 spec = describe "Semantic: test classes and test instances" $ do
 
   it "type-checks a test class with ports, a method and cases, and its instance" $
-    typeCheckErrorOn TestPlatform (unit ++ tests) `shouldBe` Nothing
+    typeCheckTestErrorOn TestPlatform (unit ++ tests) `shouldBe` Nothing
 
   it "rejects a case with an immutable self that calls a procedure with a mutable self" $
-    typeCheckErrorOn TestPlatform (unit ++
+    typeCheckTestErrorOn TestPlatform (unit ++
       "test class CReadTests {\n" ++
       "    sensor : access ISensor;\n" ++
       "    case sets_the_sensor(&self) {\n" ++
@@ -92,7 +92,7 @@ spec = describe "Semantic: test classes and test instances" $ do
       "};\n") `shouldBe` Just (pack "SE-199")
 
   it "rejects a call to a case, which only the harness runs" $
-    typeCheckErrorOn TestPlatform (unit ++
+    typeCheckTestErrorOn TestPlatform (unit ++
       "test class CCallTests {\n" ++
       "    sensor : access ISensor;\n" ++
       "    case first(&mut self) {\n" ++
@@ -106,7 +106,7 @@ spec = describe "Semantic: test classes and test instances" $ do
       "};\n") `shouldBe` Just (pack "SE-038")
 
   it "type-checks several test instances of the same class" $
-    typeCheckErrorOn TestPlatform (unit ++ tests ++
+    typeCheckTestErrorOn TestPlatform (unit ++ tests ++
       "test more_tests : CMonitorTests = {\n" ++
       "    sensor <-> sensor,\n" ++
       "    tc_out -> tcs\n" ++

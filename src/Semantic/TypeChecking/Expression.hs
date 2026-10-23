@@ -833,14 +833,19 @@ typeTypeSpecifier loc typeObj ts@(TSDefinedType "DequeAccess" [typeParam]) =
     TypeParamTypeSpec ts' -> TDequeAccess <$> typeTypeSpecifier loc typeObj ts'
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
 typeTypeSpecifier loc typeObj ts@(TSDefinedType "TestEmitter" [typeParam]) =
+  onlyInTest loc "TestEmitter" >>
   TTestEmitter <$> typeTypeParam loc typeObj ts typeParam
 typeTypeSpecifier loc typeObj ts@(TSDefinedType "TestEmitterAccess" [typeParam]) =
+  onlyInTest loc "TestEmitterAccess" >>
   TTestEmitterAccess <$> typeTypeParam loc typeObj ts typeParam
 typeTypeSpecifier loc typeObj ts@(TSDefinedType "TestChannelAccess" [typeParam]) =
+  onlyInTest loc "TestChannelAccess" >>
   TTestChannelAccess <$> typeTypeParam loc typeObj ts typeParam
 typeTypeSpecifier loc typeObj ts@(TSDefinedType "TestChannel" [typeParam, sizeParam]) =
+  onlyInTest loc "TestChannel" >>
   TTestChannel <$> typeTypeParam loc typeObj ts typeParam <*> typeSizeParam loc typeObj ts sizeParam
 typeTypeSpecifier loc typeObj ts@(TSDefinedType "TestPool" [typeParam, sizeParam]) =
+  onlyInTest loc "TestPool" >>
   TTestPool <$> typeTypeParam loc typeObj ts typeParam <*> typeSizeParam loc typeObj ts sizeParam
 typeTypeSpecifier loc typeObj (TSArray ts s) = do
   ty <- typeTypeSpecifier loc typeObj ts

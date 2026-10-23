@@ -43,7 +43,7 @@ families =
       -- configuration already exists.
       ["test/Semantic/Negative/FloatSpec.hs", "test/Semantic/Negative/DetailSpec.hs",
        "test/Pipeline/Positive/InitialEventSpec.hs"]
-      ["test/Semantic/fixtures", "test/Semantic/fixtures-multi"]
+      ["test/Semantic/fixtures", "test/Semantic/fixtures-test", "test/Semantic/fixtures-multi"]
       []
   , Family "VarUsage (VUE)" "VUE"
       "src/ControlFlow/VarUsage/Errors.hs"

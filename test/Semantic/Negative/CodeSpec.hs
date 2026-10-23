@@ -1,6 +1,6 @@
 module Semantic.Negative.CodeSpec (spec) where
 
-import Pipeline.Common (compileErrorCode, compileProjectErrorCode)
+import Pipeline.Common (compileErrorCode, compileTestErrorCode, compileProjectErrorCode)
 
 import Test.Hspec
 import Data.Text (pack)
@@ -15,6 +15,12 @@ import System.FilePath ((</>), dropExtension)
 -- error code @SE-016@.
 fixturesDir :: FilePath
 fixturesDir = "test" </> "Semantic" </> "fixtures"
+
+-- | Directory holding the negative fixtures that are compiled as the
+-- deployment of a test, for the errors of test classes, test instances and
+-- the components of a unit test, which only a test may use.
+testFixturesDir :: FilePath
+testFixturesDir = "test" </> "Semantic" </> "fixtures-test"
 
 -- | Directory holding the multi-module negative fixtures. Each subdirectory is
 -- named after the error code it must trigger and contains one @.fin@ per module
@@ -271,6 +277,17 @@ spec = do
           it name $ do
             src <- readFile (fixturesDir </> f)
             compileErrorCode src `shouldBe` Just (pack code)
+
+  testFiles <- runIO $ do
+    entries <- listDirectory testFixturesDir
+    return $ sort [ f | f <- entries, "SE-" `isPrefixOf` f, ".fin" `isSuffixOf` f ]
+  describe "Semantic: SE error-code coverage in a test (one fixture per code)" $
+    forM_ testFiles $ \f -> do
+      let code = dropExtension f
+          name = maybe code (\t -> code ++ ": " ++ t) (lookup code titles)
+      it name $ do
+        src <- readFile (testFixturesDir </> f)
+        compileTestErrorCode src `shouldBe` Just (pack code)
 
   multiCases <- runIO $ do
     subdirs <- sort . filter ("SE-" `isPrefixOf`) <$> listDirectory multiDir

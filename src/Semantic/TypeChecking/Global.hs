@@ -54,6 +54,7 @@ typeGlobal (Handler ident ts mexpr mods anns) = do
       return (SAST.Handler ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     _ -> throwError $ annotateError anns (EInvalidHandlerType ty)
 typeGlobal (Test ident ts mexpr mods anns) = do
+  onlyInTest anns ("test instance " ++ ident)
   ty <- typeTypeSpecifier anns typeGlobalObject ts
   checkTerminaType anns ty
   case ty of

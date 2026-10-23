@@ -42,6 +42,9 @@ data Environment
  -- | Target platform, for the static range checks (its @usize@ width; see
  -- 'Configuration.Platform').
  , targetPlatform :: Platform
+ -- | Whether the program is a test, the only kind of program that may use
+ -- test classes, test instances and the components of a unit test
+ , testProgram :: Bool
  }
 
 getEntry :: LocatedElement (GEntry SemanticAnn) -> GEntry SemanticAnn
@@ -279,17 +282,17 @@ makeInitialGlobalEnv (Just config) plt pltEnvironment =
       -- | test_entry only exists in a test
       if isTestBuild config then testEntryGlobalEnv else []]
   in
-  makeEnvironment (M.fromList globalEnv) plt
+  makeEnvironment (M.fromList globalEnv) plt (isTestBuild config)
 makeInitialGlobalEnv Nothing plt pltEnvironment =
   let globalEnv = mconcat [stdlibGlobalEnv defaultSysPrintOutputBufferSize defaultSysReadInputBufferSize, pltEnvironment, systemGlobalEnv]
   in
-  makeEnvironment (M.fromList globalEnv) plt
+  makeEnvironment (M.fromList globalEnv) plt False
 
 -- | The environment a project starts from, holding the entries that the
 -- language and the platform provide. Their names go into the declared map as
 -- well: they are as taken as the ones the project declares, and nothing else
 -- fills that map for them.
-makeEnvironment :: GlobalEnv -> Platform -> Environment
+makeEnvironment :: GlobalEnv -> Platform -> Bool -> Environment
 makeEnvironment globalEnv = ExprST globalEnv M.empty M.empty S.empty (M.map location globalEnv)
 
 -- | Take note of the names that the project declares at its top level.

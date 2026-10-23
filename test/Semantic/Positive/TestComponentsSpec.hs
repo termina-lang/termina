@@ -185,8 +185,22 @@ spec = describe "Semantic: components of a unit test and test_entry" $ do
   it "type-checks the example of messages in both directions, with a TestPool" $
     typeCheckTestErrorOn TestPlatform (tcExecutor ++ tcExecutorWiring) `shouldBe` Nothing
 
+  it "rejects the test class outside a test" $
+    typeCheckErrorOn TestPlatform (tempMonitor ++ tempMonitorWiring) `shouldBe` Just (pack "SE-236")
+
+  it "rejects the components of a unit test outside a test" $
+    typeCheckErrorOn TestPlatform "channel alarms : TestChannel<u32; 4>;\n" `shouldBe` Just (pack "SE-236")
+
   it "has no TestAPI outside a test" $
-    typeCheckErrorOn TestPlatform (tempMonitor ++ tempMonitorWiring) `shouldBe` Just (pack "SE-077")
+    typeCheckErrorOn TestPlatform
+      ("task class CUser {\n" ++
+       "    tick_ev : sink TimeVal triggers run;\n" ++
+       "    t : access TestAPI;\n" ++
+       "    action run(&priv self, _now : TimeVal) {\n" ++
+       "        self->t.fail();\n" ++
+       "        return;\n" ++
+       "    }\n" ++
+       "};\n") `shouldBe` Just (pack "SE-077")
 
   it "rejects firing an emitter through an immutable self reference" $
     typeCheckTestErrorOn TestPlatform (tempMonitor ++
