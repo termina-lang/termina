@@ -62,10 +62,8 @@ data ConnectionSeman a =
     -- | Size of the connected atomic array
     (Expression a)
   | APPoolConnTy
-    -- | Type specifier of the connected pool
+    -- | Type specifier of the blocks of the connected pool
     (TerminaType a)
-    -- | Size of the connected pool
-    (Expression a)
   | APDequeConnTy
     -- | Type specifier of the boxes of the connected deque
     (TerminaType a)
@@ -234,8 +232,8 @@ buildOutPortConnAnn loc ts = SemanticAnn (STy (PortConnection (OutPConnTy ts))) 
 buildAccessPortConnAnn :: Location -> TerminaType SemanticAnn -> TerminaType SemanticAnn -> [ProcedureSeman SemanticAnn] -> SemanticAnn
 buildAccessPortConnAnn loc ifaceTy ts procs = SemanticAnn (STy (PortConnection (APConnTy ifaceTy ts procs))) loc
 
-buildPoolConnAnn :: Location -> TerminaType SemanticAnn -> Expression SemanticAnn -> SemanticAnn
-buildPoolConnAnn loc ts s = SemanticAnn (STy (PortConnection (APPoolConnTy ts s))) loc
+buildPoolConnAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
+buildPoolConnAnn loc ts = SemanticAnn (STy (PortConnection (APPoolConnTy ts))) loc
 
 buildDequeConnAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
 buildDequeConnAnn loc ts = SemanticAnn (STy (PortConnection (APDequeConnTy ts))) loc

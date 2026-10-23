@@ -1704,13 +1704,13 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty fann) (FieldPortConnection 
     case fty of
       TAccessPort (TAllocator ty) ->
         case gentry of
-          LocatedElement (GGlob (TPool ty' s)) _ -> do
+          LocatedElement (GGlob (TPool ty' _)) _ -> do
             catchMismatch pann (EAllocatorPortConnectionPoolTypeMismatch sid ty) (sameTyOrError pann ty ty')
-            return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty s)
+            return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty)
           -- | A pool of a unit test is reached as any pool
-          LocatedElement (GGlob (TTestPool ty' s)) _ -> do
+          LocatedElement (GGlob (TTestPool ty' _)) _ -> do
             catchMismatch pann (EAllocatorPortConnectionPoolTypeMismatch sid ty) (sameTyOrError pann ty ty')
-            return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty s)
+            return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty)
           _ -> throwError $ annotateError pann $ EAllocatorPortConnectionInvalidGlobal sid
       TAccessPort (TAtomicAccess ty) ->
         case gentry of

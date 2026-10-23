@@ -179,11 +179,9 @@ foldAnnotation (SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ty arrSize
   let arrSizeConst = Constant arraySizeValue (buildExpAnn loc TUSize)
       arrPortSizeValue = Constant arrayPortSizeValue (buildExpAnn loc TUSize)
   return $ SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ty' arrSizeConst arrPortSizeValue))) loc
-foldAnnotation (SemanticAnn (STy (PortConnection (APPoolConnTy ty poolSize))) loc) = do
+foldAnnotation (SemanticAnn (STy (PortConnection (APPoolConnTy ty))) loc) = do
   ty' <- foldType loc ty
-  poolSizeValue <- evalConstExpression poolSize
-  let poolSizeConst = Constant poolSizeValue (buildExpAnn loc TUSize)
-  return $ SemanticAnn (STy (PortConnection (APPoolConnTy ty' poolSizeConst))) loc
+  return $ SemanticAnn (STy (PortConnection (APPoolConnTy ty'))) loc
 foldAnnotation (SemanticAnn (STy (PortConnection (APDequeConnTy ty))) loc) = do
   ty' <- foldType loc ty
   return $ SemanticAnn (STy (PortConnection (APDequeConnTy ty'))) loc
