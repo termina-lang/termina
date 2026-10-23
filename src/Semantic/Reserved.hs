@@ -62,7 +62,8 @@ reservedName plt ident =
 terminaTypes :: S.Set Identifier
 terminaTypes = S.fromList [
     "Allocator", "Atomic", "AtomicAccess", "AtomicArray", "AtomicArrayAccess",
-    "MsgQueue", "Option", "Pool", "Result", "Deque", "DequeAccess", "Status"
+    "MsgQueue", "Option", "Pool", "Result", "Deque", "DequeAccess", "Status",
+    "TestEmitter", "TestChannel", "TestPool", "TestEmitterAccess", "TestChannelAccess"
   ]
 
 platformNames :: Platform -> S.Set Identifier

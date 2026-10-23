@@ -191,6 +191,13 @@ data TerminaType' expr a
   | TAtomicAccess (TerminaType' expr a) -- Interface to access atomic variables
   | TAtomicArrayAccess (TerminaType' expr a) (expr a) -- Interface to access atomic arrays
   | TDequeAccess (TerminaType' expr a) -- Interface to access deques
+  -- Components of a unit test, and the interfaces through which a case
+  -- reaches them
+  | TTestEmitter (TerminaType' expr a) -- Emitter that a case fires
+  | TTestChannel (TerminaType' expr a) (expr a) -- Channel that a case reads
+  | TTestPool (TerminaType' expr a) (expr a) -- Pool that a case observes
+  | TTestEmitterAccess (TerminaType' expr a)
+  | TTestChannelAccess (TerminaType' expr a)
   -- Non-primitive types
   | TReference AccessKind (TerminaType' expr a)
   | TBoxSubtype (TerminaType' expr a)
@@ -305,6 +312,11 @@ instance (ShowText (expr a)) => ShowText (TerminaType' expr a) where
     showText (TAtomicArray ts size) = "AtomicArray<" <> showText ts <> "; " <> showText size <> ">"
     showText (TDeque ts size) = "Deque<" <> showText ts <> "; " <> showText size <> ">"
     showText (TDequeAccess ts) = "DequeAccess<" <> showText ts <> ">"
+    showText (TTestEmitter ts) = "TestEmitter<" <> showText ts <> ">"
+    showText (TTestChannel ts size) = "TestChannel<" <> showText ts <> "; " <> showText size <> ">"
+    showText (TTestPool ts size) = "TestPool<" <> showText ts <> "; " <> showText size <> ">"
+    showText (TTestEmitterAccess ts) = "TestEmitterAccess<" <> showText ts <> ">"
+    showText (TTestChannelAccess ts) = "TestChannelAccess<" <> showText ts <> ">"
     showText (TReference ak ts) = "&" <> showText ak <> showText ts
     showText (TBoxSubtype ts) = "box " <> showText ts
     showText (TFixedLocation ts) = "loc " <> showText ts

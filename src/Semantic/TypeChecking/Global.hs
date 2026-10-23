@@ -103,7 +103,15 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
           Nothing   -> return Nothing
       tyMods <- typeModifiers anns typeGlobalObject mods
       return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
-    -- | Atomic variables 
+    -- | Pools of a unit test, which start empty like any pool
+    TTestPool {} -> do
+      exprty <-
+        case mexpr of
+          Just _ -> throwError $ annotateError anns (ETestComponentInitialized ty)
+          Nothing   -> return Nothing
+      tyMods <- typeModifiers anns typeGlobalObject mods
+      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
+    -- | Atomic variables
     TAtomic {} -> do
       exprty <-
         case mexpr of
@@ -142,6 +150,14 @@ typeGlobal (Emitter ident ts mexpr mods anns) = do
           Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
       tyMods <- typeModifiers anns typeGlobalObject mods
       return (SAST.Emitter ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
+    -- | Emitters of a unit test, which only a case fires
+    TTestEmitter {} -> do
+      exprty <-
+        case mexpr of
+          Just _ -> throwError $ annotateError anns (ETestComponentInitialized ty)
+          Nothing -> return Nothing
+      tyMods <- typeModifiers anns typeGlobalObject mods
+      return (SAST.Emitter ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     _ -> throwError $ annotateError anns (EInvalidEmitterType ty)
 typeGlobal (Channel ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns typeGlobalObject ts
@@ -153,6 +169,14 @@ typeGlobal (Channel ident ts mexpr mods anns) = do
           -- If it has an initial value great
           Just _ -> throwError $ annotateError anns EInvalidMsgQueueInitialization
           -- If it has not, we need to check that the type has actually NO fields
+          Nothing -> return Nothing
+      tyMods <- typeModifiers anns typeGlobalObject mods
+      return (SAST.Channel ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
+    -- | Channels of a unit test, which a case reads
+    TTestChannel {} -> do
+      exprty <-
+        case mexpr of
+          Just _ -> throwError $ annotateError anns (ETestComponentInitialized ty)
           Nothing -> return Nothing
       tyMods <- typeModifiers anns typeGlobalObject mods
       return (SAST.Channel ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)

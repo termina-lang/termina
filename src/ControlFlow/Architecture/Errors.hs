@@ -25,7 +25,7 @@ data Error =
     | EInvalidResourceConnection -- ^ Invalid resource connection (Internal)
     | EInvalidPoolConnection -- ^ Invalid pool connection (Internal)
     | EUnsupportedEmitterClass -- ^ Unsupported emitter class (Internal)
-    | EUnsupportedTestInstance -- ^ Test instance, which the architecture does not model yet (Internal)
+    | EUnsupportedTestElement -- ^ Test instance or test component, which the architecture does not model yet (Internal)
     | EMissingPeriodicTimerInitializer -- ^ Missing initializer expression for periodic timer emitter (Internal)
     | EDuplicatedEmitterConnection Identifier Location -- ^ Duplicated emitter connection (AE-001)
     | EDuplicatedChannelConnection Identifier Location -- ^ Duplicated channel connection (AE-002)
@@ -124,6 +124,8 @@ instance Diagnosable Error where
                 "A deque has to get boxes from a pool, a channel or a procedure.")
     -- | Everything else is a broken invariant of the compiler, which has no code
     -- of its own.
+    describe EUnsupportedTestElement =
+        diagnosticWithoutDetail "Internal" "test instances and test components are not supported yet by the architecture"
     describe _ = diagnosticWithoutDetail "Internal" "internal error"
 
 instance ErrorMessage ArchitectureError where

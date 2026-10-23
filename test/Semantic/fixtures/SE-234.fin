@@ -1,0 +1,15 @@
+test class CTests {
+    alarms : access TestChannelAccess<u32>;
+
+    case reads(&mut self) {
+        var n : usize = 0;
+        self->alarms.pending(&mut n);
+        return;
+    }
+};
+
+channel alarms : MsgQueue<u32; 4>;
+
+test tests : CTests = {
+    alarms <-> alarms
+};

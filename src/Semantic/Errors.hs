@@ -281,6 +281,9 @@ data Error
   | ECaseOutsideTestClass (Identifier, Location) Identifier -- ^ Case in a class that is not a test class (SE-230)
   | ECaseParameters Identifier -- ^ Case with parameters (SE-231)
   | EInvalidTestType (TerminaType SemanticAnn) -- ^ Test instance of a type that is not a test class (SE-232)
+  | ETestComponentInitialized (TerminaType SemanticAnn) -- ^ Component of a unit test declared with an initial value (SE-233)
+  | ETestComponentConnectionInvalidGlobal Identifier (TerminaType SemanticAnn) -- ^ Port of a test component connected to another kind of object (SE-234)
+  | ETestComponentConnectionTypeMismatch Identifier (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Port and test component that carry different types (SE-235)
   deriving Show
 
 -- | Why an emitter takes a handler and not a task.
@@ -1075,6 +1078,15 @@ instance Diagnosable Error where
     describe (EInvalidTestType ty) =
         diagnostic "SE-232" "invalid test type"
             ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a test class.")
+    describe (ETestComponentInitialized ty) =
+        diagnostic "SE-233" "test component initialized"
+            ("A \x1b[31m" <> showText ty <> "\x1b[0m always starts empty, so its declaration takes no initial value.")
+    describe (ETestComponentConnectionInvalidGlobal ident portTy) =
+        diagnostic "SE-234" "invalid test component connection"
+            ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to a port of type \x1b[31m" <> showText portTy <> "\x1b[0m.")
+    describe (ETestComponentConnectionTypeMismatch ident portTy carriedTy) =
+        diagnostic "SE-235" "test component type mismatch"
+            ("The port of type \x1b[31m" <> showText portTy <> "\x1b[0m cannot be connected to \x1b[31m" <> T.pack ident <> "\x1b[0m, which carries values of type \x1b[31m" <> showText carriedTy <> "\x1b[0m.")
 
     -- | The two clauses below pick their detail with a case, which the script
     -- that moved the rest of this table does not read, so they were moved by

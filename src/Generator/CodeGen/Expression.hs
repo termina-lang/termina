@@ -37,9 +37,15 @@ cBinOp LogicalAnd = error "Logical and is codified as a sequential expression"
 cBinOp LogicalOr = error "Logical or is codified as a sequential expression"
 
 -- | Translate type annotation to C type
-genType :: CQualifier 
-    -> TerminaType SemanticAnn 
+genType :: CQualifier
+    -> TerminaType SemanticAnn
     -> CGenerator CType
+-- | The components of a unit test come with the harness of the tests
+genType _ ty@(TTestEmitter {}) = throwError $ InternalError $ "test components are not generated yet: " ++ show ty
+genType _ ty@(TTestChannel {}) = throwError $ InternalError $ "test components are not generated yet: " ++ show ty
+genType _ ty@(TTestPool {}) = throwError $ InternalError $ "test components are not generated yet: " ++ show ty
+genType _ ty@(TTestEmitterAccess {}) = throwError $ InternalError $ "test components are not generated yet: " ++ show ty
+genType _ ty@(TTestChannelAccess {}) = throwError $ InternalError $ "test components are not generated yet: " ++ show ty
 -- |  Unsigned integer types
 genType qual TUInt8 = return (CTInt IntSize8 Unsigned qual)
 genType qual TUInt16 = return (CTInt IntSize16 Unsigned qual)

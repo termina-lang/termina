@@ -158,6 +158,7 @@ genArchGlobal _ (Const identifier ty expr _ ann) = do
 -- | Const expressions have been already substituted by the type checker
 -- | Nothing to do here
 genArchGlobal _ (ConstExpr {}) = return ()
+genArchGlobal _ (Emitter _ (TTestEmitter _) _ _ ann) = throwError $ annotateError (getLocation ann) EUnsupportedTestElement
 genArchGlobal modName (Emitter ident emitterCls mExpr _ ann) = do
   case emitterCls of
     (TGlobal EmitterClass "Interrupt") -> ST.modify $ \tp ->
@@ -271,6 +272,7 @@ genArchGlobal modName (Resource ident (TDeque aty size) _ _ rann) =
     tp {
       deques = M.insert ident (TPDeque ident aty size modName rann) (deques tp)
     }
+genArchGlobal _ (Resource _ (TTestPool {}) _ _ rann) = throwError $ annotateError (getLocation rann) EUnsupportedTestElement
 genArchGlobal _ (Resource {}) = error "Internal error: invalid resource declaration"
 genArchGlobal modName (Handler ident (TGlobal HandlerClass hcls) (Just (StructInitializer assignments _)) modifiers hann) = do
   tpClass <- ST.get >>= \tp -> return $ fromJust (M.lookup hcls (handlerClasses tp))
@@ -314,8 +316,9 @@ genArchGlobal modName (Channel ident (TMsgQueue mty size) _ _ cann) =
     tp {
       channels = M.insert ident (TPMsgQueue ident mty size modName cann) (channels tp)
     }
+genArchGlobal _ (Channel _ (TTestChannel {}) _ _ cann) = throwError $ annotateError (getLocation cann) EUnsupportedTestElement
 genArchGlobal _ (Channel {}) = error "Internal error: invalid channel declaration"
-genArchGlobal _ (Test _ _ _ _ tann) = throwError $ annotateError (getLocation tann) EUnsupportedTestInstance
+genArchGlobal _ (Test _ _ _ _ tann) = throwError $ annotateError (getLocation tann) EUnsupportedTestElement
 
 genArchElement :: QualifiedName -> AnnASTElement SemanticAnn -> ArchitectureMonad ()
 genArchElement _ (Function identifier params mRet block _ ann) = 

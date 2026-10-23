@@ -164,6 +164,12 @@ lowerStatements acc (stmt : xs) =
                                 ("try_put", [elemnt, out]) -> lowerStatements (DequeExchange DequeTryPut obj elemnt out ann' : acc) xs
                                 ("replace", [elemnt, out]) -> lowerStatements (DequeExchange DequeReplace obj elemnt out ann' : acc) xs
                                 _ -> throwError $ InternalError ("lowerStatements: unexpected call to procedure " ++ funcName)
+                        -- | The procedures of the components of a unit test
+                        -- are invoked as any other procedure
+                        TAccessPort (TTestEmitterAccess _) ->
+                            lowerStatements (ProcedureInvoke obj funcName args ann' : acc) xs
+                        TAccessPort (TTestChannelAccess _) ->
+                            lowerStatements (ProcedureInvoke obj funcName args ann' : acc) xs
                         _ -> throwError $ InternalError ("lowerStatements: unexpected object type " ++ show obj_ty)
                 -- | We must repeat the same process for dereference member
                 -- function calls.  In this case, the object must be of a

@@ -295,6 +295,8 @@ accessPortTy (TAllocator _)          = True
 accessPortTy (TAtomicAccess _)       = True
 accessPortTy (TAtomicArrayAccess {}) = True
 accessPortTy (TDequeAccess _)         = True
+accessPortTy (TTestEmitterAccess _)  = True
+accessPortTy (TTestChannelAccess _)  = True
 accessPortTy _ = False
 
 msgTy :: TerminaType' expr a -> Bool
@@ -500,6 +502,8 @@ rootType (TArray ts _) = rootType ts
 rootType (TMsgQueue ts _) = rootType ts
 rootType (TPool ts _) = rootType ts
 rootType (TDeque ts _) = rootType ts
+rootType (TTestChannel ts _) = rootType ts
+rootType (TTestPool ts _) = rootType ts
 rootType (TReference _ ts) = rootType ts
 rootType (TBoxSubtype ts) = rootType ts
 rootType (TFixedLocation ts) = rootType ts

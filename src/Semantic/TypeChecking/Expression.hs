@@ -223,7 +223,30 @@ checkTerminaType loc (TDeque ty s) =
     TConstSubtype _ -> return ();
     _ -> throwError $ annotateError loc EExpressionNotConstant
   }
-checkTerminaType loc (TAtomic ty) = 
+checkTerminaType loc (TTestEmitter ty) =
+  checkTerminaType loc ty >>
+  msgTyOrFail loc ty
+checkTerminaType loc (TTestEmitterAccess ty) =
+  checkTerminaType loc ty >>
+  msgTyOrFail loc ty
+checkTerminaType loc (TTestChannelAccess ty) =
+  checkTerminaType loc ty >>
+  msgTyOrFail loc ty
+checkTerminaType loc (TTestChannel ty s) =
+  checkTerminaType loc ty >>
+  msgTyOrFail loc ty >>
+  getExprType s >>= \case {
+    TConstSubtype _ -> return ();
+    _ -> throwError $ annotateError loc EExpressionNotConstant
+  }
+checkTerminaType loc (TTestPool ty s) =
+  checkTerminaType loc ty >>
+  allocTyOrFail loc ty >>
+  getExprType s >>= \case {
+    TConstSubtype _ -> return ();
+    _ -> throwError $ annotateError loc EExpressionNotConstant
+  }
+checkTerminaType loc (TAtomic ty) =
   checkTerminaType loc ty >>
   catchExpectedNum loc EAtomicInvalidType (intTyOrFail loc ty)
 checkTerminaType loc (TAtomicArray ty s) =
@@ -605,9 +628,24 @@ typeMemberFunctionCall ann ak obj_ty ident args =
         "try_put" -> typeBuiltinArgs "try_put" [box, builtinParameter "rejected" (paramType opt)]
         "replace" -> typeBuiltinArgs "replace" [box, builtinParameter "evicted" (paramType opt)]
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
+    -- | A case fires the emitter that takes the place of a real one
+    TAccessPort (TTestEmitterAccess ty_event) ->
+      case ident of
+        "fire" -> mutableCall >> typeBuiltinArgs "fire" [builtinParameter "value" ty_event]
+        _ -> throwError $ annotateError ann (EUnknownProcedure ident)
+    -- | A case reads, without blocking, what the unit has sent
+    TAccessPort (TTestChannelAccess ty_msg) ->
+      case ident of
+        "pending" -> typeBuiltinArgs "pending" [builtinParameter "n" (TReference Mutable TUSize)]
+        "take" -> mutableCall >> typeBuiltinArgs "take" [builtinParameter "msg" (TReference Mutable (TOption ty_msg))]
+        _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     ty -> throwError $ annotateError ann (EMemberFunctionCallInvalidType ty)
 
   where
+
+    -- | A procedure that changes the component cannot be called through an
+    -- immutable self reference
+    mutableCall = when (ak == Immutable) (throwError $ annotateError ann EInvalidAccessToProcedureFromImmutableSelfReference)
 
     -- | Types the arguments of a built-in procedure against its parameters
     typeBuiltinArgs procName ps
@@ -677,8 +715,28 @@ typeConstant loc _typeObj (C tChar) =
     else return $ SAST.C tChar
 typeConstant _loc _typeObj Null = return SAST.Null
 
+-- | The type argument of a built-in type
+typeTypeParam :: Location
+  -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
+  -> PAST.TypeSpecifier ParserAnn
+  -> TypeParameter ParserAnn
+  -> SemanticMonad (SAST.TerminaType SemanticAnn)
+typeTypeParam loc typeObj _ (TypeParamIdentifier ident) = typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+typeTypeParam loc typeObj _ (TypeParamTypeSpec ts') = typeTypeSpecifier loc typeObj ts'
+typeTypeParam loc _ ts _ = throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+
+-- | The size argument of a built-in type, which is a constant usize
+typeSizeParam :: Location
+  -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
+  -> PAST.TypeSpecifier ParserAnn
+  -> TypeParameter ParserAnn
+  -> SemanticMonad (SAST.Expression SemanticAnn)
+typeSizeParam loc typeObj _ (TypeParamIdentifier ident) = typeExpression (Just (TConstSubtype TUSize)) typeObj (AccessObject (Variable ident loc))
+typeSizeParam _loc typeObj _ (TypeParamSize s) = typeExpression (Just (TConstSubtype TUSize)) typeObj s
+typeSizeParam loc _ ts _ = throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+
 -- | Function that translates a |TypeSpecifier| into a |TerminaType|.
-typeTypeSpecifier :: Location 
+typeTypeSpecifier :: Location
   -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -> PAST.TypeSpecifier ParserAnn 
   -> SemanticMonad (SAST.TerminaType SemanticAnn)
@@ -774,6 +832,16 @@ typeTypeSpecifier loc typeObj ts@(TSDefinedType "DequeAccess" [typeParam]) =
     TypeParamIdentifier ident -> TDequeAccess <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
     TypeParamTypeSpec ts' -> TDequeAccess <$> typeTypeSpecifier loc typeObj ts'
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "TestEmitter" [typeParam]) =
+  TTestEmitter <$> typeTypeParam loc typeObj ts typeParam
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "TestEmitterAccess" [typeParam]) =
+  TTestEmitterAccess <$> typeTypeParam loc typeObj ts typeParam
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "TestChannelAccess" [typeParam]) =
+  TTestChannelAccess <$> typeTypeParam loc typeObj ts typeParam
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "TestChannel" [typeParam, sizeParam]) =
+  TTestChannel <$> typeTypeParam loc typeObj ts typeParam <*> typeSizeParam loc typeObj ts sizeParam
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "TestPool" [typeParam, sizeParam]) =
+  TTestPool <$> typeTypeParam loc typeObj ts typeParam <*> typeSizeParam loc typeObj ts sizeParam
 typeTypeSpecifier loc typeObj (TSArray ts s) = do
   ty <- typeTypeSpecifier loc typeObj ts
   arraySize <- catchMismatch loc EArrayIndexNotUSize 
@@ -1596,6 +1664,10 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection Inb
             checkEmitterDataType pann clsId ty
             checkEmitterTargetClass pann clsId targetKind targetCls
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets action)
+          -- | An emitter of a unit test takes the place of any emitter
+          LocatedElement (GGlob ets@(TTestEmitter ty')) _ -> do
+            catchMismatch pann (ETestComponentConnectionTypeMismatch sid fty) (sameTyOrError pann ty ty')
+            return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets action)
           _ -> throwError $ annotateError pann $ ESinkPortConnectionInvalidGlobal sid
       TInPort ty action  ->
         case gentry of
@@ -1617,6 +1689,10 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection Out
           LocatedElement (GGlob cts@(TMsgQueue ty' _)) _ -> do
             catchMismatch pann (EOutboundPortConnectionMsgQueueTypeMismatch sid ty) (sameTyOrError pann ty ty')
             return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildOutPortConnAnn pann cts)
+          -- | A channel of a unit test, which a case reads
+          LocatedElement (GGlob cts@(TTestChannel ty' _)) _ -> do
+            catchMismatch pann (ETestComponentConnectionTypeMismatch sid fty) (sameTyOrError pann ty ty')
+            return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildOutPortConnAnn pann cts)
           _ -> throwError $ annotateError pann $ EOutboundPortConnectionInvalidGlobal sid
       ty -> throwError $ annotateError pann (EFieldNotOutboundPort fid ty)
   else throwError $ annotateError pann (EFieldValueAssignmentUnknownFields tyDef [pid])
@@ -1629,6 +1705,10 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty fann) (FieldPortConnection 
       TAccessPort (TAllocator ty) ->
         case gentry of
           LocatedElement (GGlob (TPool ty' s)) _ -> do
+            catchMismatch pann (EAllocatorPortConnectionPoolTypeMismatch sid ty) (sameTyOrError pann ty ty')
+            return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty s)
+          -- | A pool of a unit test is reached as any pool
+          LocatedElement (GGlob (TTestPool ty' s)) _ -> do
             catchMismatch pann (EAllocatorPortConnectionPoolTypeMismatch sid ty) (sameTyOrError pann ty ty')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty s)
           _ -> throwError $ annotateError pann $ EAllocatorPortConnectionInvalidGlobal sid
@@ -1651,6 +1731,24 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty fann) (FieldPortConnection 
             catchMismatch pann (EDequeAccessPortConnectionDequeTypeMismatch sid ty) (sameTyOrError pann ty ty')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildDequeConnAnn pann ty)
           _ -> throwError $ annotateError pann $ EDequeAccessPortConnectionInvalidGlobal sid
+      -- | The access of a case to the emitters and the channels of a unit
+      -- test, which provide the built-in procedures of the port
+      TAccessPort accessTy@(TTestEmitterAccess ty) ->
+        case gentry of
+          LocatedElement (GGlob ets@(TTestEmitter ty')) _ -> do
+            catchMismatch pann (ETestComponentConnectionTypeMismatch sid accessTy) (sameTyOrError pann ty ty')
+            return $ SAST.FieldPortConnection AccessPortConnection pid sid
+              (buildAccessPortConnAnn pann accessTy ets [ProcedureSeman "fire" [builtinParameter "value" ty] []])
+          _ -> throwError $ annotateError pann $ ETestComponentConnectionInvalidGlobal sid accessTy
+      TAccessPort accessTy@(TTestChannelAccess ty) ->
+        case gentry of
+          LocatedElement (GGlob cts@(TTestChannel ty' _)) _ -> do
+            catchMismatch pann (ETestComponentConnectionTypeMismatch sid accessTy) (sameTyOrError pann ty ty')
+            return $ SAST.FieldPortConnection AccessPortConnection pid sid
+              (buildAccessPortConnAnn pann accessTy cts [
+                ProcedureSeman "pending" [builtinParameter "n" (TReference Mutable TUSize)] [],
+                ProcedureSeman "take" [builtinParameter "msg" (TReference Mutable (TOption ty))] []])
+          _ -> throwError $ annotateError pann $ ETestComponentConnectionInvalidGlobal sid accessTy
       TAccessPort ifaceTy@(TInterface _ iface) -> do
         -- | Get the interface definition
         getGlobalTypeDef pann iface >>=
@@ -1678,6 +1776,11 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty fann) (FieldPortConnection 
                       );
                       _ -> throwError $ annotateError Internal EExpectedInterfaceType
                   }
+                -- | A pool of a unit test provides TestPoolAccess
+                LocatedElement (GGlob pts@(TTestPool {})) _ ->
+                  if iface == "TestPoolAccess"
+                    then return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann ifaceTy pts procs)
+                    else throwError $ annotateError pann $ EAccessPortConnectionInterfaceNotProvided sid iface
                 _ -> throwError $ annotateError pann $ EAccessPortConnectionInvalidGlobal sid
             );
             _ -> throwError $ annotateError Internal EExpectedInterfaceType

@@ -10,7 +10,7 @@ import Utils.Annotations
 import Utils.Errors (ErrorMessage(errorIdent))
 import Configuration.Platform
 import Configuration.Configuration
-import Data.Text (Text)
+import Data.Text (Text, pack)
 import qualified Data.Set as S
 
 -- | Parses and type-checks a single module named @test@, returning the
@@ -33,6 +33,18 @@ typeCheckErrorOn plt input = case runP (contents topLevel) "test" "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast ->
     let config = defaultConfig "test" plt in
+    case runTypeChecking (makeInitialGlobalEnv (Just config) plt []) (typeTerminaModule (S.singleton "test") ast) of
+      Left err -> Just $ errorIdent err
+      Right _ -> Nothing
+
+-- | Type-checks module @test@ as the deployment of a test, which has
+-- test_entry, returning the diagnostic code of the first error (or 'Nothing'
+-- if it type-checks).
+typeCheckTestErrorOn :: Platform -> String -> Maybe Text
+typeCheckTestErrorOn plt input = case runP (contents topLevel) "test" "" input of
+  Left err -> error $ "Parser Error: " ++ show err
+  Right ast ->
+    let config = (defaultConfig "test" plt) { deploymentKind = TestBuild (pack "test") } in
     case runTypeChecking (makeInitialGlobalEnv (Just config) plt []) (typeTerminaModule (S.singleton "test") ast) of
       Left err -> Just $ errorIdent err
       Right _ -> Nothing

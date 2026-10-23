@@ -228,6 +228,40 @@ systemEntryGlobalEnv =
     ("system_entry", LocatedElement (GGlob (TGlobal ResourceClass "SystemEntry")) Internal)
   ]
 
+-- | The API that the cases and the scenario of a test reach through
+-- test_entry. A check records its failure and returns, and the first argument
+-- of a check_eq is the value obtained and the second the one expected.
+testEntryGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
+testEntryGlobalEnv =
+  [("TestAPI", LocatedElement (GType (Interface SystemInterface "TestAPI" [] (
+      [ procedure "check" [builtinParameter "cond" TBool] ]
+      ++ [ procedure ("check_eq_" ++ suffix) [builtinParameter "actual" ty, builtinParameter "expected" ty]
+         | (suffix, ty) <- checkedTypes ]
+      ++ [ procedure "check_elapsed" [builtinParameter "t0" (TStruct "TimeVal"), builtinParameter "max" (TStruct "TimeVal")],
+           procedure "fail" [],
+           procedure "step" [builtinParameter "n" TUInt32],
+           procedure "advance" [builtinParameter "dt" (TStruct "TimeVal")],
+           procedure "finish" [] ]) [])) Internal),
+   ("TestEntry", LocatedElement (GType (Class ResourceClass "TestEntry" [] ["TestAPI"] [])) Internal),
+   ("test_entry", LocatedElement (GGlob (TGlobal ResourceClass "TestEntry")) Internal),
+   -- | The interface that a TestPool provides to a case, beside the
+   -- Allocator<T> through which the unit reaches it
+   ("TestPoolAccess", LocatedElement (GType (Interface SystemInterface "TestPoolAccess" [] [
+      viewProcedure "in_use" [builtinParameter "n" (TReference Mutable TUSize)],
+      viewProcedure "max_in_use" [builtinParameter "n" (TReference Mutable TUSize)],
+      procedure "fail_allocs" [builtinParameter "n" TUSize]
+   ] [])) Internal)]
+
+  where
+
+    procedure procName params = InterfaceProcedure Mutable procName params [] (buildExpAnn Internal TUnit)
+    viewProcedure procName params = InterfaceProcedure Immutable procName params [] (buildExpAnn Internal TUnit)
+
+    checkedTypes = [
+      ("u8", TUInt8), ("u16", TUInt16), ("u32", TUInt32), ("u64", TUInt64),
+      ("i8", TInt8), ("i16", TInt16), ("i32", TInt32), ("i64", TInt64),
+      ("usize", TUSize), ("bool", TBool), ("char", TChar)]
+
 -- | The system emitters and the system resource are declared in every
 -- program; the ones the application does not connect are dropped from the
 -- architecture.
@@ -241,7 +275,9 @@ makeInitialGlobalEnv (Just config) plt pltEnvironment =
       stdlibGlobalEnv (sysPrintOutputBufferSize config) (sysReadInputBufferSize config),
       -- | The platform specific environment. It should declare its own SystemAPI interface.
       pltEnvironment,
-      systemGlobalEnv]
+      systemGlobalEnv,
+      -- | test_entry only exists in a test
+      if isTestBuild config then testEntryGlobalEnv else []]
   in
   makeEnvironment (M.fromList globalEnv) plt
 makeInitialGlobalEnv Nothing plt pltEnvironment =
