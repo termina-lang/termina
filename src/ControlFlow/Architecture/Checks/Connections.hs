@@ -20,12 +20,19 @@ checkEmitterConnections = do
         let emitterId = getEmitterIdentifier e in
         when (emitterId `M.notMember` emitterTargets tp) (throwError $ annotateError (getLocation . getAnnotation $ e) (EDisconnectedEmitter emitterId))) . M.elems . emitters $ tp
 
+-- | A channel connects exactly one out port to exactly one in port. A second
+-- in port gives AE-002 when the architecture is built.
 checkChannelConnections :: ConnectionsCheckMonad ()
 checkChannelConnections = do
     tp <- ask
     mapM_ (
         \case TPMsgQueue channelId _ _ _ ann -> do
-                when (channelId `M.notMember` channelSources tp) (throwError $ annotateError (getLocation ann) (EChannelWithoutSources channelId))
+                case M.findWithDefault [] channelId (channelSources tp) of
+                    [] -> throwError $ annotateError (getLocation ann) (EChannelWithoutSources channelId)
+                    [_] -> return ()
+                    -- | The sources are kept with the last connection first
+                    ((_, _, connAnn) : (_, _, prevAnn) : _) ->
+                        throwError $ annotateError (getLocation connAnn) (EDuplicatedChannelSource channelId (getLocation prevAnn))
                 when (channelId `M.notMember` channelTargets tp) (throwError $ annotateError (getLocation ann) (EChannelWithoutTarget channelId))) . M.elems . channels $ tp
 
 checkPoolUsage :: ConnectionsCheckMonad ()
@@ -118,12 +125,20 @@ checkSystemExceptAction = do
 -- to the next action of the same task, and fails when a chain reaches an
 -- action that is already on it. A send or a continue in a branch that never
 -- runs counts as well, since the check reads the code and does not run it.
+-- In a unit test, a message that a case sends starts a chain too, and the
+-- methods of the test class count as part of each of its cases.
 checkActivationCycles :: ConnectionsCheckMonad ()
 checkActivationCycles = do
     tp <- ask
     forM_ (M.toList (emitterTargets tp)) $ \(emitterId, (target, port, ann)) ->
         forM_ (sinkAction tp target port) $ \action ->
             walk tp emitterId [] ((target, action), getLocation ann)
+    forM_ (M.elems (testInstances tp)) $ \test ->
+        forM_ (M.lookup (testInstanceClass test) (testClasses tp)) $ \cls ->
+            forM_ (M.elems (classCases cls)) $ \(TPFunction caseId _ _ (Block body _) _) ->
+                let methodBodies = [blockBody blk | TPFunction _ _ _ blk _ <- M.elems (classMethods cls)] in
+                forM_ (concatMap (follow tp (testInstanceName test)) (blocksIn (body ++ concat methodBodies))) $
+                    walk tp (testInstanceName test ++ "." ++ caseId) []
 
     where
 
@@ -160,19 +175,6 @@ checkActivationCycles = do
         follow _ entity (ContinueBlock (DerefMemberFunctionCall _ nextAction _ _) ann) = [((entity, nextAction), getLocation ann)]
         follow _ _ _ = []
 
-        -- | Every block of a body, those inside branches and loops included
-        blocksIn = concatMap (\blk -> blk : nested blk)
-
-        nested (IfElseBlock (CondIf _ ifBlk _) elseIfs mElse _) =
-            blocksIn (blockBody ifBlk)
-            ++ concat [blocksIn (blockBody blk) | CondElseIf _ blk _ <- elseIfs]
-            ++ maybe [] (blocksIn . blockBody . condElseBody) mElse
-        nested (MatchBlock _ cases mDefault _) =
-            concat [blocksIn (blockBody blk) | MatchCase _ _ blk _ <- cases]
-            ++ maybe [] (\(DefaultCase blk _) -> blocksIn (blockBody blk)) mDefault
-        nested (ForLoopBlock _ _ _ _ _ blk _) = blocksIn (blockBody blk)
-        nested _ = []
-
         entityClass tp entity =
             case (M.lookup entity (tasks tp), M.lookup entity (handlers tp)) of
                 (Just task, _) -> M.lookup (taskClass task) (taskClasses tp)
@@ -180,9 +182,10 @@ checkActivationCycles = do
                 _ -> Nothing
 
         outputConnections tp entity =
-            case (M.lookup entity (tasks tp), M.lookup entity (handlers tp)) of
-                (Just task, _) -> taskOutputPortConns task
-                (_, Just handler) -> handlerOutputPortConns handler
+            case (M.lookup entity (tasks tp), M.lookup entity (handlers tp), M.lookup entity (testInstances tp)) of
+                (Just task, _, _) -> taskOutputPortConns task
+                (_, Just handler, _) -> handlerOutputPortConns handler
+                (_, _, Just test) -> testInstanceOutputPortConns test
                 _ -> M.empty
 
 checkResourceUsage :: ConnectionsCheckMonad ()

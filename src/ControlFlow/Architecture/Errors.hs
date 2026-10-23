@@ -25,7 +25,6 @@ data Error =
     | EInvalidResourceConnection -- ^ Invalid resource connection (Internal)
     | EInvalidPoolConnection -- ^ Invalid pool connection (Internal)
     | EUnsupportedEmitterClass -- ^ Unsupported emitter class (Internal)
-    | EUnsupportedTestElement -- ^ Test instance or test component, which the architecture does not model yet (Internal)
     | EMissingPeriodicTimerInitializer -- ^ Missing initializer expression for periodic timer emitter (Internal)
     | EDuplicatedEmitterConnection Identifier Location -- ^ Duplicated emitter connection (AE-001)
     | EDuplicatedChannelConnection Identifier Location -- ^ Duplicated channel connection (AE-002)
@@ -42,6 +41,13 @@ data Error =
     | ESharedDeque Identifier Location -- ^ Deque connected to more than one access port (AE-013)
     | EUnfilledDeque Identifier Identifier Identifier -- ^ Deque that only gets back its own boxes (AE-014)
     | EActivationCycle Identifier [(Identifier, Identifier)] -- ^ Response to an event that reaches an action it has already run (AE-015)
+    | EDuplicatedChannelSource Identifier Location -- ^ Channel connected to more than one out port (AE-016)
+    | ETestComponentWithoutTest String Identifier -- ^ Component of a unit test that no test instance reaches (AE-017)
+    | ETestPoolWithoutAllocator Identifier -- ^ Test pool that the unit does not reach through an allocator (AE-018)
+    | EEmitterInUnitTest Identifier -- ^ Emitter other than a test emitter in a unit test (AE-019)
+    | ETestComponentInConcurrentTest String Identifier -- ^ Component of a unit test in a concurrent test (AE-020)
+    | EAdvanceInConcurrentTest -- ^ Call to advance in a concurrent test (AE-021)
+    | EFinishInUnitTest -- ^ Call to finish in a unit test (AE-022)
     deriving Show
 
 type ArchitectureError = AnnotatedError Error Location
@@ -128,11 +134,46 @@ instance Diagnosable Error where
             ("The response to " <> emph (T.pack emitterId) <> " reaches an action that is already in its chain of activations: " <>
                 T.intercalate " -> " [emph (T.pack (entity ++ "." ++ action)) | (entity, action) <- cycleSteps] <>
                 ". The chain of activations triggered by an event must be acyclic.")
+    describe (EDuplicatedChannelSource channel prevPos) =
+        relatedTo prevPos "the previous connection" $
+            diagnostic "AE-016" "duplicated channel source"
+                ("Channel " <> emph (T.pack channel) <>
+                    " is already connected to an outbound port. " <>
+                    "Only one source is allowed per channel.")
+    describe (ETestComponentWithoutTest kind ident) =
+        diagnostic "AE-017" "test component without test"
+            (T.pack kind <> " " <> emph (T.pack ident) <>
+                " is not connected to an access port of any test instance. " <>
+                "Every component of a unit test must be reached by at least one case.")
+    describe (ETestPoolWithoutAllocator poolId) =
+        diagnostic "AE-018" "test pool without allocator"
+            ("Test pool " <> emph (T.pack poolId) <>
+                " is not connected to any allocator port of the unit. " <>
+                "A test pool takes the place of a pool of the unit.")
+    describe (EEmitterInUnitTest "system_except") =
+        diagnostic "AE-019" "emitter in a unit test"
+            ("In a unit test the harness attends " <> emph "system_except" <> " to record the exceptions of each case. " <>
+                "A handler of system_except is tested by connecting it to a TestEmitter<Exception>.")
+    describe (EEmitterInUnitTest emitter) =
+        diagnostic "AE-019" "emitter in a unit test"
+            ("Emitter " <> emph (T.pack emitter) <> " is not a test emitter, and the deployment has test instances. " <>
+                "The events of a unit test come only from the cases, through test emitters.")
+    describe (ETestComponentInConcurrentTest kind ident) =
+        diagnostic "AE-020" "test component in a concurrent test"
+            (T.pack kind <> " " <> emph (T.pack ident) <>
+                " is a component of a unit test, and the deployment has no test instances. " <>
+                "A test without test instances is a concurrent test, which runs the application with its own emitters, channels and pools.")
+    describe EAdvanceInConcurrentTest =
+        diagnostic "AE-021" "advance in a concurrent test"
+            ("The deployment has no test instances, so it is a concurrent test, which runs on the real clock. " <>
+                emph "advance" <> " moves the clock of a unit test.")
+    describe EFinishInUnitTest =
+        diagnostic "AE-022" "finish in a unit test"
+            ("The deployment has test instances, so it is a unit test, where each case ends at its return. " <>
+                emph "finish" <> " ends a concurrent test.")
     -- | Everything else is a broken invariant of the compiler, which has no code
     -- of its own.
-    describe EUnsupportedTestElement =
-        diagnosticWithoutDetail "Internal" "test instances and test components are not supported yet by the architecture"
-    describe _ = diagnosticWithoutDetail "Internal" "internal error"
+    describe _ =diagnosticWithoutDetail "Internal" "internal error"
 
 instance ErrorMessage ArchitectureError where
 

@@ -58,7 +58,7 @@ addChannelSource ::
   -> ArchitectureMonad ()
 addChannelSource ident pname channel ann = do
   channelSrcs <- ST.gets channelSources
-  case M.lookup ident channelSrcs of
+  case M.lookup channel channelSrcs of
     Nothing -> do
       ST.modify $ \tp ->
         tp {
@@ -85,6 +85,7 @@ genArchTypeDef ann tydef@(Class TaskClass ident _ _ _) = do
     classMethods = M.empty,
     classProcedures = M.empty,
     classViewers = getViewers members,
+    classCases = M.empty,
     accessPorts = getAccessPorts members,
     inputPorts = getInputPorts members,
     sinkPorts = getSinkPorts members,
@@ -110,6 +111,7 @@ genArchTypeDef ann tydef@(Class HandlerClass ident _ _ _) = do
     classMethods = M.empty,
     classProcedures = M.empty,
     classViewers = getViewers members,
+    classCases = M.empty,
     accessPorts = getAccessPorts members,
     inputPorts = M.empty,
     sinkPorts = getSinkPorts members,
@@ -136,6 +138,7 @@ genArchTypeDef ann tydef@(Class ResourceClass ident _ provides _) = do
     classMethods = getMethods members,
     classProcedures = getProcedures members,
     classViewers = M.empty,
+    classCases = M.empty,
     accessPorts = getAccessPorts members,
     inputPorts = M.empty,
     sinkPorts = M.empty,
@@ -146,6 +149,32 @@ genArchTypeDef ann tydef@(Class ResourceClass ident _ provides _) = do
   ST.modify $ \tp ->
     tp {
       resourceClasses = M.insert ident resCls (resourceClasses tp)
+    }
+genArchTypeDef ann tydef@(Class TestClass ident _ _ _) = do
+  let members = getClassMembers tydef
+  outBoxMap <-
+    case runInOutClass tydef of
+      Left err -> throwError err
+      Right boxMap -> return boxMap
+  let testCls = TPClass {
+    classIdentifier = ident,
+    classKind = TestClass,
+    classProvides = [],
+    classActions = M.empty,
+    classMethods = getMethods members,
+    classProcedures = M.empty,
+    classViewers = M.empty,
+    classCases = getCases members,
+    accessPorts = getAccessPorts members,
+    inputPorts = M.empty,
+    sinkPorts = M.empty,
+    outputPorts = getOutputPorts members,
+    classBoxIOMaps = outBoxMap,
+    classAnns = ann
+  }
+  ST.modify $ \tp ->
+    tp {
+      testClasses = M.insert ident testCls (testClasses tp)
     }
 genArchTypeDef _ _ = return ()
 
@@ -158,7 +187,11 @@ genArchGlobal _ (Const identifier ty expr _ ann) = do
 -- | Const expressions have been already substituted by the type checker
 -- | Nothing to do here
 genArchGlobal _ (ConstExpr {}) = return ()
-genArchGlobal _ (Emitter _ (TTestEmitter _) _ _ ann) = throwError $ annotateError (getLocation ann) EUnsupportedTestElement
+genArchGlobal modName (Emitter ident (TTestEmitter ety) _ _ ann) =
+  ST.modify $ \tp ->
+    tp {
+      testEmitters = M.insert ident (TPTestEmitter ident ety modName ann) (testEmitters tp)
+    }
 genArchGlobal modName (Emitter ident emitterCls mExpr _ ann) = do
   case emitterCls of
     (TGlobal EmitterClass "Interrupt") -> ST.modify $ \tp ->
@@ -272,7 +305,11 @@ genArchGlobal modName (Resource ident (TDeque aty size) _ _ rann) =
     tp {
       deques = M.insert ident (TPDeque ident aty size modName rann) (deques tp)
     }
-genArchGlobal _ (Resource _ (TTestPool {}) _ _ rann) = throwError $ annotateError (getLocation rann) EUnsupportedTestElement
+genArchGlobal modName (Resource ident (TTestPool aty size) _ _ rann) =
+  ST.modify $ \tp ->
+    tp {
+      testPools = M.insert ident (TPPool ident aty size modName rann) (testPools tp)
+    }
 genArchGlobal _ (Resource {}) = error "Internal error: invalid resource declaration"
 genArchGlobal modName (Handler ident (TGlobal HandlerClass hcls) (Just (StructInitializer assignments _)) modifiers hann) = do
   tpClass <- ST.get >>= \tp -> return $ fromJust (M.lookup hcls (handlerClasses tp))
@@ -316,9 +353,38 @@ genArchGlobal modName (Channel ident (TMsgQueue mty size) _ _ cann) =
     tp {
       channels = M.insert ident (TPMsgQueue ident mty size modName cann) (channels tp)
     }
-genArchGlobal _ (Channel _ (TTestChannel {}) _ _ cann) = throwError $ annotateError (getLocation cann) EUnsupportedTestElement
+-- | A channel of a unit test is a message queue that a case reads
+genArchGlobal modName (Channel ident (TTestChannel mty size) _ _ cann) =
+  ST.modify $ \tp ->
+    tp {
+      testChannels = M.insert ident (TPMsgQueue ident mty size modName cann) (testChannels tp)
+    }
 genArchGlobal _ (Channel {}) = error "Internal error: invalid channel declaration"
-genArchGlobal _ (Test _ _ _ _ tann) = throwError $ annotateError (getLocation tann) EUnsupportedTestElement
+genArchGlobal modName (Test ident (TGlobal TestClass tcls) initializer _ tann) = do
+  tpClass <- ST.get >>= \tp -> return $ fromJust (M.lookup tcls (testClasses tp))
+  -- | A test class without ports has an instance without initializer
+  let assignments = case initializer of
+        Just (StructInitializer as _) -> as
+        Just _ -> error "Internal error: test initializer is not a struct initializer"
+        Nothing -> []
+  (outpConns, apConns) <- foldM (\(outp, accp) assignment ->
+    case assignment of
+      FieldPortConnection OutboundPortConnection pname target cann ->
+        case M.lookup pname (outputPorts tpClass) of
+          Just _ -> do
+            addChannelSource ident pname target cann
+            return (M.insert pname (target, cann) outp, accp)
+          Nothing -> error $ "Internal error: port " ++ pname ++ " is not an out port"
+      FieldPortConnection AccessPortConnection pname target cann -> do
+        addResourceSource target ident pname cann
+        return (outp, M.insert pname (target, cann) accp)
+      _ -> return (outp, accp)
+    ) (M.empty, M.empty) assignments
+  ST.modify $ \tp ->
+    tp {
+      testInstances = M.insert ident (TPTest ident tcls outpConns apConns modName tann) (testInstances tp)
+    }
+genArchGlobal _ (Test {}) = error "Internal error: invalid test declaration"
 
 genArchElement :: QualifiedName -> AnnASTElement SemanticAnn -> ArchitectureMonad ()
 genArchElement _ (Function identifier params mRet block _ ann) = 
@@ -355,7 +421,12 @@ emptyTerminaProgArch = TerminaProgArch {
   channels = M.empty,
   channelSources = M.empty,
   channelTargets = M.empty,
-  resourceSources = M.empty
+  resourceSources = M.empty,
+  testClasses = M.empty,
+  testInstances = M.empty,
+  testEmitters = M.empty,
+  testChannels = M.empty,
+  testPools = M.empty
 }
 
 -- | Every program starts with the emitters of the platform and of the system

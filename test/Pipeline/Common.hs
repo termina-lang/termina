@@ -9,6 +9,7 @@ module Pipeline.Common
   , buildAndRenderModule
   , compileErrorCode
   , compileTestErrorCode
+  , runTestArchitecture
   , compileProjectErrorCode
   , compileErrorMessage
   , compileProjectErrorMessage
@@ -241,7 +242,15 @@ compileProjectErrorCode = compileProjectErrorCodeWith configParams
 -- use test classes, test instances and the components of a unit test.
 compileTestErrorCode :: String -> Maybe Text
 compileTestErrorCode input =
-  compileProjectErrorCodeWith configParams { deploymentKind = TestBuild (pack "test") } [("test", input)]
+  compileProjectErrorCodeWith testConfigParams [("test", input)]
+
+-- | The checked architecture of the deployment of a test, which the generator
+-- of C does not build yet.
+runTestArchitecture :: String -> Either Failure (TerminaProgArch SemanticAnn)
+runTestArchitecture input = fst <$> runFullProjectAppWith testConfigParams [("test", input)]
+
+testConfigParams :: TerminaConfig
+testConfigParams = configParams { deploymentKind = TestBuild (pack "test") }
 
 -- | 'compileProjectErrorCode' under a given configuration, for an error that
 -- only a project with a feature switched on can reach.
@@ -350,6 +359,7 @@ runChecks files progArch =
               , runCheckTaskPriorities progArch
               , runCheckSystemExceptAction progArch
               , runCheckActivationCycles progArch
+              , runCheckTestDeployment progArch
               , runCheckBoxSources progArch ]
 
 renderModule :: TerminaConfig -> ElaboratedModule -> Either Failure Text

@@ -4,9 +4,11 @@
 module Architecture.Negative.CodeSpec
   ( spec
   , timerTaskClass, periodicEmitter
+  , monitorClass, monitorTestClass, monitorTest
+  , executorClass, executorTestClass, executorWiring, scenarioClass
   ) where
 
-import Pipeline.Common (compileErrorCode)
+import Pipeline.Common (compileErrorCode, compileTestErrorCode)
 
 import Test.Hspec
 import Data.Text (pack)
@@ -39,6 +41,27 @@ relayClass name starts =
         "    }\n" else "") ++
     "    action on_msg(&priv self, v : u32) {\n" ++
     "        self->msg_out.send(v);\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "};\n"
+
+-- | A task class with two in ports, which keeps what it receives and, when it
+-- forwards, sends it on its out port
+twoInputsClass :: Bool -> String
+twoInputsClass forwards =
+    "task class TwoInputs {\n" ++
+    "    last : u32;\n" ++
+    "    in_a : in u32 triggers on_a;\n" ++
+    "    in_b : in u32 triggers on_b;\n" ++
+    (if forwards then "    msg_out : out u32;\n" else "") ++
+    "    action on_a(&priv self, v : u32) {\n" ++
+    "        self->last = self->last + v;\n" ++
+    (if forwards then "        self->msg_out.send(v);\n" else "") ++
+    "        return;\n" ++
+    "    }\n" ++
+    "    action on_b(&priv self, v : u32) {\n" ++
+    "        self->last = self->last + v;\n" ++
+    (if forwards then "        self->msg_out.send(v);\n" else "") ++
     "        return;\n" ++
     "    }\n" ++
     "};\n"
@@ -208,6 +231,29 @@ spec = do
              ++ "task relay : Relay = { msg_in <- to_relay, msg_out -> to_starter };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-015")
 
+    it "AE-016: message queue connected to the out ports of two tasks" $ do
+      let src = relayClass "Starter" True
+             ++ "task class SinkTask {\n"
+             ++ "    last : u32;\n"
+             ++ "    msg_in : in u32 triggers on_msg;\n"
+             ++ "    action on_msg(&priv self, v : u32) {\n"
+             ++ "        self->last = self->last + v;\n"
+             ++ "        return;\n"
+             ++ "    }\n"
+             ++ "};\n"
+             ++ periodicEmitter "timer_a" 1
+             ++ periodicEmitter "timer_b" 2
+             ++ "channel unused_a : MsgQueue<u32; 1>;\n"
+             ++ "channel unused_b : MsgQueue<u32; 1>;\n"
+             ++ "channel shared : MsgQueue<u32; 4>;\n"
+             ++ "#[priority(10)]\n"
+             ++ "task a : Starter = { start_port <- timer_a, msg_in <- unused_a, msg_out -> shared };\n"
+             ++ "#[priority(11)]\n"
+             ++ "task b : Starter = { start_port <- timer_b, msg_in <- unused_b, msg_out -> shared };\n"
+             ++ "#[priority(12)]\n"
+             ++ "task s : SinkTask = { last = 0, msg_in <- shared };\n"
+      compileErrorCode src `shouldBe` Just (pack "AE-016")
+
     it "AE-015: a task that sends messages to itself" $ do
       let src = relayClass "Starter" True
              ++ periodicEmitter "timer" 1
@@ -217,8 +263,9 @@ spec = do
       compileErrorCode src `shouldBe` Just (pack "AE-015")
 
     it "accepts a response that reaches a task through two paths" $ do
-      -- The starter sends to two relays, and both send to the same sink task:
-      -- the sink task runs twice, but the response ends.
+      -- The starter sends to two relays, and both send to the same sink task,
+      -- each through a channel of its own: the sink task runs twice, but the
+      -- response ends.
       let src = "task class FanOut {\n"
              ++ "    start_port : sink TimeVal triggers start;\n"
              ++ "    out_a : out u32;\n"
@@ -230,26 +277,20 @@ spec = do
              ++ "    }\n"
              ++ "};\n"
              ++ relayClass "Relay" False
-             ++ "task class SinkTask {\n"
-             ++ "    last : u32;\n"
-             ++ "    msg_in : in u32 triggers on_msg;\n"
-             ++ "    action on_msg(&priv self, v : u32) {\n"
-             ++ "        self->last = self->last + v;\n"
-             ++ "        return;\n"
-             ++ "    }\n"
-             ++ "};\n"
+             ++ twoInputsClass False
              ++ periodicEmitter "timer" 1
              ++ "channel to_a : MsgQueue<u32; 1>;\n"
              ++ "channel to_b : MsgQueue<u32; 1>;\n"
-             ++ "channel to_sink : MsgQueue<u32; 2>;\n"
+             ++ "channel from_a : MsgQueue<u32; 1>;\n"
+             ++ "channel from_b : MsgQueue<u32; 1>;\n"
              ++ "#[priority(10)]\n"
              ++ "task fan_out : FanOut = { start_port <- timer, out_a -> to_a, out_b -> to_b };\n"
              ++ "#[priority(11)]\n"
-             ++ "task relay_a : Relay = { msg_in <- to_a, msg_out -> to_sink };\n"
+             ++ "task relay_a : Relay = { msg_in <- to_a, msg_out -> from_a };\n"
              ++ "#[priority(12)]\n"
-             ++ "task relay_b : Relay = { msg_in <- to_b, msg_out -> to_sink };\n"
+             ++ "task relay_b : Relay = { msg_in <- to_b, msg_out -> from_b };\n"
              ++ "#[priority(13)]\n"
-             ++ "task collector : SinkTask = { last = 0, msg_in <- to_sink };\n"
+             ++ "task collector : TwoInputs = { last = 0, in_a <- from_a, in_b <- from_b };\n"
       compileErrorCode src `shouldBe` Nothing
 
     it "AE-009: two tasks with the same priority" $ do
@@ -540,3 +581,302 @@ spec = do
             ++ "#[priority(10)]\n"
             ++ "task t : BoxTask = { timer_port <- timer, snk <-> sink_res, data_pool0 <-> pool0, data_pool1 <-> pool1 };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-003")
+
+  describe "Architecture: deployment of a test" $ do
+
+    it "AE-001: test emitter connected to the sinks of two tasks" $ do
+      let src = monitorClass "CMonitor" ++ monitorTestClass
+             ++ "emitter tick : TestEmitter<TimeVal>;\n"
+             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "channel spare : MsgQueue<u32; 4>;\n"
+             ++ "#[priority(5)]\n"
+             ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
+             ++ "#[priority(6)]\n"
+             ++ "task other : CMonitor = { tick_ev <- tick, alarm_out -> spare };\n"
+             ++ monitorTest
+      compileTestErrorCode src `shouldBe` Just (pack "AE-001")
+
+    it "AE-004: test emitter that no sink of the unit is connected to" $ do
+      let src = monitorClass "CMonitor" ++ monitorTestClass
+             ++ "emitter tick : TestEmitter<TimeVal>;\n"
+             ++ "emitter other_tick : TestEmitter<TimeVal>;\n"
+             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "#[priority(5)]\n"
+             ++ "task uut : CMonitor = { tick_ev <- other_tick, alarm_out -> alarms };\n"
+             ++ monitorTest
+      compileTestErrorCode src `shouldBe` Just (pack "AE-004")
+
+    it "AE-005: test channel that no out port of the unit is connected to" $ do
+      let src = monitorClass "CMonitor" ++ monitorTestClass
+             ++ "emitter tick : TestEmitter<TimeVal>;\n"
+             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "channel other_alarms : TestChannel<u32; 4>;\n"
+             ++ "#[priority(5)]\n"
+             ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> other_alarms };\n"
+             ++ monitorTest
+      compileTestErrorCode src `shouldBe` Just (pack "AE-005")
+
+    it "AE-016: test channel connected to the out ports of two tasks" $ do
+      let src = monitorClass "CMonitor" ++ monitorTestClass
+             ++ "emitter tick : TestEmitter<TimeVal>;\n"
+             ++ "emitter other_tick : TestEmitter<TimeVal>;\n"
+             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "#[priority(5)]\n"
+             ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
+             ++ "#[priority(6)]\n"
+             ++ "task other : CMonitor = { tick_ev <- other_tick, alarm_out -> alarms };\n"
+             ++ monitorTest
+      compileTestErrorCode src `shouldBe` Just (pack "AE-016")
+
+    it "AE-017: test emitter that no test instance reaches" $ do
+      let src = monitorClass "CMonitor"
+             ++ "test class CAlarmTests {\n"
+             ++ "    alarms : access TestChannelAccess<u32>;\n"
+             ++ "    t : access TestAPI;\n"
+             ++ "    case none_pending(&mut self) {\n"
+             ++ "        var n : usize = 0;\n"
+             ++ "        self->alarms.pending(&mut n);\n"
+             ++ "        self->t.check_eq_usize(n, 0 : usize);\n"
+             ++ "        return;\n"
+             ++ "    }\n"
+             ++ "};\n"
+             ++ "emitter tick : TestEmitter<TimeVal>;\n"
+             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "#[priority(5)]\n"
+             ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
+             ++ "test alarm_tests : CAlarmTests = { alarms <-> alarms, t <-> test_entry };\n"
+      compileTestErrorCode src `shouldBe` Just (pack "AE-017")
+
+    it "AE-017: test pool that no test instance reaches through TestPoolAccess" $ do
+      let src = executorClass ++ executorTestClass False
+             ++ "resource tm_pool : TestPool<TMPacket; 4>;\n"
+             ++ executorWiring False
+      compileTestErrorCode src `shouldBe` Just (pack "AE-017")
+
+    it "AE-018: test pool that the unit does not reach through an allocator" $ do
+      let src = executorClass ++ executorTestClass True
+             ++ "resource tm_pool : TestPool<TMPacket; 4>;\n"
+             ++ "resource unit_pool : Pool<TMPacket; 4>;\n"
+             ++ "channel tcs : MsgQueue<TCCommand; 1>;\n"
+             ++ "channel tms : TestChannel<box TMPacket; 4>;\n"
+             ++ "#[priority(5)]\n"
+             ++ "task uut : CTCExecutor = { tc_in <- tcs, tm_out -> tms, tm_pool <-> unit_pool };\n"
+             ++ "test exec_tests : CTCExecutorTests = {\n"
+             ++ "    tc_out -> tcs, tm_rx <-> tms, tm_pool <-> unit_pool,\n"
+             ++ "    tm_pool_state <-> tm_pool, t <-> test_entry\n"
+             ++ "};\n"
+      compileTestErrorCode src `shouldBe` Just (pack "AE-018")
+
+    it "AE-019: periodic timer in a unit test" $ do
+      let src = monitorClass "CMonitor" ++ monitorTestClass ++ timerTaskClass
+             ++ periodicEmitter "timer" 1
+             ++ "emitter tick : TestEmitter<TimeVal>;\n"
+             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "#[priority(5)]\n"
+             ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
+             ++ "#[priority(6)]\n"
+             ++ "task other : TimerTask = { ticks = 0, timer_port <- timer };\n"
+             ++ monitorTest
+      compileTestErrorCode src `shouldBe` Just (pack "AE-019")
+
+    it "AE-019: handler of system_except in a unit test" $ do
+      let src = monitorClass "CMonitor" ++ monitorTestClass
+             ++ "handler class FaultHandler {\n"
+             ++ "    faults : u32;\n"
+             ++ "    except_port : sink Exception triggers on_fault;\n"
+             ++ "    action on_fault(&priv self, _ex : Exception) {\n"
+             ++ "        self->faults = self->faults + 1 : u32;\n"
+             ++ "        return;\n"
+             ++ "    }\n"
+             ++ "};\n"
+             ++ "emitter tick : TestEmitter<TimeVal>;\n"
+             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "#[priority(5)]\n"
+             ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
+             ++ "handler fault_handler : FaultHandler = { faults = 0, except_port <- system_except };\n"
+             ++ monitorTest
+      compileTestErrorCode src `shouldBe` Just (pack "AE-019")
+
+    it "AE-020: test channel in a concurrent test" $ do
+      let src = monitorClass "CMonitor"
+             ++ periodicEmitter "timer" 1
+             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "#[priority(5)]\n"
+             ++ "task uut : CMonitor = { tick_ev <- timer, alarm_out -> alarms };\n"
+      compileTestErrorCode src `shouldBe` Just (pack "AE-020")
+
+    it "AE-021: call to advance in a concurrent test" $ do
+      let src = scenarioClass "advance({tv_sec = 1, tv_usec = 0} : TimeVal)"
+             ++ periodicEmitter "timer" 1
+             ++ "#[priority(5)]\n"
+             ++ "task scenario : CScenario = { tick_ev <- timer, t <-> test_entry };\n"
+      compileTestErrorCode src `shouldBe` Just (pack "AE-021")
+
+    it "AE-022: call to finish in a unit test" $ do
+      let src = monitorClass "CMonitor"
+             ++ "test class CMonitorTests {\n"
+             ++ "    tick : access TestEmitterAccess<TimeVal>;\n"
+             ++ "    alarms : access TestChannelAccess<u32>;\n"
+             ++ "    t : access TestAPI;\n"
+             ++ "    case fires(&mut self) {\n"
+             ++ "        var n : usize = 0;\n"
+             ++ "        self->tick.fire({tv_sec = 1, tv_usec = 0} : TimeVal);\n"
+             ++ "        self->alarms.pending(&mut n);\n"
+             ++ "        self->t.finish();\n"
+             ++ "        return;\n"
+             ++ "    }\n"
+             ++ "};\n"
+             ++ "emitter tick : TestEmitter<TimeVal>;\n"
+             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "#[priority(5)]\n"
+             ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
+             ++ monitorTest
+      compileTestErrorCode src `shouldBe` Just (pack "AE-022")
+
+    it "AE-015: a case sends a message to two tasks that keep sending it to each other" $ do
+      let src = relayClass "Relay" False
+             ++ twoInputsClass True
+             ++ "test class CRelayTests {\n"
+             ++ "    msg_out : out u32;\n"
+             ++ "    t : access TestAPI;\n"
+             ++ "    case sends(&mut self) {\n"
+             ++ "        self->msg_out.send(1 : u32);\n"
+             ++ "        self->t.check(true);\n"
+             ++ "        return;\n"
+             ++ "    }\n"
+             ++ "};\n"
+             ++ "channel from_case : MsgQueue<u32; 1>;\n"
+             ++ "channel to_relay : MsgQueue<u32; 1>;\n"
+             ++ "channel from_relay : MsgQueue<u32; 1>;\n"
+             ++ "#[priority(10)]\n"
+             ++ "task two : TwoInputs = { last = 0, in_a <- from_case, in_b <- from_relay, msg_out -> to_relay };\n"
+             ++ "#[priority(11)]\n"
+             ++ "task relay : Relay = { msg_in <- to_relay, msg_out -> from_relay };\n"
+             ++ "test relay_tests : CRelayTests = { msg_out -> from_case, t <-> test_entry };\n"
+      compileTestErrorCode src `shouldBe` Just (pack "AE-015")
+
+    it "AE-003: box taken from a test channel and freed to another pool" $ do
+      let src = executorClass ++ executorTestClass True
+             ++ "resource tm_pool : TestPool<TMPacket; 4>;\n"
+             ++ "resource other_pool : Pool<TMPacket; 4>;\n"
+             ++ "channel tcs : MsgQueue<TCCommand; 1>;\n"
+             ++ "channel tms : TestChannel<box TMPacket; 4>;\n"
+             ++ "#[priority(5)]\n"
+             ++ "task uut : CTCExecutor = { tc_in <- tcs, tm_out -> tms, tm_pool <-> tm_pool };\n"
+             ++ "test exec_tests : CTCExecutorTests = {\n"
+             ++ "    tc_out -> tcs, tm_rx <-> tms, tm_pool <-> other_pool,\n"
+             ++ "    tm_pool_state <-> tm_pool, t <-> test_entry\n"
+             ++ "};\n"
+      compileTestErrorCode src `shouldBe` Just (pack "AE-003")
+
+-- | A task under test that sends an alarm on each event of its sink
+monitorClass :: String -> String
+monitorClass name =
+    "task class " ++ name ++ " {\n" ++
+    "    tick_ev : sink TimeVal triggers sample;\n" ++
+    "    alarm_out : out u32;\n" ++
+    "    action sample(&priv self, now : TimeVal) {\n" ++
+    "        self->alarm_out.send(now.tv_sec);\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "};\n"
+
+-- | The cases of the monitor, which fire its emitter and read its channel
+monitorTestClass :: String
+monitorTestClass =
+    "test class CMonitorTests {\n" ++
+    "    tick : access TestEmitterAccess<TimeVal>;\n" ++
+    "    alarms : access TestChannelAccess<u32>;\n" ++
+    "    t : access TestAPI;\n" ++
+    "    case one_alarm(&mut self) {\n" ++
+    "        var n : usize = 0;\n" ++
+    "        self->tick.fire({tv_sec = 1, tv_usec = 0} : TimeVal);\n" ++
+    "        self->alarms.pending(&mut n);\n" ++
+    "        self->t.check_eq_usize(n, 1 : usize);\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "};\n"
+
+monitorTest :: String
+monitorTest = "test monitor_tests : CMonitorTests = { tick <-> tick, alarms <-> alarms, t <-> test_entry };\n"
+
+-- | A task under test that answers a telecommand with a packet in a box
+executorClass :: String
+executorClass =
+    "struct TCCommand {\n" ++
+    "    service : u8;\n" ++
+    "};\n" ++
+    "struct TMPacket {\n" ++
+    "    service : u8;\n" ++
+    "};\n" ++
+    "task class CTCExecutor {\n" ++
+    "    tc_in : in TCCommand triggers execute;\n" ++
+    "    tm_out : out box TMPacket;\n" ++
+    "    tm_pool : access Allocator<TMPacket>;\n" ++
+    "    action execute(&priv self, tc : TCCommand) {\n" ++
+    "        var tm_opt : Option<box TMPacket> = None;\n" ++
+    "        self->tm_pool.alloc(&mut tm_opt);\n" ++
+    "        match tm_opt {\n" ++
+    "            case Some(b) => {\n" ++
+    "                b.service = tc.service;\n" ++
+    "                self->tm_out.send(b);\n" ++
+    "            }\n" ++
+    "            case None => {}\n" ++
+    "        }\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "};\n"
+
+-- | The cases of the executor, which take the packet from a test channel and
+-- free it, with or without a port to observe the pool
+executorTestClass :: Bool -> String
+executorTestClass withPoolState =
+    "test class CTCExecutorTests {\n" ++
+    "    tc_out : out TCCommand;\n" ++
+    "    tm_rx : access TestChannelAccess<box TMPacket>;\n" ++
+    "    tm_pool : access Allocator<TMPacket>;\n" ++
+    (if withPoolState then "    tm_pool_state : access TestPoolAccess;\n" else "") ++
+    "    t : access TestAPI;\n" ++
+    "    case answers(&mut self) {\n" ++
+    "        var tm_opt : Option<box TMPacket> = None;\n" ++
+    "        let tc : TCCommand = { service = 17 } : TCCommand;\n" ++
+    (if withPoolState then "        self->tm_pool_state.fail_allocs(0 : usize);\n" else "") ++
+    "        self->tc_out.send(tc);\n" ++
+    "        self->tm_rx.take(&mut tm_opt);\n" ++
+    "        match tm_opt {\n" ++
+    "            case Some(b) => {\n" ++
+    "                self->t.check_eq_u8(b.service, 17 : u8);\n" ++
+    "                self->tm_pool.free(b);\n" ++
+    "            }\n" ++
+    "            case None => {\n" ++
+    "                self->t.fail();\n" ++
+    "            }\n" ++
+    "        }\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "};\n"
+
+executorWiring :: Bool -> String
+executorWiring withPoolState =
+    "channel tcs : MsgQueue<TCCommand; 1>;\n" ++
+    "channel tms : TestChannel<box TMPacket; 4>;\n" ++
+    "#[priority(5)]\n" ++
+    "task uut : CTCExecutor = { tc_in <- tcs, tm_out -> tms, tm_pool <-> tm_pool };\n" ++
+    "test exec_tests : CTCExecutorTests = {\n" ++
+    "    tc_out -> tcs, tm_rx <-> tms, tm_pool <-> tm_pool,\n" ++
+    (if withPoolState then "    tm_pool_state <-> tm_pool,\n" else "") ++
+    "    t <-> test_entry\n" ++
+    "};\n"
+
+-- | The scenario of a concurrent test, which calls a procedure of TestAPI on
+-- each period
+scenarioClass :: String -> String
+scenarioClass call =
+    "task class CScenario {\n" ++
+    "    tick_ev : sink TimeVal triggers run;\n" ++
+    "    t : access TestAPI;\n" ++
+    "    action run(&priv self, _now : TimeVal) {\n" ++
+    "        self->t." ++ call ++ ";\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "};\n"

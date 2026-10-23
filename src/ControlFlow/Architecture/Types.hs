@@ -33,6 +33,7 @@ data TPClass a = TPClass {
     classMethods :: M.Map Identifier (TPFunction a),
     classProcedures :: M.Map Identifier (TPFunction a),
     classViewers :: M.Map Identifier (TPFunction a),
+    classCases :: M.Map Identifier (TPFunction a),
 
     accessPorts :: M.Map Identifier (TerminaType a, a),
 
@@ -225,7 +226,50 @@ instance Annotated TPHandler where
   getAnnotation = handlerAnns
   updateAnnotation h a = h { handlerAnns = a }
 
-data TPAtomic a = TPAtomic 
+-- | Instance of a test class. It has no sink and no in ports, and its cases
+-- run in the task of the harness.
+data TPTest a = TPTest {
+
+    -- | Name of the test instance
+    testInstanceName :: Identifier,
+
+    -- | Class of the test instance
+    testInstanceClass :: Identifier,
+
+    -- | Map of the output ports of the test instance
+    -- It maps the name of the port to the name of the channel
+    -- that is connected to the port.
+    testInstanceOutputPortConns :: Map Identifier (Identifier, a),
+
+    -- | Map of the access ports of the test instance
+    -- It maps the name of the port to the name of the resource
+    -- or of the component of the test that is connected to the port.
+    testInstanceAPConnections :: Map Identifier (Identifier, a),
+
+    -- | Name of the module that instantiates the test
+    testInstanceModule :: QualifiedName,
+
+    testInstanceAnns :: a -- ^ annotations
+
+} deriving Show
+
+instance Annotated TPTest where
+  getAnnotation = testInstanceAnns
+  updateAnnotation t a = t { testInstanceAnns = a }
+
+-- | Emitter of a unit test, which a case fires
+data TPTestEmitter a = TPTestEmitter
+    Identifier -- ^ emitter identifier
+    (TerminaType a) -- ^ type of the event
+    QualifiedName -- ^ module that instantiates the emitter
+    a -- ^ annotations
+  deriving Show
+
+instance Annotated TPTestEmitter where
+  getAnnotation (TPTestEmitter _ _ _ a) = a
+  updateAnnotation (TPTestEmitter i t m _) = TPTestEmitter i t m
+
+data TPAtomic a = TPAtomic
     Identifier -- ^ atomic identifier
     (TerminaType a) -- ^ data type specifier
     QualifiedName -- ^ module that instantiates the atomic
@@ -346,7 +390,17 @@ data TerminaProgArch a = TerminaProgArch {
     -- It maps the name of the resource to the name of the task, handler or
     -- resource that is connected to the resource and the name of the port that
     -- is used to access the resource.
-    resourceSources :: Map Identifier [(Identifier, Identifier, a)]
+    resourceSources :: Map Identifier [(Identifier, Identifier, a)],
+
+    -- | The test classes and their instances, and the components of a unit
+    -- test. They are kept apart from the elements of production, so that
+    -- the checks of the latter do not see them. The connections to the
+    -- components are kept in the maps of connections above.
+    testClasses :: Map Identifier (TPClass a),
+    testInstances :: Map Identifier (TPTest a),
+    testEmitters :: Map Identifier (TPTestEmitter a),
+    testChannels :: Map Identifier (TPChannel a),
+    testPools :: Map Identifier (TPPool a)
 
 } deriving Show
 

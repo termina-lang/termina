@@ -27,8 +27,25 @@ classMemberFunctions tpClass =
     classMethods tpClass,
     classProcedures tpClass,
     classViewers tpClass,
-    classActions tpClass
+    classActions tpClass,
+    classCases tpClass
   ]
+
+-- | Every block of a body, those inside branches and loops included
+blocksIn :: [BasicBlock a] -> [BasicBlock a]
+blocksIn = concatMap (\blk -> blk : nested blk)
+
+  where
+
+    nested (IfElseBlock (CondIf _ ifBlk _) elseIfs mElse _) =
+        blocksIn (blockBody ifBlk)
+        ++ concat [blocksIn (blockBody blk) | CondElseIf _ blk _ <- elseIfs]
+        ++ maybe [] (blocksIn . blockBody . condElseBody) mElse
+    nested (MatchBlock _ cases mDefault _) =
+        concat [blocksIn (blockBody blk) | MatchCase _ _ blk _ <- cases]
+        ++ maybe [] (\(DefaultCase blk _) -> blocksIn (blockBody blk)) mDefault
+    nested (ForLoopBlock _ _ _ _ _ blk _) = blocksIn (blockBody blk)
+    nested _ = []
 
 getViewers :: [ClassMember a] -> M.Map Identifier (TPFunction a)
 getViewers = foldl' (\acc member ->
@@ -61,6 +78,14 @@ getActions = foldl' (\acc member ->
       M.insert identifier (TPFunction identifier [] Nothing blk ann) acc
     ClassAction _ak identifier (Just param) blk ann ->
       M.insert identifier (TPFunction identifier [param] Nothing blk ann) acc
+    _ -> acc
+  ) M.empty
+
+getCases :: [ClassMember a] -> M.Map Identifier (TPFunction a)
+getCases = foldl' (\acc member ->
+  case member of
+    ClassCase _ak identifier params blk ann ->
+      M.insert identifier (TPFunction identifier params Nothing blk ann) acc
     _ -> acc
   ) M.empty
 
@@ -131,6 +156,7 @@ genResourceUsageGraph progArchitecture = S.toList <$> resDependenciesMap
     resDependenciesMap =
       let initialMap = M.fromList $
             map (, S.empty) (M.keys (pools progArchitecture)) ++
+            map (, S.empty) (M.keys (testPools progArchitecture)) ++
             map (, S.empty) (M.keys (atomics progArchitecture)) ++
             map (, S.empty) (M.keys (atomicArrays progArchitecture)) ++
             map (, S.empty) (M.keys (deques progArchitecture))
@@ -190,7 +216,7 @@ genResourceLockings programArchitecture =
 genResourceLockingsInternal :: TerminaProgArch a -> ResLockingMonad ()
 genResourceLockingsInternal programArchitecture =
   let resIds = M.keys $ resources programArchitecture
-      poolIds = M.keys $ pools programArchitecture
+      poolIds = M.keys (pools programArchitecture) ++ M.keys (testPools programArchitecture)
       atomicIds = M.keys (atomics programArchitecture) ++ M.keys (atomicArrays programArchitecture)
       dequeIds = M.keys (deques programArchitecture) in
   mapM_ processResource (resIds ++ poolIds ++ atomicIds ++ dequeIds)
@@ -216,6 +242,12 @@ genResourceLockingsInternal programArchitecture =
           else do
             -- Non-atomic resources need appropriate locking based on their dependencies
             case findDisjointPaths reversedGraph resId of
+              -- | The test instances are not nodes of the graph, so a resource
+              -- that only they reach has no path
+              Left _ | reachedByTest resId ->
+                let resLock = ResourceLockNone in
+                modify (\st ->
+                  st { resLockingMap = M.insert resId resLock (resLockingMap st) }) >> return resLock
               Left err -> error $ "error findDisjointPaths: " ++ show reversedGraph ++ " " ++ show resId ++ " " ++ show err
               Right [] -> error $ "Internal error: no paths found for resource " ++ resId
               Right [_] ->
@@ -225,10 +257,13 @@ genResourceLockingsInternal programArchitecture =
                   st { resLockingMap = M.insert resId resLock (resLockingMap st) }) >> return resLock
               Right paths -> do
                 let dest = head <$> paths
-                -- We must filter out the initialization handler, as it does not require locking
-                let filteredDest = filter (not . isInitHandler) dest
+                -- We must filter out the initialization handler, as it does not require locking,
+                -- and the resources that only a test instance reaches, where a path ends
+                let filteredDest = filter (\d -> not (isInitHandler d) && isTaskOrHandler d) dest
                  -- Determine the locking mechanism based on the access patterns
-                resLock <- getResLocking filteredDest
+                resLock <- case filteredDest of
+                  [] -> return ResourceLockNone
+                  _ -> getResLocking filteredDest
                 modify (\st ->
                   st { resLockingMap = M.insert resId resLock (resLockingMap st) }) >> return resLock
 
@@ -241,6 +276,17 @@ genResourceLockingsInternal programArchitecture =
 
     isDeque :: Identifier -> Bool
     isDeque identifier = M.member identifier (deques programArchitecture)
+
+    -- | A case and the tasks of the unit are never inside a resource at the
+    -- same time, so the test instances are not users of a resource
+    reachedByTest :: Identifier -> Bool
+    reachedByTest identifier =
+        any (\(source, _, _) -> M.member source (testInstances programArchitecture))
+            (M.findWithDefault [] identifier (resourceSources programArchitecture))
+
+    isTaskOrHandler :: Identifier -> Bool
+    isTaskOrHandler identifier =
+        M.member identifier (tasks programArchitecture) || M.member identifier (handlers programArchitecture)
 
     isUnprotectedResource :: Identifier -> Bool
     isUnprotectedResource identifier =

@@ -7,7 +7,8 @@ module ControlFlow.Architecture.Checks (
     runCheckBoxSources,
     runCheckTaskPriorities,
     runCheckSystemExceptAction,
-    runCheckActivationCycles
+    runCheckActivationCycles,
+    runCheckTestDeployment
 ) where
 import Semantic.Types
 import ControlFlow.Architecture.Types
@@ -16,6 +17,7 @@ import Control.Monad.Except
 import ControlFlow.Architecture.Errors
 import ControlFlow.Architecture.Checks.BoxSources
 import ControlFlow.Architecture.Checks.Connections
+import ControlFlow.Architecture.Checks.Tests
 
 runCheckPoolUsage :: 
     TerminaProgArch SemanticAnn 
@@ -61,3 +63,8 @@ runCheckActivationCycles ::
     TerminaProgArch SemanticAnn
     -> Either ArchitectureError ()
 runCheckActivationCycles = runReader (runExceptT checkActivationCycles)
+
+runCheckTestDeployment ::
+    TerminaProgArch SemanticAnn
+    -> Either ArchitectureError ()
+runCheckTestDeployment = runReader (runExceptT checkTestDeployment)

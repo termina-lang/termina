@@ -144,9 +144,65 @@ checkBoxProcedureCall expectedSource elemnt accessPt procId argNum = do
                     -- | Check if the element is a resource
                     case M.lookup elemnt (resources progArchitecture) of
                         Just resource -> checkBoxSourceProcedureCallResource expectedSource resource accessPt procId argNum
-                        -- | This should not happen, since all the elements in the program
-                        -- must be either a task, a handler or a resource
-                        Nothing -> throwError $ annotateError Internal EInvalidResourceConnection
+                        Nothing ->
+                            case M.lookup elemnt (testInstances progArchitecture) of
+                                Just test -> checkBoxSourceProcedureCallTest expectedSource test accessPt procId argNum
+                                -- | This should not happen, since all the elements in the program
+                                -- must be either a task, a handler, a resource or a test
+                                Nothing -> throwError $ annotateError Internal EInvalidResourceConnection
+
+checkBoxSourceProcedureCallTest ::
+    Identifier -- ^ Expected source of the box
+    -> TPTest SemanticAnn
+    -> Identifier -- ^ The name of the access port
+    -> Identifier -- ^ The name of the procedure
+    -> Integer -- ^ The number of the argument
+    -> BoxSourcesCheckMonad ()
+checkBoxSourceProcedureCallTest expectedSource test calledPort calledProc calledArgNum = do
+    progArchitecture <- ask
+    let testCls = testClasses progArchitecture M.! testInstanceClass test
+    forM_ (M.lookup (calledPort, calledProc, calledArgNum) (outBoxProcedureCall . classBoxIOMaps $ testCls)) $
+        mapM_ (uncurry (checkTestSourceInBox expectedSource test))
+
+checkBoxSourceTestSend :: Identifier -> TPTest SemanticAnn -> Identifier -> BoxSourcesCheckMonad ()
+checkBoxSourceTestSend expectedSource test outPt = do
+    progArchitecture <- ask
+    let testCls = testClasses progArchitecture M.! testInstanceClass test
+    case M.lookup outPt (outBoxSend . classBoxIOMaps $ testCls) of
+        Just sources ->
+            mapM_ (uncurry (checkTestSourceInBox expectedSource test)) sources
+        Nothing -> throwError $ annotateError Internal EInvalidChannelConnection
+
+checkBoxSourceTestFree ::
+    Identifier -- ^ Expected source of the box
+    -> TPTest SemanticAnn
+    -> Identifier -- ^ The name of the port connected to the allocator where the box is to be freed
+    -> BoxSourcesCheckMonad ()
+checkBoxSourceTestFree expectedSource test calledPort = do
+    progArchitecture <- ask
+    let testCls = testClasses progArchitecture M.! testInstanceClass test
+    forM_ (M.lookup calledPort (outBoxFree . classBoxIOMaps $ testCls)) $
+        mapM_ (uncurry (checkTestSourceInBox expectedSource test))
+
+checkTestSourceInBox ::
+    Identifier -- ^ Expected source of the box
+    -> TPTest SemanticAnn
+    -> SemanticAnn -> InBox SemanticAnn
+    -> BoxSourcesCheckMonad ()
+checkTestSourceInBox expectedSource test prevAnn (InBoxAlloc port ann) =
+    case M.lookup port (testInstanceAPConnections test) of
+        Just (actualSource, _) -> unless (actualSource == expectedSource)
+            (throwError $ annotateError (getLocation ann) (EMismatchedBoxSource expectedSource actualSource [getLocation prevAnn]))
+        Nothing -> throwError $ annotateError Internal EInvalidResourceConnection
+checkTestSourceInBox expectedSource test prevAnn (InBoxProcedureOut port procId argNum callAnn) = do
+    progArchitecture <- ask
+    -- | A box taken from a test channel comes from the port of the unit that
+    -- sends to it
+    case M.lookup port (testInstanceAPConnections test) >>= flip M.lookup (testChannels progArchitecture) . fst of
+        Just channel -> checkNextSource (getLocation prevAnn) (getBoxSourceChannel expectedSource channel)
+        Nothing -> checkProcedureOutSources expectedSource (testInstanceAPConnections test) prevAnn port procId argNum callAnn
+-- | A test class has no in ports, no procedures and no deques
+checkTestSourceInBox _ _ _ _ = throwError $ annotateError Internal EInvalidResourceConnection
 
 checkBoxSourceTaskSend :: Identifier -> TPTask SemanticAnn -> Identifier -> BoxSourcesCheckMonad ()
 checkBoxSourceTaskSend expectedSource task outPt = do
@@ -175,7 +231,10 @@ getBoxSourceSend expectedSource (source, outPort, _ann) = do
         Nothing ->
             case M.lookup source (handlers progArchitecture) of
                 Just handler -> checkBoxSourceHandlerSend expectedSource handler outPort
-                Nothing -> throwError $ annotateError Internal EInvalidChannelConnection
+                Nothing ->
+                    case M.lookup source (testInstances progArchitecture) of
+                        Just test -> checkBoxSourceTestSend expectedSource test outPort
+                        Nothing -> throwError $ annotateError Internal EInvalidChannelConnection
 
 getBoxSourceChannel ::
     Identifier -- ^ Expected source of the box
@@ -366,9 +425,12 @@ checkBoxSourceFree expectedSource elemnt accessPt = do
                     -- | Check if the element is a resource
                     case M.lookup elemnt (resources progArchitecture) of
                         Just resource -> checkBoxSourceResourceFree expectedSource resource accessPt
-                        -- | This should not happen, since all the elements in the program
-                        -- must be either a task, a handler or a resource
-                        Nothing -> throwError $ annotateError Internal EInvalidPoolConnection
+                        Nothing ->
+                            case M.lookup elemnt (testInstances progArchitecture) of
+                                Just test -> checkBoxSourceTestFree expectedSource test accessPt
+                                -- | This should not happen, since all the elements in the program
+                                -- must be either a task, a handler, a resource or a test
+                                Nothing -> throwError $ annotateError Internal EInvalidPoolConnection
 
 
 checkBoxSource :: TPPool SemanticAnn -> BoxSourcesCheckMonad ()
@@ -384,4 +446,4 @@ checkBoxSource (TPPool poolName _ _ _ _) = do
 checkBoxSources :: BoxSourcesCheckMonad ()
 checkBoxSources = do
     progArchitecture <- ask
-    mapM_ checkBoxSource (M.elems (pools progArchitecture))
+    mapM_ checkBoxSource (M.elems (pools progArchitecture) ++ M.elems (testPools progArchitecture))
