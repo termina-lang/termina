@@ -1032,6 +1032,9 @@ checkClassMember className (ClassAction _ak member _mp body _ann) =
   checkReturning (memberName className member) body
 checkClassMember className (ClassProcedure _ak member _ps body _ann) =
   checkReturning (memberName className member) body
+-- | The harness runs a case, which nothing else calls.
+checkClassMember className (ClassCase _ak member _ps body _ann) =
+  checkReturning (memberName className member) body
 checkClassMember _ (ClassField {}) = return ()
 
 checkTypeDef :: TypeDef SemanticAnn -> ValueAnalysisMonad ()

@@ -1,0 +1,16 @@
+interface ISensor {
+    procedure set(&mut self, v : u32);
+};
+
+test class CTests {
+    sensor : access ISensor;
+
+    case sets_the_value(&mut self) {
+        self->sensor.set(1 : u32);
+        return;
+    }
+
+    viewer value(&self) -> u32 {
+        return 0 : u32;
+    }
+};

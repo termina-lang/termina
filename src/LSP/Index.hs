@@ -113,6 +113,7 @@ indexModule program =
         globalName (SAST.Channel ident _ _ _ _) = ident
         globalName (SAST.Emitter ident _ _ _ _) = ident
         globalName (SAST.Handler ident _ _ _ _) = ident
+        globalName (SAST.Test ident _ _ _ _) = ident
         globalName (SAST.Const ident _ _ _ _) = ident
         globalName (SAST.ConstExpr ident _ _ _ _) = ident
 
@@ -146,6 +147,7 @@ indexModule program =
         memberOf owner (SAST.ClassProcedure _ ident _ _ ann) = [((owner, ident), getLocation ann)]
         memberOf owner (SAST.ClassViewer ident _ _ _ ann) = [((owner, ident), getLocation ann)]
         memberOf owner (SAST.ClassAction _ ident _ _ ann) = [((owner, ident), getLocation ann)]
+        memberOf owner (SAST.ClassCase _ ident _ _ ann) = [((owner, ident), getLocation ann)]
 
         elemRefs :: SAST.AnnASTElement SemanticAnn -> [Entry]
         elemRefs (SAST.Function _ params _ body _ _) = blockRefs (paramsEnv params) body
@@ -161,6 +163,7 @@ indexModule program =
         globalRefs (SAST.Channel _ _ (Just e) _ _) = exprRefs M.empty e
         globalRefs (SAST.Emitter _ _ (Just e) _ _) = exprRefs M.empty e
         globalRefs (SAST.Handler _ _ (Just e) _ _) = exprRefs M.empty e
+        globalRefs (SAST.Test _ _ (Just e) _ _) = exprRefs M.empty e
         globalRefs (SAST.ConstExpr _ _ e _ _) = exprRefs M.empty e
         globalRefs _ = []
 
@@ -174,6 +177,8 @@ indexModule program =
             blockRefs (memberEnv ann params) body
         classMemberRefs (SAST.ClassAction _ _ mparam body ann) =
             blockRefs (memberEnv ann (maybe [] (: []) mparam)) body
+        classMemberRefs (SAST.ClassCase _ _ params body ann) =
+            blockRefs (memberEnv ann params) body
 
 -- | The parameters of a body, which are in scope from its first statement.
 paramsEnv :: [SAST.Parameter SemanticAnn] -> Locals

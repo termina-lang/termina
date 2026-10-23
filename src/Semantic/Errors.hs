@@ -273,6 +273,14 @@ data Error
   | EDequeAccessPortConnectionInvalidGlobal Identifier -- ^ Invalid deque access port connection (SE-222)
   | EDequeAccessPortConnectionDequeTypeMismatch Identifier (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Deque type mismatch in deque access port connection (SE-223)
   | EDequeInitialized -- ^ Deque declared with an initial value (SE-224)
+  | ETestClassProvides Identifier -- ^ Test class provides an interface (SE-225)
+  | ETestClassField (Identifier, Location) Identifier -- ^ Test class defines a field that is not a port (SE-226)
+  | ETestClassInputPort (Identifier, Location) Identifier -- ^ Test class defines an in or sink port (SE-227)
+  | ETestClassMember (Identifier, Location) Identifier -- ^ Test class defines an action, a procedure or a viewer (SE-228)
+  | ETestClassNoCases Identifier -- ^ Test class without cases (SE-229)
+  | ECaseOutsideTestClass (Identifier, Location) Identifier -- ^ Case in a class that is not a test class (SE-230)
+  | ECaseParameters Identifier -- ^ Case with parameters (SE-231)
+  | EInvalidTestType (TerminaType SemanticAnn) -- ^ Test instance of a type that is not a test class (SE-232)
   deriving Show
 
 -- | Why an emitter takes a handler and not a task.
@@ -1039,6 +1047,34 @@ instance Diagnosable Error where
     describe EDequeInitialized =
         diagnostic "SE-224" "deque initialized"
             "A deque always starts empty, so its declaration takes no initial value."
+    describe (ETestClassProvides ident) =
+        diagnostic "SE-225" "test class provides an interface"
+            ("Test class \x1b[31m" <> T.pack ident <> "\x1b[0m provides an interface.\n" <> "A test class is not reached through an interface, so it provides none.")
+    describe (ETestClassField (classId, clsPos) ident) =
+        relatedTo clsPos "the class is defined here" $
+        diagnostic "SE-226" "test class defines a field"
+            ("Test class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the field \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "A test class only has access and out ports, so that a case leaves no state for the next one.")
+    describe (ETestClassInputPort (classId, clsPos) ident) =
+        relatedTo clsPos "the class is defined here" $
+        diagnostic "SE-227" "test class defines an in or sink port"
+            ("Test class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the port \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "A test class has no actions, so it only has access and out ports.")
+    describe (ETestClassMember (classId, clsPos) ident) =
+        relatedTo clsPos "the class is defined here" $
+        diagnostic "SE-228" "test class defines an action, a procedure or a viewer"
+            ("Test class \x1b[31m" <> T.pack classId <> "\x1b[0m defines \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "A test class only defines cases and methods.")
+    describe (ETestClassNoCases ident) =
+        diagnostic "SE-229" "test class without cases"
+            ("Test class \x1b[31m" <> T.pack ident <> "\x1b[0m does not define any case.")
+    describe (ECaseOutsideTestClass (classId, clsPos) ident) =
+        relatedTo clsPos "the class is defined here" $
+        diagnostic "SE-230" "case outside a test class"
+            ("Class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the case \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Only a test class defines cases.")
+    describe (ECaseParameters ident) =
+        diagnostic "SE-231" "case with parameters"
+            ("Case \x1b[31m" <> T.pack ident <> "\x1b[0m has parameters.\n" <> "A case takes a self reference and nothing else.")
+    describe (EInvalidTestType ty) =
+        diagnostic "SE-232" "invalid test type"
+            ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a test class.")
 
     -- | The two clauses below pick their detail with a case, which the script
     -- that moved the rest of this table does not read, so they were moved by

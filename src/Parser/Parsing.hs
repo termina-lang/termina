@@ -58,7 +58,7 @@ lexer = Tok.makeTokenParser langDef
              ["access", "sink", "in", "out"]
       ++ -- Global declarations
               -- Global declarations
-             ["task", "function", "handler", "resource", "const", "constexpr"]
+             ["task", "function", "handler", "resource", "const", "constexpr", "test"]
       ++ -- Functions implemented in C
              ["extern", "noreturn"]
       ++ -- Stmt
@@ -1165,6 +1165,22 @@ handlerDeclParser = do
   _ <- semi
   return $ Handler identifier typeSpecifier initializer modifiers (Position current startPos endPos)
 
+testDeclParser :: TerminaParser (Global ParserAnn)
+testDeclParser = do
+  current <- getState
+  modifiers <- many modifierParser
+  startPos <- getPosition
+  reserved "test"
+  identifier <- identifierParser
+  reservedOp ":"
+  typeSpecifier <- typeSpecifierParser
+  initializer <- optionMaybe (do
+    reservedOp "="
+    expressionParser)
+  endPos <- getPosition
+  _ <- semi
+  return $ Test identifier typeSpecifier initializer modifiers (Position current startPos endPos)
+
 constExprDeclParser :: TerminaParser (Global ParserAnn)
 constExprDeclParser = do
   current <- getState
@@ -1202,6 +1218,7 @@ globalDeclParser = do
     <|> try handlerDeclParser
     <|> try emitterDeclParser
     <|> try channelDeclParser
+    <|> try testDeclParser
     <|> try constExprDeclParser
     <|> constDeclParser
   return $ GlobalDeclaration g
@@ -1279,6 +1296,23 @@ classActionParser = do
   blockRet <- blockParser
   ClassAction ak name param blockRet . Position current startPos <$> getPosition
 
+-- | A case of a test class. The access to self and the parameters are
+-- parsed as in a method, and the type checker rejects a case with
+-- parameters.
+classCaseParser :: TerminaParser (ClassMember ParserAnn)
+classCaseParser = do
+  current <- getState
+  startPos <- getPosition
+  reserved "case"
+  name <- identifierParser
+  (ak, params) <- parens $
+    do
+      ak <- selfAccessKindParser
+      params <- option [] (comma >> sepBy parameterParser comma)
+      return (ak, params)
+  blockRet <- blockParser
+  ClassCase ak name params blockRet . Position current startPos <$> getPosition
+
 classProcedureParser :: TerminaParser (ClassMember ParserAnn)
 classProcedureParser = do
   current <- getState
@@ -1351,6 +1385,7 @@ classDefinitionParser = do
       <|> classViewerParser
       <|> classProcedureParser
       <|> classActionParser
+      <|> classCaseParser
       <|> classFieldDefinitionParser)
   endPos <- getPosition
   _ <- semi
@@ -1361,6 +1396,7 @@ classDefinitionParser = do
       (reserved "task" >> return TaskClass)
       <|> (reserved "resource" >> return ResourceClass)
       <|> (reserved "handler" >> return HandlerClass)
+      <|> (reserved "test" >> return TestClass)
 
 variantDefinitionParser :: TerminaParser (EnumVariant ParserAnn)
 variantDefinitionParser = identifierParser >>= \identifier ->

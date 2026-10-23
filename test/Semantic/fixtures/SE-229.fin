@@ -1,0 +1,12 @@
+interface ISensor {
+    procedure set(&mut self, v : u32);
+};
+
+test class CTests {
+    sensor : access ISensor;
+
+    method prepare(&priv self) {
+        self->sensor.set(1 : u32);
+        return;
+    }
+};

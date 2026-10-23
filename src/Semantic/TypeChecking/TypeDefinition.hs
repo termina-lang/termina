@@ -213,11 +213,11 @@ typeTypeDefinition _ (Interface SystemInterface ident _ _ _ ) = throwError $ ann
 
 typeTypeDefinition ann (Class kind ident members provides mds_ts) =
   foldM
-    (\(fs, prcs, mths, vws, acts) cl ->
+    (\(fs, prcs, mths, vws, acts, cases) cl ->
         case cl of
           -- ClassFields
           fld@(ClassField {})  ->
-              return (fld : fs, prcs, mths, vws, acts) {-- do
+              return (fld : fs, prcs, mths, vws, acts, cases) {-- do
               fs_ty <- typeTypeSpecifier annCF fs_ts
               checkTerminaType annCF fs_ty
               classFieldTyorFail annCF fs_ty
@@ -226,22 +226,26 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
               return (checkFs : fs, prcs, mths, vws, acts) --}
           -- Procedures
           prc@(ClassProcedure {}) ->
-              return (fs, prc : prcs, mths, vws, acts)
+              return (fs, prc : prcs, mths, vws, acts, cases)
           -- Methods
           mth@(ClassMethod {}) ->
-              return (fs, prcs, mth : mths, vws, acts)
+              return (fs, prcs, mth : mths, vws, acts, cases)
           -- Viewers
           view@(ClassViewer {}) ->
-              return (fs, prcs, mths, view : vws, acts)
+              return (fs, prcs, mths, view : vws, acts, cases)
           action@(ClassAction {}) ->
-              return (fs, prcs, mths, vws , action : acts)
+              return (fs, prcs, mths, vws , action : acts, cases)
+          -- Cases of a test class
+          testCase@(ClassCase {}) ->
+              return (fs, prcs, mths, vws, acts, testCase : cases)
         )
-    ([],[],[],[],[]) members
+    ([],[],[],[],[],[]) members
   >>= \(fls   -- Fields
        , prcs -- Procedures.
        , mths -- Methods
        , vws  -- Viewers
        , acts -- Actions
+       , cases -- Cases
        -- introduce a semi-well formed type.
        ) ->
   do
@@ -250,7 +254,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
   -- Loop between methods, procedures and viewers.
   -- Assumption: dependencies are computes through `method g () {... self->f()
   -- ...}`, then `g > f`.
-    let elements = prcs ++ mths ++ vws ++ acts
+    let elements = prcs ++ mths ++ vws ++ acts ++ cases
     -- Dependencies emplying the assumption.
     let dependenciesMap =
           foldr selfDepClass M.empty elements
@@ -267,7 +271,13 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
             Nothing -> typeClassFieldDefinition S.empty fld);
         _ -> error "Internal Error: not a field";
       }) fls
-    checkClassKind ann ident kind (ty_fls, prcs, acts, mths, vws) provides
+    -- | Only a test class has cases
+    unless (kind == TestClass) $
+      case cases of
+        (ClassCase _ caseId _ _ caseAnn) : _ ->
+          throwError $ annotateError caseAnn (ECaseOutsideTestClass (ident, ann) caseId)
+        _ -> return ()
+    checkClassKind ann ident kind (ty_fls, prcs, acts, mths, vws, cases) provides
 
     -- Map from ClassNames to their definition (usefull after sorting by name and dep)
     let nameClassMap = M.fromList (map (\e -> (className e, e)) elements)
@@ -352,6 +362,13 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
                   typeBlock Nothing mbody
               let newAct = SAST.ClassAction ak mIdent param_ty typed_bret (buildExpAnn mann TUnit)
               return (newAct : prevMembers)
+            -- | A case has no parameters, which checkClassKind has checked
+            ClassCase ak cIdent _ps_ts cbody cann -> do
+              typed_bret <- localScope $ do
+                  insertLocalImmutObj cann "self" (TReference ak (TGlobal kind ident))
+                  typeBlock Nothing cbody
+              let newCase = SAST.ClassCase ak cIdent [] typed_bret (buildExpAnn cann TUnit)
+              return (newCase : prevMembers)
         ) [] topSortOrder
     -- Check that the sink and in ports are well defined, i.e., that the actions
     -- triggered by the ports are defined in the class.
@@ -437,10 +454,11 @@ checkClassKind :: Location
       [ClassMember ParserAnn],
       [ClassMember ParserAnn],
       [ClassMember ParserAnn],
+      [ClassMember ParserAnn],
       [ClassMember ParserAnn])
   -> [Identifier] -> SemanticMonad ()
 -- | Resource class type checking
-checkClassKind anns clsId ResourceClass (fs, prcs, acts, _methods, viewers) provides = do
+checkClassKind anns clsId ResourceClass (fs, prcs, acts, _methods, viewers, _cases) provides = do
   -- A resource must provide at least one interface
   when (null provides) (throwError $ annotateError anns (EResourceClassNoProvides clsId))
   -- Check that the provided interfaces are not duplicated
@@ -555,7 +573,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts, _methods, viewers) prov
                   Just Nothing -> throwError $ annotateError anns (EResourceInterfacePreviouslyExtended x extendedIface)
                   Nothing -> return $ M.insert extendedIface (Just x) acc') (M.insert x Nothing accxs) extendedIfaces
 
-checkClassKind anns clsId TaskClass (_fs, prcs, acts, methods, _viewers) provides = do
+checkClassKind anns clsId TaskClass (_fs, prcs, acts, methods, _viewers, _cases) provides = do
   -- A task must not provide any interface
   unless (null provides) (throwError $ annotateError anns (ETaskClassProvides clsId))
   -- A task must not implement any procedures
@@ -575,7 +593,7 @@ checkClassKind anns clsId TaskClass (_fs, prcs, acts, methods, _viewers) provide
     ClassAction ak ident _ _ ann -> checkMemberFunctionAccessKind ann TaskClass ak ident;
     _ -> return ();
   }) acts
-checkClassKind anns clsId HandlerClass (fs, prcs, acts, methods, _viewers) provides = do
+checkClassKind anns clsId HandlerClass (fs, prcs, acts, methods, _viewers, _cases) provides = do
   -- A handler must not provide any interface
   unless (null provides) (throwError $ annotateError anns (EHandlerClassProvides clsId))
   -- A handler must not implement any procedures
@@ -617,5 +635,45 @@ checkClassKind anns clsId HandlerClass (fs, prcs, acts, methods, _viewers) provi
         TInPort _ _ -> throwError $ annotateError loc (EHandlerClassInPort (clsId, anns) fs_id)
         _ -> checkHandlerPorts prev xfs
     checkHandlerPorts _ _ = throwError $ annotateError Internal EMalformedClassTyping
+
+-- | A test class has ports, cases and private methods. It has no fields, so
+-- that a case leaves nothing for the next one, and it has no actions,
+-- procedures or viewers.
+checkClassKind anns clsId TestClass (fs, prcs, acts, _methods, viewers, cases) provides = do
+  unless (null provides) (throwError $ annotateError anns (ETestClassProvides clsId))
+  mapM_ (
+    \case {
+      ClassField (FieldDefinition fs_id fs_ty (SemanticAnn _ loc)) ->
+        case fs_ty of
+          TAccessPort _ -> return ()
+          TOutPort _ -> return ()
+          TInPort _ _ -> throwError $ annotateError loc (ETestClassInputPort (clsId, anns) fs_id)
+          TSinkPort _ _ -> throwError $ annotateError loc (ETestClassInputPort (clsId, anns) fs_id)
+          _ -> throwError $ annotateError loc (ETestClassField (clsId, anns) fs_id)
+      ;
+      _ -> return ();
+    }) fs
+  case acts of
+    (ClassAction _ actionId _ _ ann):_ ->
+        throwError $ annotateError ann (ETestClassMember (clsId, anns) actionId)
+    _ -> return ()
+  case prcs of
+    (ClassProcedure _ procId _ _ ann):_ ->
+        throwError $ annotateError ann (ETestClassMember (clsId, anns) procId)
+    _ -> return ()
+  case viewers of
+    (ClassViewer viewerId _ _ _ ann):_ ->
+        throwError $ annotateError ann (ETestClassMember (clsId, anns) viewerId)
+    _ -> return ()
+  when (null cases) (throwError $ annotateError anns (ETestClassNoCases clsId))
+  -- | A case takes self and nothing else
+  mapM_ checkCase cases
+
+  where
+
+    checkCase :: ClassMember ParserAnn -> SemanticMonad ()
+    checkCase (ClassCase _ak caseId ps _ ann) =
+      unless (null ps) (throwError $ annotateError ann (ECaseParameters caseId))
+    checkCase _ = throwError (annotateError Internal EMalformedClassTyping)
 
 checkClassKind _anns _clsId _kind _members _provides = return ()

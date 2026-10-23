@@ -9,7 +9,7 @@ module Parser.Positive.ClassMembersSpec (spec) where
 import Parser.Common (parseWith, ctorName)
 import Parser.Parsing
   ( classFieldDefinitionParser, classMethodParser, classProcedureParser
-  , classActionParser, classViewerParser, interfaceProcedureParser )
+  , classActionParser, classViewerParser, interfaceProcedureParser, classCaseParser )
 
 import Test.Hspec
 
@@ -42,6 +42,12 @@ spec = describe "Parser: class members" $ do
     [ ("no param",  "action a(&priv self) { return; }")
     , ("one param", "action a(&priv self, x : u32) { return; }")
     , ("one param of an enum type", "action a(&priv self, x : Exception) { return; }")
+    ]
+
+  -- | The type checker rejects a case with another self or with parameters
+  describe "cases" $ table classCaseParser "ClassCase"
+    [ ("case",                 "case c(&mut self) { return; }")
+    , ("case with parameters", "case c(&mut self, x : u32) { return; }")
     ]
 
   describe "viewers" $ table classViewerParser "ClassViewer"

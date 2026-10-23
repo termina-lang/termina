@@ -265,6 +265,8 @@ getDocumentSymbols = Prelude.concatMap toDocumentSymbol
       symbol (T.pack name) LSP.SymbolKind_Method (getLocation ann) []
     toClassMemberSymbol (SAST.ClassAction _ name _ _ ann) =
       symbol (T.pack name) LSP.SymbolKind_Method (getLocation ann) []
+    toClassMemberSymbol (SAST.ClassCase _ name _ _ ann) =
+      symbol (T.pack name) LSP.SymbolKind_Method (getLocation ann) []
 
     toInterfaceMemberSymbol :: SAST.InterfaceMember SemanticAnn -> [LSP.DocumentSymbol]
     toInterfaceMemberSymbol (SAST.InterfaceProcedure _ name _ _ ann) =
@@ -276,6 +278,7 @@ getDocumentSymbols = Prelude.concatMap toDocumentSymbol
     toGlobalSymbol (SAST.Handler name _ _ _ ann) = objectSymbol name ann
     toGlobalSymbol (SAST.Channel name _ _ _ ann) = objectSymbol name ann
     toGlobalSymbol (SAST.Emitter name _ _ _ ann) = objectSymbol name ann
+    toGlobalSymbol (SAST.Test name _ _ _ ann) = objectSymbol name ann
     toGlobalSymbol (SAST.Const name _ _ _ ann) =
       symbol (T.pack name) LSP.SymbolKind_Constant (getLocation ann) []
     toGlobalSymbol (SAST.ConstExpr name _ _ _ ann) =

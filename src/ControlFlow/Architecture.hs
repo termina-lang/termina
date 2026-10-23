@@ -315,6 +315,7 @@ genArchGlobal modName (Channel ident (TMsgQueue mty size) _ _ cann) =
       channels = M.insert ident (TPMsgQueue ident mty size modName cann) (channels tp)
     }
 genArchGlobal _ (Channel {}) = error "Internal error: invalid channel declaration"
+genArchGlobal _ (Test _ _ _ _ tann) = throwError $ annotateError (getLocation tann) EUnsupportedTestInstance
 
 genArchElement :: QualifiedName -> AnnASTElement SemanticAnn -> ArchitectureMonad ()
 genArchElement _ (Function identifier params mRet block _ ann) = 

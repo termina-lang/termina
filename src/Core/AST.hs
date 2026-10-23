@@ -435,6 +435,14 @@ data Global' ty expr a
       [Modifier' expr a] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
+    -- | Instance of a test class, only in a test
+    | Test
+      Identifier -- ^ name of the variable
+      (ty a) -- ^ type of the variable
+      (Maybe (expr a)) -- ^ initialization expression (optional)
+      [Modifier' expr a] -- ^ list of possible modifiers
+      a -- ^ transpiler annotations
+
     -- | Constant constructor
     | Const
       Identifier -- ^ name of the constant
@@ -458,6 +466,7 @@ instance Annotated (Global' ty expr) where
   getAnnotation (Channel _ _ _ _ a)    = a
   getAnnotation (Emitter _ _ _ _ a)    = a
   getAnnotation (Handler _ _ _ _ a)   = a
+  getAnnotation (Test _ _ _ _ a)   = a
   getAnnotation (Const _ _ _ _ a)    = a
   getAnnotation (ConstExpr _ _ _ _ a)    = a
 
@@ -466,6 +475,7 @@ instance Annotated (Global' ty expr) where
   updateAnnotation (Channel n t i m _) = Channel n t i m
   updateAnnotation (Emitter n t i m _) = Emitter n t i m
   updateAnnotation (Handler n t i m _) = Handler n t i m
+  updateAnnotation (Test n t i m _) = Test n t i m
   updateAnnotation (Const n t i m _) = Const n t i m
   updateAnnotation (ConstExpr n t i m _) = ConstExpr n t i m
 
@@ -483,6 +493,7 @@ instance ShowText (TypeDef' ty expr blk a) where
     showText (Class TaskClass ident _ _ _) = T.pack $ "task class " <> ident
     showText (Class ResourceClass ident _ _ _) = T.pack $ "resource class " <> ident
     showText (Class HandlerClass ident _ _ _) = T.pack $ "handler class " <> ident
+    showText (Class TestClass ident _ _ _) = T.pack $ "test class " <> ident
     showText (Class EmitterClass ident _ _ _) = T.pack $ "emitter class " <> ident
     showText (Class ChannelClass ident _ _ _) = T.pack $ "channel class " <> ident
     showText (Interface RegularInterface ident _ _ _) = T.pack $ "interface " <> ident
@@ -491,7 +502,7 @@ instance ShowText (TypeDef' ty expr blk a) where
 data InterfaceKind = RegularInterface | SystemInterface
   deriving (Show, Ord, Eq)
 
-data ClassKind = TaskClass | ResourceClass | HandlerClass | EmitterClass | ChannelClass
+data ClassKind = TaskClass | ResourceClass | HandlerClass | EmitterClass | ChannelClass | TestClass
   deriving (Show, Ord, Eq)
 
 -------------------------------------------------
@@ -544,6 +555,14 @@ data ClassMember' ty blk a
       AccessKind  -- ^ access kind (immutable or private)
       Identifier  -- ^ name of the method
       (Maybe (Parameter' ty a)) -- ^ input parameter
+      (blk a) -- ^ statements block (with return) a
+      a -- ^ transpiler annotation
+    -- | Cases of a test class. The harness runs them one after another and
+    -- they return no value.
+    | ClassCase
+      AccessKind  -- ^ access kind (private)
+      Identifier  -- ^ name of the case
+      [Parameter' ty a] -- ^ parameters, which a case does not have
       (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
   deriving (Show, Functor)

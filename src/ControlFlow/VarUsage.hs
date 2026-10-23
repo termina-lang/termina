@@ -402,6 +402,8 @@ checkClassMember (ClassAction _ak ident mp body ann) =
     (checkBody (maybe [] (: []) mp) (getLocation ann) body)
 checkClassMember (ClassProcedure _ak ident ps body ann) =
   checkSelfBody (ESelfNotUsed ident) (getLocation ann) (checkBody ps (getLocation ann) body)
+checkClassMember (ClassCase _ak ident ps body ann) =
+  checkSelfBody (ESelfNotUsed ident) (getLocation ann) (checkBody ps (getLocation ann) body)
 checkClassMember (ClassField {}) = return ()
 
 -- | Methods, viewers and actions must use self. Since the identifiers read are

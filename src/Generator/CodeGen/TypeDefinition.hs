@@ -383,6 +383,10 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
                         return $ pre_cr $ struct identifier [enumField, unionField] [] |>> getLocation ann
 genTypeDefinitionDecl (TypeDefinition (Interface RegularInterface _identifier _extends _procs _mods) _ann) = return []
 
+-- | The code of test classes comes with the harness of the tests
+genTypeDefinitionDecl (TypeDefinition (Class TestClass identifier _ _ _) _) =
+    throwError $ InternalError $ "test classes are not generated yet: " ++ identifier
+
 genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier members _provides modifiers) ann) = do
     -- | Classify class members into fields and functions.
     (fields, functions) <- classifyClassMembers cls
@@ -651,6 +655,8 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
 genTaskClassCode _ = throwError $ InternalError "Not a task class definition"
 
 genClassDefinition :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
+genClassDefinition (TypeDefinition (Class TestClass identifier _ _ _) _) =
+    throwError $ InternalError $ "test classes are not generated yet: " ++ identifier
 genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members _provides _) _) = do
     (_fields, functions) <- classifyClassMembers cls
     -- | The private member functions are not declared in the header file, so

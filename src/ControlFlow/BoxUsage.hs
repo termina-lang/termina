@@ -365,6 +365,8 @@ checkClassMember (ClassAction _ak _ident Nothing bret _ann)
 checkClassMember (ClassAction _ak _ident (Just p) bret ann)
   = checkBlock bret
   >> mapM_ (`defArgumentsProc` getLocation ann) [p]
+checkClassMember (ClassCase _ak _ident _ps bret _ann)
+  = checkBlock bret
 
 checkTypeDef :: TypeDef SemanticAnn -> BoxUsageM BoxUsageError ()
 checkTypeDef (Class _k _id members _provides _mods)

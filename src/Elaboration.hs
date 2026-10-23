@@ -92,6 +92,8 @@ elaborateElement ps element = case element of
         Emitter ident ty <$> traverse expression mExpr <*> mapM modifier modifiers <*> pure ann
       Handler ident ty mExpr modifiers ann ->
         Handler ident ty <$> traverse expression mExpr <*> mapM modifier modifiers <*> pure ann
+      Test ident ty mExpr modifiers ann ->
+        Test ident ty <$> traverse expression mExpr <*> mapM modifier modifiers <*> pure ann
       Const ident ty expr modifiers ann ->
         Const ident ty <$> expression expr <*> mapM modifier modifiers <*> pure ann
       ConstExpr ident ty expr modifiers ann ->
@@ -115,6 +117,8 @@ elaborateElement ps element = case element of
         ClassViewer ident params mRet <$> body' body <*> pure ann
       ClassAction ak ident mParam body ann ->
         ClassAction ak ident mParam <$> body' body <*> pure ann
+      ClassCase ak ident params body ann ->
+        ClassCase ak ident params <$> body' body <*> pure ann
 
     interfaceMember (InterfaceProcedure ak ident params modifiers ann) =
       InterfaceProcedure ak ident params <$> mapM modifier modifiers <*> pure ann

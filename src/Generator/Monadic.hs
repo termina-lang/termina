@@ -140,6 +140,11 @@ mapClassMemberMonadic (ClassAction _ _ (Just param) blkRet _) =
   mapParameterMonadic param >>
   -- | Get the monadic types types from the block return type
   mapM_ mapStatementMonadic (blockBody blkRet)
+mapClassMemberMonadic (ClassCase _ _ params blkRet _) =
+  -- | Get the monadic types types from the parameters
+  mapM_ mapParameterMonadic params >>
+  -- | Get the monadic types types from the block return type
+  mapM_ mapStatementMonadic (blockBody blkRet)
 
 mapTypeDefMonadic ::
   -- | The new element

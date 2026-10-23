@@ -1,0 +1,13 @@
+interface ISensor {
+    procedure set(&mut self, v : u32);
+};
+
+test class CTests {
+    sensor : access ISensor;
+    tick_ev : sink u32 triggers on_tick;
+
+    case sets_the_value(&mut self) {
+        self->sensor.set(1 : u32);
+        return;
+    }
+};

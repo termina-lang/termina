@@ -300,6 +300,7 @@ checkClassMember (ClassMethod _ _ ps _ body _) = checkBody ps body
 checkClassMember (ClassViewer _ ps _ body _) = checkBody ps body
 checkClassMember (ClassAction _ _ mp body _) = checkBody (maybe [] (: []) mp) body
 checkClassMember (ClassProcedure _ _ ps body _) = checkBody ps body
+checkClassMember (ClassCase _ _ ps body _) = checkBody ps body
 checkClassMember (ClassField {}) = Nothing
 
 checkElement :: AnnASTElement SemanticAnn -> Maybe VarScopeError

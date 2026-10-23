@@ -53,6 +53,18 @@ typeGlobal (Handler ident ts mexpr mods anns) = do
       tyMods <- typeModifiers anns typeGlobalObject mods
       return (SAST.Handler ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     _ -> throwError $ annotateError anns (EInvalidHandlerType ty)
+typeGlobal (Test ident ts mexpr mods anns) = do
+  ty <- typeTypeSpecifier anns typeGlobalObject ts
+  checkTerminaType anns ty
+  case ty of
+    TGlobal TestClass _ -> do
+      exprty <-
+        case mexpr of
+          Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
+      tyMods <- typeModifiers anns typeGlobalObject mods
+      return (SAST.Test ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
+    _ -> throwError $ annotateError anns (EInvalidTestType ty)
 typeGlobal (Resource ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns typeGlobalObject ts
   checkTerminaType anns ty

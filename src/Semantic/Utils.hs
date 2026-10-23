@@ -175,6 +175,8 @@ selfDepClass (ClassViewer vId _params _type bRet _ann) =
   M.insert vId (selfInvBlock bRet M.empty)
 selfDepClass (ClassAction _ak aId _param bRet _ann) =
   M.insert aId (selfInvBlock bRet M.empty)
+selfDepClass (ClassCase _ak cId _params bRet _ann) =
+  M.insert cId (selfInvBlock bRet M.empty)
 
 fieldDepClass :: ClassMember a 
   -> M.Map Identifier (S.Set Identifier) 
@@ -187,6 +189,8 @@ fieldDepClass (ClassProcedure _ak _pId _params bRet _ann) =
 fieldDepClass (ClassViewer _vId _params _type bRet _ann) =
   M.unionWith S.union (fieldDepBlock bRet M.empty)
 fieldDepClass (ClassAction _ak _aId _param bRet _ann) =
+  M.unionWith S.union (fieldDepBlock bRet M.empty)
+fieldDepClass (ClassCase _ak _cId _params bRet _ann) =
   M.unionWith S.union (fieldDepBlock bRet M.empty)
 
 -- | A single projection in an access path.

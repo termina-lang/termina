@@ -7,10 +7,10 @@ import Parser.Common (parseWith, ctorName)
 import Parser.Parsing
   ( functionParser, externFunctionParser, constDeclParser, constExprDeclParser
   , taskDeclParser, resourceDeclParser, handlerDeclParser
-  , channelDeclParser, emitterDeclParser, globalDeclParser
+  , channelDeclParser, emitterDeclParser, testDeclParser, globalDeclParser
   , structDefinitionParser, enumDefinitionParser
   , interfaceDefinitionParser, classDefinitionParser )
-import Parser.AST (AnnASTElement'(TypeDefinition))
+import Parser.AST (AnnASTElement'(TypeDefinition, GlobalDeclaration))
 
 import Test.Hspec
 
@@ -54,6 +54,9 @@ spec = describe "Parser: top-level declarations" $ do
       , ("class definition",
           typeDefOf classDefinitionParser "resource class C provides I { procedure p(&mut self) { return; } };",
           "Class")
+      , ("test class definition",
+          typeDefOf classDefinitionParser "test class C { p : access I; case c(&mut self) { return; } };",
+          "Class")
       ]
 
   describe "application-level instances" $
@@ -63,6 +66,10 @@ spec = describe "Parser: top-level declarations" $ do
       , ("handler instance", ctorOf handlerDeclParser "handler h : CFoo = { };", "Handler")
       , ("channel instance", ctorOf channelDeclParser "channel c : MsgQueue<u32; 10>;", "Channel")
       , ("emitter instance", ctorOf emitterDeclParser "emitter e : PeriodicTimer = { };", "Emitter")
+      , ("test instance", ctorOf testDeclParser "test t : CFooTests = { };", "Test")
+      , ("test instance through the global declaration parser",
+          either show (\case { GlobalDeclaration g -> ctorName g; other -> ctorName other })
+            (parseWith globalDeclParser "test t : CFooTests = { };"), "Test")
       , ("global declaration wrapper", ctorOf globalDeclParser "task gd : CFoo = { };", "GlobalDeclaration")
       ]
 

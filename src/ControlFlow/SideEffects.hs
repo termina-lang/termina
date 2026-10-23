@@ -477,6 +477,7 @@ checkClassMember member = case member of
   ClassProcedure _ak ident _ps body _ann     -> checkBody ident body
   ClassViewer ident _ps _tyret body _ann     -> checkBody ident body
   ClassAction _ak ident _mp body _ann        -> checkBody ident body
+  ClassCase _ak ident _ps body _ann          -> checkBody ident body
   ClassField {}                              -> return ()
 
   where
