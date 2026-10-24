@@ -1,0 +1,11 @@
+task class CTicker {
+
+    tick_ev : sink TimeVal triggers run;
+    clk : access TestClock;
+
+    action run(&priv self, _now : TimeVal) {
+        self->clk.advance({ tv_sec = 1, tv_usec = 0 } : TimeVal);
+        return;
+    }
+
+};

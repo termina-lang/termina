@@ -37,8 +37,8 @@ typeCheckErrorOn plt input = case runP (contents topLevel) "test" "" input of
       Left err -> Just $ errorIdent err
       Right _ -> Nothing
 
--- | Type-checks module @test@ as the deployment of a test, which has
--- test_entry, returning the diagnostic code of the first error (or 'Nothing'
+-- | Type-checks module @test@ as the deployment of a test, which has the
+-- resources of a test, returning the diagnostic code of the first error (or 'Nothing'
 -- if it type-checks).
 typeCheckTestErrorOn :: Platform -> String -> Maybe Text
 typeCheckTestErrorOn plt input = case runP (contents topLevel) "test" "" input of

@@ -12,7 +12,7 @@ import Test.Hspec
 caseClass :: String -> [String] -> String
 caseClass cls cases =
   "test class " ++ cls ++ " {\n" ++
-  "    t : access TestAPI;\n" ++
+  "    t : access TestChecks;\n" ++
   concat [ "    case " ++ c ++ "(&mut self) {\n        self->t.check(true);\n        return;\n    }\n" | c <- cases ] ++
   "};\n"
 
@@ -22,20 +22,20 @@ spec = describe "termina test --list" $ do
   it "gives the cases of each test instance in the order of declaration" $
     casesIn [("tests/t/test.fin",
               caseClass "CFirst" ["one", "two"] ++ caseClass "CSecond" ["three"]
-              ++ "test b : CSecond = { t <-> test_entry };\n"
-              ++ "test a : CFirst = { t <-> test_entry };\n")]
+              ++ "test b : CSecond = { t <-> test_checks };\n"
+              ++ "test a : CFirst = { t <-> test_checks };\n")]
       `shouldBe` Right [("b", "three", "tests/t/test.fin", 14), ("a", "one", "tests/t/test.fin", 3), ("a", "two", "tests/t/test.fin", 7)]
 
   it "finds the test class in another module of the test" $
     casesIn [("tests/t/src/cases/first.fin", caseClass "CFirst" ["one"]),
-             ("tests/t/test.fin", "test a : CFirst = { t <-> test_entry };\n")]
+             ("tests/t/test.fin", "test a : CFirst = { t <-> test_checks };\n")]
       `shouldBe` Right [("a", "one", "tests/t/src/cases/first.fin", 3)]
 
   it "gives no cases for a concurrent test" $
     casesIn [("tests/t/test.fin", "channel c : MsgQueue<u32; 1>;\n")] `shouldBe` Right []
 
   it "rejects a test instance whose class is not a test class" $
-    casesIn [("tests/t/test.fin", "test a : CMissing = { t <-> test_entry };\n")]
+    casesIn [("tests/t/test.fin", "test a : CMissing = { t <-> test_checks };\n")]
       `shouldBe` Left "the test instance a is of type CMissing, which is not a test class"
 
   where

@@ -510,8 +510,12 @@ instance ShowText (TypeDef' ty expr blk a) where
     showText (Class ChannelClass ident _ _ _) = T.pack $ "channel class " <> ident
     showText (Interface RegularInterface ident _ _ _) = T.pack $ "interface " <> ident
     showText (Interface SystemInterface ident _ _ _) = T.pack $ "system interface " <> ident
+    showText (Interface TestInterface ident _ _ _) = T.pack $ "test interface " <> ident
 
-data InterfaceKind = RegularInterface | SystemInterface
+-- | Who declares an interface: the programmer (RegularInterface) or the
+-- transpiler (SystemInterface, and TestInterface, which only a test class
+-- reaches). The C of an access port is the same for the three.
+data InterfaceKind = RegularInterface | SystemInterface | TestInterface
   deriving (Show, Ord, Eq)
 
 data ClassKind = TaskClass | ResourceClass | HandlerClass | EmitterClass | ChannelClass | TestClass

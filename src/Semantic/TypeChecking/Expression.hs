@@ -874,8 +874,7 @@ typeTypeSpecifier loc _typeObj (TSDefinedType ident []) = do
     Struct s _ _ -> return $ TStruct s
     Enum e _ _ -> return $ TEnum e
     Class clsKind c _ _ _ -> return $ TGlobal clsKind c 
-    Interface RegularInterface i _ _ _ -> return $ TInterface RegularInterface i
-    Interface SystemInterface i _ _ _ -> return $ TInterface SystemInterface i
+    Interface kind i _ _ _ -> return $ TInterface kind i
 typeTypeSpecifier loc typeObj (TSReference ak ts) = 
   TReference ak <$> typeTypeSpecifier loc typeObj ts
 typeTypeSpecifier loc typeObj (TSBoxSubtype ts) = 

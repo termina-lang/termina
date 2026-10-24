@@ -128,7 +128,8 @@ genType _noqual TUnit = return (CTVoid noqual)
 genType qual (TEnum ident) = return (CTTypeDef ident qual)
 genType qual (TStruct ident) = return (CTTypeDef ident qual)
 genType qual (TInterface RegularInterface ident) = return (CTTypeDef ident qual)
-genType _qual (TInterface SystemInterface _) = throwError $ InternalError "System interfaces shall not be translated to C types"
+genType _qual (TInterface TestInterface _) = throwError $ InternalError "Test interfaces shall not be translated to C types"
+genType _qual (TInterface SystemInterface _) = throwError $ InternalError "System interfaces shall not be translated toC types"
 
 genFunctionType :: TerminaType SemanticAnn -> [Parameter SemanticAnn] -> CGenerator CType
 genFunctionType ts tsParams = do

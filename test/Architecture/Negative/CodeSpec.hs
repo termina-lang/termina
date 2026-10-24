@@ -632,7 +632,7 @@ spec = do
       let src = monitorClass "CMonitor"
              ++ "test class CAlarmTests {\n"
              ++ "    alarms : access TestChannelAccess<u32>;\n"
-             ++ "    t : access TestAPI;\n"
+             ++ "    t : access TestChecks;\n"
              ++ "    case none_pending(&mut self) {\n"
              ++ "        var n : usize = 0;\n"
              ++ "        self->alarms.pending(&mut n);\n"
@@ -644,7 +644,7 @@ spec = do
              ++ "channel alarms : TestChannel<u32; 4>;\n"
              ++ "#[priority(5)]\n"
              ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
-             ++ "test alarm_tests : CAlarmTests = { alarms <-> alarms, t <-> test_entry };\n"
+             ++ "test alarm_tests : CAlarmTests = { alarms <-> alarms, t <-> test_checks };\n"
       compileTestErrorCode src `shouldBe` Just (pack "AE-017")
 
     it "AE-017: test pool that no test instance reaches through TestPoolAccess" $ do
@@ -663,7 +663,7 @@ spec = do
              ++ "task uut : CTCExecutor = { tc_in <- tcs, tm_out -> tms, tm_pool <-> unit_pool };\n"
              ++ "test exec_tests : CTCExecutorTests = {\n"
              ++ "    tc_out -> tcs, tm_rx <-> tms, tm_pool <-> unit_pool,\n"
-             ++ "    tm_pool_state <-> tm_pool, t <-> test_entry\n"
+             ++ "    tm_pool_state <-> tm_pool, t <-> test_checks\n"
              ++ "};\n"
       compileTestErrorCode src `shouldBe` Just (pack "AE-018")
 
@@ -705,24 +705,17 @@ spec = do
              ++ "task uut : CMonitor = { tick_ev <- timer, alarm_out -> alarms };\n"
       compileTestErrorCode src `shouldBe` Just (pack "AE-020")
 
-    it "AE-021: call to advance in a concurrent test" $ do
-      let src = scenarioClass "advance({tv_sec = 1, tv_usec = 0} : TimeVal)"
-             ++ periodicEmitter "timer" 1
-             ++ "#[priority(5)]\n"
-             ++ "task scenario : CScenario = { tick_ev <- timer, t <-> test_entry };\n"
-      compileTestErrorCode src `shouldBe` Just (pack "AE-021")
-
-    it "AE-022: call to finish in a unit test" $ do
+    it "AE-020: test_scenario in a unit test" $ do
       let src = monitorClass "CMonitor"
              ++ "test class CMonitorTests {\n"
              ++ "    tick : access TestEmitterAccess<TimeVal>;\n"
              ++ "    alarms : access TestChannelAccess<u32>;\n"
-             ++ "    t : access TestAPI;\n"
+             ++ "    s : access TestScenario;\n"
              ++ "    case fires(&mut self) {\n"
              ++ "        var n : usize = 0;\n"
              ++ "        self->tick.fire({tv_sec = 1, tv_usec = 0} : TimeVal);\n"
              ++ "        self->alarms.pending(&mut n);\n"
-             ++ "        self->t.finish();\n"
+             ++ "        self->s.finish();\n"
              ++ "        return;\n"
              ++ "    }\n"
              ++ "};\n"
@@ -730,15 +723,15 @@ spec = do
              ++ "channel alarms : TestChannel<u32; 4>;\n"
              ++ "#[priority(5)]\n"
              ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
-             ++ monitorTest
-      compileTestErrorCode src `shouldBe` Just (pack "AE-022")
+             ++ "test monitor_tests : CMonitorTests = { tick <-> tick, alarms <-> alarms, s <-> test_scenario };\n"
+      compileTestErrorCode src `shouldBe` Just (pack "AE-020")
 
     it "AE-015: a case sends a message to two tasks that keep sending it to each other" $ do
       let src = relayClass "Relay" False
              ++ twoInputsClass True
              ++ "test class CRelayTests {\n"
              ++ "    msg_out : out u32;\n"
-             ++ "    t : access TestAPI;\n"
+             ++ "    t : access TestChecks;\n"
              ++ "    case sends(&mut self) {\n"
              ++ "        self->msg_out.send(1 : u32);\n"
              ++ "        self->t.check(true);\n"
@@ -752,7 +745,7 @@ spec = do
              ++ "task two : TwoInputs = { last = 0, in_a <- from_case, in_b <- from_relay, msg_out -> to_relay };\n"
              ++ "#[priority(11)]\n"
              ++ "task relay : Relay = { msg_in <- to_relay, msg_out -> from_relay };\n"
-             ++ "test relay_tests : CRelayTests = { msg_out -> from_case, t <-> test_entry };\n"
+             ++ "test relay_tests : CRelayTests = { msg_out -> from_case, t <-> test_checks };\n"
       compileTestErrorCode src `shouldBe` Just (pack "AE-015")
 
     it "AE-003: box taken from a test channel and freed to another pool" $ do
@@ -765,7 +758,7 @@ spec = do
              ++ "task uut : CTCExecutor = { tc_in <- tcs, tm_out -> tms, tm_pool <-> tm_pool };\n"
              ++ "test exec_tests : CTCExecutorTests = {\n"
              ++ "    tc_out -> tcs, tm_rx <-> tms, tm_pool <-> other_pool,\n"
-             ++ "    tm_pool_state <-> tm_pool, t <-> test_entry\n"
+             ++ "    tm_pool_state <-> tm_pool, t <-> test_checks\n"
              ++ "};\n"
       compileTestErrorCode src `shouldBe` Just (pack "AE-003")
 
@@ -787,7 +780,7 @@ monitorTestClass =
     "test class CMonitorTests {\n" ++
     "    tick : access TestEmitterAccess<TimeVal>;\n" ++
     "    alarms : access TestChannelAccess<u32>;\n" ++
-    "    t : access TestAPI;\n" ++
+    "    t : access TestChecks;\n" ++
     "    case one_alarm(&mut self) {\n" ++
     "        var n : usize = 0;\n" ++
     "        self->tick.fire({tv_sec = 1, tv_usec = 0} : TimeVal);\n" ++
@@ -798,7 +791,7 @@ monitorTestClass =
     "};\n"
 
 monitorTest :: String
-monitorTest = "test monitor_tests : CMonitorTests = { tick <-> tick, alarms <-> alarms, t <-> test_entry };\n"
+monitorTest = "test monitor_tests : CMonitorTests = { tick <-> tick, alarms <-> alarms, t <-> test_checks };\n"
 
 -- | A task under test that answers a telecommand with a packet in a box
 executorClass :: String
@@ -836,7 +829,7 @@ executorTestClass withPoolState =
     "    tm_rx : access TestChannelAccess<box TMPacket>;\n" ++
     "    tm_pool : access Allocator<TMPacket>;\n" ++
     (if withPoolState then "    tm_pool_state : access TestPoolAccess;\n" else "") ++
-    "    t : access TestAPI;\n" ++
+    "    t : access TestChecks;\n" ++
     "    case answers(&mut self) {\n" ++
     "        var tm_opt : Option<box TMPacket> = None;\n" ++
     "        let tc : TCCommand = { service = 17 } : TCCommand;\n" ++
@@ -865,16 +858,16 @@ executorWiring withPoolState =
     "test exec_tests : CTCExecutorTests = {\n" ++
     "    tc_out -> tcs, tm_rx <-> tms, tm_pool <-> tm_pool,\n" ++
     (if withPoolState then "    tm_pool_state <-> tm_pool,\n" else "") ++
-    "    t <-> test_entry\n" ++
+    "    t <-> test_checks\n" ++
     "};\n"
 
--- | The scenario of a concurrent test, which calls a procedure of TestAPI on
--- each period
+-- | The scenario of a concurrent test, which calls a procedure of
+-- TestScenario on each period
 scenarioClass :: String -> String
 scenarioClass call =
     "task class CScenario {\n" ++
     "    tick_ev : sink TimeVal triggers run;\n" ++
-    "    t : access TestAPI;\n" ++
+    "    t : access TestScenario;\n" ++
     "    action run(&priv self, _now : TimeVal) {\n" ++
     "        self->t." ++ call ++ ";\n" ++
     "        return;\n" ++

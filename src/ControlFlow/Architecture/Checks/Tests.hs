@@ -28,10 +28,10 @@ checkTestDeployment = do
         else checkUnitLevel
     checkUnitConnections
     checkTestConnections
-    checkTestProcedureCalls
 
--- | A unit test has no emitter other than its test emitters, and the
--- harness attends system_except.
+-- | A unit test has no emitter other than its test emitters, the harness
+-- attends system_except, and nothing reaches test_scenario, which ends a
+-- concurrent test.
 checkUnitLevel :: TestsCheckMonad ()
 checkUnitLevel = do
     tp <- ask
@@ -39,17 +39,23 @@ checkUnitLevel = do
         let emitterId = getEmitterIdentifier emitter
             loc = maybe (getLocation (getAnnotation emitter)) (\(_, _, ann) -> getLocation ann) (M.lookup emitterId (emitterTargets tp)) in
         throwError $ annotateError loc (EEmitterInUnitTest emitterId)
+    case M.findWithDefault [] "test_scenario" (resourceSources tp) of
+        (_, _, connAnn) : _ ->
+            throwError $ annotateError (getLocation connAnn) (ETestOfOtherLevel UnitTest "Test resource" "test_scenario")
+        [] -> return ()
 
--- | A concurrent test has no components of a unit test
+-- | A concurrent test has no components of a unit test. Nothing in it can reach
+-- test_clock: only a test class declares an access to it (SE-237), and a
+-- deployment with test instances is a unit test.
 checkConcurrentLevel :: TestsCheckMonad ()
 checkConcurrentLevel = do
     tp <- ask
     forM_ (M.elems (testEmitters tp)) $ \(TPTestEmitter ident _ _ ann) ->
-        throwError $ annotateError (getLocation ann) (ETestComponentInConcurrentTest "Test emitter" ident)
+        throwError $ annotateError (getLocation ann) (ETestOfOtherLevel ConcurrentTest "Test emitter" ident)
     forM_ (M.elems (testChannels tp)) $ \(TPMsgQueue ident _ _ _ ann) ->
-        throwError $ annotateError (getLocation ann) (ETestComponentInConcurrentTest "Test channel" ident)
+        throwError $ annotateError (getLocation ann) (ETestOfOtherLevel ConcurrentTest "Test channel" ident)
     forM_ (M.elems (testPools tp)) $ \(TPPool ident _ _ _ ann) ->
-        throwError $ annotateError (getLocation ann) (ETestComponentInConcurrentTest "Test pool" ident)
+        throwError $ annotateError (getLocation ann) (ETestOfOtherLevel ConcurrentTest "Test pool" ident)
 
 -- | On the side of the unit, every test emitter is connected to a sink port,
 -- every test channel to exactly one out port, and every test pool to at least
@@ -92,36 +98,6 @@ checkTestConnections = do
                                  Just (TInterface _ "TestPoolAccess") <- [portType tp source port]] in
         when (null testAccesses)
             (throwError $ annotateError (getLocation ann) (ETestComponentWithoutTest "Test pool" ident))
-
--- | advance moves the clock of a unit test and finish ends a concurrent one.
--- The check reads the code of every element connected to test_entry, so a
--- call in a branch that never runs counts as well.
-checkTestProcedureCalls :: TestsCheckMonad ()
-checkTestProcedureCalls = do
-    tp <- ask
-    let (forbidden, err) = if M.null (testInstances tp)
-            then ("advance", EAdvanceInConcurrentTest)
-            else ("finish", EFinishInUnitTest)
-    forM_ (elements tp) $ \(apConns, cls) -> do
-        let testPorts = M.keys (M.filter ((== "test_entry") . fst) apConns)
-        forM_ (M.elems (classMemberFunctions cls)) $ \(TPFunction _ _ _ (Block body _) _) ->
-            -- | TestAPI is an interface of the system, so its procedures are
-            -- system calls
-            forM_ (blocksIn body) $ \case
-                SystemCall obj procId _ ann | procId == forbidden ->
-                    case getPortName obj of
-                        Right port | port `elem` testPorts -> throwError $ annotateError (getLocation ann) err
-                        _ -> return ()
-                _ -> return ()
-
-    where
-
-        -- | The access ports of every instance, with its class
-        elements tp =
-            [(taskAPConnections t, cls) | t <- M.elems (tasks tp), Just cls <- [M.lookup (taskClass t) (taskClasses tp)]]
-            ++ [(handlerAPConnections h, cls) | h <- M.elems (handlers tp), Just cls <- [M.lookup (handlerClass h) (handlerClasses tp)]]
-            ++ [(resAPConnections r, cls) | r <- M.elems (resources tp), Just cls <- [M.lookup (resourceClass r) (resourceClasses tp)]]
-            ++ [(testInstanceAPConnections t, cls) | t <- M.elems (testInstances tp), Just cls <- [M.lookup (testInstanceClass t) (testClasses tp)]]
 
 -- | Whether a test instance is connected to the element through an access port
 reachedByTest :: TerminaProgArch SemanticAnn -> Identifier -> Bool

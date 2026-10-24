@@ -210,6 +210,7 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
                   Nothing -> return $ M.insert extendedIface (Just x) acc') (M.insert x Nothing accxs) extendedIfaces
 
 typeTypeDefinition _ (Interface SystemInterface ident _ _ _ ) = throwError $ annotateError Internal (ESystemInterfaceDefinition ident)
+typeTypeDefinition _ (Interface TestInterface ident _ _ _ ) = throwError $ annotateError Internal (ESystemInterfaceDefinition ident)
 
 typeTypeDefinition ann (Class kind ident members provides mds_ts) =
   when (kind == TestClass) (onlyInTest ann ("test class " ++ ident)) >>
@@ -277,6 +278,12 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
       case cases of
         (ClassCase _ caseId _ _ caseAnn) : _ ->
           throwError $ annotateError caseAnn (ECaseOutsideTestClass (ident, ann) caseId)
+        _ -> return ()
+    -- | Only a test class reaches the clock and the components of a unit test
+    unless (kind == TestClass) $
+      forM_ ty_fls $ \case
+        ClassField (FieldDefinition fid fty@(TAccessPort accessTy) (SemanticAnn _ loc))
+          | testAccess accessTy -> throwError $ annotateError loc (ETestAccessOutsideTestClass (ident, ann) fid fty)
         _ -> return ()
     checkClassKind ann ident kind (ty_fls, prcs, acts, mths, vws, cases) provides
 
@@ -449,7 +456,15 @@ checkMemberFunctionAccessKind loc clsKind ak ident = do
     (HandlerClass, Mutable) -> throwError $ annotateError loc (EMemberFunctionWithMutableSelfInHandlerClass ident)
     _ -> return ()
 
-checkClassKind :: Location 
+-- | The access types that only a test class declares: the interfaces of kind
+-- TestInterface and the accesses to the components of a unit test
+testAccess :: SAST.TerminaType SemanticAnn -> Bool
+testAccess (SAST.TInterface TestInterface _) = True
+testAccess (SAST.TTestEmitterAccess _) = True
+testAccess (SAST.TTestChannelAccess _) = True
+testAccess _ = False
+
+checkClassKind :: Location
   -> Identifier -> ClassKind
   -> ([SAST.ClassMember SemanticAnn],
       [ClassMember ParserAnn],

@@ -51,7 +51,7 @@ sharedDouble =
   "    out_a : access TestChannelAccess<u32>;\n" ++
   "    tick_b : access TestEmitterAccess<TimeVal>;\n" ++
   "    out_b : access TestChannelAccess<u32>;\n" ++
-  "    t : access TestAPI;\n" ++
+  "    t : access TestChecks;\n" ++
   "    case reads(&mut self) {\n" ++
   "        var n : usize = 0;\n" ++
   "        self->value.set(3);\n" ++
@@ -96,7 +96,7 @@ spec = describe "Architecture: deployment of a test" $ do
           ++ "#[priority(6)]\n"
           ++ "task reader_b : CMonitor = { tick_ev <- tick_b, alarm_out -> out_b };\n"
           ++ "test reader_tests : CReaderTests = { value <-> value, tick_a <-> tick_a, out_a <-> out_a,\n"
-          ++ "    tick_b <-> tick_b, out_b <-> out_b, t <-> test_entry };\n"
+          ++ "    tick_b <-> tick_b, out_b <-> out_b, t <-> test_checks };\n"
     M.lookup "value" <$> lockings (monitorClass "CMonitor" ++ oneTask) `shouldBe` Right (Just ResourceLockNone)
     -- Two tasks and the case: the ceiling of the two tasks
     let twoTasks = sharedDouble
@@ -105,12 +105,12 @@ spec = describe "Architecture: deployment of a test" $ do
           ++ "#[priority(6)]\n"
           ++ "task reader_b : CReader = { tick_ev <- tick_b, value <-> value, out_value -> out_b };\n"
           ++ "test reader_tests : CReaderTests = { value <-> value, tick_a <-> tick_a, out_a <-> out_a,\n"
-          ++ "    tick_b <-> tick_b, out_b <-> out_b, t <-> test_entry };\n"
+          ++ "    tick_b <-> tick_b, out_b <-> out_b, t <-> test_checks };\n"
     M.lookup "value" <$> lockings twoTasks `shouldBe` Right (Just (ResourceLockMutex 5))
 
   it "accepts the scenario of a concurrent test that calls finish" $
     lockings (scenarioClass "finish()"
               ++ periodicEmitter "timer" 1
               ++ "#[priority(5)]\n"
-              ++ "task scenario : CScenario = { tick_ev <- timer, t <-> test_entry };\n")
+              ++ "task scenario : CScenario = { tick_ev <- timer, t <-> test_scenario };\n")
       `shouldBe` Right M.empty

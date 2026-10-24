@@ -109,6 +109,8 @@ lowerStatements acc (stmt : xs) =
                             lowerStatements (ProcedureInvoke obj funcName args ann' : acc) xs
                         TAccessPort (TInterface SystemInterface _) ->
                             lowerStatements (SystemCall obj funcName args ann' : acc) xs
+                        TAccessPort (TInterface TestInterface _) ->
+                            lowerStatements (SystemCall obj funcName args ann' : acc) xs
                         -- | If the object is an access port to an allocator, we shall create a new block
                         -- of the corresponding type (AllocBox or FreeBox)
                         TAccessPort (TAllocator _) -> do

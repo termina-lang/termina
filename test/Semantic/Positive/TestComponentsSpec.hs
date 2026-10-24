@@ -8,7 +8,7 @@ import Test.Hspec
 
 -- The components of a unit test take the place of the emitters, the channels
 -- and the pools of production at the other end of the ports of the unit, and
--- a case reaches them, and test_entry, through access ports. These are the
+-- a case reaches them, and the resources of the test, through access ports. These are the
 -- examples of sections 4.10 and 4.11 of the design of the tests.
 
 -- | A task that samples a sensor on each period and sends an alarm above a
@@ -44,7 +44,8 @@ tempMonitor =
   "    sensor : access IFakeSensor;\n" ++
   "    tick : access TestEmitterAccess<TimeVal>;\n" ++
   "    alarms : access TestChannelAccess<u32>;\n" ++
-  "    t : access TestAPI;\n" ++
+  "    t : access TestChecks;\n" ++
+  "    clk : access TestClock;\n" ++
   "    case no_alarm_below_limit(&mut self) {\n" ++
   "        var n : usize = 0;\n" ++
   "        self->sensor.set(70);\n" ++
@@ -56,7 +57,7 @@ tempMonitor =
   "    case alarm_above_limit(&mut self) {\n" ++
   "        var a : Option<u32> = None;\n" ++
   "        self->sensor.set(95);\n" ++
-  "        self->t.advance({tv_sec = 1, tv_usec = 0} : TimeVal);\n" ++
+  "        self->clk.advance({tv_sec = 1, tv_usec = 0} : TimeVal);\n" ++
   "        self->tick.fire({tv_sec = 1, tv_usec = 0} : TimeVal);\n" ++
   "        self->alarms.take(&mut a);\n" ++
   "        match a {\n" ++
@@ -83,7 +84,8 @@ tempMonitorWiring =
   "    sensor <-> sensor,\n" ++
   "    tick <-> tick,\n" ++
   "    alarms <-> alarms,\n" ++
-  "    t <-> test_entry\n" ++
+  "    t <-> test_checks,\n" ++
+  "    clk <-> test_clock\n" ++
   "};\n"
 
 -- | A task that answers a telecommand with a telemetry packet in a box, with
@@ -123,7 +125,7 @@ tcExecutor =
   "    tm_rx : access TestChannelAccess<box TMPacket>;\n" ++
   "    tm_pool : access Allocator<TMPacket>;\n" ++
   "    tm_pool_state : access TestPoolAccess;\n" ++
-  "    t : access TestAPI;\n" ++
+  "    t : access TestChecks;\n" ++
   "    case ping_answers_with_one_tm(&mut self) {\n" ++
   "        var n : usize = 0;\n" ++
   "        var tm_opt : Option<box TMPacket> = None;\n" ++
@@ -173,11 +175,11 @@ tcExecutorWiring =
   "    tm_rx <-> tms,\n" ++
   "    tm_pool <-> tm_pool,\n" ++
   "    tm_pool_state <-> tm_pool,\n" ++
-  "    t <-> test_entry\n" ++
+  "    t <-> test_checks\n" ++
   "};\n"
 
 spec :: Spec
-spec = describe "Semantic: components of a unit test and test_entry" $ do
+spec = describe "Semantic: components and resources of a test" $ do
 
   it "type-checks the example of a task with a sink and an output" $
     typeCheckTestErrorOn TestPlatform (tempMonitor ++ tempMonitorWiring) `shouldBe` Nothing
@@ -191,16 +193,43 @@ spec = describe "Semantic: components of a unit test and test_entry" $ do
   it "rejects the components of a unit test outside a test" $
     typeCheckErrorOn TestPlatform "channel alarms : TestChannel<u32; 4>;\n" `shouldBe` Just (pack "SE-236")
 
-  it "has no TestAPI outside a test" $
+  it "has no TestChecks outside a test" $
     typeCheckErrorOn TestPlatform
       ("task class CUser {\n" ++
        "    tick_ev : sink TimeVal triggers run;\n" ++
-       "    t : access TestAPI;\n" ++
+       "    t : access TestChecks;\n" ++
        "    action run(&priv self, _now : TimeVal) {\n" ++
        "        self->t.fail();\n" ++
        "        return;\n" ++
        "    }\n" ++
        "};\n") `shouldBe` Just (pack "SE-077")
+
+  it "rejects an access to a test emitter in a resource class (SE-237)" $
+    typeCheckTestErrorOn TestPlatform
+      ("resource class CFiring {\n" ++
+       "    tick : access TestEmitterAccess<TimeVal>;\n" ++
+       "};\n") `shouldBe` Just (pack "SE-237")
+
+  it "rejects an access to a test pool in a handler class (SE-237)" $
+    typeCheckTestErrorOn TestPlatform
+      ("handler class CInspect {\n" ++
+       "    irq : sink u32 triggers run;\n" ++
+       "    pool_state : access TestPoolAccess;\n" ++
+       "    action run(&priv self, _v : u32) {\n" ++
+       "        return;\n" ++
+       "    }\n" ++
+       "};\n") `shouldBe` Just (pack "SE-237")
+
+  it "accepts an access to test_checks in a task class" $
+    typeCheckTestErrorOn TestPlatform
+      ("task class CScenario {\n" ++
+       "    tick_ev : sink TimeVal triggers run;\n" ++
+       "    t : access TestChecks;\n" ++
+       "    action run(&priv self, _now : TimeVal) {\n" ++
+       "        self->t.check(true);\n" ++
+       "        return;\n" ++
+       "    }\n" ++
+       "};\n") `shouldBe` Nothing
 
   it "rejects firing an emitter through an immutable self reference" $
     typeCheckTestErrorOn TestPlatform (tempMonitor ++

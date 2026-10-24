@@ -285,6 +285,7 @@ data Error
   | ETestComponentConnectionInvalidGlobal Identifier (TerminaType SemanticAnn) -- ^ Port of a test component connected to another kind of object (SE-234)
   | ETestComponentConnectionTypeMismatch Identifier (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Port and test component that carry different types (SE-235)
   | ETestOnly String -- ^ Test class, test instance or component of a unit test outside a test (SE-236)
+  | ETestAccessOutsideTestClass (Identifier, Location) Identifier (TerminaType SemanticAnn) -- ^ Access port that only a test class declares, in another class (SE-237)
   deriving Show
 
 -- | Why an emitter takes a handler and not a task.
@@ -1072,7 +1073,7 @@ instance Diagnosable Error where
     describe (ECaseOutsideTestClass (classId, clsPos) ident) =
         relatedTo clsPos "the class is defined here" $
         diagnostic "SE-230" "case outside a test class"
-            ("Class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the case \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Only a test class defines cases.")
+            ("Class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the case \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Only a test class may define cases.")
     describe (ECaseParameters ident) =
         diagnostic "SE-231" "case with parameters"
             ("Case \x1b[31m" <> T.pack ident <> "\x1b[0m has parameters.\n" <> "A case takes a self reference and nothing else.")
@@ -1091,6 +1092,10 @@ instance Diagnosable Error where
     describe (ETestOnly what) =
         diagnostic "SE-236" "only in a test"
             ("\x1b[31m" <> T.pack what <> "\x1b[0m can only be used in a test, which is built from a folder of \x1b[31mtests/\x1b[0m.")
+    describe (ETestAccessOutsideTestClass (classId, clsPos) ident ty) =
+        relatedTo clsPos "the class is defined here" $
+        diagnostic "SE-237" "test access outside a test class"
+            ("Class \x1b[31m" <> T.pack classId <> "\x1b[0m declares the access port \x1b[31m" <> T.pack ident <> "\x1b[0m of type \x1b[31m" <> showText ty <> "\x1b[0m.\n" <> "Only a test class may declare an access port of this type.")
 
     -- | The two clauses below pick their detail with a case, which the script
     -- that moved the rest of this table does not read, so they were moved by

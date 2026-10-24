@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 module ControlFlow.Architecture.Errors (
-    ArchitectureError, Error(..)
+    ArchitectureError, Error(..), TestLevel(..)
 ) where
 
 import Lowering.AST
@@ -45,9 +45,12 @@ data Error =
     | ETestComponentWithoutTest String Identifier -- ^ Component of a unit test that no test instance reaches (AE-017)
     | ETestPoolWithoutAllocator Identifier -- ^ Test pool that the unit does not reach through an allocator (AE-018)
     | EEmitterInUnitTest Identifier -- ^ Emitter other than a test emitter in a unit test (AE-019)
-    | ETestComponentInConcurrentTest String Identifier -- ^ Component of a unit test in a concurrent test (AE-020)
-    | EAdvanceInConcurrentTest -- ^ Call to advance in a concurrent test (AE-021)
-    | EFinishInUnitTest -- ^ Call to finish in a unit test (AE-022)
+    | ETestOfOtherLevel TestLevel String Identifier -- ^ Element of one level of test in a deployment of the other (AE-020)
+    deriving Show
+
+-- | The level of a test, which its deployment decides: a unit test has test
+-- instances and a concurrent test has none
+data TestLevel = UnitTest | ConcurrentTest
     deriving Show
 
 type ArchitectureError = AnnotatedError Error Location
@@ -158,19 +161,16 @@ instance Diagnosable Error where
         diagnostic "AE-019" "emitter in a unit test"
             ("Emitter " <> emph (T.pack emitter) <> " is not a test emitter, and the deployment has test instances. " <>
                 "The events of a unit test come only from the cases, through test emitters.")
-    describe (ETestComponentInConcurrentTest kind ident) =
-        diagnostic "AE-020" "test component in a concurrent test"
+    describe (ETestOfOtherLevel ConcurrentTest kind ident) =
+        diagnostic "AE-020" "element of a unit test in a concurrent test"
             (T.pack kind <> " " <> emph (T.pack ident) <>
-                " is a component of a unit test, and the deployment has no test instances. " <>
-                "A test without test instances is a concurrent test, which runs the application with its own emitters, channels and pools.")
-    describe EAdvanceInConcurrentTest =
-        diagnostic "AE-021" "advance in a concurrent test"
-            ("The deployment has no test instances, so it is a concurrent test, which runs on the real clock. " <>
-                emph "advance" <> " moves the clock of a unit test.")
-    describe EFinishInUnitTest =
-        diagnostic "AE-022" "finish in a unit test"
-            ("The deployment has test instances, so it is a unit test, where each case ends at its return. " <>
-                emph "finish" <> " ends a concurrent test.")
+                " belongs to a unit test, and the deployment has no test instances. " <>
+                "A test without test instances is a concurrent test, which runs the application with its own emitters, channels and pools on the real clock.")
+    describe (ETestOfOtherLevel UnitTest kind ident) =
+        diagnostic "AE-020" "element of a concurrent test in a unit test"
+            (T.pack kind <> " " <> emph (T.pack ident) <>
+                " belongs to a concurrent test, and the deployment has test instances. " <>
+                "A test with test instances is a unit test, where each case ends at its return.")
     -- | Everything else is a broken invariant of the compiler, which has no code
     -- of its own.
     describe _ =diagnosticWithoutDetail "Internal" "internal error"

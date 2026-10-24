@@ -543,8 +543,7 @@ sameTy  (TArray typespecl _sizel) (TArray typespecr _sizer) = sameTy typespecl t
 sameTy  (TStruct idl) (TStruct idr) = idl == idr
 sameTy  (TEnum idl) (TEnum idr) = idl == idr
 sameTy  (TGlobal _ idl) (TGlobal _ idr) = idl == idr
-sameTy  (TInterface RegularInterface idl) (TInterface RegularInterface idr) = idl == idr
-sameTy  (TInterface SystemInterface idl) (TInterface SystemInterface idr) = idl == idr
+sameTy  (TInterface kindl idl) (TInterface kindr idr) = kindl == kindr && idl == idr
 sameTy  (TAtomic tyl) (TAtomic tyr) = sameTy tyl tyr 
 sameTy  (TAtomicArray tyl _sizel) (TAtomicArray tyr _sizer) = sameTy tyl tyr
 -- TFixedLocation subtypes

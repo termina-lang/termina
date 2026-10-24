@@ -229,25 +229,36 @@ systemEntryGlobalEnv =
     ("system_entry", LocatedElement (GGlob (TGlobal ResourceClass "SystemEntry")) Internal)
   ]
 
--- | The API that the cases and the scenario of a test reach through
--- test_entry. A check records its failure and returns, and the first argument
--- of a check_eq is the value obtained and the second the one expected.
-testEntryGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
-testEntryGlobalEnv =
-  [("TestAPI", LocatedElement (GType (Interface SystemInterface "TestAPI" [] (
+-- | The resources of a test. A check records its failure and returns, and the
+-- first argument of a check_eq is the value obtained and the second the one
+-- expected. test_clock only exists in a unit test and test_scenario in a
+-- concurrent one, which the architecture checks, since the level depends on
+-- the whole deployment.
+testGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
+testGlobalEnv =
+  [("TestChecks", LocatedElement (GType (Interface SystemInterface "TestChecks" [] (
       [ procedure "check" [builtinParameter "cond" TBool] ]
       ++ [ procedure ("check_eq_" ++ suffix) [builtinParameter "actual" ty, builtinParameter "expected" ty]
          | (suffix, ty) <- checkedTypes ]
       ++ [ procedure "check_elapsed" [builtinParameter "t0" (TStruct "TimeVal"), builtinParameter "max" (TStruct "TimeVal")],
            procedure "fail" [],
-           procedure "step" [builtinParameter "n" TUInt32],
-           procedure "advance" [builtinParameter "dt" (TStruct "TimeVal")],
-           procedure "finish" [] ]) [])) Internal),
-   ("TestEntry", LocatedElement (GType (Class ResourceClass "TestEntry" [] ["TestAPI"] [])) Internal),
-   ("test_entry", LocatedElement (GGlob (TGlobal ResourceClass "TestEntry")) Internal),
+           procedure "step" [builtinParameter "n" TUSize] ]) [])) Internal),
+   ("TestChecksEntry", LocatedElement (GType (Class ResourceClass "TestChecksEntry" [] ["TestChecks"] [])) Internal),
+   ("test_checks", LocatedElement (GGlob (TGlobal ResourceClass "TestChecksEntry")) Internal),
+   -- | Only a test class reaches the clock
+   ("TestClock", LocatedElement (GType (Interface TestInterface "TestClock" [] [
+      procedure "advance" [builtinParameter "dt" (TStruct "TimeVal")]
+   ] [])) Internal),
+   ("TestClockEntry", LocatedElement (GType (Class ResourceClass "TestClockEntry" [] ["TestClock"] [])) Internal),
+   ("test_clock", LocatedElement (GGlob (TGlobal ResourceClass "TestClockEntry")) Internal),
+   ("TestScenario", LocatedElement (GType (Interface SystemInterface "TestScenario" [] [
+      procedure "finish" []
+   ] [])) Internal),
+   ("TestScenarioEntry", LocatedElement (GType (Class ResourceClass "TestScenarioEntry" [] ["TestScenario"] [])) Internal),
+   ("test_scenario", LocatedElement (GGlob (TGlobal ResourceClass "TestScenarioEntry")) Internal),
    -- | The interface that a TestPool provides to a case, beside the
    -- Allocator<T> through which the unit reaches it
-   ("TestPoolAccess", LocatedElement (GType (Interface SystemInterface "TestPoolAccess" [] [
+   ("TestPoolAccess", LocatedElement (GType (Interface TestInterface "TestPoolAccess" [] [
       viewProcedure "in_use" [builtinParameter "n" (TReference Mutable TUSize)],
       viewProcedure "max_in_use" [builtinParameter "n" (TReference Mutable TUSize)],
       procedure "fail_allocs" [builtinParameter "n" TUSize]
@@ -277,8 +288,8 @@ makeInitialGlobalEnv (Just config) plt pltEnvironment =
       -- | The platform specific environment. It should declare its own SystemAPI interface.
       pltEnvironment,
       systemGlobalEnv,
-      -- | test_entry only exists in a test
-      if isTestBuild config then testEntryGlobalEnv else []]
+      -- | The test resources only exist in a test
+      if isTestBuild config then testGlobalEnv else []]
   in
   makeEnvironment (M.fromList globalEnv) plt (isTestBuild config)
 makeInitialGlobalEnv Nothing plt pltEnvironment =
