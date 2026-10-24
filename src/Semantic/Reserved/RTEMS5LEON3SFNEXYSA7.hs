@@ -6,7 +6,7 @@
 -- instead of editing it by hand.
 --
 -- Compiler: sparc-gaisler-rtems5-gcc (Cobham Gaisler RCC 1.3.2) 10.5.0
--- Flags: -isystem /opt/rcc/sparc-gaisler-rtems5/leon3/lib/include -fmessage-length=0 -mcpu=leon3 -qbsp=leon3_sf -msoft-float -D_DEFAULT_SOURCE -O0 -g3 -fanalyzer -Wcast-align=strict -Wlogical-op -Wduplicated-cond -Wduplicated-branches -std=c11 -pedantic-errors -Wall -Wextra -Wconversion -Wmissing-prototypes -Wshadow -Wstrict-prototypes -Wcast-qual -Wundef -Wvla -Wwrite-strings -Wdouble-promotion 
+-- Flags: -isystem /opt/rcc/sparc-gaisler-rtems5/leon3/lib/include -fmessage-length=0 -mcpu=leon3 -qbsp=leon3_sf -msoft-float -D_DEFAULT_SOURCE -fanalyzer -Wcast-align=strict -Wlogical-op -Wduplicated-cond -Wduplicated-branches -std=c11 -pedantic-errors -Wall -Wextra -Wconversion -Wmissing-prototypes -Wshadow -Wstrict-prototypes -Wcast-qual -Wundef -Wvla -Wwrite-strings -Wdouble-promotion -fno-common -O0 -g3 -ffunction-sections -fdata-sections
 module Semantic.Reserved.RTEMS5LEON3SFNEXYSA7 (reservedNames) where
 
 import qualified Data.Set as S
@@ -195,7 +195,6 @@ reservedNames = S.fromList
   , "strxfrm"
   , "strxfrm_l"
   , "SystemEntry__clock_get_uptime"
-  , "SystemEntry__delay_in"
   , "SystemEntry__print"
   , "SystemEntry__print_char"
   , "SystemEntry__print_f32"

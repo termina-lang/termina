@@ -6,7 +6,7 @@
 -- instead of editing it by hand.
 --
 -- Compiler: arm-none-eabi-gcc (GNU Tools for STM32 13.3.rel1.20240926-1715) 13.3.1 20240614
--- Flags: -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -O0 -DSTM32L432xx -fdata-sections -ffunction-sections -g3 -gdwarf-2 -std=c11 -pedantic-errors -Wall -Wextra -Wconversion -Wmissing-prototypes -Wshadow -Wstrict-prototypes -Wcast-qual -Wundef -Wvla -Wwrite-strings -Wdouble-promotion 
+-- Flags: -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -DSTM32L432xx -std=c11 -pedantic-errors -Wall -Wextra -Wconversion -Wmissing-prototypes -Wshadow -Wstrict-prototypes -Wcast-qual -Wundef -Wvla -Wwrite-strings -Wdouble-promotion -fno-common -O0 -g3 -ffunction-sections -fdata-sections
 module Semantic.Reserved.FreeRTOS10STM32L432NUCLEOL432KC (reservedNames) where
 
 import qualified Data.Set as S
@@ -165,7 +165,6 @@ reservedNames = S.fromList
   , "strtok"
   , "strxfrm"
   , "SystemEntry__clock_get_uptime"
-  , "SystemEntry__delay_in"
   , "SystemEntry__print"
   , "SystemEntry__print_char"
   , "SystemEntry__print_f32"

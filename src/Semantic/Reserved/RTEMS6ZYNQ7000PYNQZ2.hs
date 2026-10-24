@@ -6,7 +6,7 @@
 -- instead of editing it by hand.
 --
 -- Compiler: arm-rtems6-gcc (GCC) 13.3.0 20240521 (RTEMS 6, RSB no-repo, Newlib 1b3dcfd)
--- Flags: -march=armv7-a -mthumb -mfpu=neon -mfloat-abi=hard -mtune=cortex-a9 -isystem /opt/rtems/6/arm-rtems6/xilinx_zynq_pynq/lib/include -fmessage-length=0 -D_DEFAULT_SOURCE -O0 -g3 -fanalyzer -Wcast-align=strict -Wlogical-op -Wduplicated-cond -Wduplicated-branches -std=c11 -pedantic-errors -Wall -Wextra -Wconversion -Wmissing-prototypes -Wshadow -Wstrict-prototypes -Wcast-qual -Wundef -Wvla -Wwrite-strings -Wdouble-promotion 
+-- Flags: -march=armv7-a -mthumb -mfpu=neon -mfloat-abi=hard -mtune=cortex-a9 -isystem /opt/rtems/6/arm-rtems6/xilinx_zynq_pynq/lib/include -fmessage-length=0 -D_DEFAULT_SOURCE -fanalyzer -Wcast-align=strict -Wlogical-op -Wduplicated-cond -Wduplicated-branches -std=c11 -pedantic-errors -Wall -Wextra -Wconversion -Wmissing-prototypes -Wshadow -Wstrict-prototypes -Wcast-qual -Wundef -Wvla -Wwrite-strings -Wdouble-promotion -fno-common -O0 -g3 -ffunction-sections -fdata-sections
 module Semantic.Reserved.RTEMS6ZYNQ7000PYNQZ2 (reservedNames) where
 
 import qualified Data.Set as S
@@ -194,7 +194,6 @@ reservedNames = S.fromList
   , "strxfrm"
   , "strxfrm_l"
   , "SystemEntry__clock_get_uptime"
-  , "SystemEntry__delay_in"
   , "SystemEntry__print"
   , "SystemEntry__print_char"
   , "SystemEntry__print_f32"

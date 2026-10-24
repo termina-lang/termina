@@ -6,7 +6,7 @@
 -- instead of editing it by hand.
 --
 -- Compiler: gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
--- Flags: -O0 -g3 -D_DEFAULT_SOURCE -std=c11 -pedantic-errors -Wall -Wextra -Wconversion -Wmissing-prototypes -Wshadow -Wstrict-prototypes -Wcast-qual -Wundef -Wvla -Wwrite-strings -Wdouble-promotion 
+-- Flags: -D_DEFAULT_SOURCE -std=c11 -pedantic-errors -Wall -Wextra -Wconversion -Wmissing-prototypes -Wshadow -Wstrict-prototypes -Wcast-qual -Wundef -Wvla -Wwrite-strings -Wdouble-promotion -fno-common -O0 -g3 -ffunction-sections -fdata-sections
 module Semantic.Reserved.POSIXGCC (reservedNames) where
 
 import qualified Data.Set as S
@@ -192,7 +192,6 @@ reservedNames = S.fromList
   , "strxfrm"
   , "strxfrm_l"
   , "SystemEntry__clock_get_uptime"
-  , "SystemEntry__delay_in"
   , "SystemEntry__print"
   , "SystemEntry__print_char"
   , "SystemEntry__print_f32"
