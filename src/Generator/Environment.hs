@@ -38,7 +38,9 @@ getPlatformInitialGlobalEnv _ TestPlatform =
     -- An interrupt so the test harness can exercise its connection errors
     -- (e.g. SE-158/193). It is a name-resolution entry only and is not added
     -- to the program architecture.
-    [("test_irq", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal)]
+    [("test_irq", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal),
+    -- The SystemAPI of posix, so the tests reach system_entry
+     ("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime", "SysPrint", "SysGetChar"] [] [])) Internal)]
 
 getPlatformInitialProgram :: TerminaConfig -> Platform -> TerminaProgArch SemanticAnn
 getPlatformInitialProgram _ TestPlatform = emptyTerminaProgArch

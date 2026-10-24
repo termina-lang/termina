@@ -431,7 +431,7 @@ genStructAssign loc before level cObj expr = do
                     return $ pre_cr (cObj @. fld @: cPtrMsgQueue @= channelExpr) : rest
                 else
                     return $ no_cr (cObj @. fld @: cPtrMsgQueue @= channelExpr) : rest
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection fid resource (SemanticAnn (STy (PortConnection (APConnTy (TInterface RegularInterface iface) rts procedures))) _) : xs) = do
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection fid resource (SemanticAnn (STy (PortConnection (APConnTy (TInterface _ iface) rts procedures))) _) : xs) = do
                 cResourceType <- genType noqual rts
                 let cInterfaceType = typeDef iface
                     resourceExpr = addrOf (resource @: cResourceType)
@@ -441,10 +441,6 @@ genStructAssign loc before level cObj expr = do
                     return $ pre_cr (((cObj @. fid @: cInterfaceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
                 else
                     return $ no_cr (((cObj @. fid @: cInterfaceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
-            genFieldAssignments _ (FieldPortConnection AccessPortConnection fid _ (SemanticAnn (STy (PortConnection (APConnTy (TInterface SystemInterface _) rts procedures))) _) : xs) = do
-                rest <- genFieldAssignments False xs
-                cProcedures <- mapM (genProcedureAssignment fid rts) procedures
-                return (cProcedures ++ rest)
             genFieldAssignments before' (FieldPortConnection AccessPortConnection fld resource (SemanticAnn (STy (PortConnection (APPoolConnTy {}))) _) : xs) = do
                 rest <- genFieldAssignments False xs
                 let allocFunctionType = CTFunction void [void_ptr, ptr _Option__box]
@@ -499,31 +495,8 @@ genDequeCall procName params obj args ann = do
 
 genBlocks :: BasicBlock SemanticAnn -> CGenerator [CCompoundBlockItem]
 genBlocks (RegularBlock stmts) = concat <$> traverse genStatement stmts
-genBlocks (ProcedureInvoke obj ident args ann) = do
-    (cFuncType, _) <- case ann of
-        SemanticAnn (ETy (AppType pts ts)) _ -> do
-            cFuncType <- genProcedureType pts
-            cRetType <- genType noqual ts
-            return (cFuncType, cRetType)
-        _ -> throwError $ InternalError $ "Invalid function annotation: " ++ show ann
-    -- Generate the C code for the object
-    typeObj <- getObjType obj
-    cObj <- case (obj, typeObj) of
-        (MemberAccess obj' identifier _ann, TAccessPort (TInterface RegularInterface iface)) -> do
-            cObj' <- genObject obj'
-            return $ cObj' @. identifier @: CTTypeDef iface noqual
-        (DereferenceMemberAccess obj' identifier _ann, TAccessPort (TInterface RegularInterface iface)) -> do
-            cObj' <- genObject obj'
-            return $ cObj' @. identifier @: CTTypeDef iface noqual
-        _ -> throwError $ InternalError $ "Invalid object in procedure call: " ++ show obj
-    cEventArg <- genEventParamArg (internalAnn CGenericAnn)
-    -- Generate the C code for the parameters
-    cArgs <- mapM genExpression args
-    -- | Obtain the type of the object
-    return
-        [pre_cr ((cObj @. ident @: cFuncType) @@
-            (cEventArg : (cObj @. thatField @: ptr void) : cArgs) |>> getLocation ann) |>> getLocation ann]
-    
+genBlocks (ProcedureInvoke obj ident args ann) = genAccessPortCall obj ident args ann
+
 genBlocks (AllocBox obj arg ann) = do
     -- Generate the C code for the object
     cObj <- genObject obj
@@ -902,37 +875,36 @@ genBlocks (NoReturnCall expr ann) = do
             pre_cr $ termina__exec__handover @@ [] |>> getLocation ann,
             no_cr cExpr |>> getLocation ann
         ]
-genBlocks (SystemCall obj ident args ann) = do
+-- | A system call is generated as any other call through an access port: the
+-- block only tells the schedulability analysis that it calls the platform.
+genBlocks (SystemCall obj ident args ann) = genAccessPortCall obj ident args ann
+
+-- | A call to a procedure through an access port, which passes the event and
+-- the object the port is connected to, whatever the kind of the interface
+genAccessPortCall :: Object SemanticAnn -> Identifier -> [Expression SemanticAnn] -> SemanticAnn -> CGenerator [CCompoundBlockItem]
+genAccessPortCall obj ident args ann = do
     (cFuncType, _) <- case ann of
         SemanticAnn (ETy (AppType pts ts)) _ -> do
-            cFuncType <- genSystemCallType pts
+            cFuncType <- genProcedureType pts
             cRetType <- genType noqual ts
             return (cFuncType, cRetType)
         _ -> throwError $ InternalError $ "Invalid function annotation: " ++ show ann
     -- Generate the C code for the object
     typeObj <- getObjType obj
     cObj <- case (obj, typeObj) of
-        (MemberAccess obj' identifier _ann, TAccessPort (TInterface SystemInterface iface)) -> do
+        (MemberAccess obj' identifier _ann, TAccessPort (TInterface _ iface)) -> do
             cObj' <- genObject obj'
             return $ cObj' @. identifier @: CTTypeDef iface noqual
-        (DereferenceMemberAccess obj' identifier _ann, TAccessPort (TInterface SystemInterface iface)) -> do
+        (DereferenceMemberAccess obj' identifier _ann, TAccessPort (TInterface _ iface)) -> do
             cObj' <- genObject obj'
             return $ cObj' @. identifier @: CTTypeDef iface noqual
         _ -> throwError $ InternalError $ "Invalid object in procedure call: " ++ show obj
-    -- Generate the C code for the parameters
     cEventArg <- genEventParamArg (internalAnn CGenericAnn)
+    -- Generate the C code for the parameters
     cArgs <- mapM genExpression args
-    -- | Obtain the type of the object
     return
-        [pre_cr ((cObj @. ident @: cFuncType) @@ (cEventArg : cArgs) |>> getLocation ann) |>> getLocation ann]
-
-    where 
-
-        genSystemCallType :: [Parameter SemanticAnn] -> CGenerator CType
-        genSystemCallType tsParams = do
-            tsParams' <- traverse (genType noqual . paramType) tsParams
-            let cEventArgType = ptr termina__event_t
-            return $ CTFunction void (cEventArgType : tsParams')
+        [pre_cr ((cObj @. ident @: cFuncType) @@
+            (cEventArg : (cObj @. thatField @: ptr void) : cArgs) |>> getLocation ann) |>> getLocation ann]
 
 genStatement :: Statement SemanticAnn -> CGenerator [CCompoundBlockItem]
 genStatement (AssignmentStmt obj expr ann) = do

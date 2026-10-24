@@ -42,7 +42,7 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAtomicArrayAcc
 genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TDequeAccess {})) _) = do
     cTs <- genType noqual ts
     return [field identifier cTs]
-genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface RegularInterface _)) (SemanticAnn (FTy (AccessPortField members)) _)) = do
+genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface _ _)) (SemanticAnn (FTy (AccessPortField members)) _)) = do
     let cThatField = field thatField (ptr void)
     memberFields <- mapM genInterfaceProcedureField (M.elems members)
     return [
@@ -67,24 +67,6 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface Regular
                 cThisParam = CParameter thisParam cThisType
                 cFuncPointerType = CTFunctionPointer (CTVoid noqual) (cEventParam : cThisParam : cParams) noqual
             return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
-genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface SystemInterface _)) (SemanticAnn (FTy (AccessPortField members)) _)) = do
-    memberFields <- mapM genInterfaceProcedureField (M.elems members)
-    return [
-            CDecl
-                (CTSStructUnion
-                    (CStruct CStructTag Nothing memberFields []))
-                (Just identifier) Nothing
-        ]
-
-    where
-
-        genInterfaceProcedureField :: InterfaceMember' TerminaType expr SemanticAnn -> CGenerator CDeclaration
-        genInterfaceProcedureField (InterfaceProcedure _ak procedure params _modifiers _) = do
-            cParams <- mapM genCParameter params
-            let cEventParam = CParameter eventParam (_const . ptr $ _const termina__event_t)
-                cFuncPointerType = CTFunctionPointer (CTVoid noqual) (cEventParam : cParams) noqual
-            return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
-
 genFieldDeclaration (FieldDefinition _ (TAccessPort (TInterface _ _)) ann) = error $ "Invalid access port annotation" ++ show ann
 genFieldDeclaration (FieldDefinition identifier ts _) = do
     cTs <- genType noqual ts
