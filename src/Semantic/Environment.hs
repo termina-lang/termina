@@ -174,9 +174,7 @@ stdlibGlobalEnv outBufSize inBufSize =
     -- | SysTime interface
     ("SysTime", LocatedElement (GType (Interface SystemInterface "SysTime" [] [
       -- | procedure clock_get_uptime (&mut self, current_time : &mut TimeVal)
-      InterfaceProcedure Immutable "clock_get_uptime" [builtinParameter "current_time" (TReference Mutable (TStruct "TimeVal"))] [] (buildExpAnn Internal TUnit),
-      -- | procedure delay_in (&mut self, delay : &TimeVal)
-      InterfaceProcedure Mutable "delay_in" [builtinParameter "delay" (TReference Immutable (TStruct "TimeVal"))] [] (buildExpAnn Internal TUnit)
+      InterfaceProcedure Immutable "clock_get_uptime" [builtinParameter "current_time" (TReference Mutable (TStruct "TimeVal"))] [] (buildExpAnn Internal TUnit)
     ] [])) Internal),
     -- | SysPrint interface
     ("SysPrint", LocatedElement (GType (Interface SystemInterface "SysPrint" [] [
