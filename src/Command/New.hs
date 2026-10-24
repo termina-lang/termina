@@ -221,7 +221,8 @@ runGit args = do
         Right (ExitSuccess, out, _) -> Right out
         Right (ExitFailure _, _, err) -> Left err
 
--- | Initializes a git repository in the project, unless the project lies
+-- | Initializes a git repository in the project, with main as the initial
+-- branch independently of init.defaultBranch, unless the project lies
 -- inside the working tree of another one. A failure is a warning: the project
 -- is created anyway.
 initRepository :: Bool -> FilePath -> IO ()
@@ -234,7 +235,7 @@ initRepository chatty project = do
                 "The project is inside a git repository: no repository created")
         _ -> do
             when chatty (putStrLn . debugMessage $ "Initializing git repository")
-            initResult <- runGit ["init", "-q", project]
+            initResult <- runGit ["init", "-q", "-b", "main", project]
             case initResult of
                 Right _ -> return ()
                 Left err -> putStrLn . warnMessage $
