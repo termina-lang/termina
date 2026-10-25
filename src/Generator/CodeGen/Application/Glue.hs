@@ -10,7 +10,7 @@ import Generator.CodeGen.Common
 import Semantic.Types
 import ControlFlow.Architecture.Types
 import Configuration.Configuration
-import Configuration.Platform (Platform, getPlatformInterruptMap)
+import Configuration.Platform (Platform, getPlatformInterruptMap, defaultStackSize)
 import Generator.LanguageC.Embedded
 import ControlFlow.Architecture.Utils
 import System.FilePath
@@ -72,10 +72,11 @@ genInitTasks progArchitecture = do
         genOSALTaskInit tsk = do
             taskId <- genDefineTaskIdLabel (taskName tsk)
             taskMsgQueueId <- genDefineTaskMsgQueueIdLabel (taskName tsk)
+            defaultSize <- gets (defaultStackSize . targetPlatform)
             let tskName = taskName tsk
                 classId = taskClass tsk
                 taskPrio = getCInteger . getPriority $ tsk
-                taskStackSize = getCInteger . getStackSize $ tsk
+                taskStackSize = getCInteger . getStackSize defaultSize $ tsk
             cTaskFunctionName <- taskFunctionName classId
             return [
                     pre_cr $ tskName @: typeDef classId @. taskIDField @: termina__id_t

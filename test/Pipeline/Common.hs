@@ -5,6 +5,7 @@ module Pipeline.Common
   , runFullProjectApp
   , runTypedModule
   , renderMainFile
+  , renderMainFileOn
   , renderInitFile
   , buildAndRenderModule
   , compileErrorCode
@@ -35,7 +36,7 @@ import Semantic.Environment (makeInitialGlobalEnv, Environment, addDeclaredNames
 import Semantic.Types (SemanticAnn)
 
 import Configuration.Configuration (defaultConfig, TerminaConfig (..), DeploymentKind (..))
-import Configuration.Platform (Platform(TestPlatform))
+import Configuration.Platform (Platform(..))
 import Generator.Environment
     (getPlatformInitialGlobalEnv, getPlatformInitialProgram)
 import Generator.CodeGen.Module (runGenSourceFile)
@@ -180,8 +181,15 @@ renderMainFile = renderMainFileWith configParams
 
 -- | 'renderMainFile' under a given configuration.
 renderMainFileWith :: TerminaConfig -> TerminaProgArch SemanticAnn -> Either Text Text
-renderMainFileWith cfg progArch =
-  case runGenMainFile cfg TestPlatform "main" progArch of
+renderMainFileWith cfg = renderMainFileWithOn cfg TestPlatform
+
+-- | 'renderMainFile' for a given target platform.
+renderMainFileOn :: Platform -> TerminaProgArch SemanticAnn -> Either Text Text
+renderMainFileOn = renderMainFileWithOn configParams
+
+renderMainFileWithOn :: TerminaConfig -> Platform -> TerminaProgArch SemanticAnn -> Either Text Text
+renderMainFileWithOn cfg plt progArch =
+  case runGenMainFile cfg plt "main" progArch of
     Left err -> Left . T.pack $ show err
     Right cFile -> Right $ runCPrinter False cFile
 

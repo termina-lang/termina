@@ -11,6 +11,7 @@ module Pipeline.Positive.ReactiveGlueSpec (spec) where
 
 import Pipeline.Common
 import Golden
+import Configuration.Platform (Platform(..))
 
 import Data.Text (unpack)
 import Test.Hspec
@@ -56,3 +57,7 @@ spec = describe "Full pipeline: reactive application glue" $
       it "installs the resource procedure as an explicit function pointer (init file)" $
         either (expectationFailure . unpack) (goldenC "reactive_glue_init")
           (renderInitFile prjprogs)
+      it "gives a task without stack_size the default stack size of the platform" $
+        either (expectationFailure . unpack)
+          (\c -> unpack c `shouldContain` "termina__task__init(t__task_id, 10, 2048U,")
+          (renderMainFileOn FreeRTOS10STM32L432NUCLEOL432KC progArch)

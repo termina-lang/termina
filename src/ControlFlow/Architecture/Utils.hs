@@ -534,14 +534,14 @@ getPriority = getPriority' . taskModifiers
 
 
 -- | Returns the value of the "stack_size" modifier, if present in the list of modifiers.
--- If not, it returns 4096, which is the default value for the stack size (RTEMS_MINIUMUM_STACK_SIZE)
-getStackSize :: TPTask a -> TInteger
-getStackSize = getStackSize' . taskModifiers
+-- If not, it returns the default stack size of the platform, given as the first argument.
+getStackSize :: Integer -> TPTask a -> TInteger
+getStackSize defaultSize = getStackSize' . taskModifiers
 
   where
 
     getStackSize' :: [Modifier a] -> TInteger
-    getStackSize' [] = TInteger 4096 DecRepr
+    getStackSize' [] = TInteger defaultSize DecRepr
     getStackSize' ((Modifier "stack_size" (Just (Constant (I stackSize _) _))) : _) = stackSize
     getStackSize' ((Modifier "stack_size" _ ) : _) = error "Internal error: invalid stack_size modifier value"
     getStackSize' (_ : modifiers) = getStackSize' modifiers

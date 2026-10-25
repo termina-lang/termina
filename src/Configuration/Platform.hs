@@ -80,6 +80,16 @@ maxTimerPeriodTicks FreeRTOS10STM32L432NUCLEOL432KC = Just 0xFFFFFFFF
 maxTimerPeriodTicks RTEMS6ZYNQ7000PYNQZ2            = Just 0xFFFFFFFF
 maxTimerPeriodTicks TestPlatform                    = Just 0xFFFFFFFF
 
+-- | The stack size, in bytes, of a task without a @stack_size@ modifier. On
+-- the RTEMS platforms it is the minimum of the architecture
+-- (@CPU_STACK_MINIMUM_SIZE@). The OSAL of posix ignores the stack size.
+defaultStackSize :: Platform -> Integer
+defaultStackSize POSIXGCC                        = 4096
+defaultStackSize RTEMS5LEON3SFNEXYSA7              = 4096
+defaultStackSize FreeRTOS10STM32L432NUCLEOL432KC = 2048
+defaultStackSize RTEMS6ZYNQ7000PYNQZ2            = 4096
+defaultStackSize TestPlatform                    = 4096
+
 -- | The interrupts the platform exposes, each one with the vector it is wired
 -- to. It lives here, beside the rest of what the transpiler knows about a
 -- target, so that a single file answers what a platform is. Every one of them
