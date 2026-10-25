@@ -447,8 +447,8 @@ genStructAssign loc before level cObj expr = do
                     freeFunctionType = CTFunction void [void_ptr, termina__box_t]
                 let resourceExpr = addrOf (resource @: termina__pool_t)
                     cPoolProcedures = [
-                            no_cr $ cObj @. fld @: termina__allocator_t @. "alloc" @: ptr allocFunctionType @= termina__pool__alloc,
-                            no_cr $ cObj @. fld @: termina__allocator_t @. "free" @: ptr freeFunctionType @= termina__pool__free
+                            no_cr $ cObj @. fld @: termina__allocator_t @. "alloc" @: ptr allocFunctionType @= addrOf ("termina__pool__alloc" @: allocFunctionType),
+                            no_cr $ cObj @. fld @: termina__allocator_t @. "free" @: ptr freeFunctionType @= addrOf ("termina__pool__free" @: freeFunctionType)
                         ]
                 if before' then
                     return $ pre_cr ((cObj @. fld @: termina__allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)

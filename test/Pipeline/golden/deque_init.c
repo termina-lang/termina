@@ -15,8 +15,8 @@ void termina__app__init_globals(void) {
     timer2.period.tv_usec = 0U;
     t.pending = &pending_deque;
     t.pool._that = &pool_res;
-    t.pool.alloc = termina__pool__alloc;
-    t.pool.free = termina__pool__free;
+    t.pool.alloc = &termina__pool__alloc;
+    t.pool.free = &termina__pool__free;
 
     return;
 
