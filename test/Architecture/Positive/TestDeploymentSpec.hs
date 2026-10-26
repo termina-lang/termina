@@ -70,6 +70,18 @@ sharedDouble =
   "channel out_a : TestChannel<u32; 4>;\n" ++
   "channel out_b : TestChannel<u32; 4>;\n"
 
+-- | A task of a concurrent test that records a check on each tick
+checkerClass :: String
+checkerClass =
+  "task class CChecker {\n" ++
+  "    tick_ev : sink TimeVal triggers run;\n" ++
+  "    t : access TestChecks;\n" ++
+  "    action run(&priv self, _now : TimeVal) {\n" ++
+  "        self->t.check(true);\n" ++
+  "        return;\n" ++
+  "    }\n" ++
+  "};\n"
+
 spec :: Spec
 spec = describe "Architecture: deployment of a test" $ do
 
@@ -80,7 +92,7 @@ spec = describe "Architecture: deployment of a test" $ do
               ++ "#[priority(5)]\n"
               ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
               ++ monitorTest)
-      `shouldBe` Right M.empty
+      `shouldBe` Right (M.fromList [("test_checks", ResourceLockNone)])
 
   it "accepts a box sent to a test channel and freed by the case to its pool" $
     M.lookup "tm_pool" <$> lockings (executorClass ++ executorTestClass True
@@ -108,9 +120,35 @@ spec = describe "Architecture: deployment of a test" $ do
           ++ "    tick_b <-> tick_b, out_b <-> out_b, t <-> test_checks };\n"
     M.lookup "value" <$> lockings twoTasks `shouldBe` Right (Just (ResourceLockMutex 5))
 
+  it "protects test_checks like any resource, without counting the cases" $ do
+    -- Only the case reaches it
+    M.lookup "test_checks" <$> lockings (monitorClass "CMonitor" ++ monitorTestClass
+              ++ "emitter tick : TestEmitter<TimeVal>;\n"
+              ++ "channel alarms : TestChannel<u32; 4>;\n"
+              ++ "#[priority(5)]\n"
+              ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
+              ++ monitorTest)
+      `shouldBe` Right (Just ResourceLockNone)
+    -- Two tasks of a concurrent test reach it: the ceiling of the two
+    M.lookup "test_checks" <$> lockings (checkerClass
+              ++ periodicEmitter "timer_a" 1
+              ++ periodicEmitter "timer_b" 2
+              ++ "#[priority(5)]\n"
+              ++ "task checker_a : CChecker = { tick_ev <- timer_a, t <-> test_checks };\n"
+              ++ "#[priority(6)]\n"
+              ++ "task checker_b : CChecker = { tick_ev <- timer_b, t <-> test_checks };\n")
+      `shouldBe` Right (Just (ResourceLockMutex 5))
+
+  it "drops the test resources that nothing connects" $
+    M.keys <$> lockings (scenarioClass "finish()"
+              ++ periodicEmitter "timer" 1
+              ++ "#[priority(5)]\n"
+              ++ "task scenario : CScenario = { tick_ev <- timer, t <-> test_scenario };\n")
+      `shouldBe` Right ["test_scenario"]
+
   it "accepts the scenario of a concurrent test that calls finish" $
     lockings (scenarioClass "finish()"
               ++ periodicEmitter "timer" 1
               ++ "#[priority(5)]\n"
               ++ "task scenario : CScenario = { tick_ev <- timer, t <-> test_scenario };\n")
-      `shouldBe` Right M.empty
+      `shouldBe` Right (M.fromList [("test_scenario", ResourceLockNone)])

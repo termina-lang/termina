@@ -412,7 +412,10 @@ emptyTerminaProgArch = TerminaProgArch {
   handlers = M.empty,
   resourceClasses = M.empty,
   resources = M.fromList [
-    ("system_entry", TPResource "system_entry" "SystemEntry" M.empty [] Nothing (SemanticAnn (GTy (TGlobal ResourceClass "SystemEntry")) Internal))
+    ("system_entry", TPResource "system_entry" "SystemEntry" M.empty [] Nothing (SemanticAnn (GTy (TGlobal ResourceClass "SystemEntry")) Internal)),
+    ("test_checks", TPResource "test_checks" "TestChecksEntry" M.empty [] Nothing (SemanticAnn (GTy (TGlobal ResourceClass "TestChecksEntry")) Internal)),
+    ("test_clock", TPResource "test_clock" "TestClockEntry" M.empty [] Nothing (SemanticAnn (GTy (TGlobal ResourceClass "TestClockEntry")) Internal)),
+    ("test_scenario", TPResource "test_scenario" "TestScenarioEntry" M.empty [] Nothing (SemanticAnn (GTy (TGlobal ResourceClass "TestScenarioEntry")) Internal))
   ],
   pools = M.empty,
   atomics = M.empty,
@@ -429,10 +432,10 @@ emptyTerminaProgArch = TerminaProgArch {
   testPools = M.empty
 }
 
--- | Every program starts with the emitters of the platform and of the system
--- and with the system resource. The ones the application does not connect are
--- dropped once all its modules have been read, so they are neither checked nor
--- generated.
+-- | Every program starts with the emitters of the platform and of the system,
+-- the system resource and the resources of a test. The ones the application
+-- does not connect are dropped once all its modules have been read, so they
+-- are neither checked nor generated.
 pruneUnconnectedSystemElements :: TerminaProgArch a -> TerminaProgArch a
 pruneUnconnectedSystemElements tp = tp {
     emitters = M.filterWithKey keepEmitter (emitters tp),
@@ -448,7 +451,9 @@ pruneUnconnectedSystemElements tp = tp {
     isSystemEmitter (TPSystemExceptEmitter {}) = True
     isSystemEmitter (TPPeriodicTimerEmitter {}) = False
 
-    keepResource ident _ = ident /= "system_entry" || ident `M.member` resourceSources tp
+    keepResource ident _ = ident `notElem` systemResources || ident `M.member` resourceSources tp
+
+    systemResources = ["system_entry", "test_checks", "test_clock", "test_scenario"]
 
 runGenArchitecture ::
   TerminaProgArch SemanticAnn

@@ -14,6 +14,7 @@ module Pipeline.Common
   , runTestArchitecture
   , runTestApp
   , runTestBuild
+  , renderTestMainFile
   , compileProjectErrorCode
   , compileErrorMessage
   , compileProjectErrorMessage
@@ -272,6 +273,10 @@ runTestArchitecture input = fst <$> runFullProjectAppWith testConfigParams [("te
 runTestApp :: String
   -> Either Failure (TerminaProgArch SemanticAnn, [(QualifiedName, AnnotatedProgram SemanticAnn)])
 runTestApp input = runFullProjectAppWith testConfigParams [("test", input)]
+
+-- | 'renderMainFile' for the deployment of a test.
+renderTestMainFile :: TerminaProgArch SemanticAnn -> Either Text Text
+renderTestMainFile = renderMainFileWith testConfigParams
 
 -- | 'runFullProjectBuild' for the deployment of a test, in a module named @test@.
 runTestBuild :: String -> Either Failure (M.Map QualifiedName Text)
