@@ -17,10 +17,27 @@ import Generator.CodeGen.Application.Option
 import qualified Data.Set as S
 
 renderHeader :: String -> Text
-renderHeader input = case runP (contents topLevel) "test" "" input of
+renderHeader = renderHeaderWith (defaultConfig "test" TestPlatform)
+
+-- | 'renderHeader' type-checking the module as a test build, where test
+-- classes are allowed.
+renderTestHeader :: String -> Text
+renderTestHeader = renderHeaderWith testBuildConfig
+
+renderSource :: String -> Text
+renderSource = renderSourceWith (defaultConfig "test" TestPlatform)
+
+-- | 'renderSource' type-checking the module as a test build.
+renderTestSource :: String -> Text
+renderTestSource = renderSourceWith testBuildConfig
+
+testBuildConfig :: TerminaConfig
+testBuildConfig = (defaultConfig "test" TestPlatform) { deploymentKind = TestBuild (pack "test") }
+
+renderHeaderWith :: TerminaConfig -> String -> Text
+renderHeaderWith configParams input = case runP (contents topLevel) "test" "" input of
   Left err -> error $ "Parser Error: " ++ show err
-  Right ast -> 
-    let configParams = defaultConfig "test" TestPlatform in
+  Right ast ->
     case runTypeChecking (makeInitialGlobalEnv (Just configParams) TestPlatform []) (typeTerminaModule (S.singleton "test") ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
@@ -31,11 +48,10 @@ renderHeader input = case runP (contents topLevel) "test" "" input of
               Left err -> pack $ show err
               Right (cHeaderFile, _) -> runCPrinter False cHeaderFile
 
-renderSource :: String -> Text
-renderSource input = case runP (contents topLevel) "test" "" input of
+renderSourceWith :: TerminaConfig -> String -> Text
+renderSourceWith configParams input = case runP (contents topLevel) "test" "" input of
   Left err -> error $ "Parser Error: " ++ show err
-  Right ast -> 
-    let configParams = defaultConfig "test" TestPlatform in
+  Right ast ->
     case runTypeChecking (makeInitialGlobalEnv (Just configParams) TestPlatform []) (typeTerminaModule (S.singleton "test") ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 

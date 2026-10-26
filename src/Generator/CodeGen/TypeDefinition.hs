@@ -365,10 +365,6 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
                         return $ pre_cr $ struct identifier [enumField, unionField] [] |>> getLocation ann
 genTypeDefinitionDecl (TypeDefinition (Interface RegularInterface _identifier _extends _procs _mods) _ann) = return []
 
--- | The code of test classes comes with the harness of the tests
-genTypeDefinitionDecl (TypeDefinition (Class TestClass identifier _ _ _) _) =
-    throwError $ InternalError $ "test classes are not generated yet: " ++ identifier
-
 genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier members _provides modifiers) ann) = do
     -- | Classify class members into fields and functions.
     (fields, functions) <- classifyClassMembers cls
@@ -480,6 +476,14 @@ genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier _ _ _) an
                     return $ CExtDecl (CEDFunction storage [] retType clsFuncName [cEventParam, cThisParam, cParamDecl]) (buildDeclarationAnn ann True)
                 Nothing ->
                     return $ CExtDecl (CEDFunction storage [] retType clsFuncName [cEventParam, cThisParam]) (buildDeclarationAnn ann True)
+        -- | A case has the form of an action without parameter
+        ClassCase ak testCase _ _ _ -> do
+            cEventParam <- getEventParam
+            cThisParam <- case ak of
+                Immutable -> genConstThisParam
+                _ -> genThisParam
+            clsFuncName <- genClassFunctionName identifier testCase
+            return $ CExtDecl (CEDFunction storage [] void clsFuncName [cEventParam, cThisParam]) (buildDeclarationAnn ann True)
         _ -> throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
 
     where
@@ -638,8 +642,6 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
 genTaskClassCode _ = throwError $ InternalError "Not a task class definition"
 
 genClassDefinition :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
-genClassDefinition (TypeDefinition (Class TestClass identifier _ _ _) _) =
-    throwError $ InternalError $ "test classes are not generated yet: " ++ identifier
 genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members _provides _) _) = do
     (_fields, functions) <- classifyClassMembers cls
     -- | The private member functions are not declared in the header file, so
@@ -730,6 +732,22 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                     return $ CFunctionDef Nothing (CFunction cRetType clsFuncName [cEventParam, cThisParam]
                         (CSCompound cBody (buildCompoundAnn ann False True)))
                         (buildDeclarationAnn ann True)
+        genClassFunctionDefinition (ClassCase ak testCase parameters (Block stmts _) ann) = do
+            clsFuncName <- genClassFunctionName identifier testCase
+            cEventParam <- getEventParam
+            cThisParam <- case ak of
+                Immutable -> genConstThisParam
+                _ -> genThisParam
+            cBody <- genMemberBody parameters $ do
+                selfCastStmt <- case ak of
+                    Immutable -> genConstSelfCastStmt ann identifier
+                    _ -> genSelfCastStmt ann identifier
+                foldM (\acc x -> do
+                    cStmt <- genBlocks x
+                    return $ acc ++ cStmt) [selfCastStmt] stmts
+            return $ CFunctionDef Nothing (CFunction void clsFuncName [cEventParam, cThisParam]
+                (CSCompound cBody (buildCompoundAnn ann False True)))
+                (buildDeclarationAnn ann True)
         genClassFunctionDefinition member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
 
         -- | Generates the body of a class member, which receives the event
