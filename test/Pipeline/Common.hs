@@ -7,6 +7,7 @@ module Pipeline.Common
   , renderMainFile
   , renderMainFileOn
   , renderInitFile
+  , renderConfigFile
   , buildAndRenderModule
   , compileErrorCode
   , compileTestErrorCode
@@ -41,6 +42,7 @@ import Generator.Environment
     (getPlatformInitialGlobalEnv, getPlatformInitialProgram)
 import Generator.CodeGen.Module (runGenSourceFile)
 import Generator.CodeGen.Application.Glue (runGenMainFile)
+import Generator.CodeGen.Application.Config (runGenConfigFile)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
 import Generator.LanguageC.Printer (runCPrinter)
 import Lowering.AST (AnnotatedProgram)
@@ -190,6 +192,14 @@ renderMainFileOn = renderMainFileWithOn configParams
 renderMainFileWithOn :: TerminaConfig -> Platform -> TerminaProgArch SemanticAnn -> Either Text Text
 renderMainFileWithOn cfg plt progArch =
   case runGenMainFile cfg plt "main" progArch of
+    Left err -> Left . T.pack $ show err
+    Right cFile -> Right $ runCPrinter False cFile
+
+-- | Render the generated @config.h@ (the identifiers of the deployment) from a
+-- program architecture, collapsing a codegen failure into the returned 'Text'.
+renderConfigFile :: TerminaProgArch SemanticAnn -> Either Text Text
+renderConfigFile progArch =
+  case runGenConfigFile configParams TestPlatform "config" progArch of
     Left err -> Left . T.pack $ show err
     Right cFile -> Right $ runCPrinter False cFile
 

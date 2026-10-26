@@ -224,12 +224,13 @@ genDefinePoolId (pl : xs) = do
 genDefineEmitterIdLabel :: Identifier -> CGenerator Identifier
 genDefineEmitterIdLabel e = return $ e <::> "emitter" <:> "id"
 
+-- | system_except takes identifier 0 in every build, connected or not, and the
+-- other emitters take 1 onwards.
 genDefineEmitterId :: [Identifier] -> CGenerator [CFileItem]
-genDefineEmitterId [] = return []
-genDefineEmitterId (emitter : xs) = do
-    this_emitter <- genDefineEmitterIdLabel emitter
-    rest <- genDefineEmitterId' xs 1
-    return $ pre_cr (_define this_emitter (Just [show (0 :: Integer)])) : rest
+genDefineEmitterId emitters = do
+    systemExcept <- genDefineEmitterIdLabel "system_except"
+    rest <- genDefineEmitterId' (filter (/= "system_except") emitters) 1
+    return $ pre_cr (_define systemExcept (Just [show (0 :: Integer)])) : rest
 
     where
 

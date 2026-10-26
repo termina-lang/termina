@@ -61,3 +61,9 @@ spec = describe "Full pipeline: reactive application glue" $
         either (expectationFailure . unpack)
           (\c -> unpack c `shouldContain` "termina__task__init(t__task_id, 10, 2048U,")
           (renderMainFileOn FreeRTOS10STM32L432NUCLEOL432KC progArch)
+      it "reserves emitter identifier 0 for system_except, connected or not" $
+        either (expectationFailure . unpack)
+          (\c -> do
+            unpack c `shouldContain` "#define system_except__emitter_id 0\n"
+            unpack c `shouldContain` "#define timer__emitter_id 1\n")
+          (renderConfigFile progArch)
