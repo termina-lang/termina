@@ -35,6 +35,7 @@ data NewCmdArgs =
         String -- ^ Name of the new project
         (Maybe String) -- ^ Target platform
         NewKind
+        (Maybe String) -- ^ Prefix exported by a new library
         Vcs -- ^ Version control system
         Bool -- ^ Generate the VS Code configuration
         Bool -- ^ Verbose mode
@@ -62,6 +63,9 @@ newCmdArgsParser = newTestParser <|> newProjectParser
             <> help "Target platform of the application (default: posix-gcc)"))
         <*> (flag' NewLib (long "lib" <> help "Create a library")
             <|> flag NewApp NewApp (long "app" <> help "Create an application (default)"))
+        <*> optional (strOption (long "exports"
+            <> metavar "PREFIX"
+            <> help "Module prefix exported by a new library (default: the name of the project)"))
         <*> option (eitherReader readVcs) (long "vcs"
             <> value VcsGit
             <> metavar "git|none"
@@ -245,7 +249,7 @@ initRepository chatty project = do
 -- | Command handler for the "new" command
 newCommand :: NewCmdArgs -> IO ()
 newCommand (NewTest testName chatty) = newTestCommand testName chatty
-newCommand (NewProject project mPltName kind vcs vscode chatty) = do
+newCommand (NewProject project mPltName kind mExports vcs vscode chatty) = do
     validateProjectName project
     plt <- case (kind, mPltName) of
         (NewLib, Just _) -> die . errorMessage $ "A library has no platform: its tests choose theirs"
@@ -254,10 +258,18 @@ newCommand (NewProject project mPltName kind vcs vscode chatty) = do
                 putStrLn (errorMessage $ "Unsupported platform: " ++ show pltName) >>
                 showSupportedPlatforms >> exitFailure
             ) return $ checkPlatform pltName
-    -- | The prefix that a new library exports, named after the project
-    let prefix = map (\c -> if c == '-' then '_' else toLower c) project
-    when (kind == NewLib && not (isSnakeCase prefix)) $
-        die . errorMessage $ "The name of a library has to make a module prefix: \"" ++ prefix ++ "\" is not lowercase snake_case"
+    -- | The prefix that a new library exports, by default named after the project
+    prefix <- case (kind, mExports) of
+        (NewApp, Just _) -> die . errorMessage $ "An application exports nothing: --exports is only for a library"
+        (_, Just given) -> do
+            unless (all (isSnakeCase . T.unpack) (T.splitOn (T.pack ".") (T.pack given))) $
+                die . errorMessage $ "The prefix \"" ++ given ++ "\" is not a module prefix (lowercase snake_case segments separated by dots)"
+            return given
+        (_, Nothing) -> do
+            let named = map (\c -> if c == '-' then '_' else toLower c) project
+            when (kind == NewLib && not (isSnakeCase named)) $
+                die . errorMessage $ "The name of a library has to make a module prefix: \"" ++ named ++ "\" is not lowercase snake_case (choose one with --exports)"
+            return named
     when chatty (putStrLn . debugMessage $ "Creating new project: " ++ project)
     -- Check if the directory already exists
     exists <- doesPathExist project
@@ -276,7 +288,8 @@ newCommand (NewProject project mPltName kind vcs vscode chatty) = do
         NewLib -> newLibraryManifest project prefix
     when chatty (putStrLn . debugMessage $ "Creating project source modules directory: " ++ sourceModulesFolderPath)
     createDirectory sourceModulesFolderPath
-    when (kind == NewLib) $ createDirectory (sourceModulesFolderPath </> prefix)
+    when (kind == NewLib) $
+        createDirectoryIfMissing True (sourceModulesFolderPath </> joinPath (map T.unpack (T.splitOn (T.pack ".") (T.pack prefix))))
     when (kind == NewApp) $ do
         let appFolderPath = project </> appFolder
         when chatty (putStrLn . debugMessage $ "Creating project application directory: " ++ appFolderPath)
