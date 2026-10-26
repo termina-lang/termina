@@ -1,32 +1,58 @@
 -- | The namespaces of a project: the prefixes that a library exports.
 module Configuration.Namespace (
     checkExports,
-    prefixText
+    prefixText,
+    hasLibraryPrefix
 ) where
 
 import Control.Monad
-import Data.List (isPrefixOf, nub, tails, (\\))
+import Data.Char (isUpper, toLower, toUpper)
+import Data.List (find, intercalate, isPrefixOf, nub, sort, tails, (\\))
+import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.ByteString as BS
+import qualified Data.Text.Encoding as TE
 import System.Directory
 import System.FilePath
+import Text.Parsec (runParser)
+import Text.Parsec.Error (errorPos)
+import Text.Parsec.Pos (sourceLine)
 
 import Configuration.Manifest
+import Core.AST
+import Parser.AST (TerminaModule)
+import Parser.Parsing (terminaModuleParser)
+import Parser.Types (ParserAnn)
+import Semantic.Environment (declaredNames)
+import Utils.Annotations
 
 -- | The prefix as it is written in the manifest, such as "drivers.gaisler".
 prefixText :: Prefix -> String
 prefixText (Prefix segments) = T.unpack (T.intercalate (T.pack ".") segments)
 
+-- | A module of the "src" of the project, by the segments of its name, with
+-- its file and the result of parsing it.
+data SourceModule = SourceModule {
+    moduleSegments :: ![String],
+    moduleFile :: !FilePath,
+    moduleParsed :: !(Either Int (TerminaModule ParserAnn))
+  }
+
 -- | Check the prefixes of the exports of a library against each other and
--- against its sources, and collect every problem so that all of them are
--- reported at once. An application exports nothing and has nothing to check.
+-- against its sources, and the exported modules against the prefixes, and
+-- collect every problem so that all of them are reported at once. An
+-- application exports nothing and has nothing to check.
 checkExports :: FilePath -> Manifest -> IO [String]
 checkExports root manifest =
     case manifestNature manifest of
         Application _ -> return []
         Library [] -> return ["a library exports at least one prefix"]
         Library prefixes -> do
-            emptyErrors <- concat <$> mapM checkHasModule (nub prefixes)
-            return (repeatedErrors prefixes ++ overlapErrors (nub prefixes) ++ emptyErrors)
+            sources <- sourceModules root
+            return $ repeatedErrors prefixes ++ overlapErrors (nub prefixes)
+                ++ concatMap (emptyErrors sources) (nub prefixes)
+                ++ concatMap (exportedErrors (nub prefixes) sources) sources
 
   where
 
@@ -42,19 +68,93 @@ checkExports root manifest =
 
     -- | A prefix owns the module that it names and everything under the
     -- folder of the same name.
-    checkHasModule p@(Prefix segments) = do
-        let path = "src" </> joinPath (map T.unpack segments)
-        isModule <- doesFileExist (root </> path <.> "fin")
-        hasModules <- if isModule then return True else holdsModule (root </> path)
-        return ["the prefix " ++ prefixText p ++ " of exports has no module: there is no "
-            ++ path <.> "fin" ++ " and no .fin under " ++ path ++ "/" | not hasModules]
+    emptyErrors sources p@(Prefix segments) =
+        let path = "src" </> joinPath (map T.unpack segments) in
+        ["the prefix " ++ prefixText p ++ " of exports has no module: there is no "
+            ++ path <.> "fin" ++ " and no .fin under " ++ path ++ "/"
+        | not (any (\m -> map T.unpack segments `isPrefixOf` moduleSegments m) sources)]
 
-    holdsModule dir = do
-        isDir <- doesDirectoryExist dir
-        if not isDir then return False else do
-            entries <- filter (not . ("." `isPrefixOf`)) <$> listDirectory dir
-            let fins = [e | e <- entries, takeExtension e == ".fin"]
-            if not (null fins) then return True else
-                anyM (\e -> holdsModule (dir </> e)) entries
+    -- | An exported module has to parse, import only exported modules of the
+    -- library, and give every name the prefix of the library.
+    exportedErrors prefixes sources m =
+        case owner prefixes (moduleSegments m) of
+            Nothing -> []
+            Just (Prefix segments) -> case moduleParsed m of
+                Left line -> [at m line ++ "the exported module " ++ dotted (moduleSegments m) ++ " does not parse"]
+                Right ast -> importErrors prefixes sources m ast ++ nameErrors (T.unpack (last segments)) m ast
 
-    anyM f = foldM (\found x -> if found then return True else f x) False
+    importErrors prefixes sources m ast =
+        [ at m (lineOf ann) ++ "the exported module " ++ dotted (moduleSegments m) ++ " imports "
+            ++ dotted imported ++ ", which is not exported"
+        | ModuleImport imported ann <- modules ast
+        , imported `S.member` moduleSet sources
+        , owner prefixes imported == Nothing ]
+
+    nameErrors segment m ast =
+        [ at m (lineOf loc) ++ "the name " ++ name ++ " of the exported module " ++ dotted (moduleSegments m)
+            ++ " does not start with the prefix " ++ segment ++ " (" ++ segment ++ "_..., "
+            ++ map toUpper segment ++ "_..., " ++ pascal segment ++ "...)"
+        | (name, loc) <- M.toList (declaredNames (frags ast))
+        , not (hasLibraryPrefix segment name) ]
+
+    moduleSet sources = S.fromList (map moduleSegments sources)
+
+    owner prefixes ms = find (\(Prefix segments) -> map T.unpack segments `isPrefixOf` ms) prefixes
+
+    at m line = moduleFile m ++ ":" ++ show line ++ ": "
+
+    lineOf (Position _ start _) = sourceLine start
+    lineOf _ = 0
+
+    dotted = intercalate "."
+
+    pascal = concatMap capitalize . splitOn '_'
+
+    capitalize (c : cs) = toUpper c : cs
+    capitalize [] = []
+
+    splitOn sep s = case break (== sep) s of
+        (part, []) -> [part]
+        (part, _ : rest) -> part : splitOn sep rest
+
+-- | Whether a name starts with the last segment of the prefix of its library:
+-- in snake case or upper case, the segment and "_" ("char_dev_send",
+-- "CHAR_DEV_MAX"); in Pascal case, the segment without "_" and an upper-case
+-- letter ("CharDevSend").
+hasLibraryPrefix :: String -> String -> Bool
+hasLibraryPrefix segment name =
+    (segment ++ "_") `isPrefixOf` map toLower name
+        || (map toLower (take (length joined) name) == joined
+            && case drop (length joined) name of
+                (c : _) -> isUpper c
+                [] -> False)
+
+  where
+
+    joined = filter (/= '_') segment
+
+-- | Every module under "src", parsed. A module that does not parse keeps the
+-- line of the error.
+sourceModules :: FilePath -> IO [SourceModule]
+sourceModules root = do
+    files <- finFiles (root </> "src") ""
+    forM (sort files) $ \rel -> do
+        let file = "src" </> rel
+            segments = splitDirectories (dropExtension rel)
+            qname = joinPath segments
+        text <- TE.decodeUtf8 <$> BS.readFile (root </> file)
+        let parsed = either (Left . sourceLine . errorPos) Right
+                (runParser terminaModuleParser qname file (T.unpack text))
+        return (SourceModule segments file parsed)
+
+  where
+
+    finFiles dir rel = do
+        exists <- doesDirectoryExist (dir </> rel)
+        if not exists then return [] else do
+            entries <- filter (not . ("." `isPrefixOf`)) <$> listDirectory (dir </> rel)
+            concat <$> forM entries (\e -> do
+                let relEntry = if null rel then e else rel </> e
+                isDir <- doesDirectoryExist (dir </> relEntry)
+                if isDir then finFiles dir relEntry
+                    else return [relEntry | takeExtension e == ".fin"])
