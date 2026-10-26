@@ -292,6 +292,8 @@ termina__except__runtime_failure :: CExpression
 termina__except__runtime_failure = "termina__except__runtime_failure" @:
     CTFunction void
         [
+            -- | const size_t address
+            _const size_t,
             -- | const termina__runtime_operation_t operation
             _const termina__runtime_operation_t,
             -- | const termina__error_code_t error_code

@@ -179,7 +179,8 @@ spec = do
               "\n" ++
               "            default:\n" ++
               "\n" ++
-              "                termina__except__runtime_failure(termina__runtime_operation__task_dispatch,\n" ++
+              "                termina__except__runtime_failure(0U,\n" ++
+              "                                                 termina__runtime_operation__task_dispatch,\n" ++
               "                                                 termina__error__invalid_id);\n" ++
               "\n" ++
               "                break;\n" ++

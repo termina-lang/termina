@@ -609,9 +609,10 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                                 -- does not have, so the event is corrupted
                                 pre_cr $ _default $
                                     -- termina__except__runtime_failure(
-                                    --     termina__runtime_operation__task_dispatch,
+                                    --     0U, termina__runtime_operation__task_dispatch,
                                     --     termina__error__invalid_id);
                                     indent . pre_cr $ termina__except__runtime_failure @@ [
+                                        dec 0 @: size_t,
                                         termina__runtime_operation__task_dispatch,
                                         termina__error__invalid_id
                                     ],

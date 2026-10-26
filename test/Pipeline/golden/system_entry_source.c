@@ -57,7 +57,8 @@ void termina__task_entry__UserTask(void * const arg) {
 
             default:
 
-                termina__except__runtime_failure(termina__runtime_operation__task_dispatch,
+                termina__except__runtime_failure(0U,
+                                                 termina__runtime_operation__task_dispatch,
                                                  termina__error__invalid_id);
 
                 break;

@@ -90,6 +90,8 @@ stdlibGlobalEnv outBufSize inBufSize =
     ("Exception", LocatedElement (GType (Enum "Exception" [
       -- | Error sending a message to a message queue
       EnumVariant "EMsgQueueSendError" [
+        -- | Address of the call to the runtime that sent the message, or 0
+        TUSize,
         -- | ID of the message queue
         TUSize,
         -- | Error code
@@ -144,6 +146,8 @@ stdlibGlobalEnv outBufSize inBufSize =
         -- | Address of the offending expression
         TUSize],
       EnumVariant "ERuntimeFailure" [
+        -- | Address of the call to the runtime that failed, or 0
+        TUSize,
         -- | Operation of the runtime that failed
         TUInt32,
         -- | Error code of the operating system
