@@ -85,6 +85,29 @@ spec = describe "Full pipeline: the components of a unit test" $ do
             unpack c `shouldContain` "termina__msg_queue_t tms;"
             unpack c `shouldContain` "termina__test__pool_t tm_pool;")
           (M.lookup "test" rendered)
+  it "gives the harness, the test emitters, the queues of the test channel and the test pool their identifiers" $
+    case runTestApp unitTest of
+      Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
+      Right (progArch, _) ->
+        either (expectationFailure . unpack)
+          (\c -> do
+            unpack c `shouldContain` "#define system_except__emitter_id 0\n#define termina__test__harness__emitter_id 1\n#define tick__emitter_id 2\n"
+            unpack c `shouldContain` "#define uut__task_id 0\n#define termina__test__harness__task_id 1\n"
+            unpack c `shouldContain` "#define tms__channel_msg_queue_id 2\n#define tms__event_msg_queue_id 3\n"
+            unpack c `shouldContain` "#define tm_pool__pool_id 0\n"
+            unpack c `shouldContain` "#define TERMINA__APP_CONFIG__POOLS 1\n"
+            unpack c `shouldContain` "#define TERMINA__APP_CONFIG__TASKS 2\n"
+            unpack c `shouldContain` "#define TERMINA__APP_CONFIG__MESSAGE_QUEUES 4\n")
+          (renderConfigFile progArch)
+  it "creates the two queues of the test channel" $
+    case runTestApp unitTest of
+      Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
+      Right (progArch, _) ->
+        either (expectationFailure . unpack)
+          (\c -> do
+            unpack c `shouldContain` "termina__msg_queue__init(tms__channel_msg_queue_id,\n                                 sizeof(termina__box_t), 4U, status);"
+            unpack c `shouldContain` "termina__msg_queue__init(tms__event_msg_queue_id,\n                                 sizeof(termina__event_t), 4U, status);")
+          (renderTestMainFile progArch)
   it "wires the ports to the functions of the runtime" $
     case runTestApp unitTest of
       Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)

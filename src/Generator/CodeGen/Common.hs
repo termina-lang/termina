@@ -136,6 +136,10 @@ testEmitterAccess = terminafy $ "test" <::> "emitter_access_t"
 testChannelAccess = terminafy $ "test" <::> "channel_access_t"
 testPool = terminafy $ "test" <::> "pool_t"
 
+-- | The harness of a unit test, as a task and as the emitter of the events of the cases
+testHarness :: Identifier
+testHarness = terminafy $ "test" <::> "harness"
+
 -- | The array that holds the boxes of a deque
 dequeItems :: Identifier -> Identifier
 dequeItems identifier = terminafy $ "deque_items" <::> identifier

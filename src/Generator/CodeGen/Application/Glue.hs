@@ -386,6 +386,29 @@ genInitMessageQueues queues = do
                                 "status" @: (_const . ptr $ termina__error_code_t)
                             ]
                 ]]
+        genOSALMsgQueueInit mq@(OSALTestChannelMsgQueue _ ty size) = do
+            msgQueueId <- genDefineMsgQueueIdLabel mq
+            cSize <- genConstExpression size
+            cTs <- genType noqual ty
+            return [[
+                            pre_cr $ termina__msg_queue__init @@ [
+                                msgQueueId @: termina__id_t,
+                                _sizeOfType cTs,
+                                cSize,
+                                "status" @: (_const . ptr $ termina__error_code_t)
+                            ]
+                ]]
+        genOSALMsgQueueInit mq@(OSALTestEventMsgQueue _ size) = do
+            msgQueueId <- genDefineMsgQueueIdLabel mq
+            cSize <- genConstExpression size
+            return [[
+                            pre_cr $ termina__msg_queue__init @@ [
+                                msgQueueId @: termina__id_t,
+                                _sizeOfType termina__event_t,
+                                cSize,
+                                "status" @: (_const . ptr $ termina__error_code_t)
+                            ]
+                ]]
         genOSALMsgQueueInit mq@(OSALSinkPortMsgQueue _ _ _ ty size) = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
             cSize <- genConstExpression size
@@ -556,7 +579,8 @@ genMainFile mName progArchitecture = do
     initEmitters <- genInitEmitters progArchitecture
     initPools <- genInitPools (M.elems $ pools progArchitecture)
     initMutexes <- genInitMutexes mutexes
-    initMessageQueues <- genInitMessageQueues (taskMessageQueues ++ sinkPortMessageQueues ++ channelMessageQueues)
+    initMessageQueues <- genInitMessageQueues (taskMessageQueues ++ sinkPortMessageQueues ++ channelMessageQueues
+        ++ getTestChannelsMessageQueues progArchitecture)
 
     channelConnections <- genChannelConnections progArchitecture
     enableProtection <- genEnableProtection progArchitecture

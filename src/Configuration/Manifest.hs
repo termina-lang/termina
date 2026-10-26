@@ -51,10 +51,6 @@ import Configuration.Platform
 knownManifestVersions :: [Int]
 knownManifestVersions = [1]
 
--- | Bytes of the record of results of a test when its entry does not say.
-defaultTestLogSize :: Integer
-defaultTestLogSize = 8192
-
 data Manifest = Manifest {
     manifestProject :: !ProjectInfo,
     manifestNature :: !Nature,
@@ -108,6 +104,7 @@ data TestEntry = TestEntry {
     testPlatforms :: ![Platform],
     testTimeout :: !Integer,
     testLogSize :: !Integer,
+    testHarnessStackSize :: !(Maybe Integer),
     testMicrosecondsPerTick :: !(Maybe Integer),
     testExtern :: !ExternConfig,
     testDependencies :: ![Dependency],
@@ -281,7 +278,7 @@ testParser testName v = do
     unless (isSnakeCase (T.unpack testName)) $
         fail $ "the test name \"" ++ T.unpack testName ++ "\" is not lowercase snake_case"
     withObject what (\o -> do
-        onlyFields what ["platforms", "timeout", "test-log-size",
+        onlyFields what ["platforms", "timeout", "test-log-size", "harness-stack-size",
             "microseconds-per-tick", "extern", "dependencies", "overrides"] o
         platformNames <- o .: "platforms"
         when (null platformNames) $ fail $ what ++ " has no platforms"
@@ -291,6 +288,7 @@ testParser testName v = do
             <$> mapM platformParser platformNames
             <*> (o .: "timeout" >>= positive "timeout")
             <*> (o .:? "test-log-size" .!= defaultTestLogSize >>= positive "test-log-size")
+            <*> (o .:? "harness-stack-size" >>= traverse (positive "harness-stack-size"))
             <*> (o .:? "microseconds-per-tick" >>= tickParser)
             <*> (o .:? "extern" >>= maybe (return emptyExternConfig) externParser)
             <*> (o .:? "dependencies" .!= [] >>= mapM dependencyParser)
@@ -416,6 +414,8 @@ configFor manifest kind plt prf tick = TerminaConfig {
     sysReadInputBufferSize = manifestReadBufSize manifest,
     microsecondsPerTick = fromMaybe defaultMicrosecondsPerTick tick,
     deploymentKind = kind,
+    recordCapacity = defaultTestLogSize,
+    harnessStackSize = Nothing,
     lineDirectives = True
   }
 
@@ -488,7 +488,10 @@ testDeployment manifest testName entry plt prf = Deployment {
 -- profile. A test without its own tick takes the one of the application.
 testConfig :: Manifest -> T.Text -> TestEntry -> Platform -> ProjectProfile -> TerminaConfig
 testConfig manifest testName entry plt prf =
-    configFor manifest (TestBuild testName) plt prf tick
+    (configFor manifest (TestBuild testName) plt prf tick) {
+        recordCapacity = testLogSize entry,
+        harnessStackSize = testHarnessStackSize entry
+    }
 
   where
 

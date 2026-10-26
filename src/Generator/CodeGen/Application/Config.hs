@@ -29,9 +29,12 @@ genConfigFile ::
     -> TerminaProgArch SemanticAnn
     -> CGenerator CFile
 genConfigFile mName config progArchitecture = do
-    let progTasks = M.elems $ tasks progArchitecture
-        periodicTimers = M.filter (\case { TPPeriodicTimerEmitter {} -> True; _ -> False }) (emitters progArchitecture)
-        progPools = M.elems $ pools progArchitecture
+    let periodicTimers = M.filter (\case { TPPeriodicTimerEmitter {} -> True; _ -> False }) (emitters progArchitecture)
+        -- | A unit test adds the harness, as a task and as an emitter, and the test emitters
+        harness = [testHarness | isUnitTest progArchitecture]
+        taskIds = M.keys (tasks progArchitecture) ++ harness
+        emitterIds = M.keys (emitters progArchitecture) ++ harness ++ M.keys (testEmitters progArchitecture)
+        poolIds = M.keys (pools progArchitecture) ++ M.keys (testPools progArchitecture)
 
     let resLockMap = genResourceLockings progArchitecture
     let mutexes =
@@ -40,16 +43,17 @@ genConfigFile mName config progArchitecture = do
     channelMessageQueues <- getChannelsMessageQueues progArchitecture
     sinkPortMessageQueues <- getSinkPortMessageQueues progArchitecture
     taskMessageQueues <- getTasksMessageQueues progArchitecture (sinkPortMessageQueues ++ channelMessageQueues)
+    let testChannelMessageQueues = getTestChannelsMessageQueues progArchitecture
+        msgQueues = taskMessageQueues ++ sinkPortMessageQueues ++ channelMessageQueues ++ testChannelMessageQueues
 
-    cEmitterDefines <- genDefineEmitterId (M.keys $ emitters progArchitecture)
+    cEmitterDefines <- genDefineEmitterId emitterIds
     cMutexDefines <- genDefineMutexId (M.keys mutexes)
-    cTaskDefines <- genDefineTaskId (M.keys $ tasks progArchitecture)
+    cTaskDefines <- genDefineTaskId taskIds
     cHandlerDefines <- genDefineHandlerId (M.keys $ handlers progArchitecture)
-    cPoolDefines <- genDefinePoolId (M.keys $ pools progArchitecture)
-    cMsgQueueDefines <- genDefineMsgQueueId (taskMessageQueues ++ sinkPortMessageQueues ++ channelMessageQueues)
+    cPoolDefines <- genDefinePoolId poolIds
+    cMsgQueueDefines <- genDefineMsgQueueId msgQueues
     cTimerDefines <- genDefineTimerId (M.keys periodicTimers)
 
-    let msgQueues = taskMessageQueues ++ sinkPortMessageQueues ++ channelMessageQueues
     messageBufferMemory <- genMessageBufferMemory msgQueues
 
     plt <- gets targetPlatform
@@ -65,8 +69,8 @@ genConfigFile mName config progArchitecture = do
         ++ cPoolDefines
         ++ cTimerDefines
         ++ [
-            pre_cr $ _define "TERMINA__APP_CONFIG__POOLS" (Just [show (length progPools)]),
-            pre_cr $ _define "TERMINA__APP_CONFIG__TASKS" (Just [show (length progTasks)]),
+            pre_cr $ _define "TERMINA__APP_CONFIG__POOLS" (Just [show (length poolIds)]),
+            pre_cr $ _define "TERMINA__APP_CONFIG__TASKS" (Just [show (length taskIds)]),
             pre_cr $ _define "TERMINA__APP_CONFIG__PERIODIC_TIMERS" (Just [show (length (M.elems periodicTimers))]),
             pre_cr $ _define "TERMINA__APP_CONFIG__MUTEXES" (Just [show (length mutexes)]),
             pre_cr $ _define "TERMINA__APP_CONFIG__MESSAGE_QUEUES" (Just [show (length msgQueues)])
@@ -109,6 +113,29 @@ genConfigFile mName config progArchitecture = do
             cSize <- genConstExpression size
             cTy <- genType noqual ty
             let cSizeOf = _sizeOfType cTy
+                ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
+                ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
+            return [
+                    "    TERMINA__APP_CONFIG__MESSAGE_QUEUE_BUFFER( ",
+                    "        " <> ppSize <> ", ",
+                    "        " <> ppSizeOf <> " ",
+                    "    ) "
+                ]
+        genMessagesForQueue (OSALTestChannelMsgQueue _ ty size) = do
+            cSize <- genConstExpression size
+            cTy <- genType noqual ty
+            let cSizeOf = _sizeOfType cTy
+                ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
+                ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
+            return [
+                    "    TERMINA__APP_CONFIG__MESSAGE_QUEUE_BUFFER( ",
+                    "        " <> ppSize <> ", ",
+                    "        " <> ppSizeOf <> " ",
+                    "    ) "
+                ]
+        genMessagesForQueue (OSALTestEventMsgQueue _ size) = do
+            cSize <- genConstExpression size
+            let cSizeOf = _sizeOfType termina__event_t
                 ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
                 ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
             return [

@@ -11,6 +11,7 @@ module Configuration.Configuration (
     defaultSysPrintOutputBufferSize,
     defaultSysReadInputBufferSize,
     defaultMicrosecondsPerTick,
+    defaultTestLogSize,
     appFolder,
     appFilename,
     outputFolderName,
@@ -96,6 +97,10 @@ data TerminaConfig =
     sysReadInputBufferSize :: !Integer,
     microsecondsPerTick :: !Integer,
     deploymentKind :: !DeploymentKind,
+    -- | Bytes of the record area of a test, its test-log-size
+    recordCapacity :: !Integer,
+    -- | Stack size of the task of the harness of a test, or the default of the platform
+    harnessStackSize :: !(Maybe Integer),
     -- | Whether the generated C carries #line pragmas that point to the .fin.
     -- Without them it is broken to the usual width, the plain C.
     lineDirectives :: !Bool
@@ -125,5 +130,11 @@ defaultConfig projectName plt = TerminaConfig {
     sysReadInputBufferSize = defaultSysReadInputBufferSize,
     microsecondsPerTick = defaultMicrosecondsPerTick,
     deploymentKind = ApplicationBuild,
+    recordCapacity = defaultTestLogSize,
+    harnessStackSize = Nothing,
     lineDirectives = False
 }
+
+-- | Bytes of the record of results of a test when its entry does not say.
+defaultTestLogSize :: Integer
+defaultTestLogSize = 8192

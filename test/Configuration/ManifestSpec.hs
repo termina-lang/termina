@@ -99,7 +99,7 @@ spec = describe "Manifest" $ do
     it "reads the entry of a test" $
       fmap (M.toList . manifestTests)
         (parsed (project ++ app ++ "tests:\n  hk:\n    platforms: [posix-gcc, rtems5-leon3sf-nexysa7]\n    timeout: 10\n"))
-        `shouldBe` Right [(T.pack "hk", TestEntry [POSIXGCC, RTEMS5LEON3SFNEXYSA7] 10 defaultTestLogSize Nothing emptyExternConfig [] [])]
+        `shouldBe` Right [(T.pack "hk", TestEntry [POSIXGCC, RTEMS5LEON3SFNEXYSA7] 10 defaultTestLogSize Nothing Nothing emptyExternConfig [] [])]
 
   describe "deployments" $ do
 
@@ -116,6 +116,27 @@ spec = describe "Manifest" $ do
       case parsed withTick of
         Right m -> microsecondsPerTick (testConfig m (T.pack "timing") (manifestTests m M.! T.pack "timing") POSIXGCC Debug) `shouldBe` 500
         Left err -> expectationFailure err
+
+    it "gives a test the size of its record and the stack of its harness" $
+      case parsed (project ++ app ++ "tests:\n  hk:\n    platforms: [posix-gcc]\n    timeout: 10\n"
+                     ++ "    test-log-size: 2048\n    harness-stack-size: 8192\n") of
+        Right m -> do
+          let config = testConfig m (T.pack "hk") (manifestTests m M.! T.pack "hk") POSIXGCC Debug
+          recordCapacity config `shouldBe` 2048
+          harnessStackSize config `shouldBe` Just 8192
+        Left err -> expectationFailure err
+
+    it "gives a test that says nothing the default record and the stack of the platform" $
+      case parsed withTick of
+        Right m -> do
+          let config = testConfig m (T.pack "hk") (manifestTests m M.! T.pack "hk") POSIXGCC Debug
+          recordCapacity config `shouldBe` defaultTestLogSize
+          harnessStackSize config `shouldBe` Nothing
+        Left err -> expectationFailure err
+
+    it "rejects a harness stack size that is not positive" $
+      failsWith (project ++ app ++ "tests:\n  hk:\n    platforms: [posix-gcc]\n    timeout: 10\n    harness-stack-size: 0\n")
+        "harness-stack-size must be positive"
 
     it "builds each test on each platform into its own folder" $
       case parsed withTick of

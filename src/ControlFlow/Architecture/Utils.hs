@@ -15,6 +15,10 @@ import qualified Data.Set as S
 import Utils.Graph (findDisjointPaths, reverseGraph)
 import Control.Monad.State
 
+-- | A test with test instances is a unit test, and one without them is concurrent
+isUnitTest :: TerminaProgArch a -> Bool
+isUnitTest tp = not (M.null (testInstances tp))
+
 getEmitterIdentifier :: TPEmitter a -> Identifier
 getEmitterIdentifier (TPInterruptEmitter ident _) = ident
 getEmitterIdentifier (TPPeriodicTimerEmitter ident _ _ _) = ident

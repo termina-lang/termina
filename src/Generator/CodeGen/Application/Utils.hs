@@ -37,6 +37,15 @@ data OSALMsgQueue =
       Identifier -- ^ identifier of the port that will receive the messages
       (TerminaType SemanticAnn) -- ^ type of the elements of the message queue
       (Expression SemanticAnn) -- ^ message queue size
+    -- | The messages of a TestChannel, which no task receives
+    | OSALTestChannelMsgQueue
+      Identifier -- ^ name of the channel
+      (TerminaType SemanticAnn) -- ^ type of the elements of the message queue
+      (Expression SemanticAnn) -- ^ message queue size
+    -- | The events of a TestChannel, in place of the queue of a receiving task
+    | OSALTestEventMsgQueue
+      Identifier -- ^ name of the channel
+      (Expression SemanticAnn) -- ^ message queue size
     deriving Show
 
 -- | This function generates the list of OSAL message queues that must be created
@@ -60,6 +69,8 @@ getTasksMessageQueues progArchitecture msgqs = do
             OSALTaskMsgQueue {} -> throwError $ InternalError "getTasksMessageQueues: there is already a task message queue";
             OSALChannelMsgQueue _ _ _ target _ -> return $ target == identifier;
             OSALSinkPortMsgQueue target _ _ _ _  -> return $ target == identifier;
+            OSALTestChannelMsgQueue {} -> return False;
+            OSALTestEventMsgQueue {} -> return False;
         }) msgqs
         curr <- getTaskMessageQueue identifier classId filteredQueues
         return $ curr : acc) [] (tasks progArchitecture)
@@ -72,11 +83,13 @@ getTasksMessageQueues progArchitecture msgqs = do
                 OSALTaskMsgQueue {} -> throwError $ InternalError "getTaskMessageQueue: there is already a task message queue"
                 OSALChannelMsgQueue _ _ size' _ _ -> return size'
                 OSALSinkPortMsgQueue _ _ _ _ size' -> return size'
+                _ -> throwError $ InternalError "getTaskMessageQueue: a queue of a test channel reaches no task"
             size' <- foldM (\acc q ->
                 case q of
                     OSALTaskMsgQueue {} -> throwError $ InternalError "getTaskMessageQueue: there is already a task message queue"
                     OSALChannelMsgQueue _ _ size' _ _ -> return $ BinOp Addition acc size' (buildExpAnn Internal (TConstSubtype TUSize))
                     OSALSinkPortMsgQueue _ _ _ _ size' -> return $ BinOp Addition acc size' (buildExpAnn Internal (TConstSubtype TUSize))
+                    _ -> throwError $ InternalError "getTaskMessageQueue: a queue of a test channel reaches no task"
                 ) size msgQueues
             return $ OSALTaskMsgQueue identifier classId size'
         getTaskMessageQueue _ _ _ = throwError $ InternalError "getTaskMessageQueue: the task does not have message queues"
@@ -92,6 +105,12 @@ getChannelsMessageQueues progArchitecture =
             Just (task, port, _) -> return (OSALChannelMsgQueue identifier ts size task port : acc)
             Nothing -> throwError $ InternalError ("channel not connected: " ++ show identifier)
     ) [] (channels progArchitecture)
+
+-- | The queue of the messages and the queue of the events of each TestChannel
+getTestChannelsMessageQueues :: TerminaProgArch SemanticAnn -> [OSALMsgQueue]
+getTestChannelsMessageQueues progArchitecture =
+    concat [ [OSALTestChannelMsgQueue identifier ts size, OSALTestEventMsgQueue identifier size]
+           | TPMsgQueue identifier ts size _ _ <- M.elems (testChannels progArchitecture) ]
 
 genVariantForPort ::
     -- | Name of the task class
@@ -274,6 +293,11 @@ genDefineMsgQueueIdLabel :: OSALMsgQueue -> CGenerator Identifier
 genDefineMsgQueueIdLabel (OSALTaskMsgQueue t _ _) = genDefineTaskMsgQueueIdLabel t
 genDefineMsgQueueIdLabel (OSALChannelMsgQueue c _ _ _ _) = genDefineChannelMsgQueueIdLabel c
 genDefineMsgQueueIdLabel (OSALSinkPortMsgQueue t _ p _ _) = genDefineSinkMsgQueueIdLabel t p
+genDefineMsgQueueIdLabel (OSALTestChannelMsgQueue c _ _) = genDefineChannelMsgQueueIdLabel c
+genDefineMsgQueueIdLabel (OSALTestEventMsgQueue c _) = genDefineTestEventMsgQueueIdLabel c
+
+genDefineTestEventMsgQueueIdLabel :: Identifier -> CGenerator Identifier
+genDefineTestEventMsgQueueIdLabel c = return $ c <::> "event_msg_queue_id"
 
 genDefineMsgQueueId :: [OSALMsgQueue] -> CGenerator [CFileItem]
 genDefineMsgQueueId [] = return []
