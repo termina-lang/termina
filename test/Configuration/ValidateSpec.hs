@@ -44,6 +44,10 @@ spec = do
       errorsOf [manifest "app:\n  platform: posix-gcc\n  profile: release\n"]
         `shouldBe` ["the package is an application: it has no exports, so it cannot be a dependency"]
 
+    it "rejects a path dependency" $
+      errorsOf (manifest "exports: [pus]\ndependencies:\n  - path: ../hal\n" : [file "src/pus/service1.fin"])
+        `shouldBe` ["the package declares the path dependency ../hal, which only exists on the machine of its author"]
+
   describe "extern" $
 
     it "rejects an absolute path, a path outside extern/ and a missing file" $

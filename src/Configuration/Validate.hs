@@ -31,7 +31,7 @@ validatePackage files =
                 Application _ -> Left ["the package is an application: it has no exports, so it cannot be a dependency"]
                 Library [] -> Left ["the package exports no prefix, so it cannot be a dependency"]
                 Library prefixes ->
-                    case externErrors manifest ++ linkErrors manifest prefixes ++ caseErrors manifest of
+                    case pathErrors manifest ++ externErrors manifest ++ linkErrors manifest prefixes ++ caseErrors manifest of
                         [] -> Right manifest
                         errs -> Left errs
 
@@ -42,6 +42,11 @@ validatePackage files =
     externPaths manifest =
         let extern = manifestExtern manifest
         in externSources extern ++ concat (M.elems (externLibraries extern))
+
+    -- | A path dependency only exists on the machine of the author.
+    pathErrors manifest =
+        [ "the package declares the path dependency " ++ p ++ ", which only exists on the machine of its author"
+        | DepPath p <- manifestDependencies manifest ]
 
     -- | Each file of the extern section lies inside "extern/" and is in the
     -- commit; a link in its place is reported with the others.
