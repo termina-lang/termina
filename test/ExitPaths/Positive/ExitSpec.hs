@@ -2,7 +2,7 @@
 -- reaches an exit point) raise no error.
 module ExitPaths.Positive.ExitSpec (spec) where
 
-import ExitPaths.Common (exitPathsError)
+import ExitPaths.Common (exitPathsError, exitPathsTestError)
 
 import Data.Maybe (isNothing)
 import Test.Hspec
@@ -111,8 +111,23 @@ continueBranchAction =
   "    }\n" ++
   "};\n"
 
+-- | A case that sends inside a for loop: EE-006 only applies to actions.
+sendLoopCase :: String
+sendLoopCase =
+  "test class CTests {\n" ++
+  "    tc_out : out u32;\n" ++
+  "    case sends(&mut self) {\n" ++
+  "        for i : u32 in 0 : u32 .. 3 : u32 {\n" ++
+  "            self->tc_out.send(i);\n" ++
+  "        }\n" ++
+  "        return;\n" ++
+  "    }\n" ++
+  "};\n"
+
 spec :: Spec
-spec = describe "Exit paths: well-formed paths raise no error" $
+spec = describe "Exit paths: well-formed paths raise no error" $ do
+  it "accepts a case that sends inside a for loop" $
+    exitPathsTestError sendLoopCase `shouldSatisfy` isNothing
   mapM_ (\(name, src) -> it name $ exitPathsError src `shouldSatisfy` isNothing)
     [ ("accepts a function returning on every branch", goodFunction)
     , ("accepts an action that exits on every path", goodAction)

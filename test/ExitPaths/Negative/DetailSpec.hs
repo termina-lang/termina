@@ -6,7 +6,7 @@
 -- reported at a real source 'Position' rather than 'Internal'/'Builtin'.
 module ExitPaths.Negative.DetailSpec (spec) where
 
-import ExitPaths.Common (exitPathsError)
+import ExitPaths.Common (exitPathsError, exitPathsTestError)
 import ControlFlow.ExitPaths.Errors (ExitCheckError(..))
 import Utils.Annotations (AnnotatedError(..), Location(Position))
 
@@ -26,9 +26,28 @@ cases =
   , ("EE-013.fin", \case EEActionInvalidReboot -> True; _ -> False)
   ]
 
+-- | A case with a return inside an if: a case has a single return, at the end.
+earlyReturnCase :: String
+earlyReturnCase =
+  "test class CTests {\n" ++
+  "    tc_out : out u32;\n" ++
+  "    case sends(&mut self) {\n" ++
+  "        var n : u32 = 0;\n" ++
+  "        if (n == 0 : u32) {\n" ++
+  "            return;\n" ++
+  "        }\n" ++
+  "        self->tc_out.send(n);\n" ++
+  "        return;\n" ++
+  "    }\n" ++
+  "};\n"
+
 spec :: Spec
-spec = describe "Exit paths: error detail (constructor + location)" $
+spec = describe "Exit paths: error detail (constructor + location)" $ do
   mapM_ each cases
+  it "a return inside an if of a case raises EEInvalidReturn at a source position" $
+    exitPathsTestError earlyReturnCase `shouldSatisfy` \case
+      Just (AnnotatedError EEInvalidReturn (Position{})) -> True
+      _ -> False
   where
     each (file, isCon) = do
       err <- runIO (exitPathsError <$> readFile (fixturesDir </> file))
