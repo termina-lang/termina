@@ -69,7 +69,7 @@ deliverCommand :: DeliverCmdArgs -> IO ()
 deliverCommand (DeliverCmdArgs chatty withTests archive withTrace) = do
     when (withTrace && not archive) $
       die . errorMessage $ "--with-trace adds a binary to the archive: use it with --archive"
-    manifest <- loadManifest >>= either dieWithErrors return
+    manifest <- loadProject >>= either dieWithErrors return
     let hasApp = isJust (appDeployment manifest)
         selection = case (withTests, hasApp) of
             (False, _) -> SelectApp

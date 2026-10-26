@@ -309,7 +309,7 @@ genMonadicHeaderFiles params plt monadicTypes = do
 selectedDeployments :: BuildCmdArgs -> IO [Deployment]
 selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
-    manifest <- loadManifest >>= either dieWithErrors return
+    manifest <- loadProject >>= either dieWithErrors return
     either (die . errorMessage) return $ selectDeployments manifest selection mPlatform mProfile
 
 selectDeployments :: Manifest -> Selection -> Maybe Platform -> Maybe ProjectProfile -> Either String [Deployment]

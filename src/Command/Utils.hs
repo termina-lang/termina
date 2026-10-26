@@ -24,6 +24,7 @@ import Configuration.Platform (Platform)
 import ControlFlow.ExitPaths
 import Configuration.Configuration
 import Configuration.Manifest
+import Configuration.Namespace (checkExports)
 import Data.List (intercalate)
 import System.Directory
 import Utils.Annotations
@@ -343,6 +344,18 @@ loadManifest = liftIO $ do
         Right manifest -> do
             layoutErrors <- checkLayout "." manifest
             return $ if null layoutErrors then Right manifest else Left (intercalate "\n" layoutErrors)
+
+-- | Load "termina.yaml" as "loadManifest" does and check also the prefixes
+-- that a library exports, for the commands that build: a new library has no
+-- module yet, and "termina new --test" has to work on it.
+loadProject :: (MonadIO m) => m (Either String Manifest)
+loadProject = do
+    result <- loadManifest
+    case result of
+        Left err -> return (Left err)
+        Right manifest -> do
+            exportErrors <- liftIO $ checkExports "." manifest
+            return $ if null exportErrors then Right manifest else Left (intercalate "\n" exportErrors)
 
 -- | Print each line of the error as an error and stop.
 dieWithErrors :: String -> IO a
