@@ -172,9 +172,9 @@ genDefineHandlerIdLabel t = return $ t <::> "handler_id"
 -- | Identifier 0 is reserved in every build for the handler of system_except
 -- of the runtime, and the handlers of the application take 1 onwards.
 genDefineHandlerId :: [Identifier] -> CGenerator [CFileItem]
-genDefineHandlerId handlers = do
+genDefineHandlerId handlerIds = do
     systemExcept <- genDefineHandlerIdLabel "system_except"
-    rest <- genDefineHandlerId' handlers 1
+    rest <- genDefineHandlerId' handlerIds 1
     return $ pre_cr (_define systemExcept (Just [show (0 :: Integer)])) : rest
 
     where
@@ -228,9 +228,9 @@ genDefineEmitterIdLabel e = return $ e <::> "emitter" <:> "id"
 -- | system_except takes identifier 0 in every build, connected or not, and the
 -- other emitters take 1 onwards.
 genDefineEmitterId :: [Identifier] -> CGenerator [CFileItem]
-genDefineEmitterId emitters = do
+genDefineEmitterId emitterIds = do
     systemExcept <- genDefineEmitterIdLabel "system_except"
-    rest <- genDefineEmitterId' (filter (/= "system_except") emitters) 1
+    rest <- genDefineEmitterId' (filter (/= "system_except") emitterIds) 1
     return $ pre_cr (_define systemExcept (Just [show (0 :: Integer)])) : rest
 
     where
