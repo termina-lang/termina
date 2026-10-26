@@ -39,7 +39,11 @@ genGlobalDecl (GlobalDeclaration (Handler identifier ts _ _ ann)) = do
 genGlobalDecl (GlobalDeclaration (Emitter identifier ts _ _ ann)) = do
     cTs <- genType noqual ts
     return [CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
-        (Just identifier) Nothing)) (buildDeclarationAnn ann True)] 
+        (Just identifier) Nothing)) (buildDeclarationAnn ann True)]
+genGlobalDecl (GlobalDeclaration (Test identifier ts _ _ ann)) = do
+    cTs <- genType noqual ts
+    return [CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
+        (Just identifier) Nothing)) (buildDeclarationAnn ann True)]
 genGlobalDecl (GlobalDeclaration (Const identifier ts _expr _ ann)) = do
     cTs <- genType constqual ts
     return [
@@ -78,7 +82,11 @@ genGlobal (GlobalDeclaration (Handler identifier ts _ _ ann)) = do
 genGlobal (GlobalDeclaration (Emitter identifier ts _ _ ann)) = do
     cTs <- genType noqual ts
     return [CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec cTs)
-        (Just identifier) Nothing)) (buildDeclarationAnn ann True)] 
+        (Just identifier) Nothing)) (buildDeclarationAnn ann True)]
+genGlobal (GlobalDeclaration (Test identifier ts _ _ ann)) = do
+    cTs <- genType noqual ts
+    return [CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec cTs)
+        (Just identifier) Nothing)) (buildDeclarationAnn ann True)]
 genGlobal (GlobalDeclaration (Const identifier ts expr _ ann)) = do
     cTs <- genType constqual ts
     cExpr <- genInitializerExpr expr

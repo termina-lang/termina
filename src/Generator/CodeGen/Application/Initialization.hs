@@ -61,6 +61,9 @@ genInitializeObj loc before (Handler identifier _ (Just expr) _ _) = do
 genInitializeObj loc before (Emitter identifier _ (Just expr) _ _) = do
     let cObj = identifier @: typeDef identifier
     genStructAssign loc before 0 cObj expr
+genInitializeObj loc before (Test identifier _ (Just expr) _ _) = do
+    let cObj = identifier @: typeDef identifier
+    genStructAssign loc before 0 cObj expr
 genInitializeObj _ _ _ = return []
 
 genInitFile :: QualifiedName -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> CGenerator CFile

@@ -12,6 +12,8 @@ module Pipeline.Common
   , compileErrorCode
   , compileTestErrorCode
   , runTestArchitecture
+  , runTestApp
+  , runTestBuild
   , compileProjectErrorCode
   , compileErrorMessage
   , compileProjectErrorMessage
@@ -262,10 +264,18 @@ compileTestErrorCode :: String -> Maybe Text
 compileTestErrorCode input =
   compileProjectErrorCodeWith testConfigParams [("test", input)]
 
--- | The checked architecture of the deployment of a test, which the generator
--- of C does not build yet.
+-- | The checked architecture of the deployment of a test.
 runTestArchitecture :: String -> Either Failure (TerminaProgArch SemanticAnn)
 runTestArchitecture input = fst <$> runFullProjectAppWith testConfigParams [("test", input)]
+
+-- | 'runFullProjectApp' for the deployment of a test, in a module named @test@.
+runTestApp :: String
+  -> Either Failure (TerminaProgArch SemanticAnn, [(QualifiedName, AnnotatedProgram SemanticAnn)])
+runTestApp input = runFullProjectAppWith testConfigParams [("test", input)]
+
+-- | 'runFullProjectBuild' for the deployment of a test, in a module named @test@.
+runTestBuild :: String -> Either Failure (M.Map QualifiedName Text)
+runTestBuild input = runFullProjectBuildWith testConfigParams [("test", input)]
 
 testConfigParams :: TerminaConfig
 testConfigParams = configParams { deploymentKind = TestBuild (pack "test") }
