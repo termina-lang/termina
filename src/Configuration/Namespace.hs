@@ -1,6 +1,7 @@
 -- | The namespaces of a project: the prefixes that a library exports.
 module Configuration.Namespace (
     checkExports,
+    exportedModules,
     prefixText,
     hasLibraryPrefix
 ) where
@@ -82,6 +83,7 @@ checkExports root manifest =
             Just (Prefix segments) -> case moduleParsed m of
                 Left line -> [at m line ++ "the exported module " ++ dotted (moduleSegments m) ++ " does not parse"]
                 Right ast -> importErrors prefixes sources m ast ++ nameErrors (T.unpack (last segments)) m ast
+                    ++ testClassErrors m ast
 
     importErrors prefixes sources m ast =
         [ at m (lineOf ann) ++ "the exported module " ++ dotted (moduleSegments m) ++ " imports "
@@ -96,6 +98,13 @@ checkExports root manifest =
             ++ map toUpper segment ++ "_..., " ++ pascal segment ++ "...)"
         | (name, loc) <- M.toList (declaredNames (frags ast))
         , not (hasLibraryPrefix segment name) ]
+
+    -- | A test class holds the cases of one test, so a library does not
+    -- publish it: what tests reuse is ordinary code.
+    testClassErrors m ast =
+        [ at m (lineOf loc) ++ "the exported module " ++ dotted (moduleSegments m) ++ " declares the test class "
+            ++ ident ++ ", which only a test or a module that is not exported may hold"
+        | TypeDefinition (Class TestClass ident _ _ _) loc <- frags ast ]
 
     moduleSet sources = S.fromList (map moduleSegments sources)
 
@@ -116,6 +125,18 @@ checkExports root manifest =
     splitOn sep s = case break (== sep) s of
         (part, []) -> [part]
         (part, _ : rest) -> part : splitOn sep rest
+
+-- | The exported modules of a library that parse, by their qualified name
+-- ("pus/service1"), and none in an application.
+exportedModules :: FilePath -> Manifest -> IO [QualifiedName]
+exportedModules root manifest =
+    case manifestNature manifest of
+        Application _ -> return []
+        Library prefixes -> do
+            sources <- sourceModules root
+            return [ joinPath (moduleSegments m) | m <- sources
+                   , any (\(Prefix segments) -> map T.unpack segments `isPrefixOf` moduleSegments m) prefixes
+                   , either (const False) (const True) (moduleParsed m) ]
 
 -- | Whether a name starts with the last segment of the prefix of its library:
 -- in snake case or upper case, the segment and "_" ("char_dev_send",

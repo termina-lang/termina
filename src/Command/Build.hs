@@ -2,11 +2,12 @@
 
 module Command.Build (
     buildCmdArgsParser, buildCommand, generateCommand, BuildCmdArgs(..),
-    Selection(..), selectDeployments, buildDeployment, announce, runMake
+    Selection(..), selectDeployments, buildDeployment, announce, runMake, loadBuildProject
 ) where
 
 import Configuration.Configuration
 import Configuration.Manifest
+import Configuration.Namespace (exportedModules)
 import Command.Utils
 import Control.Exception (IOException, try)
 import Data.Maybe (fromMaybe, isJust)
@@ -309,8 +310,50 @@ genMonadicHeaderFiles params plt monadicTypes = do
 selectedDeployments :: BuildCmdArgs -> IO [Deployment]
 selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
-    manifest <- loadProject >>= either dieWithErrors return
+    manifest <- loadBuildProject chatty
     either (die . errorMessage) return $ selectDeployments manifest selection mPlatform mProfile
+
+-- | Load the project for a command that builds: the manifest, the folders, the
+-- prefixes of a library and, in a library, the types of its exported modules.
+loadBuildProject :: Bool -> IO Manifest
+loadBuildProject chatty = do
+    manifest <- loadProject >>= either dieWithErrors return
+    checkLibrary chatty manifest
+    return manifest
+
+-- | Type check the exported modules of a library together, with what they
+-- import, on each platform of its tests, or on the platform of the test suite
+-- when it has none. A library has no app.fin that says what is loaded, and a
+-- consumer may load any exported module, so an exported module that no test
+-- imports is checked too, and the names of all of them meet (SE-081, SE-133).
+-- It is checked as a test, so that a module that is not exported may hold a
+-- test class that several tests share.
+checkLibrary :: Bool -> Manifest -> IO ()
+checkLibrary chatty manifest =
+    case manifestNature manifest of
+        Application _ -> return ()
+        Library _ -> do
+            roots <- exportedModules "." manifest
+            parsedModules <- loadModules [ModuleDependency root Internal | root <- roots] ["src"]
+            orderedModules <- either
+                (\files -> die . errorMessage $ "Detected cycle between the exported modules of the library: " ++ show files)
+                return
+                (sortProjectDepsOrLoop (M.map importedModules parsedModules))
+            forM_ libraryPlatforms $ \plt -> do
+                when chatty (putStrLn . debugMessage $ "Type checking the exported modules on " ++ show plt)
+                let config = (defaultConfig (T.unpack (projectName (manifestProject manifest))) plt) {
+                        sysPrintOutputBufferSize = manifestPrintBufSize manifest,
+                        sysReadInputBufferSize = manifestReadBufSize manifest,
+                        deploymentKind = TestBuild "library"
+                      }
+                void (typeModules parsedModules (makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)) orderedModules)
+
+  where
+
+    libraryPlatforms =
+        case foldr (\plt acc -> if plt `elem` acc then acc else plt : acc) [] (concatMap testPlatforms (M.elems (manifestTests manifest))) of
+            [] -> [TestPlatform]
+            plts -> plts
 
 selectDeployments :: Manifest -> Selection -> Maybe Platform -> Maybe ProjectProfile -> Either String [Deployment]
 selectDeployments manifest selection mPlatform mProfile =

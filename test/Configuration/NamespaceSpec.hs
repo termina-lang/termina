@@ -100,9 +100,29 @@ spec = describe "exports" $ do
         (library ["drivers.gaisler"])
         `shouldReturn` ["src/drivers/gaisler/crc.fin:1: the name crc16 of the exported module drivers.gaisler.crc does not start with the prefix gaisler (gaisler_..., GAISLER_..., Gaisler...)"]
 
+    it "rejects a test class in an exported module, and lets one that is not exported hold it" $
+      exportErrorsWith "test-class"
+        [ ("src/pus/cases.fin", "test class PusCases {\n    case hk(&priv self) {\n        return;\n    }\n};\n")
+        , ("src/test_support/cases.fin", "test class SupportCases {\n    case hk(&priv self) {\n        return;\n    }\n};\n") ]
+        (library ["pus"])
+        `shouldReturn` ["src/pus/cases.fin:1: the exported module pus.cases declares the test class PusCases, which only a test or a module that is not exported may hold"]
+
     it "does not ask for the prefix in a module that is not exported" $
       exportErrorsWith "names-free" [("src/pus/util/crc.fin", crc), ("src/test_support/fake.fin", "function fake(x : u16) -> u16 {\n    return x;\n}\n")]
         (library ["pus"]) `shouldReturn` []
+
+  describe "exported modules to type check" $
+
+    it "gives the exported modules that parse, and none of the others" $ do
+      tmp <- getTemporaryDirectory
+      let root = tmp </> "termina-namespace-spec" </> "exported"
+      removePathForcibly root
+      forM_ [("src/pus/service1.fin", ""), ("src/pus/util/crc.fin", ""), ("src/pus/broken.fin", "function {\n"), ("src/test_support/fake.fin", "")] $ \(f, content) -> do
+        createDirectoryIfMissing True (root </> takeDirectory f)
+        writeFile (root </> f) content
+      case either (Left . show) parseManifest (decodeEither' (BS.pack (library ["pus"]))) of
+        Left err -> expectationFailure err
+        Right manifest -> exportedModules root manifest `shouldReturn` ["pus" </> "service1", "pus" </> "util" </> "crc"]
 
   describe "prefix of a name" $ do
 
