@@ -169,12 +169,13 @@ genDefineTaskIdLabel t = return $ t <::> "task_id"
 genDefineHandlerIdLabel :: Identifier -> CGenerator Identifier
 genDefineHandlerIdLabel t = return $ t <::> "handler_id"
 
+-- | Identifier 0 is reserved in every build for the handler of system_except
+-- of the runtime, and the handlers of the application take 1 onwards.
 genDefineHandlerId :: [Identifier] -> CGenerator [CFileItem]
-genDefineHandlerId [] = return []
-genDefineHandlerId (task : xs) = do
-    this_task <- genDefineHandlerIdLabel task
-    rest <- genDefineHandlerId' xs 1
-    return $ pre_cr (_define this_task (Just [show (0 :: Integer)])) : rest
+genDefineHandlerId handlers = do
+    systemExcept <- genDefineHandlerIdLabel "system_except"
+    rest <- genDefineHandlerId' handlers 1
+    return $ pre_cr (_define systemExcept (Just [show (0 :: Integer)])) : rest
 
     where
 

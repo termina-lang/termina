@@ -53,10 +53,16 @@ spec = describe "Full pipeline: the system exception" $ do
     Left err ->
       it "builds an application whose system_except reaches a handler" $
         expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
-    Right (progArch, _) ->
+    Right (progArch, _) -> do
       it "registers the handler as a connection handed to the runtime" $
         either (expectationFailure . unpack) (goldenC "system_except_handler")
           (renderMainFile progArch)
+      it "gives the handler of the application identifier 1, after the 0 of the runtime" $
+        either (expectationFailure . unpack)
+          (\c -> do
+            unpack c `shouldContain` "#define system_except__handler_id 0\n"
+            unpack c `shouldContain` "#define fault_hdlr__handler_id 1\n")
+          (renderConfigFile progArch)
 
   it "SE-214: rejects a system exception attended by a task" $
     compileProjectErrorCode [("test", taskApp)]

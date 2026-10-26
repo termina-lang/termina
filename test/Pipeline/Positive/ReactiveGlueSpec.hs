@@ -67,3 +67,7 @@ spec = describe "Full pipeline: reactive application glue" $
             unpack c `shouldContain` "#define system_except__emitter_id 0\n"
             unpack c `shouldContain` "#define timer__emitter_id 1\n")
           (renderConfigFile progArch)
+      it "reserves handler identifier 0 for the handler of system_except of the runtime" $
+        either (expectationFailure . unpack)
+          (\c -> unpack c `shouldContain` "#define system_except__handler_id 0\n")
+          (renderConfigFile progArch)
