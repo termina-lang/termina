@@ -18,7 +18,6 @@ import qualified Data.Text.Encoding as TE
 import System.Directory
 import System.FilePath
 import Text.Parsec (runParser)
-import Text.Parsec.Error (errorPos)
 import Text.Parsec.Pos (sourceLine)
 
 import Configuration.Manifest
@@ -34,11 +33,11 @@ prefixText :: Prefix -> String
 prefixText (Prefix segments) = T.unpack (T.intercalate (T.pack ".") segments)
 
 -- | A module of the "src" of the project, by the segments of its name, with
--- its file and the result of parsing it.
+-- its file and its tree, if it parses.
 data SourceModule = SourceModule {
     moduleSegments :: ![String],
     moduleFile :: !FilePath,
-    moduleParsed :: !(Either Int (TerminaModule ParserAnn))
+    moduleParsed :: !(Maybe (TerminaModule ParserAnn))
   }
 
 -- | Check the prefixes of the exports of a library against each other and
@@ -76,14 +75,16 @@ checkExports root manifest =
             ++ path <.> "fin" ++ " and no .fin under " ++ path ++ "/"
         | not (any (\m -> map T.unpack segments `isPrefixOf` moduleSegments m) sources)]
 
-    -- | An exported module has to parse, import only exported modules of the
-    -- library, and give every name the prefix of the library.
+    -- | An exported module has to import only exported modules of the
+    -- library, and give every name the prefix of the library. One that does
+    -- not parse is left to the type check of the library, which loads it and
+    -- reports the error of the parser.
     exportedErrors prefixes sources m =
         case owner prefixes (moduleSegments m) of
             Nothing -> []
             Just (Prefix segments) -> case moduleParsed m of
-                Left line -> [at m line ++ "the exported module " ++ dotted (moduleSegments m) ++ " does not parse"]
-                Right ast -> importErrors prefixes sources m ast ++ nameErrors (T.unpack (last segments)) m ast
+                Nothing -> []
+                Just ast -> importErrors prefixes sources m ast ++ nameErrors (T.unpack (last segments)) m ast
                     ++ testClassErrors m ast
 
     importErrors prefixes sources m ast =
@@ -127,8 +128,9 @@ checkExports root manifest =
         (part, []) -> [part]
         (part, _ : rest) -> part : splitOn sep rest
 
--- | The exported modules of a library that parse, by their qualified name
--- ("pus/service1"), and none in an application.
+-- | The exported modules of a library, by their qualified name
+-- ("pus/service1"), those that do not parse included, and none in an
+-- application.
 exportedModules :: FilePath -> Manifest -> IO [QualifiedName]
 exportedModules root manifest =
     case manifestNature manifest of
@@ -136,8 +138,7 @@ exportedModules root manifest =
         Library prefixes -> do
             sources <- sourceModules root
             return [ joinPath (moduleSegments m) | m <- sources
-                   , any (\(Prefix segments) -> map T.unpack segments `isPrefixOf` moduleSegments m) prefixes
-                   , either (const False) (const True) (moduleParsed m) ]
+                   , any (\(Prefix segments) -> map T.unpack segments `isPrefixOf` moduleSegments m) prefixes ]
 
 -- | Whether a name starts with the last segment of the prefix of its library:
 -- in snake case or upper case, the segment and "_" ("char_dev_send",
@@ -155,17 +156,15 @@ hasLibraryPrefix segment name =
 
     joined = filter (/= '_') segment
 
--- | Parse the bytes of a module, given its qualified name and its file, or
--- give the line of the error (the first one when it is not UTF-8).
-parseModule :: QualifiedName -> FilePath -> BS.ByteString -> Either Int (TerminaModule ParserAnn)
+-- | Parse the bytes of a module, given its qualified name and its file;
+-- nothing when they are not UTF-8 or do not parse.
+parseModule :: QualifiedName -> FilePath -> BS.ByteString -> Maybe (TerminaModule ParserAnn)
 parseModule qname file bytes =
     case TE.decodeUtf8' bytes of
-        Left _ -> Left 1
-        Right text -> either (Left . sourceLine . errorPos) Right
-            (runParser terminaModuleParser qname file (T.unpack text))
+        Left _ -> Nothing
+        Right text -> either (const Nothing) Just (runParser terminaModuleParser qname file (T.unpack text))
 
--- | Every module under "src", parsed. A module that does not parse keeps the
--- line of the error.
+-- | Every module under "src", parsed when it can be.
 sourceModules :: FilePath -> IO [SourceModule]
 sourceModules root = do
     files <- finFiles (root </> "src") ""

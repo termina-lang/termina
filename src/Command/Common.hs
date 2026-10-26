@@ -47,7 +47,7 @@ loadTerminaModule ::
 loadTerminaModule root filePath srcPaths = do
   let fullP = root </> filePath <.> "fin"
   -- read it
-  src_code <- TE.decodeUtf8 <$> BS.readFile fullP
+  src_code <- either (const (die . errorMessage $ fullP ++ ": the file is not valid UTF-8")) return . TE.decodeUtf8' =<< BS.readFile fullP
   mod_time <- getModificationTime fullP
   -- parse it
   case runParser terminaModuleParser filePath fullP (T.unpack src_code) of

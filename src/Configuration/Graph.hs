@@ -57,7 +57,7 @@ checkGraph root resolution = overlapErrors ++ concatMap importErrors (M.toList p
         | FetchedFile path _ bytes <- obtainedFiles (resolvedObtained pkg)
         , isVendored m path, "src/" `isPrefixOf` path, ".fin" `isSuffixOf` path
         , let segments = splitDirectories (dropExtension (drop 4 path))
-        , Right ast <- [parseModule (joinPath segments) path bytes]
+        , Just ast <- [parseModule (joinPath segments) path bytes]
         , ModuleImport imported ann <- modules ast
         , not (any (owns imported) allowed) ]
 

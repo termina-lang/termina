@@ -32,7 +32,7 @@ exportErrorsWith label files yaml = do
   createDirectoryIfMissing True root
   forM_ files $ \(f, content) -> do
     createDirectoryIfMissing True (root </> takeDirectory f)
-    writeFile (root </> f) content
+    BS.writeFile (root </> f) (BS.pack content)
   case either (Left . show) parseManifest (decodeEither' (BS.pack yaml)) of
     Left err -> expectationFailure err >> return []
     Right manifest -> checkExports root manifest
@@ -91,9 +91,9 @@ spec = describe "exports" $ do
     it "leaves to the build an import of a module that is not in src" $
       exportErrorsWith "imports-missing" [("src/pus/service1.fin", "import hal.gpio;\n")] (library ["pus"]) `shouldReturn` []
 
-    it "rejects an exported module that does not parse, and ignores one that is not exported" $
-      exportErrorsWith "parse" [("src/pus/service1.fin", "function {\n"), ("src/test_support/fake.fin", "function {\n")]
-        (library ["pus"]) `shouldReturn` ["src/pus/service1.fin:1: the exported module pus.service1 does not parse"]
+    it "leaves to the type check of the library a module that does not parse, or is not UTF-8" $
+      exportErrorsWith "parse" [("src/pus/service1.fin", "function {\n"), ("src/pus/latin1.fin", "// versi\243n\n")]
+        (library ["pus"]) `shouldReturn` []
 
     it "rejects a name of an exported module without the prefix of the library" $
       exportErrorsWith "names" [("src/drivers/gaisler/crc.fin", "function crc16(x : u16) -> u16 {\n    return x;\n}\n")]
@@ -113,7 +113,7 @@ spec = describe "exports" $ do
 
   describe "exported modules to type check" $
 
-    it "gives the exported modules that parse, and none of the others" $ do
+    it "gives the exported modules, those that do not parse included, and none of the others" $ do
       tmp <- getTemporaryDirectory
       let root = tmp </> "termina-namespace-spec" </> "exported"
       removePathForcibly root
@@ -122,7 +122,7 @@ spec = describe "exports" $ do
         writeFile (root </> f) content
       case either (Left . show) parseManifest (decodeEither' (BS.pack (library ["pus"]))) of
         Left err -> expectationFailure err
-        Right manifest -> exportedModules root manifest `shouldReturn` ["pus" </> "service1", "pus" </> "util" </> "crc"]
+        Right manifest -> exportedModules root manifest `shouldReturn` ["pus" </> "broken", "pus" </> "service1", "pus" </> "util" </> "crc"]
 
   describe "prefix of a name" $ do
 
