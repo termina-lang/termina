@@ -129,6 +129,13 @@ poolMemoryArea identifier = terminafy $ "pool_memory" <::> identifier
 deque :: Identifier
 deque = terminafy "deque_t"
 
+-- | The types of the components of a unit test, in the runtime of the OSAL
+testEmitter, testEmitterAccess, testChannelAccess, testPool :: Identifier
+testEmitter = terminafy $ "test" <::> "emitter_t"
+testEmitterAccess = terminafy $ "test" <::> "emitter_access_t"
+testChannelAccess = terminafy $ "test" <::> "channel_access_t"
+testPool = terminafy $ "test" <::> "pool_t"
+
 -- | The array that holds the boxes of a deque
 dequeItems :: Identifier -> Identifier
 dequeItems identifier = terminafy $ "deque_items" <::> identifier

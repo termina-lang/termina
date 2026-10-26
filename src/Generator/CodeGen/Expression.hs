@@ -40,12 +40,13 @@ cBinOp LogicalOr = error "Logical or is codified as a sequential expression"
 genType :: CQualifier
     -> TerminaType SemanticAnn
     -> CGenerator CType
--- | The components of a unit test come with the harness of the tests
-genType _ ty@(TTestEmitter {}) = throwError $ InternalError $ "test components are not generated yet: " ++ show ty
-genType _ ty@(TTestChannel {}) = throwError $ InternalError $ "test components are not generated yet: " ++ show ty
-genType _ ty@(TTestPool {}) = throwError $ InternalError $ "test components are not generated yet: " ++ show ty
-genType _ ty@(TTestEmitterAccess {}) = throwError $ InternalError $ "test components are not generated yet: " ++ show ty
-genType _ ty@(TTestChannelAccess {}) = throwError $ InternalError $ "test components are not generated yet: " ++ show ty
+-- | The components of a unit test are types of the runtime of the OSAL, the
+-- same for every type of message, and a TestChannel is a channel
+genType _qual (TTestEmitter {}) = return (CTTypeDef testEmitter noqual)
+genType _qual (TTestChannel {}) = return (CTTypeDef msgQueue noqual)
+genType _qual (TTestPool {}) = return (CTTypeDef testPool noqual)
+genType _qual (TTestEmitterAccess {}) = return (CTTypeDef testEmitterAccess noqual)
+genType _qual (TTestChannelAccess {}) = return (CTTypeDef testChannelAccess noqual)
 -- |  Unsigned integer types
 genType qual TUInt8 = return (CTInt IntSize8 Unsigned qual)
 genType qual TUInt16 = return (CTInt IntSize16 Unsigned qual)

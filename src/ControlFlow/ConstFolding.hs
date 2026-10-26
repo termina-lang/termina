@@ -182,6 +182,9 @@ foldAnnotation (SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ty arrSize
 foldAnnotation (SemanticAnn (STy (PortConnection (APPoolConnTy ty))) loc) = do
   ty' <- foldType loc ty
   return $ SemanticAnn (STy (PortConnection (APPoolConnTy ty'))) loc
+foldAnnotation (SemanticAnn (STy (PortConnection (APTestPoolConnTy ty))) loc) = do
+  ty' <- foldType loc ty
+  return $ SemanticAnn (STy (PortConnection (APTestPoolConnTy ty'))) loc
 foldAnnotation (SemanticAnn (STy (PortConnection (APDequeConnTy ty))) loc) = do
   ty' <- foldType loc ty
   return $ SemanticAnn (STy (PortConnection (APDequeConnTy ty'))) loc

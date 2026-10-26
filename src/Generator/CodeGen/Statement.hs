@@ -404,6 +404,12 @@ genStructAssign loc before level cObj expr = do
                     return $ pre_cr (portFieldObj @. procid @: clsFunctionType @= clsFunctionExpr) |>> getLocation ann
                 else
                     return $ no_cr (portFieldObj @. procid @: clsFunctionType @= clsFunctionExpr) |>> getLocation ann
+            -- | The procedures of a TestPool are functions of the runtime
+            genProcedureAssignment fid (TTestPool {}) (ProcedureSeman procid ptys _modifiers) = do
+                clsFunctionType <- genProcedureType ptys
+                let portFieldObj = cObj @. fid @: typeDef testPool
+                    clsFunctionExpr = addrOf (terminafy ("test" <::> "pool" <::> procid) @: clsFunctionType)
+                return $ no_cr (portFieldObj @. procid @: clsFunctionType @= clsFunctionExpr) |>> getLocation ann
             genProcedureAssignment f i p = error $ "Invalid procedure assignment: " ++ show (f, i, p)
                 -- throwError $ InternalError "Unsupported procedure assignment"
 
@@ -454,6 +460,38 @@ genStructAssign loc before level cObj expr = do
                     return $ pre_cr ((cObj @. fld @: termina__allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
                 else
                     return $ no_cr ((cObj @. fld @: termina__allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection fld resource (SemanticAnn (STy (PortConnection (APTestPoolConnTy {}))) _) : xs) = do
+                rest <- genFieldAssignments False xs
+                let allocFunctionType = CTFunction void [void_ptr, ptr _Option__box]
+                    freeFunctionType = CTFunction void [void_ptr, termina__box_t]
+                    resourceExpr = addrOf (resource @: typeDef testPool)
+                    cPoolProcedures = [
+                            no_cr $ cObj @. fld @: termina__allocator_t @. "alloc" @: ptr allocFunctionType @= addrOf ("termina__test__pool__alloc" @: allocFunctionType),
+                            no_cr $ cObj @. fld @: termina__allocator_t @. "free" @: ptr freeFunctionType @= addrOf ("termina__test__pool__free" @: freeFunctionType)
+                        ]
+                if before' then
+                    return $ pre_cr ((cObj @. fld @: termina__allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
+                else
+                    return $ no_cr ((cObj @. fld @: termina__allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
+            -- | The ports of a case to a TestEmitter or a TestChannel take the functions of the runtime
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection fld resource (SemanticAnn (STy (PortConnection (APConnTy accessTy rts procedures))) _) : xs) = do
+                rest <- genFieldAssignments False xs
+                cPortType <- genType noqual accessTy
+                cResourceType <- genType noqual rts
+                component <- case accessTy of
+                    TTestEmitterAccess _ -> return "emitter"
+                    TTestChannelAccess _ -> return "channel"
+                    _ -> throwError $ InternalError $ "invalid access port connection: " ++ show accessTy
+                let portFieldObj = cObj @. fld @: cPortType
+                    thatAssignment = portFieldObj @. thatField @: void_ptr @= addrOf (resource @: cResourceType)
+                cProcedures <- mapM (\(ProcedureSeman procid ptys _) -> do
+                    cFunctionType <- genProcedureType ptys
+                    let cFunctionExpr = addrOf (terminafy ("test" <::> component <::> procid) @: cFunctionType)
+                    return $ no_cr (portFieldObj @. procid @: cFunctionType @= cFunctionExpr)) procedures
+                if before' then
+                    return $ pre_cr thatAssignment : (cProcedures ++ rest)
+                else
+                    return $ no_cr thatAssignment : (cProcedures ++ rest)
             genFieldAssignments before' (FieldPortConnection AccessPortConnection fld res (SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ts size _))) _) : xs) = do
                 rest <- genFieldAssignments False xs
                 cTs <- genType noqual (TArray ts size)
@@ -883,6 +921,54 @@ genBlocks (SystemCall obj ident args ann) = genAccessPortCall obj ident args ann
 -- the object the port is connected to, whatever the kind of the interface
 genAccessPortCall :: Object SemanticAnn -> Identifier -> [Expression SemanticAnn] -> SemanticAnn -> CGenerator [CCompoundBlockItem]
 genAccessPortCall obj ident args ann = do
+    typeObj <- getObjType obj
+    case typeObj of
+        TAccessPort (TTestEmitterAccess _) -> genTestComponentCall obj ident args ann
+        TAccessPort (TTestChannelAccess _) -> genTestComponentCall obj ident args ann
+        _ -> genInterfaceCall obj ident args ann
+
+-- | A call through an access port to a TestEmitter or a TestChannel
+genTestComponentCall :: Object SemanticAnn -> Identifier -> [Expression SemanticAnn] -> SemanticAnn -> CGenerator [CCompoundBlockItem]
+genTestComponentCall obj ident args ann = do
+    let loc = getLocation ann
+    cPort <- genObject obj
+    cEventArg <- genEventParamArg (internalAnn CGenericAnn)
+    let cThat = cPort @. thatField @: ptr void
+        call cArgs = (cPort @. ident @: CTFunction void []) @@ (cEventArg : cThat : cArgs) |>> loc
+    case (ident, args) of
+        -- | The value goes by address, through a temporary when it is not an object
+        ("fire", [arg@(AccessObject {})]) -> do
+            cArg <- genExpression arg
+            cArgObj <- getCObject cArg
+            return [pre_cr (call [addrOf cArgObj]) |>> loc]
+        ("fire", [arg]) -> do
+            cArg <- genExpression arg
+            cInit <- genInitializerExpr arg
+            let cArgType = _const (getCExprType cArg)
+                cTmp = "value" @: cArgType
+            return [
+                    pre_cr $ block [
+                        no_cr $ var "value" cArgType @:= cInit |>> loc,
+                        no_cr (call [addrOf cTmp]) |>> loc
+                    ]
+                ]
+        -- | The tag and the payload of the option go apart
+        ("take", [ReferenceExpression _ msgObj _]) -> do
+            cMsg <- genObject msgObj
+            msgTy <- getObjType msgObj
+            cPayloadType <- case msgTy of
+                TOption ty -> genType noqual ty
+                _ -> throwError $ InternalError $ "take of a non-option object: " ++ show msgObj
+            let cTag = cMsg @. variant @: CTTypeDef (terminafy ("enum" <::> optionType <:> "t")) noqual
+                cPayload = (cMsg @. optionSomeVariant @: CTVoid noqual) @. variantParamField 0 @: cPayloadType
+            return [pre_cr (call [addrOf cTag, addrOf cPayload]) |>> loc]
+        ("pending", _) -> do
+            cArgs <- mapM genExpression args
+            return [pre_cr (call cArgs) |>> loc]
+        _ -> throwError $ InternalError $ "invalid call to a test component: " ++ ident
+
+genInterfaceCall :: Object SemanticAnn -> Identifier -> [Expression SemanticAnn] -> SemanticAnn -> CGenerator [CCompoundBlockItem]
+genInterfaceCall obj ident args ann = do
     (cFuncType, _) <- case ann of
         SemanticAnn (ETy (AppType pts ts)) _ -> do
             cFuncType <- genProcedureType pts

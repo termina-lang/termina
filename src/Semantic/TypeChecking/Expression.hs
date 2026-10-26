@@ -1714,7 +1714,7 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty fann) (FieldPortConnection 
           -- | A pool of a unit test is reached as any pool
           LocatedElement (GGlob (TTestPool ty' _)) _ -> do
             catchMismatch pann (EAllocatorPortConnectionPoolTypeMismatch sid ty) (sameTyOrError pann ty ty')
-            return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty)
+            return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildTestPoolConnAnn pann ty)
           _ -> throwError $ annotateError pann $ EAllocatorPortConnectionInvalidGlobal sid
       TAccessPort (TAtomicAccess ty) ->
         case gentry of
@@ -1762,35 +1762,38 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty fann) (FieldPortConnection 
               extendedMembers <- concat <$> traverse (fmap M.elems . collectInterfaceProcedures pann) extends
               let procs = [ProcedureSeman procid params ms | (InterfaceProcedure _ak procid params ms _) <- members ++ extendedMembers]
               -- Check that the resource provides the interface
-              case gentry of
-                LocatedElement (GGlob rts@(TGlobal ResourceClass clsId)) _ ->
-                  getGlobalTypeDef pann clsId >>=
-                  \case {
-                      LocatedElement (Class _ _ _ provides _) _ -> (do
-                        -- Collect the interfaces provided by the resource and their extended interfaces
-                        extendedProvides <- concat <$> traverse (collectExtendedInterfaces pann) provides;
-                        case Data.List.find (iface ==) (provides ++ extendedProvides) of
-                          Just _ ->
-                            case fann of
-                              (SemanticAnn (FTy (AccessPortField usedProcs)) _) ->
-                                let filteredProcs = filter (\(ProcedureSeman procid _ _) -> M.member procid usedProcs) procs in
-                                return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann ifaceTy rts filteredProcs)
-                              _ -> error "Invalid annotation for field"
-                          _ -> throwError $ annotateError pann $ EAccessPortConnectionInterfaceNotProvided sid iface
-                      );
-                      _ -> throwError $ annotateError Internal EExpectedInterfaceType
-                  }
-                -- | A pool of a unit test provides TestPoolAccess
-                LocatedElement (GGlob pts@(TTestPool {})) _ ->
-                  if iface == "TestPoolAccess"
-                    then return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann ifaceTy pts procs)
-                    else throwError $ annotateError pann $ EAccessPortConnectionInterfaceNotProvided sid iface
-                _ -> throwError $ annotateError pann $ EAccessPortConnectionInvalidGlobal sid
+              (rts, provided) <- providedInterfaces gentry
+              case Data.List.find (iface ==) provided of
+                Just _ ->
+                  case fann of
+                    (SemanticAnn (FTy (AccessPortField usedProcs)) _) ->
+                      let filteredProcs = filter (\(ProcedureSeman procid _ _) -> M.member procid usedProcs) procs in
+                      return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann ifaceTy rts filteredProcs)
+                    _ -> error "Invalid annotation for field"
+                _ -> throwError $ annotateError pann $ EAccessPortConnectionInterfaceNotProvided sid iface
             );
             _ -> throwError $ annotateError Internal EExpectedInterfaceType
           }
       ty -> throwError $ annotateError pann (EFieldNotAccessPort fid ty)
   else throwError $ annotateError pann (EFieldValueAssignmentUnknownFields tyDef [pid])
+
+  where
+
+    -- | The type of a global that an access port to an interface can reach,
+    -- and the interfaces it provides, extended ones included
+    providedInterfaces gentry =
+      case gentry of
+        LocatedElement (GGlob rts@(TGlobal ResourceClass clsId)) _ ->
+          getGlobalTypeDef pann clsId >>=
+          \case {
+              LocatedElement (Class _ _ _ provides _) _ -> (do
+                extendedProvides <- concat <$> traverse (collectExtendedInterfaces pann) provides
+                return (rts, provides ++ extendedProvides));
+              _ -> throwError $ annotateError Internal EExpectedInterfaceType
+          }
+        -- | A pool of a unit test provides TestPoolAccess
+        LocatedElement (GGlob pts@(TTestPool {})) _ -> return (pts, ["TestPoolAccess"])
+        _ -> throwError $ annotateError pann $ EAccessPortConnectionInvalidGlobal sid
 
 typeFieldAssignments
   :: Location -> (SAST.TerminaType SemanticAnn, Location)

@@ -64,6 +64,9 @@ data ConnectionSeman a =
   | APPoolConnTy
     -- | Type specifier of the blocks of the connected pool
     (TerminaType a)
+  | APTestPoolConnTy
+    -- | Type specifier of the blocks of the connected pool of a unit test
+    (TerminaType a)
   | APDequeConnTy
     -- | Type specifier of the boxes of the connected deque
     (TerminaType a)
@@ -234,6 +237,9 @@ buildAccessPortConnAnn loc ifaceTy ts procs = SemanticAnn (STy (PortConnection (
 
 buildPoolConnAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
 buildPoolConnAnn loc ts = SemanticAnn (STy (PortConnection (APPoolConnTy ts))) loc
+
+buildTestPoolConnAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
+buildTestPoolConnAnn loc ts = SemanticAnn (STy (PortConnection (APTestPoolConnTy ts))) loc
 
 buildDequeConnAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
 buildDequeConnAnn loc ts = SemanticAnn (STy (PortConnection (APDequeConnTy ts))) loc

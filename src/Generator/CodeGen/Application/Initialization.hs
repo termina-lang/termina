@@ -36,6 +36,14 @@ genInitializeObj loc before (Resource identifier (TDeque _ size) _ _ _) = do
     if before
         then return [pre_cr initCall |>> loc]
         else return [no_cr initCall |>> loc]
+-- | The lock of a TestPool is the one of the pool inside it
+genInitializeObj loc before (Resource identifier (TTestPool {}) _ _ _) = do
+    let cLockNone =
+            ((identifier @: typeDef testPool) @. "pool" @: termina__pool_t) @. resourceLockTypeField @: termina__resource_lock_type_t
+                @. "type" @: enumFieldType @= "termina__resource_lock_type__none" @: enumFieldType
+    if before
+        then return [pre_cr cLockNone |>> loc]
+        else return [no_cr cLockNone |>> loc]
 genInitializeObj loc before (Resource identifier _ mexpr _ _) = do
     let cObj = identifier @: typeDef identifier
     let cLockNone = 
