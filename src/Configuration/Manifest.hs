@@ -29,6 +29,7 @@ module Configuration.Manifest (
     newLibraryManifest,
     defaultTestPlatforms,
     addTestEntry,
+    addDependencyEntry,
     isSnakeCase
 ) where
 
@@ -110,8 +111,7 @@ data TestEntry = TestEntry {
     testLogSize :: !Integer,
     testMicrosecondsPerTick :: !(Maybe Integer),
     testExtern :: !ExternConfig,
-    testDependencies :: ![Dependency],
-    testOverrides :: ![GitDependency]
+    testDependencies :: ![Dependency]
   } deriving (Eq, Show)
 
 -- | Parse a manifest. The version of the format is checked first, so that a
@@ -281,8 +281,11 @@ testParser testName v = do
     unless (isSnakeCase (T.unpack testName)) $
         fail $ "the test name \"" ++ T.unpack testName ++ "\" is not lowercase snake_case"
     withObject what (\o -> do
+        -- One resolution serves the whole project, so an override is forced in every build.
+        when (KM.member "overrides" o) $
+            fail $ what ++ " has overrides: they go at the top level of the manifest and apply to the whole project"
         onlyFields what ["platforms", "timeout", "test-log-size",
-            "microseconds-per-tick", "extern", "dependencies", "overrides"] o
+            "microseconds-per-tick", "extern", "dependencies"] o
         platformNames <- o .: "platforms"
         when (null platformNames) $ fail $ what ++ " has no platforms"
         when (length (nub platformNames) /= length platformNames) $
@@ -293,8 +296,7 @@ testParser testName v = do
             <*> (o .:? "test-log-size" .!= defaultTestLogSize >>= positive "test-log-size")
             <*> (o .:? "microseconds-per-tick" >>= tickParser)
             <*> (o .:? "extern" >>= maybe (return emptyExternConfig) externParser)
-            <*> (o .:? "dependencies" .!= [] >>= mapM dependencyParser)
-            <*> (o .:? "overrides" .!= [] >>= mapM gitDependencyParser)) v
+            <*> (o .:? "dependencies" .!= [] >>= mapM dependencyParser)) v
 
 -- | Check the folders of the project against the manifest, and collect every
 -- mismatch so that all of them are reported at once.
@@ -551,10 +553,56 @@ addTestEntry original testName plts timeout =
     startsSection (c : _) = c /= ' '
     startsSection [] = False
 
-    splitTrailingBlanks block =
-        let rev = reverse block
-            (blanks, content) = span (all (== ' ')) rev
-        in (reverse content, reverse blanks)
+-- | The lines of a block without its trailing blank lines, and those lines.
+splitTrailingBlanks :: [String] -> ([String], [String])
+splitTrailingBlanks block =
+    let (blanks, content) = span (all (== ' ')) (reverse block)
+    in (reverse content, reverse blanks)
+
+-- | Add a git dependency at the end of the "dependencies" of the text of a
+-- manifest, or of those of one of its tests, and add the section when there
+-- is none. The rest of the text is kept as it is, comments included.
+addDependencyEntry :: String -> Maybe String -> T.Text -> T.Text -> Either String String
+addDependencyEntry original mTest url tag =
+    unlines <$> insertUnder (maybe ["dependencies"] (\t -> ["tests", t, "dependencies"]) mTest) "" (lines original)
+
+  where
+
+    item ind = [ind ++ "- git: " ++ T.unpack url, ind ++ "  rev: \"" ++ T.unpack tag ++ "\""]
+
+    -- | Insert the item under the path of keys, in a block whose keys are
+    -- indented by "cur".
+    insertUnder [] _ block = Right block
+    insertUnder (key : rest) cur block =
+        case break (isKey cur key) block of
+            (_, [])
+                | null rest -> Right (appendEnd block (["" | null cur] ++ [cur ++ key ++ ":"] ++ item (cur ++ "  ")))
+                | otherwise -> Left $ "the manifest declares no test " ++ fromMaybe "" mTest
+            (before, header : after)
+                | not (isBlockHeader cur key header) ->
+                    Left $ "the " ++ key ++ " section of termina.yaml is not written in block style"
+                | otherwise -> do
+                    let (child, others) = span (inside cur) after
+                        ind = childIndent cur child
+                    child' <- if null rest then Right (appendEnd child (item ind)) else insertUnder rest ind child
+                    Right (before ++ [header] ++ child' ++ others)
+
+    isKey cur key l = (cur ++ key ++ ":") `isPrefixOf` l
+
+    isBlockHeader cur key l = all (== ' ') (takeWhile (/= '#') (drop (length cur + length key + 1) l))
+
+    -- | A line of the block under a key: blank, more indented, or an item of
+    -- a sequence at the indentation of the key.
+    inside cur l =
+        let (spaces, text) = span (== ' ') l
+        in null text || length spaces > length cur || (length spaces == length cur && "-" `isPrefixOf` text)
+
+    childIndent cur child =
+        case [takeWhile (== ' ') l | l <- child, let text = dropWhile (== ' ') l, not (null text), not ("#" `isPrefixOf` text)] of
+            (ind : _) -> ind
+            [] -> cur ++ "  "
+
+    appendEnd block new = let (content, blanks) = splitTrailingBlanks block in content ++ new ++ blanks
 
 -- | The manifest of a new application.
 newApplicationManifest :: String -> Platform -> String
