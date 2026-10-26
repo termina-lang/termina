@@ -3,7 +3,8 @@ module Configuration.Namespace (
     checkExports,
     exportedModules,
     prefixText,
-    hasLibraryPrefix
+    hasLibraryPrefix,
+    parseModule
 ) where
 
 import Control.Monad
@@ -154,6 +155,15 @@ hasLibraryPrefix segment name =
 
     joined = filter (/= '_') segment
 
+-- | Parse the bytes of a module, given its qualified name and its file, or
+-- give the line of the error (the first one when it is not UTF-8).
+parseModule :: QualifiedName -> FilePath -> BS.ByteString -> Either Int (TerminaModule ParserAnn)
+parseModule qname file bytes =
+    case TE.decodeUtf8' bytes of
+        Left _ -> Left 1
+        Right text -> either (Left . sourceLine . errorPos) Right
+            (runParser terminaModuleParser qname file (T.unpack text))
+
 -- | Every module under "src", parsed. A module that does not parse keeps the
 -- line of the error.
 sourceModules :: FilePath -> IO [SourceModule]
@@ -163,10 +173,7 @@ sourceModules root = do
         let file = "src" </> rel
             segments = splitDirectories (dropExtension rel)
             qname = joinPath segments
-        text <- TE.decodeUtf8 <$> BS.readFile (root </> file)
-        let parsed = either (Left . sourceLine . errorPos) Right
-                (runParser terminaModuleParser qname file (T.unpack text))
-        return (SourceModule segments file parsed)
+        SourceModule segments file . parseModule qname file <$> BS.readFile (root </> file)
 
   where
 
