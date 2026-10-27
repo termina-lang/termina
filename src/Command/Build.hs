@@ -6,8 +6,10 @@ module Command.Build (
 ) where
 
 import Configuration.Configuration
+import Configuration.Lock (decodeLockFile)
 import Configuration.Manifest
 import Configuration.Namespace (exportedModules)
+import Configuration.Vendor (checkVendor)
 import Command.Utils
 import Control.Exception (IOException, try)
 import Data.Maybe (fromMaybe, isJust)
@@ -314,10 +316,13 @@ selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile) = do
     either dieWithError return $ selectDeployments manifest selection mPlatform mProfile
 
 -- | Load the project for a command that builds: the manifest, the folders, the
--- prefixes of a library and, in a library, the types of its exported modules.
+-- prefixes of a library, the copies of its dependencies in vendor/ against the
+-- lock and, in a library, the types of its exported modules.
 loadBuildProject :: Bool -> IO Manifest
 loadBuildProject chatty = do
     manifest <- loadProject >>= either dieWithFirstError return
+    lock <- decodeLockFile "termina.lock" >>= either (dieWithError . ("termina.lock: " ++)) return
+    checkVendor "." lock >>= \errs -> unless (null errs) (dieWithFirstError errs)
     checkLibrary chatty manifest
     return manifest
 

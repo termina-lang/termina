@@ -9,7 +9,9 @@ module Configuration.Vendor (
     isVendored,
     contentHash,
     writePackage,
-    readPackage
+    readPackage,
+    lockedPackage,
+    checkVendor
 ) where
 
 import Control.Monad
@@ -101,3 +103,24 @@ readPackage root url = do
             let relPath = if null rel then e else rel ++ "/" ++ e
             isDir <- doesDirectoryExist (dir </> relPath)
             if isDir then listFiles dir relPath else return [relPath])
+
+-- | The files of a locked package in "vendor/", or why they are not the ones
+-- the lock records: the folder is missing or its content-hash differs. The
+-- copy is never repaired, so a modified "vendor/" cannot enter a build.
+lockedPackage :: FilePath -> LockedPackage -> IO (Either String [VendoredFile])
+lockedPackage root locked = do
+    let url = lockedUrl locked
+        folder = "vendor/" ++ T.unpack (normalizeUrl url)
+    exists <- doesDirectoryExist (packageDir root url)
+    if not exists
+        then return (Left $ folder ++ " is missing, and termina.lock has it at " ++ T.unpack (lockedRev locked))
+        else do
+            files <- readPackage root url
+            return $ if contentHash files == lockedContentHash locked
+                then Right files
+                else Left $ folder ++ " was modified: it does not match the content-hash that termina.lock has for "
+                    ++ T.unpack (lockedRev locked)
+
+-- | Check every package of the lock against its copy in "vendor/".
+checkVendor :: FilePath -> Lock -> IO [String]
+checkVendor root lock = concatMap (either pure (const [])) <$> mapM (lockedPackage root) (lockPackages lock)

@@ -41,8 +41,9 @@ addCmdArgsParser = AddCmdArgs
 data AddError =
     FetchFailed FetchError
     | InvalidPackage [String]
-    -- | The copy in vendor/ of a locked package does not match its hash.
-    | VendorMismatch
+    -- | The copy in vendor/ of a locked package is missing or does not match
+    -- its hash, and why.
+    | VendorMismatch String
   deriving (Eq, Show)
 
 -- | What "termina add" did, and what the user has to know about it.
@@ -118,19 +119,16 @@ addDependency place root url tag mTest = do
     -- network and whatever its tag points to now; any other is fetched.
     obtain lock used u t =
         case find ((== normalizeUrl u) . normalizeUrl . lockedUrl) (lockPackages lock) of
-            Just locked | lockedRev locked == t -> fromVendor u locked
+            Just locked | lockedRev locked == t -> fromVendor locked
             _ -> fromGit used u t
 
-    fromVendor u locked = do
-        exists <- doesDirectoryExist (packageDir root u)
-        files <- if exists then readPackage root u else return []
-        return $ if not exists || contentHash files /= lockedContentHash locked
-            then Left VendorMismatch
-            else case lookup "termina.yaml" files of
-                Nothing -> Left VendorMismatch
-                Just yaml -> case parse yaml of
-                    Left err -> Left (InvalidPackage [err])
-                    Right m -> Right (Obtained (lockedCommit locked) m [FetchedFile p "100644" b | (p, b) <- files])
+    fromVendor locked = do
+        copy <- lockedPackage root locked
+        return $ case copy of
+            Left err -> Left (VendorMismatch err)
+            Right files -> case maybe (Left "vendor/ has no termina.yaml") parse (lookup "termina.yaml" files) of
+                Left err -> Left (InvalidPackage [err])
+                Right m -> Right (Obtained (lockedCommit locked) m [FetchedFile p "100644" b | (p, b) <- files])
 
     fromGit used u t = do
         fetched <- fetchTag root u t
@@ -182,7 +180,7 @@ describeAdd (FetchFailed (TagMoved t expected actual)) =
 describeAdd (FetchFailed (NeedsCredentials _ err)) = "git has no credentials for the repository:\n" ++ err ++ misspelled
 describeAdd (FetchFailed (GitFailed err)) = "git failed:\n" ++ err
 describeAdd (InvalidPackage errs) = "the package is not valid:\n" ++ intercalate "\n" (map ("  " ++) errs)
-describeAdd VendorMismatch = "its copy in vendor/ does not match its content-hash in termina.lock"
+describeAdd (VendorMismatch err) = err
 
 -- | What the rule of git for SSH needs where termina runs. It only matters
 -- in a container, which does not keep it or has no SSH keys.

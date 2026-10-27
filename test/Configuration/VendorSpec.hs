@@ -3,11 +3,13 @@
 -- | The copies of the dependencies in "vendor/" and the hash of their content.
 module Configuration.VendorSpec (spec) where
 
+import Configuration.Lock
 import Configuration.Manifest
 import Configuration.Vendor
 
 import qualified Data.ByteString.Char8 as BS
 import Data.List (sort)
+import qualified Data.Text as T
 import System.Directory
 import System.FilePath
 import Test.Hspec
@@ -44,6 +46,20 @@ spec = do
           "extern/posix/libcrc.a", "extern/notes.c", "tests/t1/test.fin", "README.md"
         ] `shouldBe` ["termina.yaml", "src/pus/service1.fin", "src/pus/service1/tm.fin", "src/ccsds/tc/frame.fin",
           "extern/crc.c", "extern/posix/libcrc.a"]
+
+  describe "check against the lock" $
+
+    it "accepts an intact copy, and rejects a modified one and a missing one" $ do
+      tmp <- getTemporaryDirectory
+      let root = tmp </> "termina-vendor-spec-check"
+          locked name = LockedPackage ("https://github.com/acme/" <> name) "v1" (T.pack (replicate 40 'a')) (contentHash package)
+      removePathForcibly root
+      writePackage root "https://github.com/acme/pus" package
+      writePackage root "https://github.com/acme/tm" package
+      BS.writeFile (root </> "vendor" </> "github.com" </> "acme" </> "tm" </> "termina.yaml") "changed\n"
+      checkVendor root (Lock 1 [locked "pus", locked "tm", locked "ccsds"]) `shouldReturn`
+        [ "vendor/github.com/acme/tm was modified: it does not match the content-hash that termina.lock has for v1"
+        , "vendor/github.com/acme/ccsds is missing, and termina.lock has it at v1" ]
 
   describe "vendor folder" $
 
