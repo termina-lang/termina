@@ -13,7 +13,7 @@ import qualified Data.Text as T
 import Options.Applicative
 import System.Directory (removePathForcibly)
 
-import Command.Add (AddError(..), describeObtainErrors)
+import Command.Dependencies (PackageError(..), describeObtainErrors)
 import Command.Utils (Place, currentPlace, dieWithFirstError, infoMessage, loadLock)
 import Configuration.Fetch
 import Configuration.Lock

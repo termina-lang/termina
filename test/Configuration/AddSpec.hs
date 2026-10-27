@@ -6,14 +6,16 @@
 module Configuration.AddSpec (spec) where
 
 import Command.Add
+import Command.Dependencies (Sync(..), credentialsMessage, describeChange, syncDependencies)
 import Command.Restore (restoreVendor)
-import Command.Utils (Place(..))
+import Command.Utils (Place(..), loadLock)
 import Configuration.Lock
+import Configuration.Manifest (decodeManifest)
 
 import Control.Exception (bracket_)
 import Control.Monad (forM_, void)
 import qualified Data.ByteString.Char8 as BS
-import Data.List (intercalate, isInfixOf)
+import Data.List (intercalate, isInfixOf, isPrefixOf)
 import qualified Data.Text as T
 import System.Directory
 import System.Environment (setEnv, unsetEnv)
@@ -143,6 +145,54 @@ spec = do
         fmap reportLines <$> add project "tm" "v0.1.0" Nothing `shouldReturn` Right ["added https://example.invalid/acme/tm v0.1.0"]
         commits <- filter ("resolved-rev" `isInfixOf`) . lines <$> readFile (project </> "termina.lock")
         forM_ (filter ("resolved-rev" `isInfixOf`) (lines (BS.unpack locked))) (\l -> commits `shouldContain` [l])
+
+  describe "reconciliation of the lock with the manifest" $ do
+
+    let sync project = do
+          manifest <- either error id . decodeManifest <$> BS.readFile (project </> "termina.yaml")
+          lock <- either (error . unlines) id <$> loadLock project
+          fmap (map describeChange . syncChanges) <$> syncDependencies Computer "termina build" project manifest lock
+        edit project from to = do
+          text <- readFile (project </> "termina.yaml")
+          length text `seq` writeFile (project </> "termina.yaml") (replace from to text)
+        replace from to s@(c : cs)
+          | from `isPrefixOf` s = to ++ replace from to (drop (length from) s)
+          | otherwise = c : replace from to cs
+        replace _ _ [] = []
+
+    it "changes nothing when the manifest and the lock agree" $
+      withProject "sync-same" "" $ \repos project -> do
+        library repos "pus" [] "v0.1.0"
+        void $ add project "pus" "v0.1.0" Nothing
+        sync project `shouldReturn` Right []
+
+    it "follows a rev changed by hand in the manifest" $
+      withProject "sync-rev" "" $ \repos project -> do
+        library repos "pus" [] "v0.1.0"
+        let pus = repos </> "acme" </> "pus"
+        void $ add project "pus" "v0.1.0" Nothing
+        BS.writeFile (pus </> "src" </> "pus" </> "m.fin") "second\n"
+        void $ git pus ["commit", "-q", "-a", "-m", "second"]
+        void $ git pus ["tag", "v0.2.0"]
+        edit project "\"v0.1.0\"" "\"v0.2.0\""
+        sync project `shouldReturn` Right ["https://example.invalid/acme/pus v0.1.0 -> v0.2.0"]
+        lockOf project `shouldReturn` [(url "pus", "v0.2.0")]
+        BS.readFile (project </> "vendor" </> "example.invalid" </> "acme" </> "pus" </> "src" </> "pus" </> "m.fin")
+          `shouldReturn` "second\n"
+
+    it "adds a dependency written by hand, and removes one taken out of the manifest" $
+      withProject "sync-add-remove" "" $ \repos project -> do
+        library repos "pus" [] "v0.1.0"
+        library repos "tm" [] "v0.1.0"
+        void $ add project "pus" "v0.1.0" Nothing
+        edit project "acme/pus" "acme/tm"
+        sync project `shouldReturn` Right ["added https://example.invalid/acme/tm v0.1.0", "removed https://example.invalid/acme/pus v0.1.0"]
+        lockOf project `shouldReturn` [(url "tm", "v0.1.0")]
+        doesDirectoryExist (project </> "vendor" </> "example.invalid" </> "acme" </> "pus") `shouldReturn` False
+        edit project "dependencies:\n  - git: https://example.invalid/acme/tm\n    rev: \"v0.1.0\"\n" ""
+        sync project `shouldReturn` Right ["removed https://example.invalid/acme/tm v0.1.0"]
+        doesFileExist (project </> "termina.lock") `shouldReturn` False
+        doesDirectoryExist (project </> "vendor" </> "example.invalid") `shouldReturn` False
 
   describe "termina restore" $ do
 
