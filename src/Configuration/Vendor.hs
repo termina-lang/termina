@@ -113,13 +113,14 @@ lockedPackage root locked = do
         folder = "vendor/" ++ T.unpack (normalizeUrl url)
     exists <- doesDirectoryExist (packageDir root url)
     if not exists
-        then return (Left $ folder ++ " is missing, and termina.lock has it at " ++ T.unpack (lockedRev locked))
+        then return (Left $ folder ++ " is missing. Run termina restore to bring it back.")
         else do
             files <- readPackage root url
             return $ if contentHash files == lockedContentHash locked
                 then Right files
-                else Left $ folder ++ " was modified: it does not match the content-hash that termina.lock has for "
-                    ++ T.unpack (lockedRev locked)
+                else Left $ folder ++ " does not match termina.lock: its files were changed after termina added it.\n"
+                    ++ "Run termina restore to bring it back. If you meant to change the library, change it upstream, "
+                    ++ "tag it and point the dependency to the new tag."
 
 -- | Check every package of the lock against its copy in "vendor/".
 checkVendor :: FilePath -> Lock -> IO [String]

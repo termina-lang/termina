@@ -23,6 +23,7 @@ import ControlFlow.SideEffects.Errors (SideEffectsError)
 import Configuration.Platform (Platform)
 import ControlFlow.ExitPaths
 import Configuration.Configuration
+import Configuration.Lock (Lock, decodeLockFile)
 import Configuration.Manifest
 import Configuration.Namespace (checkExports)
 import System.Directory
@@ -360,6 +361,10 @@ loadManifest = liftIO $ do
         Right manifest -> do
             layoutErrors <- checkLayout "." manifest
             return $ if null layoutErrors then Right manifest else Left layoutErrors
+
+-- | Load the "termina.lock" of a project, which is empty when there is none.
+loadLock :: FilePath -> IO (Either [String] Lock)
+loadLock root = either (Left . pure . ("termina.lock: " ++)) Right <$> decodeLockFile (root </> "termina.lock")
 
 -- | Load "termina.yaml" as "loadManifest" does and check also the prefixes
 -- that a library exports, for the commands that build: a new library has no

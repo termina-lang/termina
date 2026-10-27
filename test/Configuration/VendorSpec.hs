@@ -58,8 +58,10 @@ spec = do
       writePackage root "https://github.com/acme/tm" package
       BS.writeFile (root </> "vendor" </> "github.com" </> "acme" </> "tm" </> "termina.yaml") "changed\n"
       checkVendor root (Lock 1 [locked "pus", locked "tm", locked "ccsds"]) `shouldReturn`
-        [ "vendor/github.com/acme/tm was modified: it does not match the content-hash that termina.lock has for v1"
-        , "vendor/github.com/acme/ccsds is missing, and termina.lock has it at v1" ]
+        [ "vendor/github.com/acme/tm does not match termina.lock: its files were changed after termina added it.\n"
+            ++ "Run termina restore to bring it back. If you meant to change the library, change it upstream, "
+            ++ "tag it and point the dependency to the new tag."
+        , "vendor/github.com/acme/ccsds is missing. Run termina restore to bring it back." ]
 
   describe "vendor folder" $
 

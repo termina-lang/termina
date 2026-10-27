@@ -5,7 +5,7 @@
 -- all of them or none.
 module Command.Add (
     addCmdArgsParser, addCommand, AddCmdArgs,
-    AddError(..), AddReport(..), addDependency, credentialsMessage
+    AddError(..), AddReport(..), addDependency, describeObtainErrors, credentialsMessage
 ) where
 
 import Control.Monad
@@ -19,7 +19,7 @@ import Options.Applicative
 import System.Directory
 import System.FilePath
 
-import Command.Utils (Place(..), currentPlace, dieWithFirstError, warnMessage, infoMessage)
+import Command.Utils (Place(..), currentPlace, dieWithFirstError, warnMessage, infoMessage, loadLock)
 import Configuration.Fetch
 import Configuration.Graph
 import Configuration.Lock
@@ -69,15 +69,15 @@ addCommand (AddCmdArgs url tag mTest) = do
 addDependency :: Place -> FilePath -> T.Text -> T.Text -> Maybe String -> IO (Either [String] AddReport)
 addDependency place root url tag mTest = do
     bytes <- BS.readFile (root </> "termina.yaml")
-    lockResult <- decodeLockFile (root </> "termina.lock")
-    let text = either (const (Left "termina.yaml: the file is not valid UTF-8")) (Right . T.unpack) (TE.decodeUtf8' bytes)
-    case (,) <$> (text >>= prepare) <*> either (Left . ("termina.lock: " ++)) Right lockResult of
-        Left err -> return (Left [err])
+    lockResult <- loadLock root
+    let text = either (const (Left ["termina.yaml: the file is not valid UTF-8"])) (Right . T.unpack) (TE.decodeUtf8' bytes)
+    case (,) <$> (text >>= either (Left . pure) Right . prepare) <*> lockResult of
+        Left errs -> return (Left errs)
         Right ((newText, manifest), lock) -> do
             used <- newIORef []
             resolution <- resolve (obtain lock used) manifest
             case resolution of
-                Left errs -> return (Left (describeErrors errs))
+                Left errs -> return (Left (describeObtainErrors place "termina add" errs))
                 Right res -> case checkGraph manifest res of
                     [] -> Right <$> commit newText lock res used
                     errs -> return (Left errs)
@@ -140,14 +140,6 @@ addDependency place root url tag mTest = do
                     when fromPrefetch (modifyIORef used (prefetchDir root u :))
                     return (Right (Obtained sha m files))
 
-    describeErrors errs =
-        let credentials = [(u, t) | ObtainFailed u t _ (FetchFailed (NeedsCredentials _ _)) <- errs]
-            needsCredentials (ObtainFailed _ _ _ (FetchFailed (NeedsCredentials _ _))) = True
-            needsCredentials _ = False
-        in if place == CommandLineContainer && not (null credentials)
-            then map (describeResolveError describeAdd) (filter (not . needsCredentials) errs) ++ [credentialsMessage credentials]
-            else map (describeResolveError describeAdd) errs
-
     -- | Write vendor/, the lock and the manifest, in that order, and remove
     -- the clones of the prefetch folder that were used.
     commit newText lock res used = do
@@ -194,17 +186,34 @@ sshNote CommandLineContainer = "\nThis container has no SSH keys, so it cannot c
 misspelled :: String
 misspelled = "GitHub also asks for credentials when a repository does not exist, so if it is public, check its URL."
 
+-- | The errors of bringing packages. In a command-line container, the
+-- packages that need credentials go first and together, with the ways to
+-- bring them, so that the user clones all of them on the computer at once.
+describeObtainErrors :: Place -> String -> [ResolveError AddError] -> [String]
+describeObtainErrors place commandName errs
+    | place == CommandLineContainer && not (null credentials) =
+        credentialsMessage commandName credentials : map (describeResolveError describeAdd) (filter (not . needsCredentials) errs)
+    | otherwise = map (describeResolveError describeAdd) errs
+
+  where
+
+    credentials = [(u, t) | ObtainFailed u t _ (FetchFailed (NeedsCredentials _ _)) <- errs]
+
+    needsCredentials (ObtainFailed _ _ _ (FetchFailed (NeedsCredentials _ _))) = True
+    needsCredentials _ = False
+
 -- | The ways to bring the packages that need credentials when the tool runs
--- in a command-line container, which has none.
-credentialsMessage :: [(T.Text, T.Text)] -> String
-credentialsMessage packages = intercalate "\n" $
+-- in a command-line container, which has none, for the command that needs
+-- them.
+credentialsMessage :: String -> [(T.Text, T.Text)] -> String
+credentialsMessage commandName packages = intercalate "\n" $
     ["git has no credentials in this container for:"]
     ++ ["  " ++ T.unpack u ++ " " ++ T.unpack t | (u, t) <- packages]
-    ++ [ "To add them, do one of these:"
+    ++ [ "To bring them, do one of these:"
        , "  1. On your computer, from the project folder, run:" ]
     ++ [ "       git clone --branch " ++ T.unpack t ++ " --depth 1 " ++ T.unpack u ++ " .termina/fetch/" ++ T.unpack (normalizeUrl u)
        | (u, t) <- packages ]
-    ++ [ "     and then run termina add again here."
-       , "  2. Run termina add with termina installed on your computer."
+    ++ [ "     and then run " ++ commandName ++ " again here."
+       , "  2. Run " ++ commandName ++ " with termina installed on your computer."
        , "  3. Open the project in VS Code, which passes your credentials to its container."
        , misspelled ]

@@ -10,7 +10,8 @@ module Configuration.Fetch (
     prefetchDir,
     resolveTag,
     fetchTag,
-    fetchPackage
+    fetchPackage,
+    fetchLocked
 ) where
 
 import Control.Concurrent.Async (withAsync, wait)
@@ -122,6 +123,17 @@ fetchPackage root url tag expected = do
     clone <- prefetchedClone root url
     fetchCommit clone url tag expected
 
+-- | The files of a locked commit: by its tag and, when the tag has moved
+-- since it was locked, by its SHA, which servers such as GitHub give.
+fetchLocked :: FilePath -> T.Text -> T.Text -> T.Text -> IO (Either FetchError Fetched)
+fetchLocked root url tag sha = do
+    clone <- prefetchedClone root url
+    byTag <- fetchCommit clone url tag sha
+    files <- case byTag of
+        Left (TagMoved {}) -> fetchRef clone url tag (T.unpack sha ++ "^{commit}") (T.unpack sha) sha
+        other -> return other
+    return (fmap (\fs -> Fetched sha fs (isJust clone)) files)
+
 tagRef :: T.Text -> String
 tagRef tag = "refs/tags/" ++ T.unpack tag ++ "^{commit}"
 
@@ -135,12 +147,17 @@ localCommit url tag repo rev =
 -- | The files of the expected commit of a tag, from a local clone or, without
 -- one, from a shallow fetch of the repository into a temporary folder.
 fetchCommit :: Maybe FilePath -> T.Text -> T.Text -> T.Text -> IO (Either FetchError [FetchedFile])
-fetchCommit clone url tag expected =
+fetchCommit clone url tag = fetchRef clone url tag (tagRef tag) ("refs/tags/" ++ T.unpack tag)
+
+-- | The files of the expected commit, named by a revision in a local clone or
+-- by what is fetched from the repository.
+fetchRef :: Maybe FilePath -> T.Text -> T.Text -> String -> String -> T.Text -> IO (Either FetchError [FetchedFile])
+fetchRef clone url tag localRev remoteRef expected =
     case clone of
-        Just local -> readCommit local (tagRef tag)
+        Just local -> readCommit local localRev
         Nothing -> withSystemTempDirectory "termina-fetch" $ \tmp -> do
             initialized <- git url ["init", "--bare", "-q", tmp]
-            fetched <- either (return . Left) (const $ git url ["-C", tmp, "fetch", "-q", "--depth", "1", "--no-tags", T.unpack url, "refs/tags/" ++ T.unpack tag]) initialized
+            fetched <- either (return . Left) (const $ git url ["-C", tmp, "fetch", "-q", "--depth", "1", "--no-tags", T.unpack url, remoteRef]) initialized
             either (return . Left) (const $ readCommit tmp "FETCH_HEAD^{commit}") fetched
 
   where

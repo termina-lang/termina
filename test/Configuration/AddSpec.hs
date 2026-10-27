@@ -6,6 +6,7 @@
 module Configuration.AddSpec (spec) where
 
 import Command.Add
+import Command.Restore (restoreVendor)
 import Command.Utils (Place(..))
 import Configuration.Lock
 
@@ -143,6 +144,39 @@ spec = do
         commits <- filter ("resolved-rev" `isInfixOf`) . lines <$> readFile (project </> "termina.lock")
         forM_ (filter ("resolved-rev" `isInfixOf`) (lines (BS.unpack locked))) (\l -> commits `shouldContain` [l])
 
+  describe "termina restore" $ do
+
+    let pusFolder project = project </> "vendor" </> "example.invalid" </> "acme" </> "pus"
+        added label action = withProject label "" $ \repos project -> do
+          library repos "pus" [] "v0.1.0"
+          void $ add project "pus" "v0.1.0" Nothing
+          action repos project
+
+    it "restores nothing when vendor/ matches the lock" $
+      added "restore-nothing" $ \_ project ->
+        restoreVendor Computer project `shouldReturn` Right []
+
+    it "brings back a modified copy and a missing one" $
+      added "restore-broken" $ \repos project -> do
+        library repos "tm" [] "v0.1.0"
+        void $ add project "tm" "v0.1.0" Nothing
+        BS.writeFile (pusFolder project </> "src" </> "pus" </> "m.fin") "changed\n"
+        removePathForcibly (project </> "vendor" </> "example.invalid" </> "acme" </> "tm")
+        restoreVendor Computer project `shouldReturn`
+          Right ["restored vendor/example.invalid/acme/pus (v0.1.0)", "restored vendor/example.invalid/acme/tm (v0.1.0)"]
+        BS.readFile (pusFolder project </> "src" </> "pus" </> "m.fin") `shouldReturn` ""
+        restoreVendor Computer project `shouldReturn` Right []
+
+    it "brings back the locked commit by its SHA when the tag has moved" $
+      added "restore-moved" $ \repos project -> do
+        let pus = repos </> "acme" </> "pus"
+        BS.writeFile (pus </> "src" </> "pus" </> "m.fin") "second\n"
+        void $ git pus ["commit", "-q", "-a", "-m", "second"]
+        void $ git pus ["tag", "-f", "v0.1.0"]
+        removePathForcibly (pusFolder project)
+        restoreVendor Computer project `shouldReturn` Right ["restored vendor/example.invalid/acme/pus (v0.1.0)"]
+        BS.readFile (pusFolder project </> "src" </> "pus" </> "m.fin") `shouldReturn` ""
+
   describe "messages that depend on where termina runs" $ do
 
     it "says where to set the rule for SSH only in a container" $
@@ -154,11 +188,11 @@ spec = do
           ["This container has no SSH keys, so it cannot clone over SSH. Run termina add on your computer or in VS Code."]
 
     it "gives the clone to run on the host for every package without credentials" $
-      credentialsMessage [(url "a", "v1"), (url "b", "v2")] `shouldBe` intercalate "\n"
+      credentialsMessage "termina add" [(url "a", "v1"), (url "b", "v2")] `shouldBe` intercalate "\n"
         [ "git has no credentials in this container for:"
         , "  https://example.invalid/acme/a v1"
         , "  https://example.invalid/acme/b v2"
-        , "To add them, do one of these:"
+        , "To bring them, do one of these:"
         , "  1. On your computer, from the project folder, run:"
         , "       git clone --branch v1 --depth 1 https://example.invalid/acme/a .termina/fetch/example.invalid/acme/a"
         , "       git clone --branch v2 --depth 1 https://example.invalid/acme/b .termina/fetch/example.invalid/acme/b"

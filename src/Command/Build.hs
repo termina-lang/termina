@@ -6,7 +6,6 @@ module Command.Build (
 ) where
 
 import Configuration.Configuration
-import Configuration.Lock (decodeLockFile)
 import Configuration.Manifest
 import Configuration.Namespace (exportedModules)
 import Configuration.Vendor (checkVendor)
@@ -321,7 +320,7 @@ selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile) = do
 loadBuildProject :: Bool -> IO Manifest
 loadBuildProject chatty = do
     manifest <- loadProject >>= either dieWithFirstError return
-    lock <- decodeLockFile "termina.lock" >>= either (dieWithError . ("termina.lock: " ++)) return
+    lock <- loadLock "." >>= either dieWithFirstError return
     checkVendor "." lock >>= \errs -> unless (null errs) (dieWithFirstError errs)
     checkLibrary chatty manifest
     return manifest
