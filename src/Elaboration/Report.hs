@@ -1,9 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | The report of the run-time checks of a build, written to
--- @output/checks.json@: each obligation of each module, and whether a prover
--- discharged it, in which case the generated code does not check it, or the
--- generated code checks it while the program runs.
+-- @output/checks.json@: each obligation of each module, and whether a pass
+-- showed it to hold, in which case the generated code does not check it, or the
+-- generated code checks it while the program runs. The @prover@ of a
+-- discharged obligation names the pass.
 --
 -- Modules are listed by name and the obligations of a module by position, so
 -- two builds of the same sources write the same file.
@@ -12,8 +13,7 @@ module Elaboration.Report (
 ) where
 
 import Elaboration (ElaborationReport)
-import Elaboration.Obligations (CheckKind(..))
-import Elaboration.Prover (Evidence(..))
+import Elaboration.Obligations (CheckKind(..), Evidence(..))
 import Modules.Utils (qualifiedToModuleName)
 import Utils.Annotations (Location(..), QualifiedName)
 

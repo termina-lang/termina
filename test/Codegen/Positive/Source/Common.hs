@@ -1,6 +1,9 @@
 module Codegen.Positive.Source.Common where
 
-import Elaboration (provers, elaborateProgram)
+import Elaboration (elaborateProgram)
+import Elaboration.Obligations (Proofs)
+import ControlFlow.ConstFolding (runConstFolding, foldElement)
+import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..), ConstFoldMonad)
 import Data.Text hiding (empty)
 import Parser.Parsing
 import Semantic.TypeChecking
@@ -15,6 +18,16 @@ import Generator.LanguageC.Printer
 import Generator.CodeGen.Application.Option
 
 import qualified Data.Set as S
+import qualified Data.Map.Strict as M
+
+-- | The run-time checks that the constant folding shows to hold in what the
+-- action folds. The tests elaborate the AST as the lowering left it, without
+-- the folded constants, so only the proofs are kept.
+foldingProofs :: ConstFoldMonad a -> Proofs
+foldingProofs m =
+  case runConstFolding (ConstFoldEnv M.empty TestPlatform defaultMicrosecondsPerTick M.empty) m of
+    Left err -> error $ "Constant folding error: " ++ show err
+    Right (_, env) -> constProofs env
 
 renderHeader :: String -> Text
 renderHeader = renderHeaderWith (defaultConfig "test" TestPlatform)
@@ -44,7 +57,7 @@ renderHeaderWith configParams input = case runP (contents topLevel) "test" "" in
         case runLowerModule tast of
           Left err -> pack $ "Basic blocks error: " ++ show err
           Right bbAST -> 
-            case runGenHeaderFile configParams TestPlatform "test" [] (fst (elaborateProgram provers bbAST)) emptyMonadicTypes of
+            case runGenHeaderFile configParams TestPlatform "test" [] (fst (elaborateProgram (foldingProofs (mapM foldElement bbAST)) bbAST)) emptyMonadicTypes of
               Left err -> pack $ show err
               Right (cHeaderFile, _) -> runCPrinter False cHeaderFile
 
@@ -58,7 +71,7 @@ renderSourceWith configParams input = case runP (contents topLevel) "test" "" in
         case runLowerModule tast of
           Left err -> pack $ "Basic blocks error: " ++ show err
           Right bbAST -> 
-            case runGenSourceFile configParams TestPlatform "test" (fst (elaborateProgram provers bbAST)) of
+            case runGenSourceFile configParams TestPlatform "test" (fst (elaborateProgram (foldingProofs (mapM foldElement bbAST)) bbAST)) of
               Left err -> pack $ show err
               Right cSourceFile -> runCPrinter False cSourceFile
 

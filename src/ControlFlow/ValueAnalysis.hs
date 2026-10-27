@@ -60,8 +60,7 @@ import ControlFlow.ValueAnalysis.Errors
 import ControlFlow.Dataflow
 import Core.Utils (arrayOf, intRange, intTy, shiftWidth)
 import Elaboration.Obligations
-    (CheckKind(..), Obligation(..), ObligationId, Operation(..), expressionChecks, objectChecks, atomicIndexChecks)
-import Elaboration.Prover (Evidence(..))
+    (CheckKind(..), Evidence(..), Obligation(..), ObligationId, Operation(..), Proofs, expressionChecks, objectChecks, atomicIndexChecks)
 import Semantic.Types (SemanticAnn, getObjectSAnns, getTypeSemAnn)
 import Utils.Annotations
 
@@ -327,6 +326,7 @@ evaluate plt consts locals expr =
       (M.union (M.map ConstValue (M.mapMaybe singleValue (variables locals))) consts)
       plt
       defaultMicrosecondsPerTick
+      M.empty
 
     variables path =
       M.fromList [ (ident, entry)
@@ -1579,7 +1579,7 @@ runValueAnalysisCheck ::
   -> M.Map Identifier ConstEntry
   -> ReturnedValues
   -> AnnotatedProgram SemanticAnn
-  -> (Maybe ValueAnalysisError, ReturnedValues, M.Map ObligationId Evidence)
+  -> (Maybe ValueAnalysisError, ReturnedValues, Proofs)
 runValueAnalysisCheck plt consts imported program =
   (listToMaybe (findings final), returnedValues final, M.mapMaybe id (proofs final))
 

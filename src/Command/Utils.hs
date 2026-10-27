@@ -26,8 +26,7 @@ import ControlFlow.BoxUsage.Errors (BoxUsageError)
 import ControlFlow.VarUsage.Errors (VarUsageError)
 import ControlFlow.VarScope.Errors (VarScopeError)
 import Lowering.Errors (LoweringError)
-import Elaboration (ElaborationReport, provers, elaborateProgram)
-import Elaboration.Prover.Value (valueProver)
+import Elaboration (ElaborationReport, elaborateProgram)
 import Control.Monad.IO.Class
 import qualified Data.Map.Strict as M
 import Semantic.Environment (DeclaredEnv, declaredNames)
@@ -199,18 +198,20 @@ lowerTypedModule typedModule = do
             (BasicBlockData bbAST)
 
 -- | Elaborates each module of a project, deciding the run-time checks of its
--- operations, with the report of what the provers discharged in each one. The
--- value prover of a module reads what the value analysis showed of it.
-elaborateProject :: ProjectValueEvidence -> LoweredProject -> (ElaboratedProject, M.Map QualifiedName ElaborationReport)
-elaborateProject evidence loweredProject = (fst <$> elaborated, snd <$> elaborated)
+-- operations, with the report of what was discharged in each one. The proofs
+-- come from the passes in the order given, and when two passes show the same
+-- obligation the report names the first.
+elaborateProject :: [ProjectProofs] -> LoweredProject -> (ElaboratedProject, M.Map QualifiedName ElaborationReport)
+elaborateProject passes loweredProject = (fst <$> elaborated, snd <$> elaborated)
 
   where
 
     elaborated = M.mapWithKey elaborateModule loweredProject
 
+    proofs = M.unionsWith M.union passes
+
     elaborateModule moduleName bbModule =
-      let moduleProvers = provers ++ [valueProver (M.findWithDefault M.empty moduleName evidence)]
-          (eAST, report) = elaborateProgram moduleProvers (loweredAST . metadata $ bbModule) in
+      let (eAST, report) = elaborateProgram (M.findWithDefault M.empty moduleName proofs) (loweredAST . metadata $ bbModule) in
       (bbModule { metadata = ElaboratedData eAST }, report)
 
 basicBlockPathsCheckModules :: LoweredProject -> Maybe PathsCheckError

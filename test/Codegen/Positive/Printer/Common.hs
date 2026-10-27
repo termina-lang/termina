@@ -2,7 +2,9 @@ module Codegen.Positive.Printer.Common where
 
 import qualified Lowering.AST as LAST
 import qualified Elaboration.AST as EAST
-import Elaboration (provers, elaborateProgram, elaborateBody, elaborateExpression)
+import Elaboration (elaborateProgram, elaborateBody, elaborateExpression)
+import ControlFlow.ConstFolding (foldExpression, foldBasicBlocks, foldElement)
+import Codegen.Positive.Source.Common (foldingProofs)
 import Utils.Annotations
 import Text.Parsec.Pos (newPos)
 import Semantic.Types
@@ -191,7 +193,7 @@ funSemAnn params ts = SemanticAnn (ETy (AppType params ts)) Internal
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
   let config = defaultConfig "test" TestPlatform in
-  case runState (runExceptT (genExpression (elaborateExpression provers expr))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
+  case runState (runExceptT (genExpression (elaborateExpression (foldingProofs (foldExpression expr)) expr))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
     (Left err, _) -> pack $ show err
     (Right cExpr, _) -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
@@ -200,8 +202,9 @@ renderStatement stmt =
   case runExcept (lowerStatements [] [stmt]) of
     Left err -> pack $ show err
     Right bBlocks ->
-      let config = defaultConfig "test" TestPlatform in
-      case runState (runExceptT (Prelude.concat <$> traverse genBlocks (EAST.blockBody (elaborateBody provers (LAST.Block bBlocks stmtSemAnn))))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
+      let config = defaultConfig "test" TestPlatform
+          body = LAST.Block bBlocks stmtSemAnn in
+      case runState (runExceptT (Prelude.concat <$> traverse genBlocks (EAST.blockBody (elaborateBody (foldingProofs (foldBasicBlocks body)) body)))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
         (Left err, _) -> pack $ show err
         (Right cStmts, _) -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
@@ -234,6 +237,6 @@ renderFunction func =
       case runState (runExceptT (genFunction (elaborateElement bbAST))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
--- | Elaborates a single lowered element with the provers of a build.
+-- | Elaborates a single lowered element with the proofs of the constant folding.
 elaborateElement :: LAST.AnnASTElement SemanticAnn -> EAST.AnnASTElement SemanticAnn
-elaborateElement element' = Prelude.head (fst (elaborateProgram provers [element']))
+elaborateElement element' = Prelude.head (fst (elaborateProgram (foldingProofs (foldElement element')) [element']))

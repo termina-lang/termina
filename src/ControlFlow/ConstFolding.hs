@@ -15,6 +15,19 @@ import Configuration.Platform (maxTimerPeriodTicks)
 import Core.Utils
 import Command.Types
 import Modules.Modules
+import Elaboration.Obligations
+    (CheckKind(..), Evidence(..), Obligation(..), objectChecks, expressionChecks, atomicIndexChecks)
+
+-- | Takes down as holding the obligations of one kind among those of a node,
+-- once the folding has checked them with the values of its constant operands.
+proven :: CheckKind -> String -> [Obligation] -> ConstFoldMonad ()
+proven kind reason obligations =
+  ST.modify (\env -> env { constProofs = M.union (constProofs env) shown })
+
+  where
+
+    shown = M.fromList
+      [ (oid, Evidence "constant" reason) | Obligation oid@(_, k) _ <- obligations, k == kind ]
 
 -- | The folded initializer of a constant object: a named constant, or a field
 -- or an element of one, reached down through the initializers. A name that
@@ -313,24 +326,27 @@ folding = Rewriter foldExpression foldObject foldAnnotation
 
 foldObject :: Object SemanticAnn -> ConstFoldMonad (Object SemanticAnn)
 -- | An index that is a constant expression is checked against the size of the
--- array, which is what the rest of the access path does not need.
+-- array, which is what the rest of the access path does not need. The array
+-- may be reached through a reference or sit at a fixed location.
 foldObject (ArrayIndexExpression obj index ann) = do
   ann' <- foldAnnotation ann
   obj' <- foldObject obj
   index' <- foldExpression index
   objType <- getObjType obj'
   indexExprType <- getExprType index'
-  case (withoutConst objType, indexExprType) of
-    (array@(TArray {}), TConstSubtype _) -> do
-      arraySizeValue <- getArraySizeValue array
+  let folded = ArrayIndexExpression obj' index' ann'
+  case (arrayOf objType, indexExprType) of
+    (Just (_, arraySize), TConstSubtype _) -> do
+      sizeValue <- evalConstExpression arraySize
       exprValue <- evalConstExpression index'
-      case exprValue of
-        (I (TInteger indexValue _) _) -> do
-          when (indexValue >= arraySizeValue) $ 
+      case (sizeValue, exprValue) of
+        (I (TInteger arraySizeValue _) _, I (TInteger indexValue _) _) -> do
+          when (indexValue < 0 || indexValue >= arraySizeValue) $
             throwError $ annotateError (getLocation . getAnnotation $ obj) (EArrayIndexOutOfBounds arraySizeValue indexValue)
-          return $ ArrayIndexExpression obj' index' ann'
+          proven IndexInBounds "the index is a constant" (objectChecks folded)
+          return folded
         _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
-    _ -> return $ ArrayIndexExpression obj' index' ann'
+    _ -> return folded
 foldObject obj = rewriteObject folding obj
 
 
@@ -367,23 +383,35 @@ foldExpression e@(BinOp op lhs rhs ann) = do
       fConst <- evalBinOp plt (getLocation ann) op lConst rConst ty
       return $ Constant fConst ann'
     _ -> do
+      let folded = BinOp op lhs' rhs' ann'
+          checks = expressionChecks folded
       case (op, rhs') of
-        (BitwiseLeftShift, Constant (I (TInteger k _) _) _)  -> checkShiftAmount k
-        (BitwiseRightShift, Constant (I (TInteger k _) _) _) -> checkShiftAmount k
+        (BitwiseLeftShift, Constant (I (TInteger k _) _) _)  -> checkShiftAmount k checks
+        (BitwiseRightShift, Constant (I (TInteger k _) _) _) -> checkShiftAmount k checks
         -- | A constant divisor of zero is rejected whatever the dividend.
         (Division, Constant (I (TInteger 0 _) _) _) ->
           throwError $ annotateError (getLocation ann) EConstDivisionByZero
         (Modulo, Constant (I (TInteger 0 _) _) _) ->
           throwError $ annotateError (getLocation ann) EConstDivisionByZero
+        (Division, Constant (I (TInteger k _) _) _) -> constantDivisor k checks
+        (Modulo, Constant (I (TInteger k _) _) _) -> constantDivisor k checks
         _ -> return ()
-      return $ BinOp op lhs' rhs' ann'
+      return folded
   where
-    checkShiftAmount :: Integer -> ConstFoldMonad ()
-    checkShiftAmount k = do
+    checkShiftAmount :: Integer -> [Obligation] -> ConstFoldMonad ()
+    checkShiftAmount k checks = do
       ty <- getExprType lhs
       plt <- ST.gets targetPlatform
-      when (k >= shiftWidth plt ty) $
+      when (k < 0 || k >= shiftWidth plt ty) $
         throwError $ annotateError (getLocation ann) (EShiftAmountOutOfBounds (shiftWidth plt ty) k)
+      proven ShiftBelowWidth "the amount is a constant" checks
+
+    -- | The only quotient that overflows is the minimum of the type divided by
+    -- minus one.
+    constantDivisor :: Integer -> [Obligation] -> ConstFoldMonad ()
+    constantDivisor k checks = do
+      proven NonZeroDivisor "the divisor is a constant" checks
+      when (k /= -1) $ proven NoOverflow "the divisor is a constant other than -1" checks
 foldExpression (Casting expr ty ann) = do
   ann' <- foldAnnotation ann
   expr' <- foldExpression expr
@@ -428,6 +456,7 @@ foldExpression (ArraySliceExpression ak obj lower upper ann) = do
   upper' <- foldExpression upper
   lowerType <- getExprType lower
   upperType <- getExprType upper
+  let folded = ArraySliceExpression ak obj' lower' upper' ann'
   case (exprTy, objTy, lowerType, upperType) of
     -- | If both lower and upper are constant expressions, check if the slice is valid.
     (TReference _ expectedSlice, array, TConstSubtype _, TConstSubtype _) -> do
@@ -442,9 +471,10 @@ foldExpression (ArraySliceExpression ak obj lower upper ann) = do
           else if lowerIndex > upperIndex then
             throwError $ annotateError (getLocation ann) (EArraySliceNegativeRange lowerIndex upperIndex)
           else when (expectedSliceSizeValue /= (upperIndex - lowerIndex)) $ throwError $ annotateError (getLocation ann) (EArraySliceInvalidRange arraySizeValue lowerIndex upperIndex)
+          proven SliceInBounds "the bounds are constants" (expressionChecks folded)
         _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
     _ -> return ()
-  return $ ArraySliceExpression ak obj' lower' upper' ann'
+  return folded
 -- | A struct initializer checks the value of each field against its type.
 foldExpression (StructInitializer fvas ann) = do
   ann' <- foldAnnotation ann
@@ -566,17 +596,19 @@ foldBasicBlock (AtomicArrayLoad obj indexExpr expr ann) = do
   expr' <- foldExpression expr
   objType <- getObjType obj'
   indexExprType <- getExprType index'
+  let folded = AtomicArrayLoad obj' index' expr' ann'
   case (objType, indexExprType) of
     (TAccessPort (TAtomicArrayAccess _ arraySizeExpr), TConstSubtype _) -> do
       arraySizeExprValue <- evalConstExpression arraySizeExpr
       indexExprValue <- evalConstExpression index'
       case (arraySizeExprValue, indexExprValue) of
         (I (TInteger arraySizeValue _) _, I (TInteger indexValue _) _) -> do
-          when (indexValue >= arraySizeValue) $ 
+          when (indexValue < 0 || indexValue >= arraySizeValue) $
             throwError $ annotateError (getLocation . getAnnotation $ obj) (EAtomicArrayIndexOutOfBounds arraySizeValue indexValue)
-          return $ AtomicArrayLoad obj' index' expr' ann'
+          proven IndexInBounds "the index is a constant" (atomicIndexChecks folded)
+          return folded
         _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
-    _ -> return $ AtomicArrayLoad obj' index' expr' ann'
+    _ -> return folded
 foldBasicBlock (AtomicArrayStore obj indexExpr expr ann) = do
   ann' <- foldAnnotation ann
   obj' <- foldObject obj
@@ -584,17 +616,19 @@ foldBasicBlock (AtomicArrayStore obj indexExpr expr ann) = do
   expr' <- foldExpression expr
   objType <- getObjType obj'
   indexExprType <- getExprType index'
+  let folded = AtomicArrayStore obj' index' expr' ann'
   case (objType, indexExprType) of
     (TAccessPort (TAtomicArrayAccess _ arraySizeExpr), TConstSubtype _) -> do
       arraySizeExprValue <- evalConstExpression arraySizeExpr
       indexExprValue <- evalConstExpression index'
       case (arraySizeExprValue, indexExprValue) of
         (I (TInteger arraySizeValue _) _, I (TInteger indexValue _) _) -> do
-          when (indexValue >= arraySizeValue) $ 
+          when (indexValue < 0 || indexValue >= arraySizeValue) $
             throwError $ annotateError (getLocation . getAnnotation $ obj) (EAtomicArrayIndexOutOfBounds arraySizeValue indexValue)
-          return $ AtomicArrayStore obj' index' expr' ann'
+          proven IndexInBounds "the index is a constant" (atomicIndexChecks folded)
+          return folded
         _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
-    _ -> return $ AtomicArrayStore obj' index' expr' ann'
+    _ -> return folded
 foldBasicBlock (AllocBox obj expr ann) = do
   ann' <- foldAnnotation ann
   obj' <- foldObject obj
@@ -913,9 +947,12 @@ foldElement (ExternFunction ident params mrty mode mods ann) = do
   mrty' <- mapM (foldType funLoc) mrty
   return $ ExternFunction ident params' mrty' mode mods ann'
 
+-- | The constants carry over from the modules folded before this one, and the
+-- proofs start empty, so those left at the end belong to this module.
 constFoldModule :: BasicBlocksModule -> ConstFoldMonad BasicBlocksModule
 constFoldModule (TerminaModuleData modQualifiedName modFullPath
-    modImportedModules modVisibleModules modSourcecode (BasicBlockData ast)) =
+    modImportedModules modVisibleModules modSourcecode (BasicBlockData ast)) = do
+    ST.modify (\env -> env { constProofs = M.empty })
     TerminaModuleData modQualifiedName modFullPath
         modImportedModules modVisibleModules modSourcecode . BasicBlockData <$> mapM foldElement ast
 

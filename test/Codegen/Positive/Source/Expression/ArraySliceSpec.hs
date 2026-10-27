@@ -14,7 +14,7 @@ test0 = "function add_one(input : &mut [u32; 5]) {\n" ++
         "}\n" ++
         "\n" ++
         "function slice_test0(array0 : &mut [[u32; 10]; 5]) {\n" ++
-        "    add_one(&mut(*array0)[0][0..6]);\n" ++
+        "    add_one(&mut(*array0)[0][0..5]);\n" ++
         "    return;\n" ++
         "}"
 

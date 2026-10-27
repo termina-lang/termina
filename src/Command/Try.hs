@@ -91,9 +91,9 @@ elaborateSingleModule bbModule = do
         qname = qualifiedName bbModule
         project = M.singleton qname bbModule
         files = projectSourceFiles project
-    (foldedProject, constEnvs) <- orDieWithFailure files (foldProject config TestPlatform project [qname])
-    evidence <- orDieWithFailure files (analyseValues TestPlatform constEnvs foldedProject [qname])
-    let (elaboratedProject, _) = elaborateProject evidence foldedProject
+    (foldedProject, constEnvs, constProofs) <- orDieWithFailure files (foldProject config TestPlatform project [qname])
+    valueProofs <- orDieWithFailure files (analyseValues TestPlatform constEnvs foldedProject [qname])
+    let (elaboratedProject, _) = elaborateProject [constProofs, valueProofs] foldedProject
     orDieWithFailure files (maybe (Right ()) (Left . checkFailure) (sideEffectCheckModules TestPlatform elaboratedProject))
     return $ elaboratedProject M.! qname
 

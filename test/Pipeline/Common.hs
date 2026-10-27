@@ -25,7 +25,7 @@ module Pipeline.Common
   , Failure(..)
   ) where
 
-import Elaboration (ElaborationReport, provers, elaborateProgram)
+import Elaboration (ElaborationReport, elaborateProgram)
 import Elaboration.Report (checksReport)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text.Encoding as TE
@@ -220,7 +220,7 @@ renderConfigFileWith cfg progArch =
 -- failure into the returned 'Text'.
 renderInitFile :: [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either Text Text
 renderInitFile prjprogs =
-  case runGenInitFile configParams TestPlatform "init" (fmap (fst . elaborateProgram provers) <$> prjprogs) of
+  case runGenInitFile configParams TestPlatform "init" (fmap (fst . elaborateProgram M.empty) <$> prjprogs) of
     Left err -> Left . T.pack $ show err
     Right cFile -> Right $ runCPrinter False cFile
 

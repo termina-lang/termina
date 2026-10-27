@@ -15,8 +15,7 @@ import qualified Semantic.Types as STYPES
 
 import Modules.Modules
 import Utils.Annotations
-import Elaboration.Obligations (ObligationId)
-import Elaboration.Prover (Evidence)
+import Elaboration.Obligations (Proofs)
 import ControlFlow.ConstFolding.Monad (ConstEntry)
 import qualified EFP.Schedulability.WCET.AST as WTAST
 import qualified EFP.Schedulability.Core.Types as SCHEDTYPES
@@ -79,6 +78,6 @@ type ProjectDependencies = M.Map QualifiedName [ModuleDependency]
 -- is what builds them, and the value analysis is what reads them back.
 type ProjectConstEnvs = M.Map QualifiedName (M.Map SAST.Identifier ConstEntry)
 
--- | The run-time checks of each module that the value analysis shows to hold,
--- with the reason, which the elaboration hands to the value prover.
-type ProjectValueEvidence = M.Map QualifiedName (M.Map ObligationId Evidence)
+-- | The run-time checks of each module that one pass shows to hold, with the
+-- reason, which the elaboration reads to leave them out of the generated code.
+type ProjectProofs = M.Map QualifiedName Proofs

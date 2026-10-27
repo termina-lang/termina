@@ -1,6 +1,6 @@
 -- | The index of an atomic access to an element of an array goes through the
--- bounds check, as that of any other array access, unless the provers show
--- that it falls inside the array.
+-- bounds check, as that of any other array access, unless a pass shows that
+-- it falls inside the array.
 module Codegen.Positive.Source.Statement.AtomicIndexSpec (spec) where
 
 import Pipeline.Common (runFullBuild)

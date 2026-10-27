@@ -56,9 +56,9 @@ checkModules config plt deps parsedProject orderedModules =
     checkTyped typed = do
         rawLoweredProject <- lowerModules typed
         maybe (Right ()) Left (loweredChecks rawLoweredProject)
-        (loweredProject, constEnvs) <- foldProject config plt rawLoweredProject orderedModules
-        valueEvidence <- analyseValues plt constEnvs loweredProject orderedModules
-        let (elaboratedProject, checksReports) = elaborateProject valueEvidence loweredProject
+        (loweredProject, constEnvs, foldProofs) <- foldProject config plt rawLoweredProject orderedModules
+        valueProofs <- analyseValues plt constEnvs loweredProject orderedModules
+        let (elaboratedProject, checksReports) = elaborateProject [foldProofs, valueProofs] loweredProject
         sideEffectCheck plt elaboratedProject
         programArchitecture <- genProjectArchitecture (getPlatformInitialProgram config plt) loweredProject orderedModules
         architectureCheck orderedModules programArchitecture
@@ -112,38 +112,40 @@ typeProject deps initialEnv parsedProject order =
             let typedModule = parsedModule { visibleModules = S.toList vmods, metadata = SemanticData typedProgram }
             in typeModules (M.insert m typedModule typedProject) env' ms
 
--- | Fold the constants of the modules in order. The constants of a module are
--- passed on to the modules after it.
+-- | Fold the constants of the modules in order, and give for each module the
+-- run-time checks that the folding shows to hold. The constants of a module
+-- are passed on to the modules after it.
 foldProject :: TerminaConfig -> Platform -> LoweredProject -> [QualifiedName]
-  -> Either CheckFailure (LoweredProject, ProjectConstEnvs)
+  -> Either CheckFailure (LoweredProject, ProjectConstEnvs, ProjectProofs)
 foldProject config plt loweredProject =
-    foldModules (ConstFoldEnv M.empty plt (microsecondsPerTick config)) M.empty M.empty
+    foldModules (ConstFoldEnv M.empty plt (microsecondsPerTick config) M.empty) M.empty M.empty M.empty
 
   where
 
-    foldModules _ foldedProject constEnvs [] = Right (foldedProject, constEnvs)
-    foldModules env foldedProject constEnvs (m:ms) = do
+    foldModules _ foldedProject constEnvs proofs [] = Right (foldedProject, constEnvs, proofs)
+    foldModules env foldedProject constEnvs proofs (m:ms) = do
       (foldedModule, env') <- either (Left . checkFailure) Right (runConstFolding env (constFoldModule (loweredProject M.! m)))
-      foldModules env' (M.insert m foldedModule foldedProject) (M.insert m (constEnv env') constEnvs) ms
+      foldModules env' (M.insert m foldedModule foldedProject) (M.insert m (constEnv env') constEnvs)
+        (M.insert m (constProofs env') proofs) ms
 
 -- | Check that no condition of the modules has the same value every time it is
 -- evaluated (VAE-001), and give the run-time checks that the values of their
 -- operands show to hold. The modules go in order, and what each function
 -- returns is passed on to the modules after it.
 analyseValues :: Platform -> ProjectConstEnvs -> LoweredProject -> [QualifiedName]
-  -> Either CheckFailure ProjectValueEvidence
+  -> Either CheckFailure ProjectProofs
 analyseValues plt constEnvs loweredProject = checkModules' M.empty M.empty
 
   where
 
-    checkModules' _ evidence [] = Right evidence
-    checkModules' returned evidence (m:ms) =
+    checkModules' _ proofs [] = Right proofs
+    checkModules' returned proofs (m:ms) =
       case runValueAnalysisCheck plt
              (M.findWithDefault M.empty m constEnvs)
              returned
              (loweredAST . metadata $ loweredProject M.! m) of
         (Just err, _, _) -> Left (checkFailure err)
-        (Nothing, returned', proven) -> checkModules' returned' (M.insert m proven evidence) ms
+        (Nothing, returned', moduleProofs) -> checkModules' returned' (M.insert m moduleProofs proofs) ms
 
 -- | The architecture of the program, built from the modules in order.
 genProjectArchitecture :: TerminaProgArch SemanticAnn -> LoweredProject -> [QualifiedName]

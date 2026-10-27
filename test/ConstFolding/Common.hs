@@ -34,4 +34,4 @@ constFoldError input = case runP (contents topLevel) "test" "" input of
         Left err -> error $ "Basic Blocks error: " ++ show err
         Right bb ->
           let bbModule = TerminaModuleData "test" "test" [] [] (pack input) (BasicBlockData bb)
-          in either Just (const Nothing) (runConstFolding (ConstFoldEnv M.empty TestPlatform defaultMicrosecondsPerTick) (constFoldModule bbModule))
+          in either Just (const Nothing) (runConstFolding (ConstFoldEnv M.empty TestPlatform defaultMicrosecondsPerTick M.empty) (constFoldModule bbModule))

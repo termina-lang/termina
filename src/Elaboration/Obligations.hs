@@ -2,30 +2,27 @@
 --
 -- Each operation that the generated code may check gives one obligation per
 -- property the check guarantees, and the operation is emitted without the check
--- only when a prover discharges all of them. An obligation is named by the
--- location of the operation and the property, so a prover that works on a
--- whole body, such as a data-flow analysis, can answer by name.
+-- only when a pass shows all of them to hold. An obligation is named by the
+-- location of the operation and the property, so a pass that walks a whole
+-- body, such as a data-flow analysis, gives its proofs by name.
 module Elaboration.Obligations (
     CheckKind(..)
   , ObligationId
   , Obligation(..)
   , Operation(..)
-  , Scope(..)
+  , Evidence(..)
+  , Proofs
   , objectChecks
   , expressionChecks
   , atomicIndexChecks
-  , literalValue
-  , scopeExpressions
-  , scopeObligations
 ) where
 
 import Lowering.AST
 import Semantic.Types
-import ControlFlow.Traversal (Child'(..), Child, expressionChildren)
 import Core.Utils (intTy, posTy)
 import Utils.Annotations
 
-import Data.Maybe (maybeToList)
+import qualified Data.Map.Strict as M
 
 -- | The property that a check guarantees.
 data CheckKind
@@ -56,11 +53,15 @@ data Obligation = Obligation
   , obligationOperation :: Operation
   }
 
--- | What the provers reason about: a body, or an expression that stands outside
--- any body, such as the initializer of a global.
-data Scope
-  = BodyScope (Block SemanticAnn)
-  | ExpressionScope (Expression SemanticAnn)
+-- | Why an obligation holds: the pass that showed it and the reason.
+data Evidence = Evidence
+  {
+    evidenceProver :: String
+  , evidenceReason :: String
+  } deriving Show
+
+-- | The obligations that a pass shows to hold.
+type Proofs = M.Map ObligationId Evidence
 
 -- | The checks of an access path node, not counting the ones of the objects and
 -- the expressions below it.
@@ -122,88 +123,3 @@ binOpChecks op leftTy =
     valueType (TFixedLocation ty) = valueType ty
     valueType (TBoxSubtype ty) = valueType ty
     valueType ty = ty
-
--- | The value of an integer literal.
-literalValue :: Expression SemanticAnn -> Maybe Integer
-literalValue (Constant (I (TInteger value _) _) _) = Just value
-literalValue _ = Nothing
-
--- | The expressions of a scope that stand on their own, in the order of the
--- program text. An object that a statement or a block holds outside any
--- expression is given as an access to it.
-scopeExpressions :: Scope -> [Expression SemanticAnn]
-scopeExpressions (ExpressionScope expr) = [expr]
-scopeExpressions (BodyScope blk) = blockExpressions blk
-
-  where
-
-    blockExpressions = concatMap basicBlockExpressions . blockBody
-
-    basicBlockExpressions bb = case bb of
-      RegularBlock stmts -> concatMap statementExpressions stmts
-      IfElseBlock condIf elseIfs mElse _ ->
-        condIfCond condIf : blockExpressions (condIfBody condIf)
-        ++ concatMap (\c -> condElseIfCond c : blockExpressions (condElseIfBody c)) elseIfs
-        ++ concatMap (blockExpressions . condElseBody) (maybeToList mElse)
-      ForLoopBlock _ _ initE endE mBreak body _ ->
-        initE : endE : maybeToList mBreak ++ blockExpressions body
-      MatchBlock expr cases mDefault _ ->
-        expr : concatMap (blockExpressions . matchBody) cases
-        ++ concat [blockExpressions b | DefaultCase b _ <- maybeToList mDefault]
-      _ -> maybe [] (map childExpression) (simpleBlockChildren bb)
-
-    statementExpressions (Declaration _ _ _ mExpr _) = maybeToList mExpr
-    statementExpressions (AssignmentStmt obj expr _) = [AccessObject obj, expr]
-    statementExpressions (SingleExpStmt expr _) = [expr]
-
-    childExpression (ChildExpr expr) = expr
-    childExpression (ChildArg expr) = expr
-    childExpression (ChildConstExpr expr) = expr
-    childExpression (ChildObject obj) = AccessObject obj
-    childExpression (ChildReference _ obj) = AccessObject obj
-
--- | Every obligation of a scope: those of its expressions, in the order of the
--- program text, and those of its atomic accesses to array elements.
-scopeObligations :: Scope -> [Obligation]
-scopeObligations scope =
-  concatMap expressionObligations (scopeExpressions scope)
-  ++ concatMap atomicIndexChecks (scopeBlocks scope)
-
--- | The basic blocks of a scope, those nested in others included.
-scopeBlocks :: Scope -> [BasicBlock SemanticAnn]
-scopeBlocks (ExpressionScope _) = []
-scopeBlocks (BodyScope blk) = blocksOf blk
-
-  where
-
-    blocksOf = concatMap withNested . blockBody
-
-    withNested bb = bb : case bb of
-      IfElseBlock condIf elseIfs mElse _ ->
-        blocksOf (condIfBody condIf)
-        ++ concatMap (blocksOf . condElseIfBody) elseIfs
-        ++ concatMap (blocksOf . condElseBody) (maybeToList mElse)
-      ForLoopBlock _ _ _ _ _ body _ -> blocksOf body
-      MatchBlock _ cases mDefault _ ->
-        concatMap (blocksOf . matchBody) cases
-        ++ concat [blocksOf b | DefaultCase b _ <- maybeToList mDefault]
-      _ -> []
-
-expressionObligations :: Expression SemanticAnn -> [Obligation]
-expressionObligations expr = expressionChecks expr ++ concatMap childObligations (expressionChildren expr)
-
-objectObligations :: Object SemanticAnn -> [Obligation]
-objectObligations obj = objectChecks obj ++ case obj of
-  ArrayIndexExpression inner index _ -> objectObligations inner ++ expressionObligations index
-  MemberAccess inner _ _ -> objectObligations inner
-  DereferenceMemberAccess inner _ _ -> objectObligations inner
-  Dereference inner _ -> objectObligations inner
-  Unbox inner _ -> objectObligations inner
-  Variable {} -> []
-
-childObligations :: Child SemanticAnn -> [Obligation]
-childObligations (ChildExpr expr) = expressionObligations expr
-childObligations (ChildArg expr) = expressionObligations expr
-childObligations (ChildConstExpr expr) = expressionObligations expr
-childObligations (ChildObject obj) = objectObligations obj
-childObligations (ChildReference _ obj) = objectObligations obj

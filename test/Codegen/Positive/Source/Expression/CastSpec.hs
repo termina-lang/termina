@@ -13,7 +13,7 @@ test0 = "function casting_test0() {\n" ++
         "    var bar_i8 : i8 = 0;\n" ++
         "    var bar_i16 : i16 = 0;\n" ++
         "    var bar_i32 : i32 = 0;\n" ++
-        "    bar_u8 = ((0xFFFF0000 : u32) as u8);\n" ++
+        "    bar_u8 = ((0xFF : u32) as u8);\n" ++
         "    bar_u16 = (bar_u8 as u16);\n" ++
         "    bar_u32 = (bar_u8 as u32) + (bar_i8 as u32);\n" ++
         "    bar_i16 = bar_i16 * (bar_u8 as i16);\n" ++
@@ -54,7 +54,7 @@ spec = do
               "\n" ++
               "    int32_t bar_i32 = 0L;\n" ++
               "\n" ++
-              "    bar_u8 = (uint8_t)0xFFFF0000U;\n" ++
+              "    bar_u8 = (uint8_t)0xFFU;\n" ++
               "\n" ++
               "    bar_u16 = (uint16_t)bar_u8;\n" ++
               "\n" ++

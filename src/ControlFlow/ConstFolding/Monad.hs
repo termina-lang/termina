@@ -5,6 +5,7 @@ import Semantic.Types
 import Configuration.Platform (Platform)
 import Control.Monad.Except
 import ControlFlow.ConstFolding.Errors
+import Elaboration.Obligations (Proofs)
 import qualified Control.Monad.State as ST
 
 -- | What is known of a name: the value of an integer or a boolean, which the
@@ -27,6 +28,9 @@ data ConstFoldEnv = ConstFoldEnv
     -- | Length of the tick in microseconds, which the period of a periodic
     -- timer has to be a multiple of.
   , tickMicroseconds :: Integer
+    -- | The run-time checks of the module that the folding has evaluated with
+    -- constant operands and found to hold.
+  , constProofs :: Proofs
   }
 
 type ConstFoldMonad = ExceptT ConstFoldError (ST.State ConstFoldEnv)
