@@ -12,8 +12,9 @@ import qualified Data.Set as S
 import Modules.Modules (TerminaModuleData(fullPath))
 
 
-genMakefile :: TerminaConfig -> LoweredProject -> Maybe ExternBuild -> Makefile
-genMakefile params loweredProject mExtern =
+-- | The flag says whether the deployment is a unit test, which reads the test clock
+genMakefile :: TerminaConfig -> LoweredProject -> Maybe ExternBuild -> Bool -> Makefile
+genMakefile params loweredProject mExtern unitTest =
     Makefile $ [
         MakeBlock [
             MVariable MSimple "R" [MFragment "$(shell pwd)"]
@@ -29,7 +30,7 @@ genMakefile params loweredProject mExtern =
             MVariable MConditional "TERMINA_OSAL_DIR" [MFragment "/opt/termina/osal"],
             MVariable MSimple "TERMINA_PROFILE"
                 [MFragment (case profile params of { Debug -> "debug"; Release -> "release" })]
-        ]] ++ bufferSizeFlags ++ [
+        ]] ++ testFlags ++ bufferSizeFlags ++ [
         MakeBlock [
             MInclude True $ "$(TERMINA_OSAL_DIR)" </> "platform" </> "$(PLATFORM)" </> "platform" <.> "mk"
         ],
@@ -158,6 +159,13 @@ genMakefile params loweredProject mExtern =
             , "tests" `elem` take 1 (splitDirectories (fullPath m)) ]
 
         hasExtern = maybe False (const True) mExtern
+
+        -- | A test builds the test runtime of the OSAL, which platform.mk adds
+        testFlags = [
+                MakeBlock $
+                    MVariable MSimple "TERMINA_TEST" [MFragment "1"]
+                    : [MVariable MAppend "CFLAGS" [MFragment "-DTERMINA__TEST__CLOCK"] | unitTest]
+            | isTestBuild params ]
 
         deliverableVariables = [
             "R", "TERMINA_OSAL_DIR", "TERMINA_PROJECT_DIR", "CC", "AS", "LD", "OBJCOPY", "NM", "OBJDUMP",

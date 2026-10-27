@@ -14,9 +14,7 @@ import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.Utils
 import Generator.CodeGen.Application.Utils
 import Configuration.Configuration
-import Semantic.AST
 import Generator.CodeGen.Expression
-import Generator.CodeGen.Types
 import Generator.Monadic
 import Control.Monad.State
 import qualified Data.Set as S
@@ -94,68 +92,24 @@ genConfigFile mName config progArchitecture = do
 
     where
 
-        genMessagesForQueue :: OSALMsgQueue -> CGenerator [String]
-        genMessagesForQueue (OSALTaskMsgQueue _ _ size) = do
-            cSize <- genConstExpression size
-            let cSizeOf = _sizeOfType termina__event_t
-                ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
-                ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
-            return [
-                    "    TERMINA__APP_CONFIG__MESSAGE_QUEUE_BUFFER( ",
-                    "        " <> ppSize <> ", ",
-                    "        " <> ppSizeOf <> " ",
-                    "    ) "
-                ]
         -- | Message queues with unit type do not need to be accounted for when
         -- assigning memory for the message buffer.
-        genMessagesForQueue (OSALChannelMsgQueue _ TUnit _ _ _) = return []
-        genMessagesForQueue (OSALChannelMsgQueue _ ty size _ _) = do
-            cSize <- genConstExpression size
-            cTy <- genType noqual ty
-            let cSizeOf = _sizeOfType cTy
-                ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
-                ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
-            return [
-                    "    TERMINA__APP_CONFIG__MESSAGE_QUEUE_BUFFER( ",
-                    "        " <> ppSize <> ", ",
-                    "        " <> ppSizeOf <> " ",
-                    "    ) "
-                ]
-        genMessagesForQueue (OSALTestChannelMsgQueue _ ty size) = do
-            cSize <- genConstExpression size
-            cTy <- genType noqual ty
-            let cSizeOf = _sizeOfType cTy
-                ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
-                ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
-            return [
-                    "    TERMINA__APP_CONFIG__MESSAGE_QUEUE_BUFFER( ",
-                    "        " <> ppSize <> ", ",
-                    "        " <> ppSizeOf <> " ",
-                    "    ) "
-                ]
-        genMessagesForQueue (OSALTestEventMsgQueue _ size) = do
-            cSize <- genConstExpression size
-            let cSizeOf = _sizeOfType termina__event_t
-                ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
-                ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
-            return [
-                    "    TERMINA__APP_CONFIG__MESSAGE_QUEUE_BUFFER( ",
-                    "        " <> ppSize <> ", ",
-                    "        " <> ppSizeOf <> " ",
-                    "    ) "
-                ]
-        genMessagesForQueue (OSALSinkPortMsgQueue _ _ _ ty size) = do
-            cSize <- genConstExpression size
-            cTy <- genType noqual ty
-            let cSizeOf = _sizeOfType cTy
-                ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
-                ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
-            return [
-                    "    TERMINA__APP_CONFIG__MESSAGE_QUEUE_BUFFER( ",
-                    "        " <> ppSize <> ", ",
-                    "        " <> ppSizeOf <> " ",
-                    "    ) "
-                ]
+        genMessagesForQueue :: OSALMsgQueue -> CGenerator [String]
+        genMessagesForQueue msgq = do
+            elements <- msgQueueElements msgq
+            case elements of
+                Nothing -> return []
+                Just (size, cTy) -> do
+                    cSize <- genConstExpression size
+                    let cSizeOf = _sizeOfType cTy
+                        ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
+                        ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
+                    return [
+                            "    TERMINA__APP_CONFIG__MESSAGE_QUEUE_BUFFER( ",
+                            "        " <> ppSize <> ", ",
+                            "        " <> ppSizeOf <> " ",
+                            "    ) "
+                        ]
 
         genMessagesForQueues :: [OSALMsgQueue] -> CGenerator [String]
         genMessagesForQueues [msgq] = genMessagesForQueue msgq

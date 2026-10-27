@@ -49,6 +49,10 @@ termina__runtime_operation__task_dispatch :: CExpression
 termina__runtime_operation__task_dispatch =
     "termina__runtime_operation__task_dispatch" @: termina__runtime_operation_t
 
+termina__runtime_operation__test_reset :: CExpression
+termina__runtime_operation__test_reset =
+    "termina__runtime_operation__test_reset" @: termina__runtime_operation_t
+
 termina__lock_t, termina__resource_lock_type_t,
     termina__enum__resource_lock_type__mutex_params_t :: CType
 termina__lock_t = typeDef "termina__lock_t"
@@ -158,6 +162,50 @@ termina__test__pool__init = "termina__test__pool__init" @:
             -- | const size_t block_size
             CTSizeT noqual
         ]
+
+termina__test__selected :: CExpression
+termina__test__selected = "termina__test__selected" @:
+    CTFunction (CTBool noqual)
+        [
+            -- | const uint16_t test_case
+            _const uint16_t
+        ]
+
+termina__test__case_begin :: CExpression
+termina__test__case_begin = "termina__test__case_begin" @:
+    CTFunction void
+        [
+            -- | const uint16_t test_case
+            _const uint16_t
+        ]
+
+termina__test__case_end :: CExpression
+termina__test__case_end = "termina__test__case_end" @:
+    CTFunction void []
+
+termina__test__end :: CExpression
+termina__test__end = "termina__test__end" @:
+    CTFunction void []
+
+termina__test__clock__reset :: CExpression
+termina__test__clock__reset = "termina__test__clock__reset" @:
+    CTFunction void []
+
+termina__test__channel__flush :: CExpression
+termina__test__channel__flush = "termina__test__channel__flush" @:
+    CTFunction void
+        [
+            -- | const termina__msg_queue_t * const channel
+            _const . ptr $ _const termina__msg_queue_t
+        ]
+
+-- | The action that attends system_except in a unit test
+termina__test__except_hook :: CObject
+termina__test__except_hook = "termina__test__except_hook" @: termina__system_except_action_t
+
+termina__app__test_reset :: CExpression
+termina__app__test_reset = "termina__app__test_reset" @:
+    CTFunction void []
 
 _SystemEntry__clock_get_uptime :: CExpression
 _SystemEntry__clock_get_uptime = "SystemEntry__clock_get_uptime" @:

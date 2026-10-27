@@ -42,7 +42,7 @@ spec = describe "Manifest: extern section" $ do
 
   it "links the C into a relocatable object listed among the objects" $ do
     let config = defaultConfig "test" TestPlatform
-        makefile = runMakefilePrinter (genMakefile config M.empty (Just (ExternBuild ["crc.c"] ["leon3sf/libmcs.a"])))
+        makefile = runMakefilePrinter (genMakefile config M.empty (Just (ExternBuild ["crc.c"] ["leon3sf/libmcs.a"])) False)
     mapM_ (\line -> T.unpack makefile `shouldContain` line)
       [ "EXTERN_SRCS+=$R/extern/crc.c\n"
       , "EXTERN_LIBS+=$R/extern/leon3sf/libmcs.a\n"

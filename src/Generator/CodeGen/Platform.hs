@@ -5,6 +5,7 @@ module Generator.CodeGen.Platform where
 
 import Configuration.Configuration
 import ControlFlow.Architecture.Types
+import ControlFlow.Architecture.Utils (isUnitTest)
 import Semantic.Types
 
 import System.FilePath
@@ -31,7 +32,7 @@ genPlatformCode params plt loweredProject progArchitecture mExtern = do
     Right cConfigFile -> writeIfChanged configFile $ runCPrinter (lineDirectives params) cConfigFile
 
   writeIfChanged (destinationPath </> "Makefile") $
-    runMakefilePrinter (genMakefile params loweredProject mExtern)
+    runMakefilePrinter (genMakefile params loweredProject mExtern (isUnitTest progArchitecture))
 
   where
 

@@ -12,7 +12,7 @@ import qualified Data.Text as T
 import Test.Hspec
 
 makefileFor :: TerminaConfig -> String
-makefileFor config = T.unpack . runMakefilePrinter $ genMakefile config M.empty Nothing
+makefileFor config = T.unpack . runMakefilePrinter $ genMakefile config M.empty Nothing False
 
 spec :: Spec
 spec = describe "Makefile: project configuration" $ do
@@ -42,3 +42,13 @@ spec = describe "Makefile: project configuration" $ do
 
   it "deletes the target of a recipe that fails" $
     makefileFor (defaultConfig "test" TestPlatform) `shouldContain` ".DELETE_ON_ERROR:"
+
+  it "builds the test runtime only in a test, and the test clock only in a unit test" $ do
+    let testConfig = (defaultConfig "test" TestPlatform) { deploymentKind = TestBuild (T.pack "hk") }
+        unitMakefile = T.unpack . runMakefilePrinter $ genMakefile testConfig M.empty Nothing True
+        concurrentMakefile = T.unpack . runMakefilePrinter $ genMakefile testConfig M.empty Nothing False
+    -- Before the platform.mk, which reads it
+    unitMakefile `shouldContain` "TERMINA_TEST:=1\nCFLAGS+=-DTERMINA__TEST__CLOCK\n"
+    concurrentMakefile `shouldContain` "TERMINA_TEST:=1\n"
+    concurrentMakefile `shouldNotContain` "TERMINA__TEST__CLOCK"
+    makefileFor (defaultConfig "test" TestPlatform) `shouldNotContain` "TERMINA_TEST"

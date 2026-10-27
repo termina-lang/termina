@@ -18,13 +18,15 @@ import Control.Monad.Except
 import Generator.CodeGen.Application.Utils
 import Generator.CodeGen.Types
 import Semantic.AST
-import Control.Monad (forM)
-import Data.List (find)
+import Control.Monad (forM, when)
+import Data.List (find, sortOn)
+import Data.Maybe (fromMaybe)
 import Generator.CodeGen.Expression
 import Generator.Monadic
 import Control.Monad.State
 import qualified Data.Set as S
 import Utils.Annotations
+import Core.Utils (harnessTaskPriority)
 
 -- | Body of an initialization function that can fail, given the declarations of
 -- the local variables that its steps share and the steps. The status is an
@@ -64,10 +66,30 @@ genInitTasks :: TerminaProgArch a -> CGenerator [CFileItem]
 genInitTasks progArchitecture = do
     let progTasks = M.elems $ tasks progArchitecture
     initTasks <- mapM genOSALTaskInit progTasks
+    initHarness <- if isUnitTest progArchitecture then (: []) <$> genHarnessInit else return []
+    let steps = initTasks ++ initHarness
     return [pre_cr $ static_function (terminafy $ "app" <::> "init_tasks") ["status" @: (_const . ptr $ termina__error_code_t)] @-> void $
-            trail_cr . block $ genStatusSteps [] initTasks | not (null initTasks)]
+            trail_cr . block $ genStatusSteps [] steps | not (null steps)]
 
     where
+
+        -- | The task of the harness, at the priority reserved for it and without a queue
+        genHarnessInit :: CGenerator [CCompoundBlockItem]
+        genHarnessInit = do
+            harnessId <- genDefineTaskIdLabel testHarness
+            defaultSize <- gets (defaultStackSize . targetPlatform)
+            stackSize <- gets (fromMaybe defaultSize . harnessStackSize . configParams)
+            return [
+                    pre_cr $ termina__task__init @@ [
+                        harnessId @: termina__id_t,
+                        dec harnessTaskPriority @: termina__task_prio_t,
+                        dec stackSize @: size_t,
+                        addrOf (testHarnessFunction @: termina__task_entry_t),
+                        "NULL" @: ptr void,
+                        "status" @: (_const . ptr $ termina__error_code_t)
+                    ]
+                ]
+
         genOSALTaskInit :: TPTask a -> CGenerator [CCompoundBlockItem]
         genOSALTaskInit tsk = do
             taskId <- genDefineTaskIdLabel (taskName tsk)
@@ -108,16 +130,39 @@ genInitEmitters progArchitecture = do
             ++ [pre_cr $ var "interrupt_connection" termina__interrupt_connection_t
                 | any (\case { TPInterruptEmitter {} -> True; _ -> False }) installedEmitters]
             ++ [pre_cr $ var "except_connection" termina__system_except_connection_t
-                | any (\case { TPSystemExceptEmitter {} -> True; _ -> False }) installedEmitters]
+                | any (\case { TPSystemExceptEmitter {} -> True; _ -> False }) installedEmitters
+                    || isUnitTest progArchitecture]
     initEmitter <- mapM genEmitterConnection installedEmitters
     let progTestEmitters = M.elems $ testEmitters progArchitecture
     initTestEmitters <- mapM genTestEmitterConnection progTestEmitters
     fireFunctions <- concat <$> mapM genTestFireFunction progTestEmitters
-    let steps = initEmitter ++ initTestEmitters
+    initHook <- if isUnitTest progArchitecture then (: []) <$> genExceptHookConnection else return []
+    let steps = initEmitter ++ initTestEmitters ++ initHook
     return $ fireFunctions ++ [pre_cr $ static_function (terminafy $ "app" <::> "init_emitters") ["status" @: (_const . ptr $ termina__error_code_t)] @-> void $
             trail_cr . block $ genStatusSteps declarations steps | not (null steps)]
 
     where
+
+        -- | In a unit test the hook of the runtime attends system_except
+        genExceptHookConnection :: CGenerator [CCompoundBlockItem]
+        genExceptHookConnection = do
+            handlerId <- genDefineHandlerIdLabel "system_except"
+            genExceptConnection ("NULL" @: ptr void) handlerId termina__test__except_hook
+
+        -- | The handler of system_except: its object, its identifier and its action
+        genExceptConnection :: CExpression -> Identifier -> CObject -> CGenerator [CCompoundBlockItem]
+        genExceptConnection handlerObject handlerId handlerAction = do
+            emitterId <- genDefineEmitterIdLabel "system_except"
+            let connection = "except_connection" @: termina__system_except_connection_t
+            return [
+                    pre_cr $ connection @. "handler_object" @: ptr void @= handlerObject,
+                    no_cr $ connection @. "handler_id" @: termina__id_t @= handlerId @: termina__id_t,
+                    no_cr $ connection @. "handler_action" @: termina__system_except_action_t @= addrOf handlerAction,
+                    pre_cr $ termina__except__init_emitter @@ [
+                        emitterId @: termina__id_t,
+                        addrOf connection
+                    ]
+                ]
 
         -- | The target of an emitter and its port
         emitterTarget :: Identifier -> CGenerator (Identifier, Identifier)
@@ -313,32 +358,14 @@ genInitEmitters progArchitecture = do
                     Nothing -> throwError $ InternalError $ "Invalid connection for interrupt: " ++ show targetEntity
         -- | Only a handler can attend system_except (SE-214)
         genEmitterConnection (TPSystemExceptEmitter systemExcept _) = do
-            emitterId <- genDefineEmitterIdLabel systemExcept
-            (targetEntity, targetPort) <- case M.lookup systemExcept (emitterTargets progArchitecture) of
-                Just (entity, port, _) -> return (entity, port)
-                Nothing -> throwError $ InternalError $ "System except emitter not connected: " ++ show systemExcept
+            (targetEntity, targetPort) <- emitterTarget systemExcept
             case M.lookup targetEntity (handlers progArchitecture) of
                 Just (TPHandler identifier classId _ _ _ _ _ _) -> do
                     let cls = handlerClasses progArchitecture M.! classId
                         (_, targetAction) = sinkPorts cls M.! targetPort
-                        connection = "except_connection" @: termina__system_except_connection_t
                     handlerId <- genDefineHandlerIdLabel identifier
-                    return [
-                            -- except_connection.handler_object = (void *)&identifier;
-                            pre_cr $ connection @. "handler_object" @: ptr void
-                                @= cast (ptr void) (addrOf (identifier @: typeDef classId)),
-                            -- except_connection.handler_id = handlerId;
-                            no_cr $ connection @. "handler_id" @: termina__id_t
-                                @= handlerId @: termina__id_t,
-                            -- except_connection.handler_action = &classId__targetAction;
-                            no_cr $ connection @. "handler_action" @: termina__system_except_action_t
-                                @= addrOf (classId <::> targetAction @: termina__system_except_action_t),
-                            -- termina__except__init_emitter(emitterId, &except_connection);
-                            pre_cr $ termina__except__init_emitter @@ [
-                                emitterId @: termina__id_t,
-                                addrOf connection
-                            ]
-                        ]
+                    genExceptConnection (cast (ptr void) (addrOf (identifier @: typeDef classId))) handlerId
+                        (classId <::> targetAction @: termina__system_except_action_t)
                 Nothing -> throwError $ InternalError $ "Invalid connection for system except: " ++ show targetEntity
         genEmitterConnection _ = throwError $ InternalError "Invalid event emitter"
 
@@ -428,43 +455,29 @@ genChannelConnections progArchitecture = do
 
 genInitPools :: [TPPool SemanticAnn] -> [TPPool SemanticAnn] -> CGenerator [CFileItem]
 genInitPools pls testPls = do
-    initPools <- mapM genPoolInit pls
-    initTestPools <- mapM genTestPoolInit testPls
+    initPools <- mapM (\p@(TPPool identifier _ _ _ _) ->
+        let poolObj = identifier @: termina__pool_t in genPoolInit termina__pool__init poolObj poolObj p) pls
+    -- | The pool of a TestPool is its first field
+    initTestPools <- mapM (\p@(TPPool identifier _ _ _ _) ->
+        let testPoolObj = identifier @: typeDef testPool in
+        genPoolInit termina__test__pool__init (testPoolObj @. "pool" @: termina__pool_t) testPoolObj p) testPls
     let steps = initPools ++ initTestPools
     return [pre_cr $ static_function (terminafy $ "app" <::> "init_pools") ["status" @: (_const . ptr $ termina__error_code_t)] @-> void $
             trail_cr . block $ genStatusSteps [] steps | not (null steps)]
 
     where
 
-        -- | The pool of a TestPool is its first field
-        genTestPoolInit :: TPPool SemanticAnn -> CGenerator [CCompoundBlockItem]
-        genTestPoolInit (TPPool identifier ts _ _ _) = do
-            cTs <- genType noqual ts
-            poolId <- genDefinePoolIdLabel identifier
-            let testPoolObj = identifier @: typeDef testPool
-            return [
-                    pre_cr $ testPoolObj @. "pool" @: termina__pool_t @. "pool_id" @: termina__id_t
-                        @= poolId @: termina__id_t,
-                    pre_cr $ termina__test__pool__init @@
-                            [
-                                addrOf testPoolObj,
-                                cast (ptr void) (poolMemoryArea identifier @: ptr uint8_t),
-                                _sizeOfExpr (poolMemoryArea identifier @: ptr uint8_t),
-                                _sizeOfType cTs,
-                                "status" @: (_const . ptr $ termina__error_code_t)
-                            ]
-                ]
-
-        genPoolInit :: TPPool SemanticAnn -> CGenerator [CCompoundBlockItem]
-        genPoolInit (TPPool identifier ts _ _ _) = do
+        -- | The identifier goes in the pool, and the function initializes the object around it
+        genPoolInit :: CExpression -> CObject -> CObject -> TPPool SemanticAnn -> CGenerator [CCompoundBlockItem]
+        genPoolInit initFunction poolObj obj (TPPool identifier ts _ _ _) = do
             cTs <- genType noqual ts
             poolId <- genDefinePoolIdLabel identifier
             return [
-                    pre_cr $ identifier @: termina__pool_t @. "pool_id" @: termina__id_t
+                    pre_cr $ poolObj @. "pool_id" @: termina__id_t
                         @= poolId @: termina__id_t,
-                    pre_cr $ termina__pool__init @@
+                    pre_cr $ initFunction @@
                             [
-                                addrOf (identifier @: ptr termina__pool_t),
+                                addrOf obj,
                                 cast (ptr void) (poolMemoryArea identifier @: ptr uint8_t),
                                 _sizeOfExpr (poolMemoryArea identifier @: ptr uint8_t),
                                 _sizeOfType cTs,
@@ -482,66 +495,22 @@ genInitMessageQueues queues = do
         -- | Steps that initialize a message queue: one step, or none if the
         -- queue does not need a definition
         genOSALMsgQueueInit :: OSALMsgQueue -> CGenerator [[CCompoundBlockItem]]
-        genOSALMsgQueueInit mq@(OSALTaskMsgQueue _ _ size) = do
-            msgQueueId <- genDefineMsgQueueIdLabel mq
-            cSize <- genConstExpression size
-            return [[
-                    pre_cr $ termina__msg_queue__init @@ [
-                        msgQueueId @: termina__id_t,
-                        _sizeOfType termina__event_t,
-                        cSize,
-                        "status" @: (_const . ptr $ termina__error_code_t)
-                    ]
-                ]]
-        -- | Message queues with unit type do not need a definition
-        genOSALMsgQueueInit (OSALChannelMsgQueue _ TUnit _ _ _) = return []
-        genOSALMsgQueueInit mq@(OSALChannelMsgQueue _ ty size _ _) = do
-            msgQueueId <- genDefineMsgQueueIdLabel mq
-            cSize <- genConstExpression size
-            cTs <- genType noqual ty
-            return [[
+        genOSALMsgQueueInit mq = do
+            elements <- msgQueueElements mq
+            case elements of
+                -- | Message queues with unit type do not need a definition
+                Nothing -> return []
+                Just (size, cTs) -> do
+                    msgQueueId <- genDefineMsgQueueIdLabel mq
+                    cSize <- genConstExpression size
+                    return [[
                             pre_cr $ termina__msg_queue__init @@ [
                                 msgQueueId @: termina__id_t,
                                 _sizeOfType cTs,
                                 cSize,
                                 "status" @: (_const . ptr $ termina__error_code_t)
                             ]
-                ]]
-        genOSALMsgQueueInit mq@(OSALTestChannelMsgQueue _ ty size) = do
-            msgQueueId <- genDefineMsgQueueIdLabel mq
-            cSize <- genConstExpression size
-            cTs <- genType noqual ty
-            return [[
-                            pre_cr $ termina__msg_queue__init @@ [
-                                msgQueueId @: termina__id_t,
-                                _sizeOfType cTs,
-                                cSize,
-                                "status" @: (_const . ptr $ termina__error_code_t)
-                            ]
-                ]]
-        genOSALMsgQueueInit mq@(OSALTestEventMsgQueue _ size) = do
-            msgQueueId <- genDefineMsgQueueIdLabel mq
-            cSize <- genConstExpression size
-            return [[
-                            pre_cr $ termina__msg_queue__init @@ [
-                                msgQueueId @: termina__id_t,
-                                _sizeOfType termina__event_t,
-                                cSize,
-                                "status" @: (_const . ptr $ termina__error_code_t)
-                            ]
-                ]]
-        genOSALMsgQueueInit mq@(OSALSinkPortMsgQueue _ _ _ ty size) = do
-            msgQueueId <- genDefineMsgQueueIdLabel mq
-            cSize <- genConstExpression size
-            cTs <- genType noqual ty
-            return [[
-                            pre_cr $ termina__msg_queue__init @@ [
-                                msgQueueId @: termina__id_t,
-                                _sizeOfType cTs,
-                                cSize,
-                                "status" @: (_const . ptr $ termina__error_code_t)
-                            ]
-                ]]
+                        ]]
 
 genEnableProtection :: TerminaProgArch SemanticAnn -> CGenerator [CFileItem]
 genEnableProtection progArchitecture = do
@@ -635,6 +604,88 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
             ]]
 genInitalEventFunction _ _ = throwError $ InternalError "Invalid event emitter"
 
+-- | The record of a unit test, with stamp zero until the descriptor exists
+genTestRecord :: CGenerator [CFileItem]
+genTestRecord = do
+    capacity <- gets (recordCapacity . configParams)
+    let cCapacity = dec capacity @: size_t
+    return [
+            pre_cr $ global (var "termina__test__stamp" (_const uint32_t) @:= (dec 0 @: uint32_t)),
+            pre_cr $ global (var "termina__test__capacity" (_const uint32_t) @:= (dec capacity @: uint32_t)),
+            pre_cr $ global (var "termina__test__header" (typeDef "termina__test__header_t")),
+            pre_cr $ global (var "termina__test__area" (CTArray uint8_t cCapacity))
+        ]
+
+-- | The name of the function of the task of the harness
+testHarnessFunction :: Identifier
+testHarnessFunction = terminafy ("app" <::> "test_harness")
+
+-- | The reset before each case: the steps of the initialization that only write memory
+genTestReset :: TerminaProgArch SemanticAnn -> Bool -> Bool -> CGenerator [CFileItem]
+genTestReset progArchitecture hasPools hasProtection = do
+    let status = "status" @: termina__error_code_t
+        flushes = [ pre_cr $ termina__test__channel__flush @@ [addrOf (channel @: termina__msg_queue_t)]
+                  | channel <- M.keys (testChannels progArchitecture) ]
+    return [pre_cr $ static_function (terminafy ("app" <::> "test_reset")) [] @-> void $
+            trail_cr . block $
+                [pre_cr $ var "status" termina__error_code_t @:= termina__error__none | hasPools]
+                ++ [pre_cr $ termina__app__init_globals @@ []]
+                ++ [pre_cr $ termina__app__init_pools @@ [addrOf status] | hasPools]
+                ++ [pre_cr $ termina__app__enable_protection @@ [] | hasProtection]
+                ++ flushes
+                ++ [pre_cr $ termina__test__clock__reset @@ []]
+                ++ [pre_cr $ _if (termina__error__none @!= ("status" @: termina__error_code_t)) $ trail_cr . block $ [
+                        pre_cr $ termina__except__runtime_failure @@ [
+                            dec 0 @: size_t,
+                            termina__runtime_operation__test_reset,
+                            "status" @: termina__error_code_t
+                        ]
+                    ] | hasPools]
+        ]
+
+-- | The task of the harness, which runs each selected case after the reset
+genTestHarness :: TerminaProgArch SemanticAnn -> CGenerator [CFileItem]
+genTestHarness progArchitecture = do
+    harnessTaskId <- genDefineTaskIdLabel testHarness
+    harnessEmitterId <- genDefineEmitterIdLabel testHarness
+    let cEventType = termina__event_t
+        cEvent = [
+                "emitter_id" @.= (harnessEmitterId @: termina__id_t),
+                "owner.type" @.= ("termina__active_entity__task" @: enumFieldType),
+                "owner.task.task_id" @.= (harnessTaskId @: termina__id_t),
+                "port_id" @.= (dec 0 @: size_t)
+            ] @.: cEventType
+        cEventObj = eventParam @: cEventType
+    cCases <- concat <$> mapM casesOf (sortOn (getLocation . getAnnotation) (M.elems (testInstances progArchitecture)))
+    return [pre_cr $ static_function testHarnessFunction ["arg" @: (_const . ptr $ void)] @-> void $
+            trail_cr . block $
+                genDiscardedParameters [("arg", _const . ptr $ void)]
+                ++ [pre_cr $ var eventParam (_const cEventType) @:= cEvent]
+                ++ zipWith (genCaseBlock cEventObj) [1 ..] cCases
+                ++ [pre_cr $ termina__test__end @@ []]
+        ]
+
+    where
+
+        -- | The instances and the cases go in the order of declaration, all of them in the test.fin
+        casesOf :: TPTest SemanticAnn -> CGenerator [(Identifier, Identifier, Identifier)]
+        casesOf test =
+            case M.lookup (testInstanceClass test) (testClasses progArchitecture) of
+                Just cls -> return
+                    [ (testInstanceName test, testInstanceClass test, caseId)
+                    | TPFunction caseId _ _ _ _ <- sortOn (\(TPFunction _ _ _ _ ann) -> getLocation ann) (M.elems (classCases cls)) ]
+                Nothing -> throwError $ InternalError $ "Unknown test class: " ++ show (testInstanceClass test)
+
+        genCaseBlock :: CObject -> Integer -> (Identifier, Identifier, Identifier) -> CCompoundBlockItem
+        genCaseBlock cEventObj n (instanceId, classId, caseId) =
+            let cCase = dec n @: uint16_t in
+            pre_cr $ _if (termina__test__selected @@ [cCase]) $ trail_cr . block $ [
+                    pre_cr $ termina__test__case_begin @@ [cCase],
+                    no_cr $ termina__app__test_reset @@ [],
+                    no_cr $ ((classId <::> caseId) @: CTFunction void []) @@ [addrOf cEventObj, addrOf (instanceId @: typeDef classId)],
+                    no_cr $ termina__test__case_end @@ []
+                ]
+
 -- | Step of the application initialization: the call to the function that
 -- performs it, whether that function can fail (and then receives the status)
 -- and the definition of the function. A step whose definition is empty has
@@ -715,6 +766,20 @@ genMainFile mName progArchitecture = do
             genInitalEventFunction progArchitecture systemInitEmitter
         _ -> return [])
 
+    -- | A unit test adds its record, the reset and the harness
+    testBuild <- gets (isTestBuild . configParams)
+    let unitTest = isUnitTest progArchitecture
+    when (testBuild && not unitTest) $
+        throwError $ InternalError "concurrent tests are not supported yet"
+    testRecord <- if unitTest then genTestRecord else return []
+    testReset <- if unitTest then genTestReset progArchitecture (not (null initPools)) (not (null enableProtection)) else return []
+    testHarnessTask <- if unitTest then genTestHarness progArchitecture else return []
+    let harnessDeclaration = [
+                pre_cr $ CExtDecl (CEDFunction (Just CStatic) [] void testHarnessFunction
+                    [CDecl (CTypeSpec (_const . ptr $ void)) (Just "arg") Nothing])
+                    (internalAnn (CDeclarationAnn True))
+            | unitTest ]
+
     -- | The steps are listed in the order in which they are called
     appInit <- genAppInit [
             InitStep (termina__app__init_msg_queues @@ ["status" @: (_const . ptr $ termina__error_code_t)]) True initMessageQueues,
@@ -735,9 +800,12 @@ genMainFile mName progArchitecture = do
             -- include config.h, so that the modules do not depend on it.
             CPPDirective (CPPInclude False "config.h") (internalAnn (CPPDirectiveAnn False))
         ] ++ includes
+        ++ testRecord
         ++ cPoolMemoryAreas
+        ++ harnessDeclaration
         ++ initTasks ++ initHandlers ++ initEmitters ++ initMutexes ++ initPools ++ initMessageQueues
         ++ enableProtection ++ channelConnections ++ initialEventFunction
+        ++ testReset ++ testHarnessTask
         ++ [appInit]
 
     where

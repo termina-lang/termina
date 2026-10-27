@@ -413,6 +413,22 @@ genStructAssign loc before level cObj expr = do
             genProcedureAssignment f i p = error $ "Invalid procedure assignment: " ++ show (f, i, p)
                 -- throwError $ InternalError "Unsupported procedure assignment"
 
+            -- | An Allocator port points to the pool and to its alloc and free, named after the pool
+            genAllocatorConnection :: Bool -> Identifier -> CObject -> Identifier -> [FieldAssignment SemanticAnn] -> CGenerator [CCompoundBlockItem]
+            genAllocatorConnection before' fld cPool functionPrefix xs = do
+                rest <- genFieldAssignments False xs
+                let allocFunctionType = CTFunction void [void_ptr, ptr _Option__box]
+                    freeFunctionType = CTFunction void [void_ptr, termina__box_t]
+                    cPoolProcedures = [
+                            no_cr $ cObj @. fld @: termina__allocator_t @. "alloc" @: ptr allocFunctionType @= addrOf ((functionPrefix <::> "alloc") @: allocFunctionType),
+                            no_cr $ cObj @. fld @: termina__allocator_t @. "free" @: ptr freeFunctionType @= addrOf ((functionPrefix <::> "free") @: freeFunctionType)
+                        ]
+                    thatAssignment = (cObj @. fld @: termina__allocator_t) @. thatField @: void_ptr @= addrOf cPool
+                if before' then
+                    return $ pre_cr thatAssignment : (cPoolProcedures ++ rest)
+                else
+                    return $ no_cr thatAssignment : (cPoolProcedures ++ rest)
+
             genFieldAssignments :: Bool -> [FieldAssignment SemanticAnn] -> CGenerator [CCompoundBlockItem]
             genFieldAssignments _ [] = return []
             genFieldAssignments before' (FieldValueAssignment fld expr' _: xs) = do
@@ -447,32 +463,10 @@ genStructAssign loc before level cObj expr = do
                     return $ pre_cr (((cObj @. fid @: cInterfaceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
                 else
                     return $ no_cr (((cObj @. fid @: cInterfaceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection fld resource (SemanticAnn (STy (PortConnection (APPoolConnTy {}))) _) : xs) = do
-                rest <- genFieldAssignments False xs
-                let allocFunctionType = CTFunction void [void_ptr, ptr _Option__box]
-                    freeFunctionType = CTFunction void [void_ptr, termina__box_t]
-                let resourceExpr = addrOf (resource @: termina__pool_t)
-                    cPoolProcedures = [
-                            no_cr $ cObj @. fld @: termina__allocator_t @. "alloc" @: ptr allocFunctionType @= addrOf ("termina__pool__alloc" @: allocFunctionType),
-                            no_cr $ cObj @. fld @: termina__allocator_t @. "free" @: ptr freeFunctionType @= addrOf ("termina__pool__free" @: freeFunctionType)
-                        ]
-                if before' then
-                    return $ pre_cr ((cObj @. fld @: termina__allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
-                else
-                    return $ no_cr ((cObj @. fld @: termina__allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection fld resource (SemanticAnn (STy (PortConnection (APTestPoolConnTy {}))) _) : xs) = do
-                rest <- genFieldAssignments False xs
-                let allocFunctionType = CTFunction void [void_ptr, ptr _Option__box]
-                    freeFunctionType = CTFunction void [void_ptr, termina__box_t]
-                    resourceExpr = addrOf (resource @: typeDef testPool)
-                    cPoolProcedures = [
-                            no_cr $ cObj @. fld @: termina__allocator_t @. "alloc" @: ptr allocFunctionType @= addrOf ("termina__test__pool__alloc" @: allocFunctionType),
-                            no_cr $ cObj @. fld @: termina__allocator_t @. "free" @: ptr freeFunctionType @= addrOf ("termina__test__pool__free" @: freeFunctionType)
-                        ]
-                if before' then
-                    return $ pre_cr ((cObj @. fld @: termina__allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
-                else
-                    return $ no_cr ((cObj @. fld @: termina__allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection fld resource (SemanticAnn (STy (PortConnection (APPoolConnTy {}))) _) : xs) =
+                genAllocatorConnection before' fld (resource @: termina__pool_t) (terminafy "pool") xs
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection fld resource (SemanticAnn (STy (PortConnection (APTestPoolConnTy {}))) _) : xs) =
+                genAllocatorConnection before' fld (resource @: typeDef testPool) (terminafy ("test" <::> "pool")) xs
             -- | The ports of a case to a TestEmitter or a TestChannel take the functions of the runtime
             genFieldAssignments before' (FieldPortConnection AccessPortConnection fld resource (SemanticAnn (STy (PortConnection (APConnTy accessTy rts procedures))) _) : xs) = do
                 rest <- genFieldAssignments False xs

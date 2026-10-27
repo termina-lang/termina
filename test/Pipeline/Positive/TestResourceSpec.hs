@@ -38,8 +38,36 @@ concurrentTest =
     "#[priority(6)]\n" ++
     "task ender : CEnder = { tick_ev <- timer_b, t <-> test_checks, s <-> test_scenario };\n"
 
+-- | Two tasks of a unit test that record checks, so test_checks takes the ceiling of both
+unitTest :: String
+unitTest =
+    "task class CChecker {\n" ++
+    "    tick_ev : sink TimeVal triggers run;\n" ++
+    "    t : access TestChecks;\n" ++
+    "    action run(&priv self, _now : TimeVal) {\n" ++
+    "        self->t.check(true);\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "};\n" ++
+    "test class CCheckerTests {\n" ++
+    "    tick_a : access TestEmitterAccess<TimeVal>;\n" ++
+    "    tick_b : access TestEmitterAccess<TimeVal>;\n" ++
+    "    case fires(&mut self) {\n" ++
+    "        self->tick_a.fire({tv_sec = 1, tv_usec = 0} : TimeVal);\n" ++
+    "        self->tick_b.fire({tv_sec = 1, tv_usec = 0} : TimeVal);\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "};\n" ++
+    "emitter tick_a : TestEmitter<TimeVal>;\n" ++
+    "emitter tick_b : TestEmitter<TimeVal>;\n" ++
+    "#[priority(5)]\n" ++
+    "task checker_a : CChecker = { tick_ev <- tick_a, t <-> test_checks };\n" ++
+    "#[priority(6)]\n" ++
+    "task checker_b : CChecker = { tick_ev <- tick_b, t <-> test_checks };\n" ++
+    "test checker_tests : CCheckerTests = { tick_a <-> tick_a, tick_b <-> tick_b };\n"
+
 spec :: Spec
-spec = describe "Full pipeline: the test resources" $
+spec = describe "Full pipeline: the test resources" $ do
   case runTestApp concurrentTest of
     Left err ->
       it "builds a concurrent test" $
@@ -54,6 +82,15 @@ spec = describe "Full pipeline: the test resources" $
             unpack c `shouldContain` "ender.s._that = &test_scenario;"
             unpack c `shouldContain` "ender.s.finish = &TestScenarioEntry__finish;")
           (renderInitFile prjprogs)
+      it "does not generate the main file of a concurrent test yet" $
+        either (\e -> unpack e `shouldContain` "concurrent tests are not supported yet")
+          (const (expectationFailure "the main file of a concurrent test was generated"))
+          (renderTestMainFile progArch)
+  case runTestApp unitTest of
+    Left err ->
+      it "builds a unit test" $
+        expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
+    Right (progArch, _) ->
       it "protects test_checks with a mutex at the ceiling of its two tasks" $
         either (expectationFailure . unpack)
           (\c -> do

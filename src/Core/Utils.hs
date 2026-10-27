@@ -457,6 +457,10 @@ minTaskPriority, maxTaskPriority :: Integer
 minTaskPriority = 1
 maxTaskPriority = 253
 
+-- | The priority of the task of the test harness, outside the range of the tasks
+harnessTaskPriority :: Integer
+harnessTaskPriority = 254
+
 getTypeIdentifier :: TypeDef' ty expr blk a -> Identifier
 getTypeIdentifier (Struct ident _ _)        = ident
 getTypeIdentifier (Enum ident _ _)          = ident

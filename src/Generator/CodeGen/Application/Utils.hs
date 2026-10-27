@@ -106,6 +106,15 @@ getChannelsMessageQueues progArchitecture =
             Nothing -> throwError $ InternalError ("channel not connected: " ++ show identifier)
     ) [] (channels progArchitecture)
 
+-- | The size and the C type of the elements of a queue, or nothing for a channel of unit type
+msgQueueElements :: OSALMsgQueue -> CGenerator (Maybe (Expression SemanticAnn, CType))
+msgQueueElements (OSALTaskMsgQueue _ _ size) = return $ Just (size, termina__event_t)
+msgQueueElements (OSALChannelMsgQueue _ TUnit _ _ _) = return Nothing
+msgQueueElements (OSALChannelMsgQueue _ ty size _ _) = Just . (size,) <$> genType noqual ty
+msgQueueElements (OSALSinkPortMsgQueue _ _ _ ty size) = Just . (size,) <$> genType noqual ty
+msgQueueElements (OSALTestChannelMsgQueue _ ty size) = Just . (size,) <$> genType noqual ty
+msgQueueElements (OSALTestEventMsgQueue _ size) = return $ Just (size, termina__event_t)
+
 -- | The queue of the messages and the queue of the events of each TestChannel
 getTestChannelsMessageQueues :: TerminaProgArch SemanticAnn -> [OSALMsgQueue]
 getTestChannelsMessageQueues progArchitecture =
