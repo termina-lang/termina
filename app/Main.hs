@@ -5,6 +5,7 @@ import Data.List (intercalate)
 import Data.Version (versionBranch)
 import Paths_termina (version)
 import Command.New
+import Command.Add
 import Command.Build
 import Command.Deliver
 import Command.Test
@@ -21,11 +22,16 @@ data Command =
     | Try TryCmdArgs
     | LSP LSPCmdArgs
     | Sched SchedCmdArgs
+    | Add AddCmdArgs
     deriving Show
 
 newCommandParser :: Parser Command
 newCommandParser = New
     <$> newCmdArgsParser
+
+addCommandParser :: Parser Command
+addCommandParser = Add
+    <$> addCmdArgsParser
 
 generateCommandParser :: Parser Command
 generateCommandParser = Generate
@@ -58,6 +64,7 @@ lspCommandParser = LSP
 commandParser :: Parser Command
 commandParser = subparser
   ( command "new" (info newCommandParser ( progDesc "Setup a new project" ))
+ <> command "add" (info addCommandParser ( progDesc "Add a dependency to the project or to one of its tests" ))
  <> command "generate" (info generateCommandParser ( progDesc "Generate the C code and the Makefile of the project" ))
  <> command "build" (info buildCommandParser ( progDesc "Generate and compile the project" ))
  <> command "deliver" (info deliverCommandParser ( progDesc "Build the self-contained deliverable of the project" ))
@@ -86,3 +93,4 @@ main = do
         Try cmdargs -> tryCommand cmdargs
         LSP cmdargs -> lspCommand cmdargs
         Sched cmdargs -> schedCommand cmdargs
+        Add cmdargs -> addCommand cmdargs

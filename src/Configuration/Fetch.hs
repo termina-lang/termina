@@ -8,6 +8,7 @@ module Configuration.Fetch (
     FetchedFile(..),
     prefetchDir,
     resolveTag,
+    fetchTag,
     fetchPackage
 ) where
 
@@ -84,6 +85,21 @@ resolveTag url tag = do
             (Just sha, _) -> Right (T.pack sha)
             (Nothing, Just sha) -> Right (T.pack sha)
             _ -> Left (TagNotFound url tag)
+
+-- | The commit of a tag and its files. The commit comes from the clone in the
+-- prefetch folder of the project when there is one, and from the repository
+-- otherwise.
+fetchTag :: FilePath -> T.Text -> T.Text -> IO (Either FetchError (T.Text, [FetchedFile]))
+fetchTag root url tag = do
+    let local = prefetchDir root url
+    prefetched <- doesDirectoryExist local
+    commit <- if prefetched
+        then either (const (Left (TagNotFound url tag))) (Right . T.pack . takeWhile (`notElem` ("\r\n" :: String)))
+            <$> git url ["-C", local, "rev-parse", "--verify", "-q", "refs/tags/" ++ T.unpack tag ++ "^{commit}"]
+        else resolveTag url tag
+    case commit of
+        Left err -> return (Left err)
+        Right sha -> fmap ((,) sha) <$> fetchPackage root url tag sha
 
 -- | The files of the commit of a tag, which has to be the expected one. A
 -- clone in the prefetch folder of the project is taken instead of the

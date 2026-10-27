@@ -1,0 +1,212 @@
+{-# LANGUAGE OverloadedStrings #-}
+
+-- | "termina add": a dependency of the project or of one of its tests, with
+-- its transitive closure, into "termina.yaml", "termina.lock" and "vendor/",
+-- all of them or none.
+module Command.Add (
+    addCmdArgsParser, addCommand, AddCmdArgs,
+    AddError(..), AddReport(..), addDependency, credentialsMessage
+) where
+
+import Control.Monad
+import Data.IORef
+import Data.List (find, intercalate)
+import qualified Data.Map.Strict as M
+import Data.Maybe (isJust, isNothing)
+import qualified Data.ByteString as BS
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
+import Data.Yaml (decodeEither', prettyPrintParseException)
+import Options.Applicative
+import System.Directory
+import System.Environment (getEnvironment)
+import System.Exit
+import System.FilePath
+
+import Command.Utils (errorMessage, warnMessage, infoMessage)
+import Configuration.Fetch
+import Configuration.Graph
+import Configuration.Lock
+import Configuration.Manifest
+import Configuration.Resolve
+import Configuration.Validate
+import Configuration.Vendor
+
+data AddCmdArgs = AddCmdArgs String String (Maybe String)
+  deriving Show
+
+addCmdArgsParser :: Parser AddCmdArgs
+addCmdArgsParser = AddCmdArgs
+    <$> argument str (metavar "URL" <> help "https:// URL of the git repository of the package")
+    <*> argument str (metavar "TAG" <> help "Tag of the version to add")
+    <*> optional (strOption (long "test" <> metavar "NAME" <> help "Add it to the dependencies of this test only"))
+
+-- | Why a package could not be brought.
+data AddError =
+    FetchFailed FetchError
+    | InvalidPackage [String]
+    -- | The copy in vendor/ of a locked package does not match its hash.
+    | VendorMismatch
+  deriving (Eq, Show)
+
+-- | What "termina add" did, and what the user has to know about it.
+data AddReport = AddReport {
+    reportLines :: ![String],
+    reportWarnings :: ![String]
+  } deriving (Eq, Show)
+
+addCommand :: AddCmdArgs -> IO ()
+addCommand (AddCmdArgs url tag mTest) = do
+    env <- getEnvironment
+    -- The image sets TERMINA_CONTAINER, and VS Code sets REMOTE_CONTAINERS in the one it opens.
+    let container = isJust (lookup "TERMINA_CONTAINER" env) && isNothing (lookup "REMOTE_CONTAINERS" env)
+    result <- addDependency container "." (T.pack url) (T.pack tag) mTest
+    case result of
+        Left errs -> mapM_ (putStrLn . errorMessage) errs >> exitFailure
+        Right report -> do
+            mapM_ (putStrLn . warnMessage) (reportWarnings report)
+            mapM_ (putStrLn . infoMessage) (reportLines report)
+
+-- | Add the dependency to the project in the folder, or give every problem
+-- found and leave the project as it was. In a command-line container, the
+-- packages that need credentials are reported together with the ways to
+-- bring them.
+addDependency :: Bool -> FilePath -> T.Text -> T.Text -> Maybe String -> IO (Either [String] AddReport)
+addDependency container root url tag mTest = do
+    bytes <- BS.readFile (root </> "termina.yaml")
+    lockResult <- decodeLockFile (root </> "termina.lock")
+    let text = either (const (Left "termina.yaml: the file is not valid UTF-8")) (Right . T.unpack) (TE.decodeUtf8' bytes)
+    case (,) <$> (text >>= prepare) <*> either (Left . ("termina.lock: " ++)) Right lockResult of
+        Left err -> return (Left [err])
+        Right ((newText, manifest), lock) -> do
+            used <- newIORef []
+            resolution <- resolve (obtain lock used) manifest
+            case resolution of
+                Left errs -> return (Left (describeErrors errs))
+                Right res -> case checkGraph manifest res of
+                    [] -> Right <$> commit newText lock res used
+                    errs -> return (Left errs)
+
+  where
+
+    key = normalizeUrl url
+
+    parse yaml = either (Left . ("termina.yaml: " ++)) Right
+        (either (Left . prettyPrintParseException) parseManifest (decodeEither' yaml))
+
+    utf8 = TE.encodeUtf8 . T.pack
+
+    -- | The new text of the manifest and the manifest it gives.
+    prepare text = do
+        old <- parse (utf8 text)
+        checkAbsent old
+        newText <- addDependencyEntry text mTest url tag
+        (,) newText <$> parse (utf8 newText)
+
+    keysOf deps = [normalizeUrl (gitUrl g) | DepGit g <- deps]
+
+    checkAbsent m =
+        let inRoot = key `elem` keysOf (manifestDependencies m)
+            inTests = [T.unpack t | (t, e) <- M.toList (manifestTests m), key `elem` keysOf (testDependencies e)]
+        in case mTest of
+            Nothing
+                | inRoot -> Left $ T.unpack url ++ " is already a dependency of the project: use termina update to change its tag"
+                | (t : _) <- inTests -> Left $ T.unpack url ++ " is already a dependency of the test " ++ t
+                    ++ ": remove it there to make it a dependency of the project"
+                | otherwise -> Right ()
+            Just t
+                | inRoot -> Left $ T.unpack url ++ " is already a dependency of the project, which the test " ++ t ++ " sees"
+                | t `elem` inTests -> Left $ T.unpack url ++ " is already a dependency of the test " ++ t
+                    ++ ": use termina update to change its tag"
+                | otherwise -> Right ()
+
+    -- | A package locked with the same tag is read from vendor/, without
+    -- network and whatever its tag points to now; any other is fetched.
+    obtain lock used u t =
+        case find ((== normalizeUrl u) . normalizeUrl . lockedUrl) (lockPackages lock) of
+            Just locked | lockedRev locked == t -> fromVendor u locked
+            _ -> fromGit used u t
+
+    fromVendor u locked = do
+        exists <- doesDirectoryExist (packageDir root u)
+        files <- if exists then readPackage root u else return []
+        return $ if not exists || contentHash files /= lockedContentHash locked
+            then Left VendorMismatch
+            else case lookup "termina.yaml" files of
+                Nothing -> Left VendorMismatch
+                Just yaml -> case parse yaml of
+                    Left err -> Left (InvalidPackage [err])
+                    Right m -> Right (Obtained (lockedCommit locked) m [FetchedFile p "100644" b | (p, b) <- files])
+
+    fromGit used u t = do
+        prefetched <- doesDirectoryExist (prefetchDir root u)
+        fetched <- fetchTag root u t
+        case fetched of
+            Left err -> return (Left (FetchFailed err))
+            Right (sha, files) -> case validatePackage files of
+                Left errs -> return (Left (InvalidPackage errs))
+                Right m -> do
+                    when prefetched (modifyIORef used (prefetchDir root u :))
+                    return (Right (Obtained sha m files))
+
+    describeErrors errs =
+        let credentials = [(u, t) | ObtainFailed u t _ (FetchFailed (NeedsCredentials _ _)) <- errs]
+            needsCredentials (ObtainFailed _ _ _ (FetchFailed (NeedsCredentials _ _))) = True
+            needsCredentials _ = False
+        in if container && not (null credentials)
+            then map (describeResolveError describeAdd) (filter (not . needsCredentials) errs) ++ [credentialsMessage credentials]
+            else map (describeResolveError describeAdd) errs
+
+    -- | Write vendor/, the lock and the manifest, in that order, and remove
+    -- the clones of the prefetch folder that were used.
+    commit newText lock res used = do
+        let packages = M.elems (resolvedPackages res)
+            oldKeys = M.fromList [(normalizeUrl (lockedUrl l), l) | l <- lockPackages lock]
+            vendored p = [ (path, bytes) | FetchedFile path _ bytes <- obtainedFiles (resolvedObtained p)
+                         , isVendored (obtainedManifest (resolvedObtained p)) path ]
+            entry p = LockedPackage (resolvedUrl p) (resolvedTag p) (obtainedSha (resolvedObtained p)) (contentHash (vendored p))
+            unchanged p = M.lookup (normalizeUrl (resolvedUrl p)) oldKeys == Just (entry p)
+        forM_ packages $ \p -> unless (unchanged p) (writePackage root (resolvedUrl p) (vendored p))
+        writeLockFile (root </> "termina.lock") (Lock (lockVersion emptyLock) (map entry packages))
+        BS.writeFile (root </> "termina.yaml") (utf8 newText)
+        readIORef used >>= mapM_ removePathForcibly
+        let pulled = [ "pulled " ++ T.unpack (resolvedUrl p) ++ " " ++ T.unpack (resolvedTag p) ++ " (" ++ intercalate " -> " (resolvedPath p) ++ ")"
+                     | p <- packages, let k = normalizeUrl (resolvedUrl p), k /= key, not (M.member k oldKeys) ]
+        return AddReport {
+            reportLines = ("added " ++ T.unpack url ++ " " ++ T.unpack tag ++ maybe "" (" to the test " ++) mTest) : pulled,
+            reportWarnings =
+                [ "override active: " ++ T.unpack (overriddenUrl o) ++ " forced to " ++ T.unpack (forcedTag o) ++ "; "
+                    ++ intercalate " -> " (requestedBy o) ++ " requested " ++ T.unpack (requestedTag o)
+                | o <- appliedOverrides res ]
+                ++ [ "the overrides of " ++ T.unpack name ++ " are ignored (" ++ T.unpack u ++ "): only those of the project count"
+                   | (name, u) <- ignoredOverrides res ]
+          }
+
+describeAdd :: AddError -> String
+describeAdd (FetchFailed (TagNotFound _ t)) = "the repository has no tag " ++ T.unpack t
+describeAdd (FetchFailed (TagMoved t expected actual)) =
+    "the tag " ++ T.unpack t ++ " moved while it was fetched, from " ++ T.unpack expected ++ " to " ++ T.unpack actual
+describeAdd (FetchFailed (NeedsCredentials _ err)) = "git has no credentials for the repository:\n" ++ err ++ misspelled
+describeAdd (FetchFailed (GitFailed err)) = "git failed:\n" ++ err
+describeAdd (InvalidPackage errs) = "the package is not valid:\n" ++ intercalate "\n" (map ("  " ++) errs)
+describeAdd VendorMismatch = "its copy in vendor/ does not match its content-hash in termina.lock"
+
+-- | GitHub asks for credentials for a repository that does not exist, so as
+-- not to tell whether a private one has that name.
+misspelled :: String
+misspelled = "If the repository is public, check the URL: GitHub also asks for credentials for a repository that does not exist."
+
+-- | The ways to bring the packages that need credentials when the tool runs
+-- in a command-line container, which has none.
+credentialsMessage :: [(T.Text, T.Text)] -> String
+credentialsMessage packages = intercalate "\n" $
+    ["git has no credentials in this container for:"]
+    ++ ["  " ++ T.unpack u ++ " " ++ T.unpack t | (u, t) <- packages]
+    ++ [ "Bring them in one of these ways:"
+       , "  1. On the host, where git has your credentials, run from the project folder:" ]
+    ++ [ "       git clone --branch " ++ T.unpack t ++ " --depth 1 " ++ T.unpack u ++ " .termina/fetch/" ++ T.unpack (normalizeUrl u)
+       | (u, t) <- packages ]
+    ++ [ "     and run the same termina add here again."
+       , "  2. Run the same termina add with a native termina on the host."
+       , "  3. Open the project in VS Code, whose container gets your credentials."
+       , misspelled ]
