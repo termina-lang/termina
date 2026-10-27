@@ -416,6 +416,7 @@ configFor manifest kind plt prf tick = TerminaConfig {
     deploymentKind = kind,
     recordCapacity = defaultTestLogSize,
     harnessStackSize = Nothing,
+    runTimeout = Nothing,
     lineDirectives = True
   }
 
@@ -490,7 +491,8 @@ testConfig :: Manifest -> T.Text -> TestEntry -> Platform -> ProjectProfile -> T
 testConfig manifest testName entry plt prf =
     (configFor manifest (TestBuild testName) plt prf tick) {
         recordCapacity = testLogSize entry,
-        harnessStackSize = testHarnessStackSize entry
+        harnessStackSize = testHarnessStackSize entry,
+        runTimeout = Just (testTimeout entry)
     }
 
   where

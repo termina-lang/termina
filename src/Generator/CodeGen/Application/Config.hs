@@ -28,10 +28,8 @@ genConfigFile ::
     -> CGenerator CFile
 genConfigFile mName config progArchitecture = do
     let periodicTimers = M.filter (\case { TPPeriodicTimerEmitter {} -> True; _ -> False }) (emitters progArchitecture)
-        -- | A unit test adds the harness, as a task and as an emitter, and the test emitters
-        harness = [testHarness | isUnitTest progArchitecture]
-        taskIds = M.keys (tasks progArchitecture) ++ harness
-        emitterIds = M.keys (emitters progArchitecture) ++ harness ++ M.keys (testEmitters progArchitecture)
+        taskIds = taskIdOrder progArchitecture
+        emitterIds = emitterIdOrder progArchitecture
         poolIds = M.keys (pools progArchitecture) ++ M.keys (testPools progArchitecture)
 
     let resLockMap = genResourceLockings progArchitecture

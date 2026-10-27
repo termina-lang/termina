@@ -15,6 +15,7 @@ module Pipeline.Common
   , runTestArchitecture
   , runTestApp
   , runTestBuild
+  , runTestDescriptor
   , renderTestMainFile
   , compileProjectErrorCode
   , compileErrorMessage
@@ -46,6 +47,8 @@ import Generator.Environment
     (getPlatformInitialGlobalEnv, getPlatformInitialProgram)
 import Generator.CodeGen.Module (runGenSourceFile)
 import Generator.CodeGen.Application.Glue (runGenMainFile)
+import Generator.TestDescriptor (genTestDescriptor)
+import Data.Word (Word32)
 import Generator.CodeGen.Application.Config (runGenConfigFile)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
 import Generator.LanguageC.Printer (runCPrinter)
@@ -199,7 +202,7 @@ renderMainFileOn = renderMainFileWithOn configParams
 
 renderMainFileWithOn :: TerminaConfig -> Platform -> TerminaProgArch SemanticAnn -> Either Text Text
 renderMainFileWithOn cfg plt progArch =
-  case runGenMainFile cfg plt "main" progArch of
+  case runGenMainFile cfg plt "main" 0 progArch of
     Left err -> Left . T.pack $ show err
     Right cFile -> Right $ runCPrinter False cFile
 
@@ -286,6 +289,13 @@ runTestApp input = runFullProjectAppWith testConfigParams [("test", input)]
 -- | 'renderMainFile' for the deployment of a test.
 renderTestMainFile :: TerminaProgArch SemanticAnn -> Either Text Text
 renderTestMainFile = renderMainFileWith testConfigParams
+
+-- | The descriptor of a unit test in a module named @test@, and its stamp.
+runTestDescriptor :: String -> Either Failure (BL.ByteString, Word32)
+runTestDescriptor input = do
+  result <- runProjectPipeline testConfigParams [("test", input)]
+  either (\err -> Left (Failure (pack err) (pack err))) Right
+    (genTestDescriptor testConfigParams (foldedModules result) (programArch result))
 
 -- | 'runFullProjectBuild' for the deployment of a test, in a module named @test@.
 runTestBuild :: String -> Either Failure (M.Map QualifiedName Text)

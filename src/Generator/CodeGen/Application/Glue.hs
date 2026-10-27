@@ -28,6 +28,7 @@ import qualified Data.Set as S
 import Utils.Annotations
 import Core.Utils (harnessTaskPriority)
 import Core.TestCases (NumberedCase(..))
+import Data.Word (Word32)
 
 -- | Body of an initialization function that can fail, given the declarations of
 -- the local variables that its steps share and the steps. The status is an
@@ -605,13 +606,13 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
             ]]
 genInitalEventFunction _ _ = throwError $ InternalError "Invalid event emitter"
 
--- | The record of a unit test, with stamp zero until the descriptor exists
-genTestRecord :: CGenerator [CFileItem]
-genTestRecord = do
+-- | The record of a unit test, with the stamp of its descriptor
+genTestRecord :: Word32 -> CGenerator [CFileItem]
+genTestRecord stamp = do
     capacity <- gets (recordCapacity . configParams)
     let cCapacity = dec capacity @: size_t
     return [
-            pre_cr $ global (var "termina__test__stamp" (_const uint32_t) @:= (dec 0 @: uint32_t)),
+            pre_cr $ global (var "termina__test__stamp" (_const uint32_t) @:= (dec (toInteger stamp) @: uint32_t)),
             pre_cr $ global (var "termina__test__capacity" (_const uint32_t) @:= (dec capacity @: uint32_t)),
             pre_cr $ global (var "termina__test__header" (typeDef "termina__test__header_t")),
             pre_cr $ global (var "termina__test__area" (CTArray uint8_t cCapacity))
@@ -731,9 +732,10 @@ genAppInit initSteps = do
                 $ trail_cr . block $ map stepCall steps
 
 genMainFile :: QualifiedName
+    -> Word32
     -> TerminaProgArch SemanticAnn
     -> CGenerator CFile
-genMainFile mName progArchitecture = do
+genMainFile mName stamp progArchitecture = do
     let includeTermina = CPPDirective (CPPInclude True "termina.h") (internalAnn (CPPDirectiveAnn True))
     sinkPortMessageQueues <- getSinkPortMessageQueues progArchitecture
     channelMessageQueues <- getChannelsMessageQueues progArchitecture
@@ -765,7 +767,7 @@ genMainFile mName progArchitecture = do
     let unitTest = isUnitTest progArchitecture
     when (testBuild && not unitTest) $
         throwError $ InternalError "concurrent tests are not supported yet"
-    testRecord <- if unitTest then genTestRecord else return []
+    testRecord <- if unitTest then genTestRecord stamp else return []
     testReset <- if unitTest then genTestReset progArchitecture (not (null initPools)) (not (null enableProtection)) else return []
     testHarnessTask <- if unitTest then genTestHarness progArchitecture else return []
     let harnessDeclaration = [
@@ -812,10 +814,11 @@ runGenMainFile ::
     TerminaConfig
     -> Platform
     -> QualifiedName
+    -> Word32 -- ^ the stamp of the descriptor of a unit test
     -> TerminaProgArch SemanticAnn
     -> Either CGeneratorError CFile
-runGenMainFile config plt mainFilePath progArchitecture =
-    case runState (runExceptT (genMainFile mainFilePath progArchitecture))
+runGenMainFile config plt mainFilePath stamp progArchitecture =
+    case runState (runExceptT (genMainFile mainFilePath stamp progArchitecture))
         (CGeneratorEnv mainFilePath S.empty emptyMonadicTypes config plt False) of
     (Left err, _) -> Left err
     (Right cFile, _) -> Right cFile

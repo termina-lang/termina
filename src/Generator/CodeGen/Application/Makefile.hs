@@ -119,11 +119,11 @@ genMakefile params loweredProject mExtern unitTest =
                     MakeCommand False [MFragment "$(info CC_VERSION=$(shell $(CC) --version 2>/dev/null | head -n 1))"],
                     MakeCommand False [MFragment "$(foreach v,$(.VARIABLES),$(if $(findstring $$($(v)),$(value CROSS)),$(info VAR $(v)=$($(v)))))"]
                 ],
-            MRule "$(TARGET)" ["$(OBJS)"] [
+            MRule "$(TARGET)" (["$(OBJS)"] ++ ["$R/test.json" | unitTest]) ([
                 MakeCommand False [MFragment "@echo Linking $@"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
                 MakeCommand False [MFragment "@$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@"]
-            ]
+            ] ++ descriptorSection)
         ] ++ externRule ++ [
             MRule "clean" [] [
                 MakeCommand False [MFragment "@echo Cleaning up"],
@@ -159,6 +159,14 @@ genMakefile params loweredProject mExtern unitTest =
             , "tests" `elem` take 1 (splitDirectories (fullPath m)) ]
 
         hasExtern = maybe False (const True) mExtern
+
+        -- | The descriptor of a unit test goes into a section of the binary that is not loaded
+        descriptorSection = [
+            MakeCommand False [MFragment $ unwords [
+                "@if command -v $(OBJCOPY) >/dev/null 2>&1; then",
+                "$(OBJCOPY) --add-section .termina_test=$R/test.json $@;",
+                "else echo $(OBJCOPY) not found: the descriptor is not added to the binary; fi"]]
+            | unitTest ]
 
         -- | A test builds the test runtime of the OSAL, which platform.mk adds
         testFlags = [

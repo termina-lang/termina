@@ -16,6 +16,17 @@ import Generator.LanguageC.Embedded
 import Generator.CodeGen.Expression
 import Generator.CodeGen.Types
 import Utils.Annotations
+import ControlFlow.Architecture.Utils (isUnitTest)
+
+-- | The tasks in the order of their identifiers, the harness of a unit test last
+taskIdOrder :: TerminaProgArch a -> [Identifier]
+taskIdOrder tp = M.keys (tasks tp) ++ [testHarness | isUnitTest tp]
+
+-- | The emitters in the order of their identifiers: system_except, the emitters
+-- of the deployment, the harness of a unit test and its test emitters
+emitterIdOrder :: TerminaProgArch a -> [Identifier]
+emitterIdOrder tp = "system_except" : filter (/= "system_except") (M.keys (emitters tp))
+    ++ [testHarness | isUnitTest tp] ++ M.keys (testEmitters tp)
 
 -- | Data type used to represent a message queue in OSAL
 --  There are different types depending on the original source code element that

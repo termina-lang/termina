@@ -52,3 +52,10 @@ spec = describe "Makefile: project configuration" $ do
     concurrentMakefile `shouldContain` "TERMINA_TEST:=1\n"
     concurrentMakefile `shouldNotContain` "TERMINA__TEST__CLOCK"
     makefileFor (defaultConfig "test" TestPlatform) `shouldNotContain` "TERMINA_TEST"
+
+  it "adds the descriptor of a unit test to its binary" $ do
+    let testConfig = (defaultConfig "test" TestPlatform) { deploymentKind = TestBuild (T.pack "hk") }
+        unitMakefile = T.unpack . runMakefilePrinter $ genMakefile testConfig M.empty Nothing True
+    unitMakefile `shouldContain` "$(TARGET): $(OBJS) $R/test.json\n"
+    unitMakefile `shouldContain` "$(OBJCOPY) --add-section .termina_test=$R/test.json $@;"
+    makefileFor testConfig `shouldNotContain` "test.json"
