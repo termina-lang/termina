@@ -61,6 +61,10 @@ prepareExtern config folders = do
 -- the selected platform needs, relative to the folder.
 checkExtern :: TerminaConfig -> FilePath -> ExternConfig -> IO [FilePath]
 checkExtern config externFolderPath (ExternConfig srcs libs) = do
+  -- | The C of a project is versioned with it, so it lies in its extern folder
+  forM_ (externFiles (ExternConfig srcs libs)) $ \file ->
+    unless (insideFolder file) $
+      die . errorMessage $ "The extern file \"" ++ file ++ "\" is outside the folder \"" ++ externFolderPath ++ "\""
   folderExists <- doesDirectoryExist externFolderPath
   presentSources <- if folderExists then listCSources externFolderPath else return []
   -- | Every source of the folder is listed, so that no C is left uncompiled

@@ -87,6 +87,10 @@ spec = describe "Manifest" $ do
       (project ++ app ++ "dependencies:\n  - git: git@github.com:uah/drivers\n    rev: v1\n") `failsWith` ssh
       (project ++ app ++ "dependencies:\n  - git: ssh://git@github.com/uah/drivers\n    rev: v1\n") `failsWith` ssh
 
+    it "rejects a rev that YAML reads as a number" $
+      (project ++ app ++ "dependencies:\n  - git: https://github.com/a/b\n    rev: 1.10\n")
+        `failsWith` "the rev of https://github.com/a/b is read as a number. Write the tag in quotes, as in rev: \"1.10\""
+
     it "rejects a dependency that is not https" $
       (project ++ app ++ "dependencies:\n  - git: http://example.com/a/b\n    rev: v1\n")
         `failsWith` "http://example.com/a/b is not an https:// URL, and dependencies are fetched with https://"

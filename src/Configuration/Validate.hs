@@ -11,7 +11,6 @@ import Data.Char (toLower)
 import Data.List (find, isPrefixOf, sortOn, groupBy)
 import Data.Function (on)
 import qualified Data.Map.Strict as M
-import System.FilePath (splitDirectories)
 
 import Configuration.Configuration
 import Configuration.Fetch (FetchedFile(..))
@@ -53,8 +52,7 @@ validatePackage files =
       where
 
         check p
-            | "/" `isPrefixOf` p = ["extern/" ++ p ++ ": the extern section lists an absolute path"]
-            | ".." `elem` splitDirectories p = ["extern/" ++ p ++ ": the extern section lists a path outside extern/"]
+            | not (insideFolder p) = ["the extern section lists " ++ p ++ ", which is outside extern/"]
             | M.member ("extern/" ++ p) modes = []
             | otherwise = ["extern/" ++ p ++ ": the extern section lists a file that the package does not have"]
 

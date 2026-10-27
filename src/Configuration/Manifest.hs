@@ -245,7 +245,12 @@ gitDependencyParser = withObject "dependency" $ \o -> do
     onlyFields "a git dependency" ["git", "rev"] o
     url <- o .: "git"
     either fail return (checkGitUrl url)
-    GitDependency url <$> o .: "rev"
+    rev <- o .: "rev"
+    GitDependency url <$> case rev of
+        String tag -> return tag
+        -- YAML reads 1.0 or 1.10 as a number, and 1.10 becomes 1.1, so the tag is lost.
+        Number _ -> fail $ "the rev of " ++ T.unpack url ++ " is read as a number. Write the tag in quotes, as in rev: \"1.10\""
+        _ -> fail $ "the rev of " ++ T.unpack url ++ " is not a tag"
 
 -- | A dependency is written with https://. An SSH address gets its https://
 -- form and the rule that makes git use SSH for it on this machine.

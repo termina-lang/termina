@@ -5,6 +5,7 @@ module Configuration.Configuration (
     ExternConfig(..),
     emptyExternConfig,
     externFiles,
+    insideFolder,
     ProjectProfile(..),
     defaultConfig,
     DeploymentKind(..),
@@ -21,6 +22,7 @@ module Configuration.Configuration (
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
 import Data.Yaml
+import System.FilePath (isRelative, splitDirectories)
 
 import Configuration.Platform
 
@@ -41,6 +43,11 @@ emptyExternConfig = ExternConfig [] M.empty
 -- included, relative to the "extern" folder.
 externFiles :: ExternConfig -> [FilePath]
 externFiles extern = externSources extern ++ concat (M.elems (externLibraries extern))
+
+-- | Whether a path of an extern section stays inside the extern folder: it
+-- is relative and does not go up with "..".
+insideFolder :: FilePath -> Bool
+insideFolder path = isRelative path && ".." `notElem` splitDirectories path
 
 instance FromJSON ExternConfig where
   parseJSON (Object o) =

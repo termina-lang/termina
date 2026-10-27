@@ -54,8 +54,8 @@ spec = do
 
     it "rejects an absolute path, a path outside extern/ and a missing file" $
       errorsOf (manifest "exports: [pus]\nextern:\n  sources: [/etc/crc.c, ../crc.c, crc.c]\n" : file "src/pus/service1.fin" : [])
-        `shouldBe` [ "extern//etc/crc.c: the extern section lists an absolute path"
-                   , "extern/../crc.c: the extern section lists a path outside extern/"
+        `shouldBe` [ "the extern section lists /etc/crc.c, which is outside extern/"
+                   , "the extern section lists ../crc.c, which is outside extern/"
                    , "extern/crc.c: the extern section lists a file that the package does not have" ]
 
   describe "links and submodules" $ do
