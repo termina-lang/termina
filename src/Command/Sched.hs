@@ -126,7 +126,7 @@ loadRTModule rtModelFile = do
       let pErr = annotateError (Position rtModelFile (errorPos err) (errorPos err)) (EParseError err)
           fileMap = M.singleton rtModelFile src_code
       in
-      TIO.putStrLn (toText pErr fileMap) >> exitFailure
+      dieWithReport (toText pErr fileMap)
     Right term -> return $ TerminaModuleData rtModelFile rtModelFile mod_time [] [] src_code (ParsingRTData term)
 
 typeRTModule :: TerminaProgArch SemanticAnn
@@ -148,7 +148,7 @@ typeRTModule arch trPathMap loweredProject pathProject rtModule = do
           pathFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 sourceFilesMap pathProject in
-      TIO.putStrLn (toText err pathFilesMap) >> exitFailure
+      dieWithReport (toText err pathFilesMap)
     (Right tyElems) -> return $ TerminaModuleData
         (qualifiedName rtModule)
         (fullPath rtModule)
@@ -169,7 +169,7 @@ flattenRTModule arch wcepMap rtModule = do
             -- will be feed to the error pretty printer. The source files map must use as key the
             -- path of the source file and as element the text of the source file.
             let fileMap = M.singleton (fullPath rtModule) (sourcecode rtModule) in
-            TIO.putStrLn (toText err fileMap) >> exitFailure
+            dieWithReport (toText err fileMap)
         Right result -> return result
 
 genTransPath :: TypedRTModule
@@ -190,7 +190,7 @@ genTransPath rtModule pathProject arch config wcepMap wcetMap transaction = do
                 pathFilesMap =
                   M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                       fileMap pathProject in
-            TIO.putStrLn (toText err pathFilesMap) >> exitFailure
+            dieWithReport (toText err pathFilesMap)
         Right trPaths -> return trPaths
 
 -- | Load the files containing the transactional worst-case execution paths
@@ -234,7 +234,7 @@ loadWCETModules loweredProject efpPath = do
         let pErr = annotateError (Position filePath (errorPos err) (errorPos err)) (EParseError err)
             fileMap = M.singleton fullP src_code
         in
-        TIO.putStrLn (toText pErr fileMap) >> exitFailure
+        dieWithReport (toText pErr fileMap)
       Right term -> return $ TerminaModuleData filePath fullP mod_time [] [] src_code (WCETData term)
 
 -- | Type check the transactional worst-case execution paths of the project modules
@@ -262,7 +262,7 @@ typeWCETModules arch wcepMap loweredProject wcetProject =
               pathFilesMap =
                 M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                     sourceFilesMap wcetProject in
-          TIO.putStrLn (toText err pathFilesMap) >> exitFailure
+          dieWithReport (toText err pathFilesMap)
         (Right newMap) -> return newMap
 
 -- | Load the files containing the transactional worst-case execution paths
@@ -306,7 +306,7 @@ loadWCEPathModules loweredProject efpPath = do
         let pErr = annotateError (Position filePath (errorPos err) (errorPos err)) (EParseError err)
             fileMap = M.singleton fullP src_code
         in
-        TIO.putStrLn (toText pErr fileMap) >> exitFailure
+        dieWithReport (toText pErr fileMap)
       Right term -> return $ TerminaModuleData filePath fullP mod_time [] [] src_code (TransPathData term)
 
 -- | Type check the transactional worst-case execution paths of the project modules
@@ -333,7 +333,7 @@ typeWCEPathModules arch loweredProject pathProject =
               pathFilesMap =
                 M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                     sourceFilesMap pathProject in
-          TIO.putStrLn (toText err pathFilesMap) >> exitFailure
+          dieWithReport (toText err pathFilesMap)
         (Right newMap) -> return newMap
 
 genPlantUMLModels :: MASTModelReduction -> TerminaConfig -> RTSituationMap RTSemAnn -> TransPathMap TRPSemAnn -> IO ()
@@ -351,7 +351,7 @@ genPlantUMLModelForTransaction base (SelectedEventBursty _ _ transactionId initi
   let result = runPlantUMLGenerator transactionId initialStep stMap
   case result of
     Left err ->
-      TIO.putStrLn err >> exitFailure
+      dieWithReport err
     Right diagram -> do
       let targetFile = base </> "plantuml" </> transactionId <.> "plantuml"
       createDirectoryIfMissing True (takeDirectory targetFile)
@@ -360,7 +360,7 @@ genPlantUMLModelForTransaction base (SelectedEventPeriodic _ _ transactionId ini
   let result = runPlantUMLGenerator transactionId initialStep stMap
   case result of
     Left err ->
-      TIO.putStrLn err >> exitFailure
+      dieWithReport err
     Right diagram -> do
       let targetFile = base </> "plantuml" </> transactionId <.> "plantuml"
       createDirectoryIfMissing True (takeDirectory targetFile)
@@ -438,7 +438,7 @@ writeMASTModels reduction config arch sitMap trPathMap = do
       zipWithM_ (\peList modelName ->
         let result = runMASTModelGenerator config arch modelName peList in
         case result of
-          Left err -> TIO.putStrLn (toText err M.empty) >> exitFailure
+          Left err -> dieWithReport (toText err M.empty)
           Right model -> do
             let targetFile = base </> modelName <.> "mast"
             createDirectoryIfMissing True (takeDirectory targetFile)
@@ -491,14 +491,9 @@ runMASTAnalyzer base modelName model = do
 
     case eRes of
       Left ioex -> do
-        if isDoesNotExistError ioex
-          then TIO.putStrLn $
-                "\x1b[31m[error]\x1b[0m: Cannot run " <> T.pack cmd
-                <> " (command not found). Is it in your PATH?"
-          else TIO.putStrLn $
-                "\x1b[31m[error]\x1b[0m: Failed to start " <> T.pack cmd
-                <> ": " <> T.pack (show ioex)
-        exitFailure
+        dieWithError $ if isDoesNotExistError ioex
+          then "Cannot run " ++ cmd ++ " (command not found). Is it in your PATH?"
+          else "Failed to start " ++ cmd ++ ": " ++ show ioex
 
       Right (ec, out, err) ->
         case ec of
@@ -513,27 +508,16 @@ runMASTAnalyzer base modelName model = do
               createDirectoryIfMissing True (takeDirectory targetFile)
               TIO.writeFile targetFile mastText
 
-              TIO.putStrLn $
-                "\x1b[31m[error]\x1b[0m: System NOT schedulable for "
-                <> T.pack modelName
-                <> " (mast-analysis completed but did not end with DONE)."
-
-              TIO.putStrLn (T.pack out)
-
-              exitFailure
+              dieWithError $ "System NOT schedulable for " ++ modelName
+                ++ " (mast-analysis completed but did not end with DONE).\n" ++ out
           ExitFailure code -> do
             -- Optional: keep failing model for debugging
             let targetFile = base </> modelName <.> "mast"
             createDirectoryIfMissing True (takeDirectory targetFile)
             TIO.writeFile targetFile mastText
 
-            TIO.putStrLn $
-              "\x1b[31m[error]\x1b[0m: Error when running MAST for "
-              <> T.pack modelName <> " (exit " <> T.pack (show code) <> ")."
-
-            unless (null err) $ TIO.putStrLn (T.pack err)
-            unless (null out) $ TIO.putStrLn (T.pack out)
-            exitFailure
+            dieWithError $ "Error when running MAST for " ++ modelName ++ " (exit " ++ show code ++ ")."
+              ++ concat ["\n" ++ text | text <- [err, out], not (null text)]
   
   where
 
@@ -627,7 +611,7 @@ genMASTModels reduction config arch sitMap trPathMap = do
 
             case runMASTModelGenerator config arch modelName peList of
               Left err ->
-                TIO.putStrLn (toText err M.empty) >> exitFailure
+                dieWithReport (toText err M.empty)
               Right model -> runMASTAnalyzer base modelName model
 
             -- progress
@@ -658,9 +642,7 @@ genMASTModels reduction config arch sitMap trPathMap = do
           when isTTY $
               TIO.putStrLn ""
 
-    _ ->
-      TIO.putStrLn "\x1b[31m[error]\x1b[0m: Unexpected RT element when generating MAST models for transactional paths"
-        >> exitFailure
+    _ -> dieWithError "Unexpected RT element when generating MAST models for transactional paths"
 
 -- | Command handler for the "sched" command
 schedCommand :: SchedCmdArgs -> IO ()
@@ -696,8 +678,7 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
     orderedDependencies <-
       either
         (\files ->
-          let msg = "\x1b[31m[error]\x1b[0m: Detected cycle between project source files: " <> T.intercalate " -> " (map (T.pack . show) files) in
-          TIO.putStrLn msg >> exitFailure)
+          dieWithError . T.unpack $ "Detected cycle between project source files: " <> T.intercalate " -> " (map (T.pack . show) files))
         return
         $ sortProjectDepsOrLoop projectDependencies
     when chatty (putStrLn. debugMessage $ "Type checking project modules")
@@ -709,7 +690,7 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
     rawLoweredProject <-
       either
         (\err ->
-          TIO.putStrLn (toText err M.empty) >> exitFailure)
+          dieWithReport (toText err M.empty))
         return
         $ lowerProject typedProject
     runLoweredChecks chatty plt rawLoweredProject

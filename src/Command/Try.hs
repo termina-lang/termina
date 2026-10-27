@@ -8,7 +8,6 @@ import Command.Utils
 import Modules.Modules
 import Command.Types
 import System.FilePath
-import System.Exit
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import qualified Data.Map.Strict as M
@@ -64,7 +63,7 @@ loadSingleModule filePath = do
             let pErr = annotateError (Position filePath (errorPos err) (errorPos err)) (EParseError err)
                 fileMap = M.singleton filePath src_code
             in
-            TIO.putStrLn (toText pErr fileMap) >> exitFailure
+            dieWithReport (toText pErr fileMap)
         Right term -> do
             -- Imported modules are ignored
             return $ TerminaModuleData noExtension filePath mod_time [] [] src_code (ParsingData . frags $ term)
@@ -76,7 +75,7 @@ typeSingleModule parsedModule = do
     case result of
         (Left err) ->
             let sourceFilesMap = M.fromList [(fullPath parsedModule, sourcecode parsedModule)] in
-            TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+            dieWithReport (toText err sourceFilesMap)
         (Right (typedProgram, _)) -> 
             return $ TerminaModuleData
                     (qualifiedName parsedModule)
@@ -127,19 +126,19 @@ tryCommand (TryCmdArgs targetFile noUsageChecking printHeader debugBuild) = do
     case lowerTypedModule typedModule of
         Left err -> 
             let sourceFilesMap = M.fromList [(fullPath typedModule, sourcecode typedModule)] in
-            TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+            dieWithReport (toText err sourceFilesMap)
         Right bbModule -> do
             mapM_ 
                 (\err -> 
                     let sourceFilesMap = M.fromList [(fullPath bbModule, sourcecode bbModule)] in
-                    TIO.putStrLn (toText err sourceFilesMap) >> exitFailure) 
+                    dieWithReport (toText err sourceFilesMap)) 
                 $ basicBlockPathsCheckModule bbModule
             -- | Check variable usage (if enabled)
             unless noUsageChecking (
                     mapM_ 
                         (\err -> 
                             let sourceFilesMap = M.fromList [(fullPath bbModule, sourcecode bbModule)] in
-                            TIO.putStrLn (toText err sourceFilesMap) >> exitFailure) 
+                            dieWithReport (toText err sourceFilesMap)) 
                         $ boxUsageCheckModule bbModule
                 )
             eModule <- elaborateSingleModule bbModule

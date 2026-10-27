@@ -47,6 +47,7 @@ import Data.Maybe (listToMaybe, mapMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import System.Exit (die, exitFailure)
+import System.IO (stderr)
 import System.Environment (getEnvironment)
 
 -- | Error message formatter
@@ -347,7 +348,7 @@ runLoweredChecks chatty plt loweredProject = mapM_ runOne loweredChecks
       when chatty (putStrLn . debugMessage $ checkMessage check)
       case runCheck check plt loweredProject of
         Nothing -> return ()
-        Just failure -> TIO.putStrLn (failureMessage failure sourceFilesMap) >> exitFailure
+        Just failure -> dieWithReport (failureMessage failure sourceFilesMap)
 
 -- | Load "termina.yaml" and check the folders of the project against it,
 -- giving every problem found.
@@ -375,6 +376,11 @@ loadProject = do
 -- | Print an error, which may take several lines, and stop.
 dieWithError :: String -> IO a
 dieWithError = die . errorMessage
+
+-- | Print a report of the transpiler, which carries its own tag, on the
+-- error output and stop.
+dieWithReport :: T.Text -> IO a
+dieWithReport report = TIO.hPutStrLn stderr report >> exitFailure
 
 -- | Print the first error and stop. The errors are reported one at a time,
 -- as the type checker does.

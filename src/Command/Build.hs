@@ -490,8 +490,7 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _) 
     orderedDependencies <-
       either
         (\files ->
-          let msg = "\x1b[31m[error]\x1b[0m: Detected cycle between project source files: " <> T.intercalate " -> " (map (T.pack . show) files) in
-          TIO.putStrLn msg >> exitFailure)
+          dieWithError . T.unpack $ "Detected cycle between project source files: " <> T.intercalate " -> " (map (T.pack . show) files))
         return
         $ sortProjectDepsOrLoop projectDependencies
     when chatty (putStrLn. debugMessage $ "Type checking project modules")
@@ -506,7 +505,7 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _) 
     rawLoweredProject <-
       either
         (\err ->
-          TIO.putStrLn (toText err M.empty) >> exitFailure)
+          dieWithReport (toText err M.empty))
         return
         $ lowerProject typedProject
     runLoweredChecks chatty plt rawLoweredProject

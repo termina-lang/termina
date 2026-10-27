@@ -4,10 +4,8 @@ import Command.Utils
 import Command.Types
 
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 
 import System.FilePath
-import System.Exit
 import System.Directory
 import Parser.Parsing (terminaModuleParser)
 import Parser.Errors
@@ -55,13 +53,13 @@ loadTerminaModule root filePath srcPaths = do
       let pErr = annotateError (Position filePath (errorPos err) (errorPos err)) (EParseError err)
           fileMap = M.singleton fullP src_code
       in
-      TIO.putStrLn (toText pErr fileMap) >> exitFailure
+      dieWithReport (toText pErr fileMap)
     Right term -> do
       mimports <- getModuleImportsFrom srcPaths term
       case mimports of
         Left err ->
           let fileMap = M.singleton fullP src_code in
-          TIO.putStrLn (toText err fileMap) >> exitFailure
+          dieWithReport (toText err fileMap)
         Right imports ->
           return $ TerminaModuleData filePath fullP mod_time imports [] src_code (ParsingData . frags $ term)
 
@@ -118,7 +116,7 @@ typeModules parsedProject initialState =
           let sourceFilesMap =
                 M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                     M.empty parsedProject in
-          TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+          dieWithReport (toText err sourceFilesMap)
         (Right (typedProgram, newState)) -> do
           let typedModule =
                 TerminaModuleData
@@ -150,7 +148,7 @@ genArchitecture loweredProject initialTerminaProgram orderedDependencies = do
           let sourceFilesMap =
                 M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                     M.empty loweredProject in
-          TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+          dieWithReport (toText err sourceFilesMap)
         Right tp' -> genArchitecture' tp' ms
 
 checkEmitterConnections :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
@@ -161,7 +159,7 @@ checkEmitterConnections loweredProject progArchitecture =
       let sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 M.empty loweredProject in
-      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+      dieWithReport (toText err sourceFilesMap)
     Right _ -> return ()
 
 checkChannelConnections :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
@@ -172,7 +170,7 @@ checkChannelConnections loweredProject progArchitecture =
       let sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 M.empty loweredProject in
-      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+      dieWithReport (toText err sourceFilesMap)
     Right _ -> return ()
 
 checkResourceUsage :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
@@ -183,7 +181,7 @@ checkResourceUsage loweredProject progArchitecture =
       let sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 M.empty loweredProject in
-      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+      dieWithReport (toText err sourceFilesMap)
     Right _ -> return ()
 
 checkTaskPriorities :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
@@ -194,7 +192,7 @@ checkTaskPriorities loweredProject progArchitecture =
       let sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 M.empty loweredProject in
-      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+      dieWithReport (toText err sourceFilesMap)
     Right _ -> return ()
 
 checkSystemExceptAction :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
@@ -205,7 +203,7 @@ checkSystemExceptAction loweredProject progArchitecture =
       let sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 M.empty loweredProject in
-      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+      dieWithReport (toText err sourceFilesMap)
     Right _ -> return ()
 
 checkActivationCycles :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
@@ -216,7 +214,7 @@ checkActivationCycles loweredProject progArchitecture =
       let sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 M.empty loweredProject in
-      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+      dieWithReport (toText err sourceFilesMap)
     Right _ -> return ()
 
 checkTestDeployment :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
@@ -227,7 +225,7 @@ checkTestDeployment loweredProject progArchitecture =
       let sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 M.empty loweredProject in
-      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+      dieWithReport (toText err sourceFilesMap)
     Right _ -> return ()
 
 checkPoolUsage :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
@@ -238,7 +236,7 @@ checkPoolUsage loweredProject progArchitecture =
       let sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 M.empty loweredProject in
-      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+      dieWithReport (toText err sourceFilesMap)
     Right _ -> return ()
 
 checkDequeConnections :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
@@ -249,7 +247,7 @@ checkDequeConnections loweredProject progArchitecture =
       let sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 M.empty loweredProject in
-      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+      dieWithReport (toText err sourceFilesMap)
     Right _ -> return ()
 
 checkProjectBoxSources :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
@@ -263,7 +261,7 @@ checkProjectBoxSources loweredProject progArchitecture =
       let sourceFilesMap =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 M.empty loweredProject in
-      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+      dieWithReport (toText err sourceFilesMap)
     Right _ -> return ()
 
 constFolding :: TerminaConfig -> Platform -> LoweredProject -> IO (LoweredProject, ProjectConstEnvs)
@@ -289,7 +287,7 @@ constFolding config plt loweredProject =
           let sourceFilesMap =
                 M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                     M.empty loweredProject in
-          TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+          dieWithReport (toText err sourceFilesMap)
         Right (foldedModule, env') ->
           foldModules env' (M.insert m foldedModule foldedProject)
             (M.insert m (constEnv env') constEnvs) ms
@@ -307,7 +305,7 @@ constFolding config plt loweredProject =
 sideEffectCheck :: Platform -> ElaboratedProject -> IO ()
 sideEffectCheck plt project =
   forM_ (sideEffectCheckModules plt project) $ \err ->
-    TIO.putStrLn (toText err (projectSourceFiles project)) >> exitFailure
+    dieWithReport (toText err (projectSourceFiles project))
 
 -- | Returns, for each module, the run-time checks that the values of their
 -- operands show to hold, which the elaboration hands to the value prover.
@@ -328,5 +326,5 @@ valueAnalysisCheck plt constEnvs loweredProject =
              returned
              (loweredAST . metadata $ loweredProject M.! m) of
         (Just err, _, _) ->
-          TIO.putStrLn (toText err (projectSourceFiles loweredProject)) >> exitFailure
+          dieWithReport (toText err (projectSourceFiles loweredProject))
         (Nothing, returned', proven) -> checkModules returned' (M.insert m proven evidence) ms
