@@ -317,7 +317,7 @@ selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile) = do
 -- prefixes of a library and, in a library, the types of its exported modules.
 loadBuildProject :: Bool -> IO Manifest
 loadBuildProject chatty = do
-    manifest <- loadProject >>= either dieWithErrors return
+    manifest <- loadProject >>= either dieWithFirstError return
     checkLibrary chatty manifest
     return manifest
 

@@ -37,7 +37,7 @@ initializeHandler _req = do
     ecfg <- loadConfig
     case ecfg of
       Left errs ->
-        errorM $ "Error when loading termina.yaml: " <> T.pack (unlines errs)
+        errorM $ "Error when loading termina.yaml: " <> T.pack (concat (take 1 errs))
       Right cfg -> do
         -- We have loaded the configuration file. Then we must check that the platform is OK
         -- Decode the selected platform field

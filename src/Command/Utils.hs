@@ -25,7 +25,6 @@ import ControlFlow.ExitPaths
 import Configuration.Configuration
 import Configuration.Manifest
 import Configuration.Namespace (checkExports)
-import Data.List (intercalate)
 import System.Directory
 import Utils.Annotations
 import ControlFlow.ExitPaths.Errors (PathsCheckError)
@@ -373,9 +372,10 @@ loadProject = do
             exportErrors <- liftIO $ checkExports "." manifest
             return $ if null exportErrors then Right manifest else Left exportErrors
 
--- | Print each error, which may take several lines, and stop.
-dieWithErrors :: [String] -> IO a
-dieWithErrors = die . intercalate "\n" . map errorMessage
+-- | Print the first error, which may take several lines, and stop. The
+-- errors are reported one at a time, as the type checker does.
+dieWithFirstError :: [String] -> IO a
+dieWithFirstError errs = die (errorMessage (concat (take 1 errs)))
 
 -- | The configuration of the application of the project.
 loadConfig :: (MonadIO m) => m (Either [String] TerminaConfig)

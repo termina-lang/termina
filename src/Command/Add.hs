@@ -19,7 +19,7 @@ import Options.Applicative
 import System.Directory
 import System.FilePath
 
-import Command.Utils (Place(..), currentPlace, dieWithErrors, warnMessage, infoMessage)
+import Command.Utils (Place(..), currentPlace, dieWithFirstError, warnMessage, infoMessage)
 import Configuration.Fetch
 import Configuration.Graph
 import Configuration.Lock
@@ -56,7 +56,7 @@ addCommand (AddCmdArgs url tag mTest) = do
     place <- currentPlace
     result <- addDependency place "." (T.pack url) (T.pack tag) mTest
     case result of
-        Left errs -> dieWithErrors errs
+        Left errs -> dieWithFirstError errs
         Right report -> do
             mapM_ (putStrLn . warnMessage) (reportWarnings report)
             mapM_ (putStrLn . infoMessage) (reportLines report)

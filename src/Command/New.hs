@@ -321,7 +321,7 @@ newCommand (NewProject project mPltName kind mExports vcs vscode chatty) = do
 -- read back, both are undone.
 newTestCommand :: String -> Bool -> IO ()
 newTestCommand testName chatty = do
-    manifest <- loadManifest >>= either dieWithErrors return
+    manifest <- loadManifest >>= either dieWithFirstError return
     unless (isSnakeCase testName) $
         die . errorMessage $ "The name of a test is lowercase snake_case: \"" ++ testName ++ "\""
     when (T.pack testName `M.member` manifestTests manifest) $
@@ -345,7 +345,7 @@ newTestCommand testName chatty = do
             writeFile manifestFile original
             removeFile testFile
             removeDirectory testFolder
-            dieWithErrors err
+            dieWithFirstError err
 
   where
 

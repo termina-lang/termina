@@ -40,8 +40,8 @@ data SourceModule = SourceModule {
 
 -- | Check the prefixes of the exports of a library against each other and
 -- against its sources, and the exported modules against the prefixes, and
--- collect every problem so that all of them are reported at once. An
--- application exports nothing and has nothing to check.
+-- give every problem found. An application exports nothing and has nothing
+-- to check.
 checkExports :: FilePath -> Manifest -> IO [String]
 checkExports root manifest =
     case manifestNature manifest of

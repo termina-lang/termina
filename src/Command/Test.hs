@@ -58,7 +58,7 @@ testCommand :: TestCmdArgs -> IO ()
 testCommand (TestCmdArgs list json) = do
     unless list $
       die . errorMessage $ "termina test can only list the tests for now: use --list"
-    manifest <- loadManifest >>= either dieWithErrors return
+    manifest <- loadManifest >>= either dieWithFirstError return
     listed <- forM (M.toList (manifestTests manifest)) $ \(testName, entry) -> do
       cases <- loadTestCases (T.unpack testName)
       return (testName, entry, cases)

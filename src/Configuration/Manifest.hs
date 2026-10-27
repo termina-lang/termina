@@ -340,8 +340,8 @@ testParser testName v = do
             <*> (o .:? "extern" >>= maybe (return emptyExternConfig) externParser)
             <*> (o .:? "dependencies" .!= [] >>= mapM dependencyParser)) v
 
--- | Check the folders of the project against the manifest, and collect every
--- mismatch so that all of them are reported at once.
+-- | Check the folders of the project against the manifest, and give every
+-- mismatch found.
 checkLayout :: FilePath -> Manifest -> IO [String]
 checkLayout root manifest = do
     appErrors <- checkApp
