@@ -9,7 +9,8 @@ import Configuration.Configuration
 import Configuration.Manifest
 import Configuration.Namespace (exportedModules)
 import Command.Dependencies (Sync(..), syncDependencies, describeChange)
-import Command.Sources (loadSources)
+import Command.Sources (loadSources, localFolders)
+import Configuration.Local (LocalPackage(..), readLocalPackages)
 import Configuration.Lock (Lock(..), LockedPackage(..))
 import Configuration.Vendor (packageDir)
 import Command.Utils
@@ -331,13 +332,14 @@ loadBuildProject chatty = do
     mapM_ (putStrLn . infoMessage . ("termina.lock: " ++) . describeChange) changes
     -- The C of each package will be linked into its own object; until then a package with C cannot be built.
     lockAfter <- loadLock "." >>= either dieWithFirstError return
-    forM_ (lockPackages lockAfter) $ \locked -> do
-        vendored <- decodeManifestFile (packageDir "." (lockedUrl locked) </> "termina.yaml")
-        case vendored of
-            Right m | not (null (externFiles (manifestExtern m))) ->
-                dieWithError $ T.unpack (projectName (manifestProject m)) ++ " (" ++ T.unpack (lockedUrl locked)
-                    ++ ") has C in its extern section, and termina cannot build the C of a dependency yet."
-            _ -> return ()
+    locals <- readLocalPackages [(".", p) | DepPath p <- manifestDependencies manifest ++ concatMap testDependencies (M.elems (manifestTests manifest))]
+        >>= either dieWithFirstError return
+    vendored <- forM (lockPackages lockAfter) $ \locked ->
+        (,) (T.unpack (lockedUrl locked)) <$> decodeManifestFile (packageDir "." (lockedUrl locked) </> "termina.yaml")
+    forM_ ([(origin, m) | (origin, Right m) <- vendored] ++ [(folder, localManifest l) | (folder, l) <- M.toList locals]) $ \(origin, m) ->
+        unless (null (externFiles (manifestExtern m))) $
+            dieWithError $ T.unpack (projectName (manifestProject m)) ++ " (" ++ origin
+                ++ ") has C in its extern section, and termina cannot build the C of a dependency yet."
     checkLibrary chatty manifest
     return manifest
 
@@ -503,6 +505,11 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _) 
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
     manifest <- decodeManifestFile "termina.yaml" >>= either (dieWithError . ("termina.yaml: " ++)) return
     sources <- loadSources manifest mTest mainFolder
+    -- A library of a local folder is not in the lock, so the build cannot be reproduced.
+    forM_ (localFolders sources) $ \folder -> case profile config of
+        Release -> dieWithError $ folder ++ " is a local folder, and a release is built only from tagged dependencies. "
+            ++ "Point it to a tag of its repository."
+        Debug -> putStrLn . warnMessage $ folder ++ " is a local folder, so this build cannot be reproduced from termina.lock."
     -- | Load the module that wires the deployment
     let mainModulePath = mainFolder </> deploymentMainModule deployment <.> "fin"
     when chatty (putStrLn . debugMessage $ "Loading the main module: \"" ++ mainModulePath ++ "\"")

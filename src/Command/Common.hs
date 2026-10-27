@@ -77,6 +77,8 @@ loadTerminaModule sources root filePath = do
             Ambiguous a b -> dieWithError (collisionMessage sources qname a b)
             Hidden folder -> dieWithError $ fullP ++ ":" ++ show (locationLine ann) ++ ": "
               ++ hiddenMessage folder importerOwner (qualifiedToModuleName qname)
+            NotExported folder -> dieWithError $ fullP ++ ":" ++ show (locationLine ann) ++ ": "
+              ++ notExportedMessage folder (qualifiedToModuleName qname)
             Missing -> dieWithReport (toText (annotateError ann (EImportedFileNotFound (root </> qname <.> "fin"))) fileMap)
 
 -- | Load the modules that the modules of a folder import, and everything they

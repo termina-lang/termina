@@ -10,6 +10,7 @@ module Configuration.Resolve (
     Resolution(..),
     ResolveError(..),
     resolve,
+    resolveWith,
     describeResolveError
 ) where
 
@@ -79,8 +80,15 @@ data State e = State {
 -- already met with the same tag is not brought again, which also ends the
 -- cycles; every error is collected before giving up.
 resolve :: Monad m => (T.Text -> T.Text -> m (Either e Obtained)) -> Manifest -> m (Either [ResolveError e] Resolution)
-resolve obtain root = do
-    final <- go initial (State M.empty M.empty [] [] [])
+resolve obtain root = resolveWith obtain root []
+
+-- | Resolve as "resolve" does, with more requirements after those of the
+-- root and its tests, each with the path that brings it: the dependencies
+-- of the libraries that the project takes from local folders.
+resolveWith :: Monad m => (T.Text -> T.Text -> m (Either e Obtained)) -> Manifest -> [(GitDependency, [String])]
+    -> m (Either [ResolveError e] Resolution)
+resolveWith obtain root extra = do
+    final <- go (initial ++ [Requirement (gitUrl g) (gitRev g) path | (g, path) <- extra]) (State M.empty M.empty [] [] [])
     return $ case reverse (errors final) of
         [] -> Right (Resolution (packages final) (reverse (applied final)) (reverse (ignored final)))
         errs -> Left errs

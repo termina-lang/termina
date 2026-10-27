@@ -37,12 +37,15 @@ withProject action = do
                 write (packageDir "." (url name) </> "termina.yaml") (header name ++ "exports: [" ++ name ++ "]\n" ++ deps pkgDeps)
                 write (packageDir "." (url name) </> "src" </> name </> "m.fin") ""
         write "termina.yaml" ""
+        write ("libs" </> "drivers" </> "termina.yaml") (header "drivers" ++ "exports: [drivers]\n" ++ deps ["ccsds"])
+        forM_ ["libs/drivers/src/drivers/uart.fin", "libs/drivers/src/support/fake.fin"] (`write` "")
         package "pus" ["ccsds"]
         package "ccsds" []
         package "fixtures" []
         forM_ ["src/obdh/tm.fin", "src/pus/m.fin", "tests/hk/src/hk/h.fin"] (`write` "")
         writeLockFile "termina.lock" (Lock 1 [LockedPackage (url n) "v1" (T.pack (replicate 40 'a')) (T.pack ("sha256:" ++ replicate 64 'b')) | n <- ["pus", "ccsds", "fixtures"]])
         let manifest = manifestOf $ header "obdh" ++ "app:\n  platform: posix-gcc\n  profile: release\n" ++ deps ["pus"]
+                ++ "  - path: libs/drivers\n"
                 ++ "tests:\n  hk:\n    platforms: [posix-gcc]\n    timeout: 10\n    dependencies:\n      - git: " ++ T.unpack (url "fixtures") ++ "\n        rev: \"v1\"\n"
         app <- either (error . unlines) id <$> buildSources manifest Nothing "app"
         test <- either (error . unlines) id <$> buildSources manifest (Just "hk") ("tests" </> "hk")
@@ -59,6 +62,7 @@ lookupIn sources importer qname = do
         Found folder -> "found in " ++ folder
         Ambiguous a b -> collisionMessage sources qname a b
         Hidden folder -> hiddenMessage folder (maybe Project folderOwner (lookup importer [(folderPath f, f) | f <- sources])) (dotted qname)
+        NotExported folder -> notExportedMessage folder (dotted qname)
         Missing -> "missing"
 
   where
@@ -76,7 +80,7 @@ spec = describe "source folders of a build" $ do
   it "refuses a package that only reaches the build through another" $
     withProject $ \app _ ->
       lookupIn app "src" "ccsds/m" `shouldReturn`
-        "ccsds reaches this build through pus, but termina.yaml does not declare it, so this project cannot import ccsds.m. Add ccsds to the dependencies to use it."
+        "ccsds reaches this build through drivers, but termina.yaml does not declare it, so this project cannot import ccsds.m. Add ccsds to the dependencies to use it."
 
   it "lets the test see its dependencies and its modules, and keeps them from the code of src/" $
     withProject $ \_ test -> do
@@ -84,6 +88,14 @@ spec = describe "source folders of a build" $ do
       lookupIn test ("tests" </> "hk" </> "src") "hk/h" `shouldReturn` ("found in " ++ "tests" </> "hk" </> "src")
       lookupIn test "src" "fixtures/m" `shouldReturn` "fixtures is a dependency of the test hk only, so the code of src/ cannot import fixtures.m."
       lookupIn test "src" "hk/h" `shouldReturn` "hk.h is a module of the test hk, so the code of src/ cannot import it."
+
+  it "takes the exported modules of a library in a local folder, which sees its own dependencies" $
+    withProject $ \app _ -> do
+      let drivers = "libs" </> "drivers" </> "src"
+      lookupIn app "src" "drivers/uart" `shouldReturn` ("found in " ++ drivers)
+      lookupIn app "src" "support/fake" `shouldReturn`
+        ("support.fake is in " ++ drivers ++ ", outside the exports of drivers, so it cannot be imported from it.")
+      lookupIn app drivers "ccsds/m" `shouldReturn` ("found in " ++ vendored "ccsds")
 
   it "refuses a module of the project with the name of one of a dependency" $
     withProject $ \app _ ->

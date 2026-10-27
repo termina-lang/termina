@@ -31,6 +31,10 @@ package name exports deps modules = ResolvedPackage (T.pack (url name)) "v1" (Ob
 
     files = FetchedFile "termina.yaml" "100644" "" : [FetchedFile p "100644" (BS.pack body) | (p, body) <- modules]
 
+-- | The problems of a graph without local packages.
+graphErrors :: Manifest -> Resolution -> [String]
+graphErrors root res = checkGraph root res M.empty
+
 resolution :: [ResolvedPackage] -> Resolution
 resolution pkgs = Resolution (M.fromList [(normalizeUrl (resolvedUrl p), p) | p <- pkgs]) [] []
 
@@ -52,28 +56,28 @@ spec = do
   describe "prefixes" $ do
 
     it "accepts disjoint prefixes" $
-      checkGraph app (resolution [ccsds, hal]) `shouldBe` []
+      graphErrors app (resolution [ccsds, hal]) `shouldBe` []
 
     it "rejects a prefix of a package that contains one of another" $
-      checkGraph app (resolution [package "drivers" "drivers" [] [], package "gaisler" "drivers.gaisler" [] []])
+      graphErrors app (resolution [package "drivers" "drivers" [] [], package "gaisler" "drivers.gaisler" [] []])
         `shouldBe` ["the prefix drivers of drivers overlaps drivers.gaisler of gaisler"]
 
     it "rejects a prefix of a package that the library being built also owns" $
-      checkGraph (manifestOf (header "lib" ++ "exports: [ccsds.tm]\n")) (resolution [ccsds])
+      graphErrors (manifestOf (header "lib" ++ "exports: [ccsds.tm]\n")) (resolution [ccsds])
         `shouldBe` ["the prefix ccsds.tm of lib overlaps ccsds of ccsds"]
 
   describe "imports of the exported modules" $ do
 
     it "accepts its own modules and those of the dependencies it declares" $
-      checkGraph app (resolution [ccsds, package "pus" "pus" ["ccsds"] [("src/pus/s1.fin", module' ["pus.util", "ccsds.tc"])]])
+      graphErrors app (resolution [ccsds, package "pus" "pus" ["ccsds"] [("src/pus/s1.fin", module' ["pus.util", "ccsds.tc"])]])
         `shouldBe` []
 
     it "rejects a package of the graph that it does not declare, and a module of nobody" $
-      checkGraph app (resolution [ccsds, hal, package "pus" "pus" ["ccsds"] [("src/pus/s1.fin", module' ["hal.gpio", "util.crc"])]])
+      graphErrors app (resolution [ccsds, hal, package "pus" "pus" ["ccsds"] [("src/pus/s1.fin", module' ["hal.gpio", "util.crc"])]])
         `shouldBe`
           [ "vendor/github.com/acme/pus/src/pus/s1.fin:1: the exported module pus.s1 imports hal.gpio, which is neither exported by pus nor by a dependency it declares"
           , "vendor/github.com/acme/pus/src/pus/s1.fin:2: the exported module pus.s1 imports util.crc, which is neither exported by pus nor by a dependency it declares" ]
 
     it "leaves to the build a module that does not parse, and one that is not exported" $
-      checkGraph app (resolution [package "pus" "pus" [] [("src/pus/s1.fin", "import util.crc\n"), ("src/util/x.fin", module' ["hal.gpio"])]])
+      graphErrors app (resolution [package "pus" "pus" [] [("src/pus/s1.fin", "import util.crc\n"), ("src/util/x.fin", module' ["hal.gpio"])]])
         `shouldBe` []

@@ -4,7 +4,8 @@
 -- the fetch needs to know what to copy, and what the build of the consumer
 -- would not see. The rest is left to the build.
 module Configuration.Validate (
-    validatePackage
+    validatePackage,
+    validateLocalPackage
 ) where
 
 import Data.Char (toLower)
@@ -21,7 +22,15 @@ import Configuration.Vendor (isVendored)
 -- | Check the files of the commit of a package, and give its manifest or
 -- every problem found.
 validatePackage :: [FetchedFile] -> Either [String] Manifest
-validatePackage files =
+validatePackage = validateFiles False
+
+-- | Check the files of a library in a local folder as those of a fetched
+-- package, except that it may itself depend on other local folders.
+validateLocalPackage :: [FetchedFile] -> Either [String] Manifest
+validateLocalPackage = validateFiles True
+
+validateFiles :: Bool -> [FetchedFile] -> Either [String] Manifest
+validateFiles local files =
     case find ((== "termina.yaml") . fetchedPath) files of
         Nothing -> Left ["the package has no termina.yaml"]
         Just yaml -> case decodeManifest (fetchedBytes yaml) of
@@ -43,7 +52,7 @@ validatePackage files =
     -- | A path dependency only exists on the machine of the author.
     pathErrors manifest =
         [ "the package declares the path dependency " ++ p ++ ", which only exists on the machine of its author"
-        | DepPath p <- manifestDependencies manifest ]
+        | not local, DepPath p <- manifestDependencies manifest ]
 
     -- | Each file of the extern section lies inside "extern/" and is in the
     -- commit; a link in its place is reported with the others.

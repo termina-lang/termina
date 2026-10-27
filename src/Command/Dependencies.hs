@@ -24,6 +24,7 @@ import System.FilePath
 import Command.Utils (Place(..))
 import Configuration.Fetch
 import Configuration.Graph
+import Configuration.Local
 import Configuration.Lock
 import Configuration.Manifest
 import Configuration.Resolve
@@ -62,14 +63,24 @@ data Sync = Sync {
 syncDependencies :: Place -> String -> FilePath -> Manifest -> Lock -> IO (Either [String] Sync)
 syncDependencies place commandName root manifest lock = do
     used <- newIORef []
-    resolution <- resolve (obtain used) manifest
-    case resolution of
-        Left errs -> return (Left (describeObtainErrors place commandName errs))
-        Right res -> case checkGraph manifest res of
-            [] -> Right <$> commit res used
-            errs -> return (Left errs)
+    localResult <- readLocalPackages [(root, p) | DepPath p <- allDependencies]
+    case localResult of
+        Left errs -> return (Left errs)
+        Right locals -> do
+            let extra = [ (g, [rootName, T.unpack (projectName (manifestProject (localManifest l)))])
+                        | l <- M.elems locals, DepGit g <- manifestDependencies (localManifest l) ]
+            resolution <- resolveWith (obtain used) manifest extra
+            case resolution of
+                Left errs -> return (Left (describeObtainErrors place commandName errs))
+                Right res -> case checkGraph manifest res locals of
+                    [] -> Right <$> commit res used
+                    errs -> return (Left errs)
 
   where
+
+    rootName = T.unpack (projectName (manifestProject manifest))
+
+    allDependencies = manifestDependencies manifest ++ concatMap testDependencies (M.elems (manifestTests manifest))
 
     oldPackages = M.fromList [(normalizeUrl (lockedUrl l), l) | l <- lockPackages lock]
 
