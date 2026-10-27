@@ -46,6 +46,7 @@ data Error =
     | ETestPoolWithoutAllocator Identifier -- ^ Test pool that the unit does not reach through an allocator (AE-018)
     | EEmitterInUnitTest Identifier -- ^ Emitter other than a test emitter in a unit test (AE-019)
     | ETestOfOtherLevel TestLevel String Identifier -- ^ Element of one level of test in a deployment of the other (AE-020)
+    | EInstanceOutsideMainModule Identifier QualifiedName QualifiedName -- ^ Instance declared outside the main module of the deployment (AE-023)
     deriving Show
 
 -- | The level of a test, which its deployment decides: a unit test has test
@@ -171,6 +172,11 @@ instance Diagnosable Error where
             (T.pack kind <> " " <> emph (T.pack ident) <>
                 " belongs to a concurrent test, and the deployment has test instances. " <>
                 "A test with test instances is a unit test, where each case ends at its return.")
+    describe (EInstanceOutsideMainModule ident modName mainModule) =
+        diagnostic "AE-023" "instance outside the main module"
+            ("The instance " <> emph (T.pack ident) <> " is declared in the module " <> emph (T.replace "/" "." (T.pack modName)) <> ". " <>
+                "The instances of a deployment are declared in its main module, " <> emph (T.pack mainModule) <>
+                ": the app.fin of the application or the test.fin of a test.")
     -- | Everything else is a broken invariant of the compiler, which has no code
     -- of its own.
     describe _ =diagnosticWithoutDetail "Internal" "internal error"

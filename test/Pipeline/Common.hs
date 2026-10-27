@@ -11,6 +11,7 @@ module Pipeline.Common
   , buildAndRenderModule
   , compileErrorCode
   , compileTestErrorCode
+  , compileTestProjectErrorCode
   , runTestArchitecture
   , runTestApp
   , runTestBuild
@@ -64,6 +65,7 @@ import Utils.Annotations (QualifiedName, annotateError, Location(Internal))
 import ControlFlow.Architecture (runGenArchitecture, pruneUnconnectedSystemElements)
 import ControlFlow.Architecture.Types (TerminaProgArch)
 import ControlFlow.Architecture.Checks
+import ControlFlow.Architecture.Checks.Instances (runCheckInstanceModules)
 import ControlFlow.ConstFolding (runConstFolding, constFoldModule)
 import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
 import ControlFlow.ValueAnalysis (runValueAnalysisCheck)
@@ -163,6 +165,9 @@ runProjectPipeline cfg sources = do
   maybe (Right ()) (Left . failure files)
     (sideEffectCheckModules TestPlatform elaborated)
   progArch <- genProjectArchitecture cfg files foldedProject ordered
+  stage files (case ordered of
+    [] -> Right ()
+    _ -> runCheckInstanceModules (last ordered) progArch)
   runChecks files progArch
   pure (PipelineResult foldedProject ordered progArch elaborated reports)
 
@@ -264,6 +269,10 @@ compileProjectErrorCode = compileProjectErrorCodeWith configParams
 compileTestErrorCode :: String -> Maybe Text
 compileTestErrorCode input =
   compileProjectErrorCodeWith testConfigParams [("test", input)]
+
+-- | Multi-module variant of 'compileTestErrorCode'.
+compileTestProjectErrorCode :: [(QualifiedName, String)] -> Maybe Text
+compileTestProjectErrorCode = compileProjectErrorCodeWith testConfigParams
 
 -- | The checked architecture of the deployment of a test.
 runTestArchitecture :: String -> Either Failure (TerminaProgArch SemanticAnn)

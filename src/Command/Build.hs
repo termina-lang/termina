@@ -479,6 +479,7 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _) 
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
     programArchitecture <- genArchitecture loweredProject (getPlatformInitialProgram config plt) orderedDependencies
+    checkInstanceModules loweredProject orderedDependencies programArchitecture
     checkEmitterConnections loweredProject programArchitecture
     checkChannelConnections loweredProject programArchitecture
     checkResourceUsage loweredProject programArchitecture

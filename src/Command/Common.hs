@@ -19,6 +19,7 @@ import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import ControlFlow.Architecture
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.Checks
+import ControlFlow.Architecture.Checks.Instances (runCheckInstanceModules)
 import Core.AST
     ( TerminaModule'(frags) )
 import Configuration.Configuration (TerminaConfig(..))
@@ -218,6 +219,20 @@ checkActivationCycles loweredProject progArchitecture =
                 M.empty loweredProject in
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
+
+-- | The main module is the last one in the order of dependencies
+checkInstanceModules :: LoweredProject -> [QualifiedName] -> TerminaProgArch SemanticAnn -> IO ()
+checkInstanceModules loweredProject orderedDependencies progArchitecture =
+  case orderedDependencies of
+    [] -> return ()
+    _ ->
+      case runCheckInstanceModules (last orderedDependencies) progArchitecture of
+        Left err ->
+          let sourceFilesMap =
+                M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
+                    M.empty loweredProject in
+          TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+        Right _ -> return ()
 
 checkTestDeployment :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
 checkTestDeployment loweredProject progArchitecture =

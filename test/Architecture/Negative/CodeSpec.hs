@@ -8,7 +8,7 @@ module Architecture.Negative.CodeSpec
   , executorClass, executorTestClass, executorWiring, scenarioClass
   ) where
 
-import Pipeline.Common (compileErrorCode, compileTestErrorCode)
+import Pipeline.Common (compileErrorCode, compileTestErrorCode, compileProjectErrorCode, compileTestProjectErrorCode)
 
 import Test.Hspec
 import Data.Text (pack)
@@ -696,6 +696,43 @@ spec = do
              ++ "handler fault_handler : FaultHandler = { faults = 0, except_port <- system_except };\n"
              ++ monitorTest
       compileTestErrorCode src `shouldBe` Just (pack "AE-019")
+
+    it "AE-023: a resource declared in a module that the main module imports" $ do
+      let lib = "interface IValue {\n"
+             ++ "    procedure set(&mut self, v : u32);\n"
+             ++ "};\n"
+             ++ "resource class CValue provides IValue {\n"
+             ++ "    value : u32;\n"
+             ++ "    procedure set(&mut self, v : u32) {\n"
+             ++ "        self->value = self->value + v;\n"
+             ++ "        return;\n"
+             ++ "    }\n"
+             ++ "};\n"
+             ++ "resource value : CValue = { value = 0 };\n"
+          app = "import lib.value;\n"
+             ++ "task class CWriter {\n"
+             ++ "    tick_ev : sink TimeVal triggers run;\n"
+             ++ "    value : access IValue;\n"
+             ++ "    action run(&priv self, _now : TimeVal) {\n"
+             ++ "        self->value.set(1 : u32);\n"
+             ++ "        return;\n"
+             ++ "    }\n"
+             ++ "};\n"
+             ++ periodicEmitter "timer" 1
+             ++ "#[priority(5)]\n"
+             ++ "task writer : CWriter = { tick_ev <- timer, value <-> value };\n"
+      compileProjectErrorCode [("lib/value", lib), ("app", app)] `shouldBe` Just (pack "AE-023")
+
+    it "AE-023: a test instance declared in a module that the test.fin imports" $ do
+      let lib = monitorTestClass
+             ++ "emitter tick : TestEmitter<TimeVal>;\n"
+             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ monitorTest
+          test = "import lib.tests;\n"
+             ++ monitorClass "CMonitor"
+             ++ "#[priority(5)]\n"
+             ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
+      compileTestProjectErrorCode [("lib/tests", lib), ("test", test)] `shouldBe` Just (pack "AE-023")
 
     it "AE-020: test channel in a concurrent test" $ do
       let src = monitorClass "CMonitor"
