@@ -104,10 +104,12 @@ manifestFile :: FilePath
 manifestFile = "termina" <.> "yaml"
 
 -- | Content of the .gitignore of a new project: the whole output, which the
--- transpiler generates again from the project and the deliverable keeps.
+-- transpiler generates again from the project and the deliverable keeps, and
+-- the clones that the user leaves in .termina/fetch/ for "termina add".
 gitignoreContent :: String
 gitignoreContent = unlines [
         "/" ++ outputFolderName ++ "/",
+        "/.termina/",
         ".DS_Store"
     ]
 
