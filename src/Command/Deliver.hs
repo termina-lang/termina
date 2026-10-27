@@ -68,7 +68,7 @@ deliverCmdArgsParser = DeliverCmdArgs
 deliverCommand :: DeliverCmdArgs -> IO ()
 deliverCommand (DeliverCmdArgs chatty withTests archive withTrace) = do
     when (withTrace && not archive) $
-      die . errorMessage $ "--with-trace adds a binary to the archive: use it with --archive"
+      dieWithError $ "--with-trace adds a binary to the archive: use it with --archive"
     manifest <- loadBuildProject chatty
     let hasApp = isJust (appDeployment manifest)
         selection = case (withTests, hasApp) of
@@ -76,8 +76,8 @@ deliverCommand (DeliverCmdArgs chatty withTests archive withTrace) = do
             (True, True) -> SelectAll
             (True, False) -> SelectTests
     unless (hasApp || withTests) $
-      die . errorMessage $ "the project is a library and has no application: deliver its tests with --tests"
-    deployments <- either (die . errorMessage) return $ selectDeployments manifest selection Nothing Nothing
+      dieWithError $ "the project is a library and has no application: deliver its tests with --tests"
+    deployments <- either dieWithError return $ selectDeployments manifest selection Nothing Nothing
     forM_ deployments $ \deployment -> do
       announce deployments ("Delivering " ++ deploymentLabel deployment)
       deliverDeployment chatty manifest archive withTrace deployment
@@ -109,14 +109,14 @@ deliverDeployment chatty manifest archive withTrace deployment = do
     -- and have no spaces
     forM_ [("TERMINA_OSAL_DIR", osalDir), ("the output folder", outDir)] $ \(what, dir) ->
       unless (isAbsolute dir && not (any isSpace dir)) $
-        die . errorMessage $ what ++ " must be an absolute path without spaces to deliver " ++ label ++ ": \"" ++ dir ++ "\""
+        dieWithError $ what ++ " must be an absolute path without spaces to deliver " ++ label ++ ": \"" ++ dir ++ "\""
     forM_ (toolchainVariables info) $ \var ->
       unless (M.member ("VAR " ++ var) info) $
-        die . errorMessage $ "make gave no value of " ++ var ++ ", which CROSS names, for " ++ label
+        dieWithError $ "make gave no value of " ++ var ++ ", which CROSS names, for " ++ label
     let fromOutput paths = forM paths $ \p ->
           if inFolder outDir p
             then return (relativeTo outDir p)
-            else die . errorMessage $ "the build of " ++ label ++ " names a file outside its output folder: " ++ p
+            else dieWithError $ "the build of " ++ label ++ " names a file outside its output folder: " ++ p
     exists <- doesDirectoryExist folder
     when exists (removeDirectoryRecursive folder)
     createDirectoryIfMissing True folder
@@ -154,9 +154,9 @@ deliverDeployment chatty manifest archive withTrace deployment = do
     case (M.lookup binary builtHashes, M.lookup binary deliveredHashes) of
         (Just h1, Just h2) ->
             unless (h1 == h2) $
-              die . errorMessage $ "the binary of the deliverable of " ++ label ++ " differs without debugging information from the one built from the C with the #line pragmas ("
+              dieWithError $ "the binary of the deliverable of " ++ label ++ " differs without debugging information from the one built from the C with the #line pragmas ("
                 ++ h2 ++ " in " ++ folder ++ ", " ++ h1 ++ " in " ++ built ++ ")"
-        _ -> die . errorMessage $ "the binaries of " ++ label ++ " have no hashes to compare (is " ++ value "OBJCOPY" ++ " installed?)"
+        _ -> dieWithError $ "the binaries of " ++ label ++ " have no hashes to compare (is " ++ value "OBJCOPY" ++ " installed?)"
     -- | provenance.json of the deliverable
     fileHashes <- mapM (\f -> (f,) <$> sha256File (folder </> f)) delivered
     osalVersion <- readOsalVersion osalDir
@@ -207,7 +207,7 @@ deliverableInfo label folder = do
     (code, out, err) <- readCreateProcessWithExitCode (proc "make" ["-s", "--no-print-directory", "-C", folder, "deliverable-info"]) ""
     case code of
         ExitSuccess -> return . M.fromList . map (fmap (drop 1) . break (== '=')) . filter ('=' `elem`) . lines $ out
-        ExitFailure _ -> die . errorMessage $ "make failed to give the values of the build of " ++ label ++ ":\n" ++ err
+        ExitFailure _ -> dieWithError $ "make failed to give the values of the build of " ++ label ++ ":\n" ++ err
 
 -- | The paths that the values of the build name, and what the flat Makefile
 -- writes in their place: the output folder is the folder of the deliverable,
@@ -536,7 +536,7 @@ terminaVersion = intercalate "." (map show (take 3 (versionBranch version)))
 writeArchive :: FilePath -> FilePath -> [(FilePath, FilePath)] -> IO ()
 writeArchive archiveFile root contents = do
     entries <- forM contents $ \(path, source) -> do
-      tarPath <- either (die . errorMessage . (("cannot archive " ++ path ++ ": ") ++)) return
+      tarPath <- either (dieWithError . (("cannot archive " ++ path ++ ": ") ++)) return
         (Tar.toTarPath False (root </> path))
       isExecutable <- executable <$> getPermissions source
       content <- BL.readFile source

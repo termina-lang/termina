@@ -92,7 +92,7 @@ showSupportedPlatforms =
 validateProjectName :: String -> IO ()
 validateProjectName project =
     unless (not (null project) && all (\x -> isAsciiLower x || isAsciiUpper x || isDigit x || x == '_' || x == '-') project)
-        (die . errorMessage $ "Project name must be one or more ASCII letters, digits, '_' and '-'")
+        (dieWithError $ "Project name must be one or more ASCII letters, digits, '_' and '-'")
 
 emptyAppModuleContent :: String -> String
 emptyAppModuleContent projectName = unlines [
@@ -254,7 +254,7 @@ newCommand (NewTest testName chatty) = newTestCommand testName chatty
 newCommand (NewProject project mPltName kind mExports vcs vscode chatty) = do
     validateProjectName project
     plt <- case (kind, mPltName) of
-        (NewLib, Just _) -> die . errorMessage $ "A library has no platform: its tests choose theirs"
+        (NewLib, Just _) -> dieWithError $ "A library has no platform: its tests choose theirs"
         (_, Nothing) -> return POSIXGCC
         (NewApp, Just pltName) -> maybe (
                 putStrLn (errorMessage $ "Unsupported platform: " ++ show pltName) >>
@@ -262,20 +262,20 @@ newCommand (NewProject project mPltName kind mExports vcs vscode chatty) = do
             ) return $ checkPlatform pltName
     -- | The prefix that a new library exports, by default named after the project
     prefix <- case (kind, mExports) of
-        (NewApp, Just _) -> die . errorMessage $ "An application exports nothing: --exports is only for a library"
+        (NewApp, Just _) -> dieWithError $ "An application exports nothing: --exports is only for a library"
         (_, Just given) -> do
             unless (all (isSnakeCase . T.unpack) (T.splitOn (T.pack ".") (T.pack given))) $
-                die . errorMessage $ "The prefix \"" ++ given ++ "\" is not a module prefix (lowercase snake_case segments separated by dots)"
+                dieWithError $ "The prefix \"" ++ given ++ "\" is not a module prefix (lowercase snake_case segments separated by dots)"
             return given
         (_, Nothing) -> do
             let named = map (\c -> if c == '-' then '_' else toLower c) project
             when (kind == NewLib && not (isSnakeCase named)) $
-                die . errorMessage $ "The name of a library has to make a module prefix: \"" ++ named ++ "\" is not lowercase snake_case (choose one with --exports)"
+                dieWithError $ "The name of a library has to make a module prefix: \"" ++ named ++ "\" is not lowercase snake_case (choose one with --exports)"
             return named
     when chatty (putStrLn . debugMessage $ "Creating new project: " ++ project)
     -- Check if the directory already exists
     exists <- doesPathExist project
-    when exists (die . errorMessage $ "Path already exists: " ++ project)
+    when exists (dieWithError $ "Path already exists: " ++ project)
     -- | Create the project directory
     when chatty (putStrLn . debugMessage $ "Creating project directory: " ++ project)
     createDirectory project
@@ -323,15 +323,15 @@ newTestCommand :: String -> Bool -> IO ()
 newTestCommand testName chatty = do
     manifest <- loadManifest >>= either dieWithFirstError return
     unless (isSnakeCase testName) $
-        die . errorMessage $ "The name of a test is lowercase snake_case: \"" ++ testName ++ "\""
+        dieWithError $ "The name of a test is lowercase snake_case: \"" ++ testName ++ "\""
     when (T.pack testName `M.member` manifestTests manifest) $
-        die . errorMessage $ "The manifest already declares the test " ++ testName
+        dieWithError $ "The manifest already declares the test " ++ testName
     let testFolder = "tests" </> testName
         testFile = testFolder </> "test" <.> "fin"
     exists <- doesPathExist testFolder
-    when exists (die . errorMessage $ "Path already exists: " ++ testFolder)
+    when exists (dieWithError $ "Path already exists: " ++ testFolder)
     original <- readFileStrict manifestFile
-    updated <- either (die . errorMessage) return $
+    updated <- either dieWithError return $
         addTestEntry original testName (defaultTestPlatforms manifest) 10
     when chatty (putStrLn . debugMessage $ "Creating " ++ testFile)
     createDirectoryIfMissing True testFolder

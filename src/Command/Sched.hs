@@ -114,10 +114,10 @@ loadRTModule :: FilePath -> IO ParsedRTModule
 loadRTModule rtModelFile = do
   -- | Check RT model file extension
   when (takeExtension rtModelFile /= ".rt") $
-      die . errorMessage $ "RT model file must have .rt extension"
+      dieWithError $ "RT model file must have .rt extension"
   -- | Check that RT model file exists
   sourceFileExists <- doesFileExist rtModelFile
-  unless sourceFileExists (die . errorMessage $ "RT model file \"" ++ rtModelFile ++ "\" does not exist")
+  unless sourceFileExists (dieWithError $ "RT model file \"" ++ rtModelFile ++ "\" does not exist")
   src_code <- TE.decodeUtf8 <$> BS.readFile rtModelFile
   mod_time <- getModificationTime rtModelFile
   -- parse it
@@ -344,7 +344,7 @@ genPlantUMLModels reduction config sitMap trPathMap = do
       let base = destinationPath </> situationName 
       pickedEvents <- concat <$> mapM (genPickedEvents reduction trPathMap) (M.elems evMap) 
       mapM_ (genPlantUMLModelForTransaction base) pickedEvents
-    _ -> putStrLn (errorMessage "Unexpected RT element when generating PlantUML diagrams for transactional paths") >> exitFailure
+    _ -> dieWithError "Unexpected RT element when generating PlantUML diagrams for transactional paths"
 
 genPlantUMLModelForTransaction :: FilePath -> SelectedEvent TRPSemAnn -> IO ()
 genPlantUMLModelForTransaction base (SelectedEventBursty _ _ transactionId initialStep stMap _ _ _) = do
@@ -399,9 +399,9 @@ genPickedEvents reduction trPathMap (RTEventBursty eventId emitterId transaction
               return $ SelectedEventBursty eventId emitterId (transactionId ++ "__" ++ printf "%0*d" width_pickedEvents idx) initialStep stMap interval arrivals deadlines
             ) (sequenceA finalOpMap) [0 :: Integer ..]
     Just _ -> 
-      putStrLn (errorMessage $ "Invalid transactional path for transaction " ++ transactionId ++ " when generating picked events") >> exitFailure
+      dieWithError $ "Invalid transactional path for transaction " ++ transactionId ++ " when generating picked events"
     Nothing -> 
-      putStrLn (errorMessage $ "No transactional path found for transaction " ++ transactionId ++ " when generating picked events") >> exitFailure
+      dieWithError $ "No transactional path found for transaction " ++ transactionId ++ " when generating picked events"
 genPickedEvents reduction trPathMap (RTEventPeriodic eventId emitterId transactionId deadlines _) =
   case M.lookup transactionId trPathMap of
     Just (SimpleTransactionPath initialStep opMap _) -> do
@@ -420,9 +420,9 @@ genPickedEvents reduction trPathMap (RTEventPeriodic eventId emitterId transacti
             return $ SelectedEventPeriodic eventId emitterId (transactionId ++ "__" ++ printf "%0*d" width_pickedEvents idx) initialStep stMap deadlines
           ) (sequenceA finalOpMap) [0 :: Integer ..]
     Just _ -> 
-      putStrLn (errorMessage $ "Invalid transactional path for transaction " ++ transactionId ++ " when generating picked events") >> exitFailure
+      dieWithError $ "Invalid transactional path for transaction " ++ transactionId ++ " when generating picked events"
     Nothing -> 
-      putStrLn (errorMessage $ "No transactional path found for transaction " ++ transactionId ++ " when generating picked events") >> exitFailure
+      dieWithError $ "No transactional path found for transaction " ++ transactionId ++ " when generating picked events"
 
 writeMASTModels :: MASTModelReduction -> TerminaConfig -> TerminaProgArch SemanticAnn -> RTSituationMap RTSemAnn -> TransPathMap TRPSemAnn -> IO ()
 writeMASTModels reduction config arch sitMap trPathMap = do
@@ -444,7 +444,7 @@ writeMASTModels reduction config arch sitMap trPathMap = do
             createDirectoryIfMissing True (takeDirectory targetFile)
             TIO.writeFile targetFile (runMASTPrinter model))
         (sequenceA pickedEvents) [situationName ++ "__" ++ printf "%0*d" width_pickedEvents idx | idx <- [(0 :: Integer) ..]]
-    _ -> putStrLn (errorMessage "Unexpected RT element when generating MAST models for transactional paths") >> exitFailure
+    _ -> dieWithError "Unexpected RT element when generating MAST models for transactional paths"
 
 fmtSec :: Double -> String
 fmtSec s =
@@ -669,13 +669,13 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
     -- | Read the termina.yaml file
     config <- loadConfig >>= either dieWithFirstError return
     -- | Decode the selected platform field
-    plt <- maybe (die . errorMessage $ "Unsupported platform: \"" ++ show (platform config) ++ "\"") return $ checkPlatform (T.unpack $ platform config)
+    plt <- maybe (dieWithError $ "Unsupported platform: \"" ++ show (platform config) ++ "\"") return $ checkPlatform (T.unpack $ platform config)
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
     -- | Check that the files are in place
     existSourceFolder <- doesDirectoryExist (sourceModulesFolder config)
-    unless existSourceFolder (die . errorMessage $ "Source folder \"" ++ sourceModulesFolder config ++ "\" does not exist")
+    unless existSourceFolder (dieWithError $ "Source folder \"" ++ sourceModulesFolder config ++ "\" does not exist")
     existAppFolder <- doesDirectoryExist appFolder
-    unless existAppFolder (die . errorMessage $ "Application folder \"" ++ appFolder ++ "\" does not exist")
+    unless existAppFolder (dieWithError $ "Application folder \"" ++ appFolder ++ "\" does not exist")
     -- | Create output header and source folder if it does not exist
     let outputSrcFolder = outputFolder config </> "src"
     let outputIncludeFolder = outputFolder config </> "include"

@@ -372,10 +372,14 @@ loadProject = do
             exportErrors <- liftIO $ checkExports "." manifest
             return $ if null exportErrors then Right manifest else Left exportErrors
 
--- | Print the first error, which may take several lines, and stop. The
--- errors are reported one at a time, as the type checker does.
+-- | Print an error, which may take several lines, and stop.
+dieWithError :: String -> IO a
+dieWithError = die . errorMessage
+
+-- | Print the first error and stop. The errors are reported one at a time,
+-- as the type checker does.
 dieWithFirstError :: [String] -> IO a
-dieWithFirstError errs = die (errorMessage (concat (take 1 errs)))
+dieWithFirstError = dieWithError . concat . take 1
 
 -- | The configuration of the application of the project.
 loadConfig :: (MonadIO m) => m (Either [String] TerminaConfig)

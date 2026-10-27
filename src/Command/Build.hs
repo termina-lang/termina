@@ -217,7 +217,7 @@ genComponentDiagramFile params progArch param = do
             CmpDiagramParamFlag -> Nothing
             CmpDiagramParamRange range -> Just range
     case result of
-        Left err -> die . errorMessage $ T.unpack err
+        Left err -> dieWithError $ T.unpack err
         Right diagram -> do
             createDirectoryIfMissing True (takeDirectory cmpFile)
             TIO.writeFile cmpFile $ runPlantUMLPrinter diagram
@@ -255,7 +255,7 @@ genModules params plt initialMonadicTypes loweredProject =
           sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
           tAST = elaboratedAST . metadata $ bbModule
       case runGenSourceFile params plt (qualifiedName bbModule) tAST of
-        Left err -> die. errorMessage $ show err
+        Left err -> dieWithError $ show err
         Right cSourceFile -> writeIfChanged sourceFile $ runCPrinter (lineDirectives params) cSourceFile
 
     printHeader :: MonadicTypes -> ElaboratedModule -> IO MonadicTypes
@@ -264,7 +264,7 @@ genModules params plt initialMonadicTypes loweredProject =
           tAST = elaboratedAST . metadata $ bbModule
           moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
       case runGenHeaderFile params plt (qualifiedName bbModule) moduleDeps tAST currentMonadicTypes of
-        Left err -> die . errorMessage $ show err
+        Left err -> dieWithError $ show err
         Right (cHeaderFile, newMonadicTypes) -> do
           let headerFile = destinationPath </> "include" </> qualifiedName bbModule <.> "h"
           writeIfChanged headerFile $ runCPrinter (lineDirectives params) cHeaderFile
@@ -275,7 +275,7 @@ genInitFile params plt loweredProject = do
   let initFile = outputFolder params </> "init" <.> "c"
       projectModules = M.toList $ elaboratedAST . metadata <$> loweredProject
   case runGenInitFile params plt initFile projectModules of
-    Left err -> die . errorMessage $ show err
+    Left err -> dieWithError $ show err
     Right cInitFile -> writeIfChanged initFile $ runCPrinter False cInitFile
 
 -- | The headers of the option, status and result types, each when the project
@@ -295,7 +295,7 @@ genMonadicHeaderFiles params plt monadicTypes = do
       | otherwise = do
           let file = outputFolder params </> "include" </> headerName <.> "h"
           case generator params plt file monadicTypes of
-            Left err -> die . errorMessage $ show err
+            Left err -> dieWithError $ show err
             Right cFile -> writeIfChanged file (runCPrinter (lineDirectives params) cFile) >> return [file]
 
     notStructOrEnum (TStruct _) = False
@@ -311,7 +311,7 @@ selectedDeployments :: BuildCmdArgs -> IO [Deployment]
 selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
     manifest <- loadBuildProject chatty
-    either (die . errorMessage) return $ selectDeployments manifest selection mPlatform mProfile
+    either dieWithError return $ selectDeployments manifest selection mPlatform mProfile
 
 -- | Load the project for a command that builds: the manifest, the folders, the
 -- prefixes of a library and, in a library, the types of its exported modules.
@@ -336,7 +336,7 @@ checkLibrary chatty manifest =
             roots <- exportedModules "." manifest
             parsedModules <- loadModules [ModuleDependency root Internal | root <- roots] ["src"]
             orderedModules <- either
-                (\files -> die . errorMessage $ "Detected cycle between the exported modules of the library: " ++ show files)
+                (\files -> dieWithError $ "Detected cycle between the exported modules of the library: " ++ show files)
                 return
                 (sortProjectDepsOrLoop (M.map importedModules parsedModules))
             forM_ libraryPlatforms $ \plt -> do
@@ -424,9 +424,9 @@ runMake :: String -> FilePath -> [String] -> IO ()
 runMake label folder targets = do
     result <- try (rawSystem "make" (["-C", folder] ++ targets))
     case result of
-        Left err -> die . errorMessage $ "Could not run make: " ++ show (err :: IOException)
+        Left err -> dieWithError $ "Could not run make: " ++ show (err :: IOException)
         Right ExitSuccess -> return ()
-        Right (ExitFailure _) -> die . errorMessage $ "make failed for " ++ label ++ " in " ++ folder
+        Right (ExitFailure _) -> dieWithError $ "make failed for " ++ label ++ " in " ++ folder
 
 -- | Write provenance.json of a build: its binary and each module, where its
 -- source comes from, with the SHA-256 of their objects without debugging

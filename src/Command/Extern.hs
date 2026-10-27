@@ -24,7 +24,6 @@ import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import System.Directory
-import System.Exit
 import System.FilePath
 
 -- | What the build of the C of the project needs: the sources and the
@@ -49,7 +48,7 @@ prepareExtern config folders = do
   let files = concat checked
       relFiles = map snd files
   forM_ (relFiles \\ nub relFiles) $ \file ->
-    die . errorMessage $ "The extern file \"" ++ file ++ "\" is in more than one extern folder of the deployment"
+    dieWithError $ "The extern file \"" ++ file ++ "\" is in more than one extern folder of the deployment"
   copyExtern (outputFolder config </> externFolder) files
   let srcs = filter ((== ".c") . takeExtension) relFiles
       libs = filter ((== ".a") . takeExtension) relFiles
@@ -64,35 +63,35 @@ checkExtern config externFolderPath (ExternConfig srcs libs) = do
   -- | The C of a project is versioned with it, so it lies in its extern folder
   forM_ (externFiles (ExternConfig srcs libs)) $ \file ->
     unless (insideFolder file) $
-      die . errorMessage $ "The extern file \"" ++ file ++ "\" is outside the folder \"" ++ externFolderPath ++ "\""
+      dieWithError $ "The extern file \"" ++ file ++ "\" is outside the folder \"" ++ externFolderPath ++ "\""
   folderExists <- doesDirectoryExist externFolderPath
   presentSources <- if folderExists then listCSources externFolderPath else return []
   -- | Every source of the folder is listed, so that no C is left uncompiled
   forM_ presentSources $ \src ->
     unless (src `elem` srcs) $
-      die . errorMessage $ "The C source \"" ++ externFolderPath </> src ++ "\" is not listed in its \"extern\" section of \"termina.yaml\""
+      dieWithError $ "The C source \"" ++ externFolderPath </> src ++ "\" is not listed in its \"extern\" section of \"termina.yaml\""
   forM_ srcs $ \src -> do
     unless (takeExtension src == ".c") $
-      die . errorMessage $ "The extern source \"" ++ src ++ "\" is not a C source file"
+      dieWithError $ "The extern source \"" ++ src ++ "\" is not a C source file"
     exists <- doesFileExist (externFolderPath </> src)
     unless exists $
-      die . errorMessage $ "The extern source \"" ++ externFolderPath </> src ++ "\" does not exist"
+      dieWithError $ "The extern source \"" ++ externFolderPath </> src ++ "\" does not exist"
   forM_ (M.toList libs) $ \(pltName, pltLibs) -> do
     when (checkPlatform (T.unpack pltName) == Nothing) $
-      die . errorMessage $ "Unknown platform \"" ++ T.unpack pltName ++ "\" in the extern libraries"
+      dieWithError $ "Unknown platform \"" ++ T.unpack pltName ++ "\" in the extern libraries"
     forM_ pltLibs $ \lib -> do
       unless (takeExtension lib == ".a") $
-        die . errorMessage $ "The extern library \"" ++ lib ++ "\" is not a static library"
+        dieWithError $ "The extern library \"" ++ lib ++ "\" is not a static library"
       exists <- doesFileExist (externFolderPath </> lib)
       unless exists $
-        die . errorMessage $ "The extern library \"" ++ externFolderPath </> lib ++ "\" does not exist"
+        dieWithError $ "The extern library \"" ++ externFolderPath </> lib ++ "\" does not exist"
   -- | The libraries of a project are tied to the platforms they were compiled
   -- for, so a project that has some has to have them for the selected one
   pltLibs <- if M.null libs
     then return []
     else case M.lookup (platform config) libs of
       Just ls -> return ls
-      Nothing -> die . errorMessage $ "The folder \"" ++ externFolderPath ++ "\" provides no extern libraries for the platform \"" ++ T.unpack (platform config) ++ "\""
+      Nothing -> dieWithError $ "The folder \"" ++ externFolderPath ++ "\" provides no extern libraries for the platform \"" ++ T.unpack (platform config) ++ "\""
   return (srcs ++ pltLibs)
 
 -- | The C sources under a folder, as paths relative to it.

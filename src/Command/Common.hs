@@ -47,7 +47,7 @@ loadTerminaModule ::
 loadTerminaModule root filePath srcPaths = do
   let fullP = root </> filePath <.> "fin"
   -- read it
-  src_code <- either (const (die . errorMessage $ fullP ++ ": the file is not valid UTF-8")) return . TE.decodeUtf8' =<< BS.readFile fullP
+  src_code <- either (const (dieWithError $ fullP ++ ": the file is not valid UTF-8")) return . TE.decodeUtf8' =<< BS.readFile fullP
   mod_time <- getModificationTime fullP
   -- parse it
   case runParser terminaModuleParser filePath fullP (T.unpack src_code) of
@@ -90,7 +90,7 @@ loadModules imported srcPaths = do
     then loadModules' fsLoaded fss
     -- Import and load it.
     else do
-      srcPath <- maybe (die . errorMessage $ "Module " ++ qname ++ " not found") return =<< findModuleRoot srcPaths qname
+      srcPath <- maybe (dieWithError $ "Module " ++ qname ++ " not found") return =<< findModuleRoot srcPaths qname
       loadedModule <- loadTerminaModule srcPath qname srcPaths
       let deps = importedModules loadedModule
       loadModules'
@@ -274,7 +274,7 @@ constFolding config plt loweredProject =
   case sortProjectDepsOrLoop (M.map importedModules loweredProject) of
     -- | The build pipeline orders the modules (and reports dependency cycles)
     -- before reaching this point, so a cycle here would be an internal error.
-    Left _ -> die . errorMessage $ "Dependency cycle detected during constant folding"
+    Left _ -> dieWithError $ "Dependency cycle detected during constant folding"
     Right orderedDependencies ->
       foldModules (ConstFoldEnv M.empty plt (microsecondsPerTick config)) M.empty M.empty orderedDependencies
 
@@ -316,7 +316,7 @@ valueAnalysisCheck plt constEnvs loweredProject =
   case sortProjectDepsOrLoop (M.map importedModules loweredProject) of
     -- | The build pipeline orders the modules (and reports dependency cycles)
     -- before reaching this point, so a cycle here would be an internal error.
-    Left _ -> die . errorMessage $ "Dependency cycle detected during the value analysis"
+    Left _ -> dieWithError $ "Dependency cycle detected during the value analysis"
     Right orderedDependencies -> checkModules M.empty M.empty orderedDependencies
 
   where

@@ -26,7 +26,6 @@ import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Options.Applicative as O
-import System.Exit
 import System.FilePath
 import Text.Parsec.Pos (sourceName)
 
@@ -57,7 +56,7 @@ data TestCase = TestCase {
 testCommand :: TestCmdArgs -> IO ()
 testCommand (TestCmdArgs list json) = do
     unless list $
-      die . errorMessage $ "termina test can only list the tests for now: use --list"
+      dieWithError $ "termina test can only list the tests for now: use --list"
     manifest <- loadManifest >>= either dieWithFirstError return
     listed <- forM (M.toList (manifestTests manifest)) $ \(testName, entry) -> do
       cases <- loadTestCases (T.unpack testName)
@@ -105,10 +104,10 @@ loadTestCases testName = do
     parsedModules <- loadModules (importedModules testModule) sources
     let parsedProject = M.insert (qualifiedName testModule) testModule parsedModules
     orderedModules <- either
-        (\cycleFiles -> die . errorMessage $ "Detected cycle between the source files of the test " ++ testName ++ ": " ++ show cycleFiles)
+        (\cycleFiles -> dieWithError $ "Detected cycle between the source files of the test " ++ testName ++ ": " ++ show cycleFiles)
         return
         (sortProjectDepsOrLoop (M.map importedModules parsedProject))
-    either (die . errorMessage) return $
+    either dieWithError return $
       testCases [parsedAST . metadata $ parsedProject M.! m | m <- orderedModules]
 
 -- | The cases of a test, from its modules in the order in which they are

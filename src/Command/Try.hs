@@ -104,7 +104,7 @@ printSourceModule debugBuild eModule = do
     let tAST = elaboratedAST . metadata $ eModule
         config = defaultConfig "test" TestPlatform
     case runGenSourceFile config TestPlatform (qualifiedName eModule) tAST of
-        Left err -> die. errorMessage $ show err
+        Left err -> dieWithError $ show err
         Right cSourceFile -> TIO.putStrLn $ runCPrinter debugBuild cSourceFile
 
 printHeaderModule :: Bool -> ElaboratedModule -> IO ()
@@ -113,7 +113,7 @@ printHeaderModule debugBuild eModule = do
         configParams = defaultConfig "test" TestPlatform
         moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules eModule
     case runGenHeaderFile configParams TestPlatform (qualifiedName eModule) moduleDeps tAST emptyMonadicTypes of
-        Left err -> die . errorMessage $ show err
+        Left err -> dieWithError $ show err
         Right (cHeaderFile, _) -> TIO.putStrLn $ runCPrinter debugBuild cHeaderFile
 
 -- | Command handler for the "try" command
