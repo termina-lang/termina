@@ -4,11 +4,6 @@ import Command.Types
 
 import System.FilePath
 
-import qualified Parser.AST as PAST
-import Core.AST
-
-import Parser.Types
-
 import Lowering
 
 import Modules.Modules
@@ -35,14 +30,11 @@ import ControlFlow.VarScope.Errors (VarScopeError)
 import Lowering.Errors (LoweringError)
 import Elaboration (ElaborationReport, provers, elaborateProgram)
 import Elaboration.Prover.Value (valueProver)
-import Parser.Errors
 import Control.Monad.IO.Class
-import Data.Functor ((<&>))
 import qualified Data.Map.Strict as M
 import Semantic.Environment (DeclaredEnv, declaredNames)
 import Utils.Graph (TopSortError(..), topSortFromDepList)
 import Utils.Errors (ErrorMessage(toText, errorIdent))
-import Modules.Utils
 import Control.Monad (forM_, unless, when)
 import Data.Maybe (listToMaybe, mapMaybe)
 import qualified Data.Text as T
@@ -130,45 +122,6 @@ removeStaleFiles folder extensions expected = do
       concat <$> mapM (\e -> do
         isDir <- doesDirectoryExist e
         if isDir then listFilesRecursive e else return [e]) entries
-
--- | The folder, among the source folders of a deployment, that holds a
--- module. The layout check guarantees that at most one holds it.
-findModuleRoot :: [FilePath] -> QualifiedName -> IO (Maybe FilePath)
-findModuleRoot [] _ = return Nothing
-findModuleRoot (root : roots) qname = do
-    exists <- doesFileExist (root </> qname <.> "fin")
-    if exists then return (Just root) else findModuleRoot roots qname
-
-getModuleImports :: Maybe FilePath -> PAST.TerminaModule ParserAnn -> IO (Either ParsingErrors [ModuleDependency])
-getModuleImports (Just srcPath) m = getModuleImportsFrom [srcPath] m
-getModuleImports Nothing m =
-    case modules m of
-        [] -> return $ Right []
-        ((ModuleImport modName ann):_) -> do
-            let mname = buildModuleName ann modName
-            case mname of
-                Left err -> return $ Left err
-                Right qname -> do
-                    return $ Left (annotateError ann (EImportedFileNotFound (qname <.> "fin")))
-
--- | The modules a module imports, each one looked up in the source folders of
--- the deployment.
-getModuleImportsFrom :: [FilePath] -> PAST.TerminaModule ParserAnn -> IO (Either ParsingErrors [ModuleDependency])
-getModuleImportsFrom roots m =
-    mapM buildAndTest (modules m) <&> sequence
-    where
-
-        buildAndTest :: PAST.ModuleImport ParserAnn -> IO (Either ParsingErrors ModuleDependency)
-        buildAndTest (ModuleImport modName ann) = do
-            let mname = buildModuleName ann modName
-            case mname of
-                Left err -> return $ Left err
-                Right qname -> do
-                    mRoot <- findModuleRoot roots qname
-                    case mRoot of
-                        Just _ -> return $ Right (ModuleDependency qname ann)
-                        Nothing ->
-                            return $ Left (annotateError ann (EImportedFileNotFound (head (roots ++ ["."]) </> qname <.> "fin")))
 
 boxUsageCheckModules :: LoweredProject -> Maybe BoxUsageError
 boxUsageCheckModules = check . M.elems

@@ -9,6 +9,9 @@ import Configuration.Configuration
 import Configuration.Manifest
 import Configuration.Namespace (exportedModules)
 import Command.Dependencies (Sync(..), syncDependencies, describeChange)
+import Command.Sources (loadSources)
+import Configuration.Lock (Lock(..), LockedPackage(..))
+import Configuration.Vendor (packageDir)
 import Command.Utils
 import Control.Exception (IOException, try)
 import Data.Maybe (fromMaybe, isJust)
@@ -326,6 +329,15 @@ loadBuildProject chatty = do
     Sync changes warnings <- syncDependencies place "termina build" "." manifest lock >>= either dieWithFirstError return
     mapM_ (putStrLn . warnMessage) warnings
     mapM_ (putStrLn . infoMessage . ("termina.lock: " ++) . describeChange) changes
+    -- The C of each package will be linked into its own object; until then a package with C cannot be built.
+    lockAfter <- loadLock "." >>= either dieWithFirstError return
+    forM_ (lockPackages lockAfter) $ \locked -> do
+        vendored <- decodeManifestFile (packageDir "." (lockedUrl locked) </> "termina.yaml")
+        case vendored of
+            Right m | not (null (externFiles (manifestExtern m))) ->
+                dieWithError $ T.unpack (projectName (manifestProject m)) ++ " (" ++ T.unpack (lockedUrl locked)
+                    ++ ") has C in its extern section, and termina cannot build the C of a dependency yet."
+            _ -> return ()
     checkLibrary chatty manifest
     return manifest
 
@@ -342,7 +354,8 @@ checkLibrary chatty manifest =
         Application _ -> return ()
         Library _ -> do
             roots <- exportedModules "." manifest
-            parsedModules <- loadModules [ModuleDependency root Internal | root <- roots] ["src"]
+            sources <- loadSources manifest Nothing "src"
+            parsedModules <- loadModules sources "src" [ModuleDependency root Internal | root <- roots]
             orderedModules <- either
                 (\files -> dieWithError $ "Detected cycle between the exported modules of the library: " ++ show files)
                 return
@@ -482,15 +495,21 @@ generateDeployment :: BuildCmdArgs -> Deployment -> IO [(QualifiedName, FilePath
 generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _) deployment = do
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
-        sources = deploymentSources deployment
+        mainFolder = deploymentMainFolder deployment
+        -- The main module of a test is in tests/<name>
+        mTest = case splitDirectories mainFolder of
+            ["tests", testName] -> Just testName
+            _ -> Nothing
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
+    manifest <- decodeManifestFile "termina.yaml" >>= either (dieWithError . ("termina.yaml: " ++)) return
+    sources <- loadSources manifest mTest mainFolder
     -- | Load the module that wires the deployment
-    let mainModulePath = deploymentMainFolder deployment </> deploymentMainModule deployment <.> "fin"
+    let mainModulePath = mainFolder </> deploymentMainModule deployment <.> "fin"
     when chatty (putStrLn . debugMessage $ "Loading the main module: \"" ++ mainModulePath ++ "\"")
-    appModule <- loadTerminaModule (deploymentMainFolder deployment) (deploymentMainModule deployment) sources
+    appModule <- loadTerminaModule sources mainFolder (deploymentMainModule deployment)
     -- | Load the project
     when chatty (putStrLn . debugMessage $ "Loading project modules")
-    parsedModules <- loadModules (importedModules appModule) sources
+    parsedModules <- loadModules sources mainFolder (importedModules appModule)
     let parsedProject = M.insert (qualifiedName appModule) appModule parsedModules
     -- | Detect any possible loops in the project
     when chatty (putStrLn . debugMessage $ "Ordering project modules")

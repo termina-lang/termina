@@ -9,6 +9,7 @@ module Command.Test (
 ) where
 
 import Command.Common (loadTerminaModule, loadModules)
+import Command.Sources (loadSources)
 import Command.Types
 import Command.Utils
 import Configuration.Manifest
@@ -59,7 +60,7 @@ testCommand (TestCmdArgs list json) = do
       dieWithError $ "termina test can only list the tests for now: use --list"
     manifest <- loadManifest >>= either dieWithFirstError return
     listed <- forM (M.toList (manifestTests manifest)) $ \(testName, entry) -> do
-      cases <- loadTestCases (T.unpack testName)
+      cases <- loadTestCases manifest (T.unpack testName)
       return (testName, entry, cases)
     if json
       then BLC.putStrLn $ encodePretty' defConfig { confCompare = keyOrder keys } (object [
@@ -96,12 +97,12 @@ testCommand (TestCmdArgs list json) = do
     joinWith sep = foldr1 (\a b -> a ++ sep ++ b)
 
 -- | Parse the modules of a test and read its cases
-loadTestCases :: String -> IO [TestCase]
-loadTestCases testName = do
+loadTestCases :: Manifest -> String -> IO [TestCase]
+loadTestCases manifest testName = do
     let testFolder = "tests" </> testName
-        sources = ["src", testFolder </> "src"]
-    testModule <- loadTerminaModule testFolder "test" sources
-    parsedModules <- loadModules (importedModules testModule) sources
+    sources <- loadSources manifest (Just testName) testFolder
+    testModule <- loadTerminaModule sources testFolder "test"
+    parsedModules <- loadModules sources testFolder (importedModules testModule)
     let parsedProject = M.insert (qualifiedName testModule) testModule parsedModules
     orderedModules <- either
         (\cycleFiles -> dieWithError $ "Detected cycle between the source files of the test " ++ testName ++ ": " ++ show cycleFiles)

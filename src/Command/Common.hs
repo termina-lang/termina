@@ -1,7 +1,11 @@
 module Command.Common where
 
 import Command.Utils
+import Command.Sources
 import Command.Types
+import Configuration.Namespace (locationLine)
+import Data.List (find)
+import Modules.Utils (buildModuleName, qualifiedToModuleName)
 
 import qualified Data.Text as T
 
@@ -18,7 +22,7 @@ import ControlFlow.Architecture
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.Checks
 import Core.AST
-    ( TerminaModule'(frags) )
+    ( TerminaModule'(frags, modules), ModuleImport'(..) )
 import Configuration.Configuration (TerminaConfig(..))
 import Configuration.Platform (Platform)
 import Utils.Errors
@@ -36,13 +40,13 @@ import qualified Data.Text.Encoding as TE
 
 -- | Load Termina file 
 loadTerminaModule ::
-  FilePath
+  Sources
+  -- | Source folder of the module
+  -> FilePath
   -- | Path of the file to load
   -> FilePath
-  -- | Source folders that store the imported modules
-  -> [FilePath]
   -> IO ParsedModule
-loadTerminaModule root filePath srcPaths = do
+loadTerminaModule sources root filePath = do
   let fullP = root </> filePath <.> "fin"
   -- read it
   src_code <- either (const (dieWithError $ fullP ++ ": the file is not valid UTF-8")) return . TE.decodeUtf8' =<< BS.readFile fullP
@@ -55,45 +59,59 @@ loadTerminaModule root filePath srcPaths = do
       in
       dieWithReport (toText pErr fileMap)
     Right term -> do
-      mimports <- getModuleImportsFrom srcPaths term
-      case mimports of
-        Left err ->
-          let fileMap = M.singleton fullP src_code in
-          dieWithReport (toText err fileMap)
-        Right imports ->
-          return $ TerminaModuleData filePath fullP mod_time imports [] src_code (ParsingData . frags $ term)
-
--- | Load the modules of the project
-loadModules
-  :: [ModuleDependency]
-  -> [FilePath]
-  -> IO ParsedProject
-loadModules imported srcPaths = do
-  -- | Load and parse the project.
-  -- The main application module has been already loaded. We need to load the
-  -- rest of the modules.
-  loadModules' M.empty imported
+      imports <- mapM (importOf (M.singleton fullP src_code) fullP) (modules term)
+      return $ TerminaModuleData filePath fullP mod_time imports [] src_code (ParsingData . frags $ term)
 
   where
 
-  loadModules' :: ParsedProject
-    -- Modules to load
-    -> [ModuleDependency]
-    -> IO ParsedProject
+    importerOwner = maybe Project folderOwner (find ((== root) . folderPath) sources)
+
+    -- | An import, looked up in the folders that the folder of the module sees.
+    importOf fileMap fullP (ModuleImport modName ann) =
+      case buildModuleName ann modName of
+        Left err -> dieWithReport (toText err fileMap)
+        Right qname -> do
+          found <- lookupModule sources root qname
+          case found of
+            Found _ -> return (ModuleDependency qname ann)
+            Ambiguous a b -> dieWithError (collisionMessage sources qname a b)
+            Hidden folder -> dieWithError $ fullP ++ ":" ++ show (locationLine ann) ++ ": "
+              ++ hiddenMessage folder importerOwner (qualifiedToModuleName qname)
+            Missing -> dieWithReport (toText (annotateError ann (EImportedFileNotFound (root </> qname <.> "fin"))) fileMap)
+
+-- | Load the modules that the modules of a folder import, and everything they
+-- import in turn, each one from the folder where the importer finds it. One
+-- name found in two folders of the build is an error.
+loadModules
+  :: Sources
+  -> FilePath
+  -> [ModuleDependency]
+  -> IO ParsedProject
+loadModules sources importer imported = loadModules' M.empty [(dep, importer) | dep <- imported]
+
+  where
+
+  loadModules' :: ParsedProject -> [(ModuleDependency, FilePath)] -> IO ParsedProject
   loadModules' fsLoaded [] = pure fsLoaded
-  loadModules' fsLoaded ((ModuleDependency qname _):fss) =
-    if M.member qname fsLoaded
-    -- Nothing to do, skip to the next one. It could be the case of a module
-    -- imported from several files.
-    then loadModules' fsLoaded fss
-    -- Import and load it.
-    else do
-      srcPath <- maybe (dieWithError $ "Module " ++ qname ++ " not found") return =<< findModuleRoot srcPaths qname
-      loadedModule <- loadTerminaModule srcPath qname srcPaths
-      let deps = importedModules loadedModule
-      loadModules'
-        (M.insert qname loadedModule fsLoaded)
-        (fss ++ deps)
+  loadModules' fsLoaded ((ModuleDependency qname _, from) : fss) = do
+    found <- lookupModule sources from qname
+    folder <- case found of
+      Found folder -> return folder
+      Ambiguous a b -> dieWithError (collisionMessage sources qname a b)
+      _ -> dieWithError $ "Module " ++ qname ++ " not found"
+    case M.lookup qname fsLoaded of
+      Just loaded
+        | fullPath loaded == folder </> qname <.> "fin" -> loadModules' fsLoaded fss
+        | otherwise -> dieWithError (collisionMessage sources qname (moduleFolder qname (fullPath loaded)) folder)
+      Nothing -> do
+        loadedModule <- loadTerminaModule sources folder qname
+        loadModules' (M.insert qname loadedModule fsLoaded)
+          (fss ++ [(dep, folder) | dep <- importedModules loadedModule])
+
+  -- | The source folder of a module, from its file and its qualified name.
+  moduleFolder qname path =
+    let parts = splitDirectories path
+    in joinPath (take (length parts - length (splitDirectories qname)) parts)
 
 typeModules :: ParsedProject -> Environment -> [QualifiedName] -> IO (TypedProject, Environment)
 typeModules parsedProject initialState =
