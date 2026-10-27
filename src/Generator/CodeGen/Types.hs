@@ -84,6 +84,10 @@ _Option__box = typeDef optionBox
 termina__emitter_task_connection_t :: CType
 termina__emitter_task_connection_t = typeDef "termina__emitter_task_connection_t"
 
+termina__test__emitter_handler_connection_t, termina__test__emitter_handler_action_t :: CType
+termina__test__emitter_handler_connection_t = typeDef "termina__test__emitter_handler_connection_t"
+termina__test__emitter_handler_action_t = typeDef "termina__test__emitter_handler_action_t"
+
 termina__periodic_timer_connection_t,
     termina__periodic_timer_handler_connection_t,
     termina__periodic_timer_action_t :: CType
@@ -138,6 +142,20 @@ termina__pool__init = "termina__pool__init" @:
             -- | size_t memory_area_size
             CTSizeT noqual,
             -- | size_t block_size
+            CTSizeT noqual
+        ]
+
+termina__test__pool__init :: CExpression
+termina__test__pool__init = "termina__test__pool__init" @:
+    CTFunction void
+        [
+            -- | termina__test__pool_t * const self
+            _const . ptr $ typeDef testPool,
+            -- | void * const p_memory_area
+            CTPointer (CTVoid noqual) noqual,
+            -- | const size_t memory_area_size
+            CTSizeT noqual,
+            -- | const size_t block_size
             CTSizeT noqual
         ]
 

@@ -96,7 +96,7 @@ genInitTasks progArchitecture = do
 -- | Function termina__app__install_emitters. This function is called from the
 -- Init task.  The function installs the ISRs and the periodic timers. The
 -- function is called AFTER the initialization of the tasks and handlers.
-genInitEmitters :: TerminaProgArch a -> CGenerator [CFileItem]
+genInitEmitters :: TerminaProgArch SemanticAnn -> CGenerator [CFileItem]
 genInitEmitters progArchitecture = do
     let progEmitters = M.elems $ emitters progArchitecture
     let installedEmitters = filter (\case { TPSystemInitEmitter {} -> False; _ -> True }) progEmitters
@@ -110,12 +110,87 @@ genInitEmitters progArchitecture = do
             ++ [pre_cr $ var "except_connection" termina__system_except_connection_t
                 | any (\case { TPSystemExceptEmitter {} -> True; _ -> False }) installedEmitters]
     initEmitter <- mapM genEmitterConnection installedEmitters
-    return [pre_cr $ static_function (terminafy $ "app" <::> "init_emitters") ["status" @: (_const . ptr $ termina__error_code_t)] @-> void $
-            trail_cr . block $ genStatusSteps declarations initEmitter | not (null initEmitter)]
+    let progTestEmitters = M.elems $ testEmitters progArchitecture
+    initTestEmitters <- mapM genTestEmitterConnection progTestEmitters
+    fireFunctions <- concat <$> mapM genTestFireFunction progTestEmitters
+    let steps = initEmitter ++ initTestEmitters
+    return $ fireFunctions ++ [pre_cr $ static_function (terminafy $ "app" <::> "init_emitters") ["status" @: (_const . ptr $ termina__error_code_t)] @-> void $
+            trail_cr . block $ genStatusSteps declarations steps | not (null steps)]
 
     where
 
-        genEmitterConnection :: TPEmitter a -> CGenerator [CCompoundBlockItem]
+        -- | The target of an emitter and its port
+        emitterTarget :: Identifier -> CGenerator (Identifier, Identifier)
+        emitterTarget emitter = case M.lookup emitter (emitterTargets progArchitecture) of
+            Just (entity, port, _) -> return (entity, port)
+            Nothing -> throwError $ InternalError $ "Emitter not connected: " ++ show emitter
+
+        -- | The connection of a TestEmitter goes in its own object
+        genTestEmitterConnection :: TPTestEmitter SemanticAnn -> CGenerator [CCompoundBlockItem]
+        genTestEmitterConnection (TPTestEmitter emitter _ _ _) = do
+            emitterId <- genDefineEmitterIdLabel emitter
+            (targetEntity, targetPort) <- emitterTarget emitter
+            let obj = emitter @: typeDef testEmitter
+                idAssignment = pre_cr $ obj @. "emitter_id" @: termina__id_t @= emitterId @: termina__id_t
+            case M.lookup targetEntity (handlers progArchitecture) of
+                Just (TPHandler identifier _ _ _ _ _ _ _) -> do
+                    handlerId <- genDefineHandlerIdLabel identifier
+                    return [
+                            idAssignment,
+                            no_cr $ obj @. "type" @: enumFieldType
+                                @= "termina__emitter_connection_type__handler" @: enumFieldType,
+                            no_cr $ obj @. "handler" @: termina__test__emitter_handler_connection_t
+                                @. "handler_id" @: termina__id_t @= handlerId @: termina__id_t,
+                            no_cr $ obj @. "handler" @: termina__test__emitter_handler_connection_t
+                                @. "handler_action" @: termina__test__emitter_handler_action_t
+                                @= addrOf (testFireFunctionName emitter @: termina__test__emitter_handler_action_t)
+                        ]
+                Nothing -> case M.lookup targetEntity (tasks progArchitecture) of
+                    Just (TPTask _ tskCls _ _ _ _ _ _ _) -> do
+                        variantForPort <- genVariantForPort tskCls targetPort
+                        taskId <- genDefineTaskIdLabel targetEntity
+                        taskMsgQueueId <- genDefineTaskMsgQueueIdLabel targetEntity
+                        sinkMsgQueueId <- genDefineSinkMsgQueueIdLabel targetEntity targetPort
+                        let taskConnection = obj @. "task" @: termina__emitter_task_connection_t
+                        return [
+                                idAssignment,
+                                no_cr $ obj @. "type" @: enumFieldType
+                                    @= "termina__emitter_connection_type__task" @: enumFieldType,
+                                no_cr $ taskConnection @. "task_id" @: termina__id_t @= taskId @: termina__id_t,
+                                no_cr $ taskConnection @. "task_msg_queue_id" @: termina__id_t @= taskMsgQueueId @: termina__id_t,
+                                no_cr $ taskConnection @. "sink_msgq_id" @: termina__id_t @= sinkMsgQueueId @: termina__id_t,
+                                no_cr $ taskConnection @. "sink_port_id" @: termina__id_t @= variantForPort @: termina__id_t,
+                                pre_cr $ targetEntity @: typeDef tskCls @. targetPort @: termina__id_t
+                                    @= sinkMsgQueueId @: termina__id_t
+                            ]
+                    Nothing -> throwError $ InternalError $ "Invalid connection for test emitter: " ++ show targetEntity
+
+        -- | The function through which fire calls the action of a handler with the value
+        genTestFireFunction :: TPTestEmitter SemanticAnn -> CGenerator [CFileItem]
+        genTestFireFunction (TPTestEmitter emitter ety _ _) = do
+            (targetEntity, targetPort) <- emitterTarget emitter
+            case M.lookup targetEntity (handlers progArchitecture) of
+                Just (TPHandler identifier classId _ _ _ _ _ _) -> do
+                    let cls = handlerClasses progArchitecture M.! classId
+                        (_, targetAction) = sinkPorts cls M.! targetPort
+                    cEventType <- genType noqual ety
+                    let cValue = "value" @: (_const . ptr $ _const void)
+                        cArg = deref (cast (ptr (_const cEventType)) cValue)
+                        cAction = classId <::> targetAction @: CTFunction void []
+                        cEvent = eventParam @: (_const . ptr $ _const termina__event_t)
+                    return [pre_cr $ static_function (testFireFunctionName emitter) [
+                                eventParam @: (_const . ptr $ _const termina__event_t),
+                                "value" @: (_const . ptr $ _const void)
+                            ] @-> void $
+                            trail_cr . block $ [
+                                pre_cr $ cAction @@ [cEvent, addrOf (identifier @: typeDef classId), cArg]
+                            ]]
+                Nothing -> return []
+
+        testFireFunctionName :: Identifier -> Identifier
+        testFireFunctionName emitter = terminafy ("test_fire" <::> emitter)
+
+        genEmitterConnection :: TPEmitter SemanticAnn -> CGenerator [CCompoundBlockItem]
         genEmitterConnection (TPPeriodicTimerEmitter timer _ _ _) = do
             timerId <- genDefineTimerIdLabel timer
             emitterId <- genDefineEmitterIdLabel timer
@@ -294,10 +369,29 @@ genChannelConnections :: TerminaProgArch a -> CGenerator [CFileItem]
 genChannelConnections progArchitecture = do
     let targets = M.toList $ channelTargets progArchitecture
     channelConnections <- concat <$> traverse genChannelConnection targets
+    testChannelConnections <- concat <$> traverse genTestChannelConnection (M.keys $ testChannels progArchitecture)
+    let connections = channelConnections ++ testChannelConnections
     return [pre_cr $ static_function (terminafy $ "app" <::> "init_channel_connections") [] @-> void $
-            trail_cr . block $ channelConnections | not (null channelConnections)]
+            trail_cr . block $ connections | not (null connections)]
 
     where
+
+        -- | A TestChannel delivers to the harness, through a queue of events of its own
+        genTestChannelConnection :: Identifier -> CGenerator [CCompoundBlockItem]
+        genTestChannelConnection channelName = do
+            harnessId <- genDefineTaskIdLabel testHarness
+            eventMsgQueueId <- genDefineTestEventMsgQueueIdLabel channelName
+            channelMsgQueueId <- genDefineChannelMsgQueueIdLabel channelName
+            return [
+                    pre_cr $ channelName @: termina__msg_queue_t @. "task_id" @: termina__id_t
+                        @= harnessId @: termina__id_t,
+                    no_cr $ channelName @: termina__msg_queue_t @. "task_msg_queue_id" @: termina__id_t
+                        @= eventMsgQueueId @: termina__id_t,
+                    no_cr $ channelName @: termina__msg_queue_t @. "channel_msg_queue_id" @: termina__id_t
+                        @= channelMsgQueueId @: termina__id_t,
+                    no_cr $ channelName @: termina__msg_queue_t @. "port_id" @: termina__id_t
+                        @= dec 0 @: size_t
+                ]
 
         genChannelConnection :: (Identifier, (Identifier, Identifier, a)) -> CGenerator [CCompoundBlockItem]
         genChannelConnection (channelName, (targetName, targetPort, _)) = do
@@ -326,13 +420,34 @@ genChannelConnections progArchitecture = do
                         @= channelMsgQueueId @: termina__id_t
                 ]
 
-genInitPools :: [TPPool SemanticAnn] -> CGenerator [CFileItem]
-genInitPools pls = do
+genInitPools :: [TPPool SemanticAnn] -> [TPPool SemanticAnn] -> CGenerator [CFileItem]
+genInitPools pls testPls = do
     initPools <- mapM genPoolInit pls
+    initTestPools <- mapM genTestPoolInit testPls
+    let steps = initPools ++ initTestPools
     return [pre_cr $ static_function (terminafy $ "app" <::> "init_pools") ["status" @: (_const . ptr $ termina__error_code_t)] @-> void $
-            trail_cr . block $ genStatusSteps [] initPools | not (null initPools)]
+            trail_cr . block $ genStatusSteps [] steps | not (null steps)]
 
     where
+
+        -- | The pool of a TestPool is its first field
+        genTestPoolInit :: TPPool SemanticAnn -> CGenerator [CCompoundBlockItem]
+        genTestPoolInit (TPPool identifier ts _ _ _) = do
+            cTs <- genType noqual ts
+            poolId <- genDefinePoolIdLabel identifier
+            let testPoolObj = identifier @: typeDef testPool
+            return [
+                    pre_cr $ testPoolObj @. "pool" @: termina__pool_t @. "pool_id" @: termina__id_t
+                        @= poolId @: termina__id_t,
+                    pre_cr $ termina__test__pool__init @@
+                            [
+                                addrOf testPoolObj,
+                                cast (ptr void) (poolMemoryArea identifier @: ptr uint8_t),
+                                _sizeOfExpr (poolMemoryArea identifier @: ptr uint8_t),
+                                _sizeOfType cTs,
+                                "status" @: (_const . ptr $ termina__error_code_t)
+                            ]
+                ]
 
         genPoolInit :: TPPool SemanticAnn -> CGenerator [CCompoundBlockItem]
         genPoolInit (TPPool identifier ts _ _ _) = do
@@ -425,8 +540,12 @@ genInitMessageQueues queues = do
 genEnableProtection :: TerminaProgArch SemanticAnn -> CGenerator [CFileItem]
 genEnableProtection progArchitecture = do
     resourceProtections <- concat <$> forM (M.elems $ resources progArchitecture) genEnableProtectionResource
-    poolProtections <- concat <$> forM (M.elems $ pools progArchitecture) genEnableProtectionPool
-    let protections = resourceProtections ++ poolProtections
+    poolProtections <- concat <$> forM (M.elems $ pools progArchitecture)
+        (\(TPPool poolId _ _ _ _) -> genEnableProtectionPool poolId (poolId @: termina__pool_t))
+    -- | The lock of a TestPool is the one of the pool inside it
+    testPoolProtections <- concat <$> forM (M.elems $ testPools progArchitecture)
+        (\(TPPool poolId _ _ _ _) -> genEnableProtectionPool poolId ((poolId @: typeDef testPool) @. "pool" @: termina__pool_t))
+    let protections = resourceProtections ++ poolProtections ++ testPoolProtections
     return [pre_cr $ static_function (terminafy $ "app" <::> "enable_protection") [] @-> void $
             trail_cr . block $ protections | not (null protections)]
 
@@ -455,20 +574,20 @@ genEnableProtection progArchitecture = do
                 Nothing -> throwError $ InternalError $ "Resource " ++ show resourceId
                     ++ " not found in resource locking map" 
         
-        genEnableProtectionPool :: TPPool SemanticAnn -> CGenerator [CCompoundBlockItem]
-        genEnableProtectionPool (TPPool poolId _ _ _ _) = do
+        genEnableProtectionPool :: Identifier -> CObject -> CGenerator [CCompoundBlockItem]
+        genEnableProtectionPool poolId poolObj = do
             case M.lookup poolId resourceLockingMap of
                 Just ResourceLockNone -> return []
                 Just ResourceLockIrq -> return [
-                        pre_cr $ poolId @: termina__pool_t @. resourceLockTypeField @: termina__resource_lock_type_t @. "type" @: enumFieldType @= 
+                        pre_cr $ poolObj @. resourceLockTypeField @: termina__resource_lock_type_t @. "type" @: enumFieldType @=
                             "termina__resource_lock_type__irq" @: enumFieldType
                     ]
                 Just (ResourceLockMutex _) -> do
                     mutexId <- genDefineMutexIdLabel poolId
                     return [
-                        pre_cr $ poolId @: termina__pool_t @. resourceLockTypeField @: termina__resource_lock_type_t @. "type" @: enumFieldType @= 
+                        pre_cr $ poolObj @. resourceLockTypeField @: termina__resource_lock_type_t @. "type" @: enumFieldType @=
                             "termina__resource_lock_type__mutex" @: enumFieldType,
-                        no_cr $ poolId @: termina__pool_t @. resourceLockTypeField @: termina__resource_lock_type_t @. "mutex" @: termina__enum__resource_lock_type__mutex_params_t @. "mutex_id" @: termina__id_t
+                        no_cr $ poolObj @. resourceLockTypeField @: termina__resource_lock_type_t @. "mutex" @: termina__enum__resource_lock_type__mutex_params_t @. "mutex_id" @: termina__id_t
                             @= mutexId @: termina__id_t
                         ]
                 Nothing -> throwError $ InternalError $ "Pool " ++ show poolId ++ " not found in resource locking map"
@@ -572,12 +691,12 @@ genMainFile mName progArchitecture = do
     let mutexes = 
             M.filter (\case{ResourceLockMutex {} -> True; _ -> False}) (genResourceLockings progArchitecture)
 
-    cPoolMemoryAreas <- genPoolMemoryAreas (M.elems $ pools progArchitecture)
+    cPoolMemoryAreas <- genPoolMemoryAreas (M.elems (pools progArchitecture) ++ M.elems (testPools progArchitecture))
 
     initTasks <- genInitTasks progArchitecture
     initHandlers <- genInitHandlers progArchitecture
     initEmitters <- genInitEmitters progArchitecture
-    initPools <- genInitPools (M.elems $ pools progArchitecture)
+    initPools <- genInitPools (M.elems $ pools progArchitecture) (M.elems $ testPools progArchitecture)
     initMutexes <- genInitMutexes mutexes
     initMessageQueues <- genInitMessageQueues (taskMessageQueues ++ sinkPortMessageQueues ++ channelMessageQueues
         ++ getTestChannelsMessageQueues progArchitecture)

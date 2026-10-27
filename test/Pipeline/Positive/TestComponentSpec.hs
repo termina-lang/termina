@@ -68,8 +68,59 @@ unitTest =
     "test exec_tests : CExecutorTests = { tick <-> tick, tms <-> tms, tm_pool <-> tm_pool,\n" ++
     "    pool_state <-> tm_pool, t <-> test_checks };\n"
 
+-- | A handler that forwards the value of its interrupt to a channel, and a
+-- case that fires the interrupt and reads the channel.
+handlerTest :: String
+handlerTest =
+    "handler class CRx {\n" ++
+    "    rx : sink u32 triggers on_rx;\n" ++
+    "    rx_out : out u32;\n" ++
+    "    action on_rx(&priv self, v : u32) {\n" ++
+    "        self->rx_out.send(v);\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "};\n" ++
+    "test class CRxTests {\n" ++
+    "    irq : access TestEmitterAccess<u32>;\n" ++
+    "    rxs : access TestChannelAccess<u32>;\n" ++
+    "    t : access TestChecks;\n" ++
+    "    case forwards(&mut self) {\n" ++
+    "        var n : usize = 0;\n" ++
+    "        self->irq.fire(7 : u32);\n" ++
+    "        self->rxs.pending(&mut n);\n" ++
+    "        self->t.check_eq_usize(n, 1 : usize);\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "};\n" ++
+    "emitter irq : TestEmitter<u32>;\n" ++
+    "channel rxs : TestChannel<u32; 2>;\n" ++
+    "handler rx : CRx = { rx <- irq, rx_out -> rxs };\n" ++
+    "test rx_tests : CRxTests = { irq <-> irq, rxs <-> rxs, t <-> test_checks };\n"
+
 spec :: Spec
 spec = describe "Full pipeline: the components of a unit test" $ do
+  it "sets up the test pool, the test channel and the test emitter in the main file" $
+    case runTestApp unitTest of
+      Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
+      Right (progArch, _) ->
+        either (expectationFailure . unpack)
+          (\c -> do
+            unpack c `shouldContain` "static max_align_t termina__pool_memory__tm_pool["
+            unpack c `shouldContain` "tm_pool.pool.pool_id = tm_pool__pool_id;"
+            unpack c `shouldContain` "termina__test__pool__init(&tm_pool, (void *)termina__pool_memory__tm_pool,"
+            unpack c `shouldContain` "tms.task_id = termina__test__harness__task_id;\n    tms.task_msg_queue_id = tms__event_msg_queue_id;\n    tms.channel_msg_queue_id = tms__channel_msg_queue_id;\n    tms.port_id = 0U;"
+            unpack c `shouldContain` "tick.emitter_id = tick__emitter_id;\n    tick.type = termina__emitter_connection_type__task;\n    tick.task.task_id = uut__task_id;\n    tick.task.task_msg_queue_id = uut__task_msg_queue_id;\n    tick.task.sink_msgq_id = uut__tick__sink_msg_queue_id;\n    tick.task.sink_port_id = CExecutor__tick;"
+            unpack c `shouldContain` "uut.tick = uut__tick__sink_msg_queue_id;")
+          (renderTestMainFile progArch)
+  it "reaches the action of a handler through a function of the main file" $
+    case runTestApp handlerTest of
+      Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
+      Right (progArch, _) ->
+        either (expectationFailure . unpack)
+          (\c -> do
+            unpack c `shouldContain` "static void termina__test_fire__irq(const termina__event_t * const termina__ev,\n                                    const void * const value) {\n    \n    CRx__on_rx(termina__ev, &rx, *(const uint32_t *)value);\n\n}"
+            unpack c `shouldContain` "irq.emitter_id = irq__emitter_id;\n    irq.type = termina__emitter_connection_type__handler;\n    irq.handler.handler_id = rx__handler_id;\n    irq.handler.handler_action = &termina__test_fire__irq;")
+          (renderTestMainFile progArch)
   it "calls fire, pending and take with the functions of the runtime" $
     case runTestBuild unitTest of
       Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
