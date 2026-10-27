@@ -225,11 +225,14 @@ genInitEmitters progArchitecture = do
                 Nothing -> case M.lookup targetEntity (tasks progArchitecture) of
                     Just (TPTask _ tskCls _ _ _ _ _ _ _) -> do
                         variantForPort <- genVariantForPort tskCls targetPort
+                        taskId <- genDefineTaskIdLabel targetEntity
                         taskMsgQueueId <- genDefineTaskMsgQueueIdLabel targetEntity
                         sinkMsgQueueId <- genDefineSinkMsgQueueIdLabel targetEntity targetPort
                         return [
                                 pre_cr $ "timer_connection" @: termina__periodic_timer_connection_t @. "type" @: enumFieldType
                                     @= "termina__emitter_connection_type__task" @: enumFieldType,
+                                no_cr $ "timer_connection" @: termina__periodic_timer_connection_t @. "task" @: termina__emitter_task_connection_t
+                                    @. "task_id" @: termina__id_t @= taskId @: termina__id_t,
                                 no_cr $ "timer_connection" @: termina__periodic_timer_connection_t @. "task" @: termina__emitter_task_connection_t
                                     @. "task_msg_queue_id" @: termina__id_t @= taskMsgQueueId @: termina__id_t,
                                 no_cr $ "timer_connection" @: termina__periodic_timer_connection_t @. "task" @: termina__emitter_task_connection_t
@@ -284,11 +287,14 @@ genInitEmitters progArchitecture = do
                 Nothing -> case M.lookup targetEntity (tasks progArchitecture) of
                     Just (TPTask _ tskCls _ _ _ _ _ _ _) -> do
                         variantForPort <- genVariantForPort tskCls targetPort
+                        taskId <- genDefineTaskIdLabel targetEntity
                         taskMsgQueueId <- genDefineTaskMsgQueueIdLabel targetEntity
                         sinkMsgQueueId <- genDefineSinkMsgQueueIdLabel targetEntity targetPort
                         return [
                                 pre_cr $ "interrupt_connection" @: termina__interrupt_connection_t @. "type" @: enumFieldType
                                     @= "termina__emitter_connection_type__task" @: enumFieldType,
+                                no_cr $ "interrupt_connection" @: termina__interrupt_connection_t @. "task" @: termina__emitter_task_connection_t
+                                    @. "task_id" @: termina__id_t @= taskId @: termina__id_t,
                                 no_cr $ "interrupt_connection" @: termina__interrupt_connection_t @. "task" @: termina__emitter_task_connection_t
                                     @. "task_msg_queue_id" @: termina__id_t @= taskMsgQueueId @: termina__id_t,
                                 no_cr $ "interrupt_connection" @: termina__interrupt_connection_t @. "task" @: termina__emitter_task_connection_t

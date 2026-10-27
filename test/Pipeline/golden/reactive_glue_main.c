@@ -24,6 +24,7 @@ static void termina__app__init_emitters(termina__error_code_t * const status) {
     *status = termina__error__none;
 
     timer_connection.type = termina__emitter_connection_type__task;
+    timer_connection.task.task_id = t__task_id;
     timer_connection.task.task_msg_queue_id = t__task_msg_queue_id;
     timer_connection.task.sink_msgq_id = t__timer_port__sink_msg_queue_id;
     timer_connection.task.sink_port_id = UserTask__timer_port;
