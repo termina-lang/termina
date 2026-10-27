@@ -7,6 +7,8 @@ module Pipeline.Positive.TestDescriptorSpec (spec) where
 import Pipeline.Common
 
 import Data.Aeson (FromJSON(..), eitherDecode, withObject, (.:))
+import qualified Data.Map.Strict as M
+import qualified Runner.Descriptor as R
 import Data.Text (unpack)
 import Test.Hspec
 import Text.Printf (printf)
@@ -104,6 +106,18 @@ spec = describe "Full pipeline: the descriptor of a unit test" $ do
   it "carries the stamp that the main file gets" $
     withDescriptor descriptorTest $ \d stamp ->
       descriptorStamp d `shouldBe` stamp
+
+  it "is read by the runner as the generator writes it" $
+    case runTestDescriptor descriptorTest of
+      Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
+      Right (text, stamp) -> case R.decodeDescriptor text of
+        Left err -> expectationFailure $ "the runner does not read the descriptor: " ++ err
+        Right d -> do
+          R.descriptorStamp d `shouldBe` toInteger stamp
+          map R.caseId (R.descriptorCases d) `shouldBe` ["b_tests.zeta", "b_tests.alpha", "a_tests.zeta", "a_tests.alpha"]
+          map R.checkLine (R.descriptorChecks d) `shouldBe` [15, 20]
+          R.descriptorTasks d `shouldBe` M.fromList [(0, "ticker"), (1, "harness")]
+          R.symbolInit (R.descriptorSymbols d) `shouldBe` "termina__test__init"
 
   it "changes the stamp when a check changes" $
     case (runTestDescriptor descriptorTest, runTestDescriptor (concatMap (\c -> if c == '1' then "2" else [c]) descriptorTest)) of
