@@ -80,9 +80,16 @@ spec = describe "Manifest" $ do
     it "rejects a project with neither exports nor app" $
       project `failsWith` "needs either exports"
 
+    it "rejects an SSH dependency, with its https:// form and the rule to keep SSH" $ do
+      let ssh = "Use https://github.com/uah/drivers instead.\n"
+            ++ "If you want git to clone it over SSH, run this once on your computer:\n"
+            ++ "  git config --global url.\"git@github.com:\".insteadOf \"https://github.com/\"\n"
+      (project ++ app ++ "dependencies:\n  - git: git@github.com:uah/drivers\n    rev: v1\n") `failsWith` ssh
+      (project ++ app ++ "dependencies:\n  - git: ssh://git@github.com/uah/drivers\n    rev: v1\n") `failsWith` ssh
+
     it "rejects a dependency that is not https" $
-      (project ++ app ++ "dependencies:\n  - git: git@github.com:a/b\n    rev: v1\n")
-        `failsWith` "is not an https:// URL"
+      (project ++ app ++ "dependencies:\n  - git: http://example.com/a/b\n    rev: v1\n")
+        `failsWith` "http://example.com/a/b is not an https:// URL, and dependencies are fetched with https://"
 
     it "rejects a tick that does not divide 1000000" $
       (project ++ "app:\n  platform: posix-gcc\n  profile: release\n  microseconds-per-tick: 7\n")

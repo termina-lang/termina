@@ -12,18 +12,16 @@ import Control.Monad
 import Data.IORef
 import Data.List (find, intercalate)
 import qualified Data.Map.Strict as M
-import Data.Maybe (isJust, isNothing)
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Yaml (decodeEither', prettyPrintParseException)
 import Options.Applicative
 import System.Directory
-import System.Environment (getEnvironment)
 import System.Exit
 import System.FilePath
 
-import Command.Utils (errorMessage, warnMessage, infoMessage)
+import Command.Utils (Place(..), currentPlace, errorMessage, warnMessage, infoMessage)
 import Configuration.Fetch
 import Configuration.Graph
 import Configuration.Lock
@@ -57,10 +55,8 @@ data AddReport = AddReport {
 
 addCommand :: AddCmdArgs -> IO ()
 addCommand (AddCmdArgs url tag mTest) = do
-    env <- getEnvironment
-    -- The image sets TERMINA_CONTAINER, and VS Code sets REMOTE_CONTAINERS in the one it opens.
-    let container = isJust (lookup "TERMINA_CONTAINER" env) && isNothing (lookup "REMOTE_CONTAINERS" env)
-    result <- addDependency container "." (T.pack url) (T.pack tag) mTest
+    place <- currentPlace
+    result <- addDependency place "." (T.pack url) (T.pack tag) mTest
     case result of
         Left errs -> mapM_ (putStrLn . errorMessage) errs >> exitFailure
         Right report -> do
@@ -71,8 +67,8 @@ addCommand (AddCmdArgs url tag mTest) = do
 -- found and leave the project as it was. In a command-line container, the
 -- packages that need credentials are reported together with the ways to
 -- bring them.
-addDependency :: Bool -> FilePath -> T.Text -> T.Text -> Maybe String -> IO (Either [String] AddReport)
-addDependency container root url tag mTest = do
+addDependency :: Place -> FilePath -> T.Text -> T.Text -> Maybe String -> IO (Either [String] AddReport)
+addDependency place root url tag mTest = do
     bytes <- BS.readFile (root </> "termina.yaml")
     lockResult <- decodeLockFile (root </> "termina.lock")
     let text = either (const (Left "termina.yaml: the file is not valid UTF-8")) (Right . T.unpack) (TE.decodeUtf8' bytes)
@@ -98,6 +94,7 @@ addDependency container root url tag mTest = do
 
     -- | The new text of the manifest and the manifest it gives.
     prepare text = do
+        either (Left . (++ sshNote place)) Right (checkGitUrl url)
         old <- parse (utf8 text)
         checkAbsent old
         newText <- addDependencyEntry text mTest url tag
@@ -153,7 +150,7 @@ addDependency container root url tag mTest = do
         let credentials = [(u, t) | ObtainFailed u t _ (FetchFailed (NeedsCredentials _ _)) <- errs]
             needsCredentials (ObtainFailed _ _ _ (FetchFailed (NeedsCredentials _ _))) = True
             needsCredentials _ = False
-        in if container && not (null credentials)
+        in if place == CommandLineContainer && not (null credentials)
             then map (describeResolveError describeAdd) (filter (not . needsCredentials) errs) ++ [credentialsMessage credentials]
             else map (describeResolveError describeAdd) errs
 
@@ -191,10 +188,17 @@ describeAdd (FetchFailed (GitFailed err)) = "git failed:\n" ++ err
 describeAdd (InvalidPackage errs) = "the package is not valid:\n" ++ intercalate "\n" (map ("  " ++) errs)
 describeAdd VendorMismatch = "its copy in vendor/ does not match its content-hash in termina.lock"
 
+-- | What the rule of git for SSH needs where termina runs. It only matters
+-- in a container, which does not keep it or has no SSH keys.
+sshNote :: Place -> String
+sshNote Computer = ""
+sshNote VSCodeContainer = "\nWhen it is rebuilt, this container loses its git configuration."
+sshNote CommandLineContainer = "\nThis container has no SSH keys, so it cannot clone over SSH. Run termina add on your computer or in VS Code."
+
 -- | GitHub asks for credentials for a repository that does not exist, so as
 -- not to tell whether a private one has that name.
 misspelled :: String
-misspelled = "If the repository is public, check the URL: GitHub also asks for credentials for a repository that does not exist."
+misspelled = "GitHub also asks for credentials when a repository does not exist, so if it is public, check its URL."
 
 -- | The ways to bring the packages that need credentials when the tool runs
 -- in a command-line container, which has none.
@@ -202,11 +206,11 @@ credentialsMessage :: [(T.Text, T.Text)] -> String
 credentialsMessage packages = intercalate "\n" $
     ["git has no credentials in this container for:"]
     ++ ["  " ++ T.unpack u ++ " " ++ T.unpack t | (u, t) <- packages]
-    ++ [ "Bring them in one of these ways:"
-       , "  1. On the host, where git has your credentials, run from the project folder:" ]
+    ++ [ "To add them, do one of these:"
+       , "  1. On your computer, from the project folder, run:" ]
     ++ [ "       git clone --branch " ++ T.unpack t ++ " --depth 1 " ++ T.unpack u ++ " .termina/fetch/" ++ T.unpack (normalizeUrl u)
        | (u, t) <- packages ]
-    ++ [ "     and run the same termina add here again."
-       , "  2. Run the same termina add with a native termina on the host."
-       , "  3. Open the project in VS Code, whose container gets your credentials."
+    ++ [ "     and then run termina add again here."
+       , "  2. Run termina add with termina installed on your computer."
+       , "  3. Open the project in VS Code, which passes your credentials to its container."
        , misspelled ]

@@ -48,6 +48,7 @@ import Data.Maybe (listToMaybe, mapMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import System.Exit (die, exitFailure)
+import System.Environment (getEnvironment)
 
 -- | Error message formatter
 -- Prints error messages in the form "[error] <message>"
@@ -68,6 +69,21 @@ warnMessage msg = "\x1b[33m[warning]\x1b[0m " ++ msg
 -- Prints info messages in the form "[info] <message>"
 infoMessage :: String -> String
 infoMessage msg = "\x1b[34m[info]\x1b[0m " ++ msg
+
+-- | Where termina runs, which decides what git can reach and what the
+-- messages suggest.
+data Place = Computer | VSCodeContainer | CommandLineContainer
+  deriving (Eq, Show)
+
+-- | The image sets TERMINA_CONTAINER, and VS Code sets REMOTE_CONTAINERS in
+-- the container it opens.
+currentPlace :: IO Place
+currentPlace = do
+    env <- getEnvironment
+    return $ case (lookup "TERMINA_CONTAINER" env, lookup "REMOTE_CONTAINERS" env) of
+        (Nothing, _) -> Computer
+        (Just _, Just _) -> VSCodeContainer
+        (Just _, Nothing) -> CommandLineContainer
 
 getVisibleModules ::  M.Map QualifiedName [QualifiedName] -> [ModuleDependency] -> [QualifiedName]
 getVisibleModules prevModsMap importedMods =

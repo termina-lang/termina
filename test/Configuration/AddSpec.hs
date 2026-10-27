@@ -6,6 +6,7 @@
 module Configuration.AddSpec (spec) where
 
 import Command.Add
+import Command.Utils (Place(..))
 import Configuration.Lock
 
 import Control.Exception (bracket_)
@@ -63,7 +64,7 @@ withProject label tests action = do
         (action repos project)
 
 add :: FilePath -> String -> String -> Maybe String -> IO (Either [String] AddReport)
-add project name = addDependency False project (url name) . T.pack
+add project name = addDependency Computer project (url name) . T.pack
 
 lockOf :: FilePath -> IO [(T.Text, T.Text)]
 lockOf project = either error (map (\p -> (lockedUrl p, lockedRev p)) . lockPackages) <$> decodeLockFile (project </> "termina.lock")
@@ -147,18 +148,26 @@ spec = do
         commits <- filter ("resolved-rev" `isInfixOf`) . lines <$> readFile (project </> "termina.lock")
         forM_ (filter ("resolved-rev" `isInfixOf`) (lines (BS.unpack locked))) (\l -> commits `shouldContain` [l])
 
-  describe "message of the container" $
+  describe "messages that depend on where termina runs" $ do
+
+    it "says where to set the rule for SSH only in a container" $
+      withProject "ssh" "" $ \_ project -> do
+        let ssh place = either (map (last . lines)) (const []) <$> addDependency place project "git@github.com:uah/drivers" "v1" Nothing
+        ssh Computer `shouldReturn` ["git will then use SSH for every https://github.com/ address."]
+        ssh VSCodeContainer `shouldReturn` ["When it is rebuilt, this container loses its git configuration."]
+        ssh CommandLineContainer `shouldReturn`
+          ["This container has no SSH keys, so it cannot clone over SSH. Run termina add on your computer or in VS Code."]
 
     it "gives the clone to run on the host for every package without credentials" $
       credentialsMessage [(url "a", "v1"), (url "b", "v2")] `shouldBe` intercalate "\n"
         [ "git has no credentials in this container for:"
         , "  https://example.invalid/acme/a v1"
         , "  https://example.invalid/acme/b v2"
-        , "Bring them in one of these ways:"
-        , "  1. On the host, where git has your credentials, run from the project folder:"
+        , "To add them, do one of these:"
+        , "  1. On your computer, from the project folder, run:"
         , "       git clone --branch v1 --depth 1 https://example.invalid/acme/a .termina/fetch/example.invalid/acme/a"
         , "       git clone --branch v2 --depth 1 https://example.invalid/acme/b .termina/fetch/example.invalid/acme/b"
-        , "     and run the same termina add here again."
-        , "  2. Run the same termina add with a native termina on the host."
-        , "  3. Open the project in VS Code, whose container gets your credentials."
-        , "If the repository is public, check the URL: GitHub also asks for credentials for a repository that does not exist." ]
+        , "     and then run termina add again here."
+        , "  2. Run termina add with termina installed on your computer."
+        , "  3. Open the project in VS Code, which passes your credentials to its container."
+        , "GitHub also asks for credentials when a repository does not exist, so if it is public, check its URL." ]

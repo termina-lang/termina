@@ -30,6 +30,7 @@ module Configuration.Manifest (
     defaultTestPlatforms,
     addTestEntry,
     addDependencyEntry,
+    checkGitUrl,
     isSnakeCase
 ) where
 
@@ -37,7 +38,7 @@ import Control.Monad
 import qualified Data.Aeson.Key as K
 import qualified Data.Aeson.KeyMap as KM
 import Data.Char (isAsciiLower, isDigit)
-import Data.List (intercalate, isPrefixOf, nub, sort, (\\))
+import Data.List (intercalate, isPrefixOf, nub, sort, stripPrefix, (\\))
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
@@ -237,9 +238,39 @@ gitDependencyParser :: Value -> Parser GitDependency
 gitDependencyParser = withObject "dependency" $ \o -> do
     onlyFields "a git dependency" ["git", "rev"] o
     url <- o .: "git"
-    unless ("https://" `T.isPrefixOf` url) $
-        fail $ "the repository " ++ T.unpack url ++ " is not an https:// URL"
+    either fail return (checkGitUrl url)
     GitDependency url <$> o .: "rev"
+
+-- | A dependency is written with https://. An SSH address gets its https://
+-- form and the rule that makes git use SSH for it on this machine.
+checkGitUrl :: T.Text -> Either String ()
+checkGitUrl url
+    | "https://" `T.isPrefixOf` url = Right ()
+    | otherwise = Left (notHttps (T.unpack url))
+
+  where
+
+    notHttps u = case sshParts u of
+        Just (host, path) -> intercalate "\n" [
+            u ++ " is an SSH address; dependencies only take https:// addresses.",
+            "Use https://" ++ host ++ "/" ++ path ++ " instead.",
+            "If you want git to clone it over SSH, run this once on your computer:",
+            "  git config --global url.\"git@" ++ host ++ ":\".insteadOf \"https://" ++ host ++ "/\"",
+            "git will then use SSH for every https://" ++ host ++ "/ address." ]
+        Nothing -> u ++ " is not an https:// URL, and dependencies are fetched with https://"
+
+    sshParts s
+        | Just rest <- stripPrefix "ssh://" s = case break (== '/') (dropUser rest) of
+            (host, _ : path) -> Just (host, path)
+            _ -> Nothing
+        | (user, '@' : rest) <- break (== '@') s, not (null user), '/' `notElem` user = case break (== ':') rest of
+            (host, _ : path) -> Just (host, path)
+            _ -> Nothing
+        | otherwise = Nothing
+
+    dropUser s = case break (== '@') s of
+        (_, _ : host) -> host
+        _ -> s
 
 platformParser :: T.Text -> Parser Platform
 platformParser pltName =
