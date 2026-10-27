@@ -49,7 +49,8 @@ spec = do
               "\n" ++
               "    for (size_t i = 0U; i < 10U; i = i + 1U) {\n" ++
               "        \n" ++
-              "        total = total + array0[termina__check__array_index(10U, i)];\n" ++
+              "        total = (uint16_t)(((uint32_t)total + array0[termina__check__array_index(10U,\n" ++
+              Prelude.replicate 81 ' ' ++ "i)]) & 0xFFFFU);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++

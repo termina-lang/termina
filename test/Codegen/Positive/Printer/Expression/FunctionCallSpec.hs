@@ -120,19 +120,19 @@ spec = do
         pack "foo(*p_var)"
     it "Prints the expression: foo(var0 + 1024U : u16)" $ do
       renderExpression functionCallSingleVar0PlusConstant `shouldBe`
-        pack "foo(var0 + 1024U)"
+        pack "foo((uint16_t)(((uint32_t)var0 + 1024U) & 0xFFFFU))"
     it "Prints the expression: foo(var1 + 1024U : u16)" $ do
       renderExpression functionCallSingleBoxVar1PlusConstant `shouldBe`
-        pack "foo(*(uint16_t *)var1.data + 1024U)"
+        pack "foo((uint16_t)(((uint32_t)*(uint16_t *)var1.data + 1024U) & 0xFFFFU))"
     it "Prints the expression: foo(var0 + boxVar1)" $ do
       renderExpression functionCallSingleVar0PlusVar1 `shouldBe`
-        pack "foo(var0 + *(uint16_t *)var1.data)"
+        pack "foo((uint16_t)(((uint32_t)var0 + *(uint16_t *)var1.data) & 0xFFFFU))"
     it "Prints the expression: foo(*p_var + 1024U : u16)" $ do
       renderExpression functionCallSingleDerefpVarPlusConstant `shouldBe`
-        pack "foo(*p_var + 1024U)"
+        pack "foo((uint16_t)(((uint32_t)*p_var + 1024U) & 0xFFFFU))"
     it "Prints the expression: foo(*p_var + *p_boxVar3)" $ do
       renderExpression functionCallSingleDerefpVarPlusDerefRefVar1 `shouldBe`
-        pack "foo(*p_var + *(uint16_t *)var1.data)"
+        pack "foo((uint16_t)(((uint32_t)*p_var + *(uint16_t *)var1.data) & 0xFFFFU))"
     it "Prints the expression: foo(&array0)" $ do
       renderExpression functionCallSingleRefArray0 `shouldBe`
         pack "foo(array0)"
@@ -145,9 +145,11 @@ spec = do
   describe "Pretty printing function call expressions with multiple parameters" $ do
     it "Prints the expression: foo2(var0 + 1024U, var0 + var1)" $ do
       renderExpression call2Parameters `shouldBe`
-        pack "foo2(var0 + 1024U, var0 + *(uint16_t *)var1.data)"
+        pack ("foo2((uint16_t)(((uint32_t)var0 + 1024U) & 0xFFFFU),\n     " ++
+              "(uint16_t)(((uint32_t)var0 + *(uint16_t *)var1.data) & 0xFFFFU))")
     it "Prints the expression: foo4(boxArray0, &boxVar1, foo(var0), foo2(var0 + 1024U, var0 + boxVar1))" $ do
       renderExpression call3Parameters `shouldBe`
         pack (
           "foo4(boxArray0, (uint16_t *)var1.data, foo(var0),\n     " ++
-          "foo2(var0 + 1024U, var0 + *(uint16_t *)var1.data))")
+          "foo2((uint16_t)(((uint32_t)var0 + 1024U) & 0xFFFFU),\n          " ++
+          "(uint16_t)(((uint32_t)var0 + *(uint16_t *)var1.data) & 0xFFFFU)))")

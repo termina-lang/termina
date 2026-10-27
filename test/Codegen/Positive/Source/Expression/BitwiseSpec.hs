@@ -47,13 +47,15 @@ spec = do
               "\n" ++
               "    uint16_t bar16 = 0U;\n" ++ 
               "\n" ++
-              "    bar16 = foo << 8U;\n" ++
+              "    bar16 = (uint16_t)((uint32_t)foo << 8U & 0xFFFFU);\n" ++
               "\n" ++
-              "    bar8 = (uint8_t)8U << termina__check__shift_amount(8U, foo);\n" ++ 
+              "    bar8 = (uint8_t)((uint32_t)8U << termina__check__shift_amount(8U,\n" ++
+              Prelude.replicate 66 ' ' ++ "foo) & 0xFFU);\n" ++
               "\n" ++
-              "    bar16 = foo >> 8U;\n" ++ 
+              "    bar16 = foo >> 8U;\n" ++
               "\n" ++
-              "    bar8 = (uint8_t)8U << termina__check__shift_amount(8U, foo);\n" ++
+              "    bar8 = (uint8_t)((uint32_t)8U << termina__check__shift_amount(8U,\n" ++
+              Prelude.replicate 66 ' ' ++ "foo) & 0xFFU);\n" ++
               "\n" ++
               "    bar16 = foo & 1024U;\n" ++
               "\n" ++
@@ -67,7 +69,8 @@ spec = do
               "\n" ++
               "    bar16 = 1024U ^ foo;\n" ++
               "\n" ++
-              "    bar16 = (uint16_t)1U << termina__check__shift_amount(16U, foo);\n" ++
+              "    bar16 = (uint16_t)((uint32_t)1U << termina__check__shift_amount(16U,\n" ++
+              Prelude.replicate 68 ' ' ++ "foo) & 0xFFFFU);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

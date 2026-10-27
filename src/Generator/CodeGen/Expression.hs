@@ -282,39 +282,36 @@ castBinOpToOwnType loc expr cExpr =
 
     castOperation op = do
         plt <- gets targetPlatform
-        if productLeavesInt plt op cExpr then
-            -- | multiplyInUnsignedInt has already cast the product to its type.
+        if inUnsignedInt plt op (getCExprType cExpr) then
+            -- | operateInUnsignedInt has already brought the result to its type.
             return cExpr
-        else if widens op then
-            castToOwnType loc (dropBitsAbove plt cExpr)
         else
             castToOwnType loc cExpr
 
--- | Whether the product of two operands of this unsigned type can leave the
--- range of the signed int they are promoted to, which is undefined in C.
-productLeavesInt :: Platform -> Op -> CExpression -> Bool
-productLeavesInt plt Multiplication cExpr =
-    case getCExprType cExpr of
-        CTInt size Unsigned _ ->
-            let width = intSizeWidth size in
-            width < intWidth plt && 2 * width >= intWidth plt
+-- | Whether an operation is carried out in the unsigned type as wide as the int
+-- of the platform: one whose result can need more bits than its operands hold,
+-- on an unsigned type narrower than int, which C would promote to a signed int.
+inUnsignedInt :: Platform -> Op -> CType -> Bool
+inUnsignedInt plt op cType =
+    case cType of
+        CTInt size Unsigned _ -> widens op && intSizeWidth size < intWidth plt
         _ -> False
-productLeavesInt _ _ _ = False
 
--- | Multiplies in the unsigned type as wide as the int of the platform, so that
--- the operation is carried out without promotion to a signed int, and brings
--- the product back to the type of the operands. Converting one operand is
--- enough, since the usual arithmetic conversions convert the other one.
-multiplyInUnsignedInt :: Platform -> CExpression -> CExpression -> Location -> CExpression
-multiplyInUnsignedInt plt cLeft cRight loc =
-    let ownType = getCExprType cLeft
-        uintType = CTInt (intSizeOfWidth (intWidth plt)) Unsigned noqual
-        cProduct = (cast uintType cLeft @* cRight) @: uintType |>> loc
+-- | Carries out the operation in the unsigned type as wide as the int of the
+-- platform, so that it is not promoted to a signed int and a product cannot
+-- overflow it, drops the bits that the type of the operands does not hold and
+-- brings the result back to that type. Converting the left operand is enough:
+-- the usual arithmetic conversions convert the right one, and the type of a
+-- shift is the one of its left operand.
+operateInUnsignedInt :: Platform -> Op -> CExpression -> CExpression -> Location -> CExpression
+operateInUnsignedInt plt op cLeft cRight loc =
+    let uintType = CTInt (intSizeOfWidth (intWidth plt)) Unsigned noqual
+        cResult = binOp (cBinOp op) (cast uintType cLeft) cRight @: uintType |>> loc
     in
-    case ownType of
+    case getCExprType cLeft of
         CTInt size Unsigned _ ->
-            cast (CTInt size Unsigned noqual) (maskToWidth size cProduct)
-        _ -> cProduct
+            cast (CTInt size Unsigned noqual) (maskToWidth size cResult) |>> loc
+        _ -> cResult
 
 -- | The run-time check of an integer operation, for an operation that the
 -- elaboration left checked. A signed operation goes to the function of the
@@ -377,23 +374,10 @@ widens Multiplication = True
 widens BitwiseLeftShift = True
 widens _ = False
 
--- | Drops the bits that the width of the type does not hold, which is what an
--- operation on a type narrower than the @int@ of the platform means: C
--- promotes the operands of such a type, so the operation is carried out in
--- @int@ and the result comes back with the bits above the width still in it.
--- Masking them off says that they are dropped and leaves a value that provably
--- fits the type, where the cast alone would be a conversion that an analyser
--- reads as losing them. A type as wide as @int@, or wider, is not promoted and
--- wraps on its own, and a signed type is left alone, since dropping the bits is
--- not the value the operation gives.
-dropBitsAbove :: Platform -> CExpression -> CExpression
-dropBitsAbove plt cExpr = case getCExprType cExpr of
-    CTInt size Unsigned _ ->
-        if intSizeWidth size < intWidth plt then maskToWidth size cExpr else cExpr
-    _ -> cExpr
-
 -- | Masks an integer C expression with the bits of the given width, keeping the
--- type of the expression.
+-- type of the expression. Masking says that the bits above the width are
+-- dropped and leaves a value that provably fits the type, where the cast alone
+-- would be a conversion that an analyser reads as losing them.
 maskToWidth :: CIntSize -> CExpression -> CExpression
 maskToWidth size cExpr =
     let cType = getCExprType cExpr
@@ -448,35 +432,33 @@ genBinOp checked op left right ann =
             -- is truncated to the correct type
             cLeft <- genExpression left >>= castBinOpToOwnType loc left
             cRight <- genExpression right >>= castBinOpToOwnType loc right
+            plt <- gets targetPlatform
             -- | The type of a shift is the one of its left operand. A constant
             -- left operand is cast to its type, so that the type written in the
             -- source is the one of the shift, regardless of the value.
             let castShiftConstant =
-                    case left of
-                        Constant {} -> castToOwnType loc cLeft
+                    case (op, left) of
+                        (BitwiseLeftShift, Constant {}) -> castToOwnType loc cLeft
+                        (BitwiseRightShift, Constant {}) -> castToOwnType loc cLeft
                         _ -> return cLeft
-            cLeft' <- case op of
-                BitwiseLeftShift  -> castShiftConstant
-                BitwiseRightShift -> castShiftConstant
-                _ -> return cLeft
             let boundShift = do
                     leftTy <- getExprType left
-                    plt <- gets targetPlatform
                     let cFuncType = CTFunction size_t [_const size_t, _const size_t]
                         cWidth = dec (shiftWidth plt leftTy) @: size_t |>> loc
                     return $ ("termina__check__shift_amount" @: cFuncType |>> loc)
                         @@ [cWidth, cRight] |>> loc
             cRight' <- case op of
-                BitwiseLeftShift | checked -> boundShift
-                BitwiseRightShift | checked -> boundShift
+                BitwiseLeftShift -> if checked then boundShift else return cRight
+                BitwiseRightShift -> if checked then boundShift else return cRight
                 _ -> return cRight
-            plt <- gets targetPlatform
-            case (if checked then checkedArithmetic op cLeft' cRight' loc else Nothing) of
+            case (if checked then checkedArithmetic op cLeft cRight' loc else Nothing) of
                 Just cChecked -> return cChecked
                 Nothing ->
-                    if productLeavesInt plt op cLeft' then
-                        return $ multiplyInUnsignedInt plt cLeft' cRight' loc
-                    else
+                    -- | operateInUnsignedInt converts the left operand, a constant included.
+                    if inUnsignedInt plt op (getCExprType cLeft) then
+                        return $ operateInUnsignedInt plt op cLeft cRight' loc
+                    else do
+                        cLeft' <- castShiftConstant
                         return $ binOp (cBinOp op) cLeft' cRight' @: getCExprType cLeft |>> loc
 
   where
