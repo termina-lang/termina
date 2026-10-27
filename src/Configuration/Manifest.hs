@@ -17,6 +17,7 @@ module Configuration.Manifest (
     knownManifestVersions,
     defaultTestLogSize,
     parseManifest,
+    decodeManifest,
     decodeManifestFile,
     checkLayout,
     Deployment(..),
@@ -37,6 +38,7 @@ module Configuration.Manifest (
 import Control.Monad
 import qualified Data.Aeson.Key as K
 import qualified Data.Aeson.KeyMap as KM
+import qualified Data.ByteString as BS
 import Data.Char (isAsciiLower, isDigit)
 import Data.List (intercalate, isPrefixOf, nub, sort, stripPrefix, (\\))
 import qualified Data.Map.Strict as M
@@ -134,12 +136,16 @@ parseManifest v = do
         mVersion <- maybe (return Nothing) (withObject "project" (.:? "manifest-version")) mProject
         maybe (fail "the manifest has no project.manifest-version") return mVersion
 
+-- | Parse the bytes of a manifest.
+decodeManifest :: BS.ByteString -> Either String Manifest
+decodeManifest = fromYaml . decodeEither'
+
+-- | Parse the manifest in a file; a missing file is an error, not an exception.
 decodeManifestFile :: FilePath -> IO (Either String Manifest)
-decodeManifestFile path = do
-    result <- decodeFileEither path
-    return $ case result of
-        Left err -> Left (prettyPrintParseException err)
-        Right v -> parseManifest v
+decodeManifestFile path = fromYaml <$> decodeFileEither path
+
+fromYaml :: Either ParseException Value -> Either String Manifest
+fromYaml = either (Left . prettyPrintParseException) parseManifest
 
 -- | Fail on a field that the object does not admit, suggesting the admitted
 -- one closest to it.

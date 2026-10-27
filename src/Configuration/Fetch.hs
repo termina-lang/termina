@@ -6,6 +6,7 @@
 module Configuration.Fetch (
     FetchError(..),
     FetchedFile(..),
+    Fetched(..),
     prefetchDir,
     resolveTag,
     fetchTag,
@@ -16,6 +17,7 @@ import Control.Concurrent.Async (withAsync, wait)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BC
 import Data.List (isInfixOf)
+import Data.Maybe (isJust)
 import qualified Data.Text as T
 import System.Directory
 import System.Environment (getEnvironment)
@@ -25,7 +27,7 @@ import System.IO
 import System.IO.Temp (withSystemTempDirectory)
 import System.Process
 
-import Configuration.Lock (normalizeUrl)
+import Configuration.Lock (normalizedFolder)
 
 data FetchError =
     -- | The repository has no such tag.
@@ -52,7 +54,22 @@ data FetchedFile = FetchedFile {
 -- | The folder where the user may leave a clone of a package for the tool to
 -- take instead of fetching it.
 prefetchDir :: FilePath -> T.Text -> FilePath
-prefetchDir root url = root </> ".termina" </> "fetch" </> joinPath (T.unpack <$> T.splitOn "/" (normalizeUrl url))
+prefetchDir root url = root </> ".termina" </> "fetch" </> normalizedFolder url
+
+-- | The clone that the user left in the prefetch folder, if any.
+prefetchedClone :: FilePath -> T.Text -> IO (Maybe FilePath)
+prefetchedClone root url = do
+    let local = prefetchDir root url
+    exists <- doesDirectoryExist local
+    return (if exists then Just local else Nothing)
+
+-- | What a fetch brought: the commit of the tag, its files, and whether they
+-- came from the clone of the prefetch folder.
+data Fetched = Fetched {
+    fetchedCommit :: !T.Text,
+    fetchedFiles :: ![FetchedFile],
+    fetchedFromPrefetch :: !Bool
+  } deriving (Eq, Show)
 
 -- | Git in the C locale, so that its errors are in English whatever the
 -- language of the user, and can be told apart.
@@ -89,28 +106,39 @@ resolveTag url tag = do
 -- | The commit of a tag and its files. The commit comes from the clone in the
 -- prefetch folder of the project when there is one, and from the repository
 -- otherwise.
-fetchTag :: FilePath -> T.Text -> T.Text -> IO (Either FetchError (T.Text, [FetchedFile]))
+fetchTag :: FilePath -> T.Text -> T.Text -> IO (Either FetchError Fetched)
 fetchTag root url tag = do
-    let local = prefetchDir root url
-    prefetched <- doesDirectoryExist local
-    commit <- if prefetched
-        then either (const (Left (TagNotFound url tag))) (Right . T.pack . takeWhile (`notElem` ("\r\n" :: String)))
-            <$> git url ["-C", local, "rev-parse", "--verify", "-q", "refs/tags/" ++ T.unpack tag ++ "^{commit}"]
-        else resolveTag url tag
+    clone <- prefetchedClone root url
+    commit <- maybe (resolveTag url tag) (\local -> localCommit url tag local (tagRef tag)) clone
     case commit of
         Left err -> return (Left err)
-        Right sha -> fmap ((,) sha) <$> fetchPackage root url tag sha
+        Right sha -> fmap (\files -> Fetched sha files (isJust clone)) <$> fetchCommit clone url tag sha
 
 -- | The files of the commit of a tag, which has to be the expected one. A
 -- clone in the prefetch folder of the project is taken instead of the
 -- repository when there is one.
 fetchPackage :: FilePath -> T.Text -> T.Text -> T.Text -> IO (Either FetchError [FetchedFile])
 fetchPackage root url tag expected = do
-    let local = prefetchDir root url
-    prefetched <- doesDirectoryExist local
-    if prefetched
-        then readCommit local ("refs/tags/" ++ T.unpack tag ++ "^{commit}")
-        else withSystemTempDirectory "termina-fetch" $ \tmp -> do
+    clone <- prefetchedClone root url
+    fetchCommit clone url tag expected
+
+tagRef :: T.Text -> String
+tagRef tag = "refs/tags/" ++ T.unpack tag ++ "^{commit}"
+
+-- | The commit that a reference names in a local repository; one it does
+-- not have is a tag that is not there.
+localCommit :: T.Text -> T.Text -> FilePath -> String -> IO (Either FetchError T.Text)
+localCommit url tag repo rev =
+    either (const (Left (TagNotFound url tag))) (Right . T.pack . takeWhile (`notElem` ("\r\n" :: String)))
+        <$> git url ["-C", repo, "rev-parse", "--verify", "-q", rev]
+
+-- | The files of the expected commit of a tag, from a local clone or, without
+-- one, from a shallow fetch of the repository into a temporary folder.
+fetchCommit :: Maybe FilePath -> T.Text -> T.Text -> T.Text -> IO (Either FetchError [FetchedFile])
+fetchCommit clone url tag expected =
+    case clone of
+        Just local -> readCommit local (tagRef tag)
+        Nothing -> withSystemTempDirectory "termina-fetch" $ \tmp -> do
             initialized <- git url ["init", "--bare", "-q", tmp]
             fetched <- either (return . Left) (const $ git url ["-C", tmp, "fetch", "-q", "--depth", "1", "--no-tags", T.unpack url, "refs/tags/" ++ T.unpack tag]) initialized
             either (return . Left) (const $ readCommit tmp "FETCH_HEAD^{commit}") fetched
@@ -118,14 +146,12 @@ fetchPackage root url tag expected = do
   where
 
     readCommit repo rev = do
-        commit <- git url ["-C", repo, "rev-parse", "--verify", "-q", rev]
+        commit <- localCommit url tag repo rev
         case commit of
-            Left _ -> return (Left (TagNotFound url tag))
-            Right out
-                | T.pack (trim out) /= expected -> return (Left (TagMoved tag expected (T.pack (trim out))))
+            Left err -> return (Left err)
+            Right sha
+                | sha /= expected -> return (Left (TagMoved tag expected sha))
                 | otherwise -> readTree repo (T.unpack expected)
-
-    trim = takeWhile (`notElem` ("\r\n" :: String))
 
     readTree repo sha = do
         listing <- git url ["-C", repo, "ls-tree", "-r", "-z", sha]

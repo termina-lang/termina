@@ -8,6 +8,7 @@ module Configuration.Lock (
     knownLockVersions,
     emptyLock,
     normalizeUrl,
+    normalizedFolder,
     parseLock,
     decodeLockFile,
     renderLock,
@@ -26,6 +27,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Yaml
 import System.Directory
+import System.FilePath (joinPath)
 
 -- | The versions of the format of the lock that this transpiler reads.
 knownLockVersions :: [Int]
@@ -68,6 +70,11 @@ normalizeUrl url = host <> caseOf (stripGit (T.dropWhileEnd (== '/') path))
     caseOf p
         | host `elem` ["github.com", "gitlab.com"] = T.toLower p
         | otherwise = p
+
+-- | The folders named after the normalized URL of a package, such as
+-- "github.com/termina-lang/pus", under "vendor/" or ".termina/fetch/".
+normalizedFolder :: T.Text -> FilePath
+normalizedFolder url = joinPath (T.unpack <$> T.splitOn "/" (normalizeUrl url))
 
 -- | Parse a lock. The version of the format is checked first, as in the
 -- manifest.

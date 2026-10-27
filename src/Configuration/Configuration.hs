@@ -4,6 +4,7 @@ module Configuration.Configuration (
     TerminaConfig(..),
     ExternConfig(..),
     emptyExternConfig,
+    externFiles,
     ProjectProfile(..),
     defaultConfig,
     DeploymentKind(..),
@@ -35,6 +36,11 @@ data ExternConfig = ExternConfig {
 
 emptyExternConfig :: ExternConfig
 emptyExternConfig = ExternConfig [] M.empty
+
+-- | Every file that the section lists, the libraries of all the platforms
+-- included, relative to the "extern" folder.
+externFiles :: ExternConfig -> [FilePath]
+externFiles extern = externSources extern ++ concat (M.elems (externLibraries extern))
 
 instance FromJSON ExternConfig where
   parseJSON (Object o) =

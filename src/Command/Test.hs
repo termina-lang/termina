@@ -12,6 +12,7 @@ import Command.Common (loadTerminaModule, loadModules)
 import Command.Types
 import Command.Utils
 import Configuration.Manifest
+import Configuration.Namespace (locationLine)
 import Core.AST
 import Modules.Modules
 import Parser.AST
@@ -27,7 +28,7 @@ import qualified Data.Text as T
 import qualified Options.Applicative as O
 import System.Exit
 import System.FilePath
-import Text.Parsec.Pos (sourceLine, sourceName)
+import Text.Parsec.Pos (sourceName)
 
 -- | Data type for the "test" command arguments
 data TestCmdArgs =
@@ -127,10 +128,7 @@ testCases programs = concat <$> mapM casesOf instances
     casesOf (ident, cls) =
         case M.lookup cls testClasses of
             Nothing -> Left $ "the test instance " ++ ident ++ " is of type " ++ cls ++ ", which is not a test class"
-            Just members -> Right [ TestCase ident cname (fileOf ann) (lineOf ann) | ClassCase _ cname _ _ ann <- members ]
+            Just members -> Right [ TestCase ident cname (fileOf ann) (locationLine ann) | ClassCase _ cname _ _ ann <- members ]
 
     fileOf (Position _ start _) = sourceName start
     fileOf _ = ""
-
-    lineOf (Position _ start _) = sourceLine start
-    lineOf _ = 0

@@ -11,12 +11,12 @@ import Data.Char (toLower)
 import Data.List (find, isPrefixOf, sortOn, groupBy)
 import Data.Function (on)
 import qualified Data.Map.Strict as M
-import qualified Data.Text as T
-import Data.Yaml (decodeEither', prettyPrintParseException)
+import System.FilePath (splitDirectories)
 
 import Configuration.Configuration
 import Configuration.Fetch (FetchedFile(..))
 import Configuration.Manifest
+import Configuration.Prefix
 import Configuration.Vendor (isVendored)
 
 -- | Check the files of the commit of a package, and give its manifest or
@@ -25,7 +25,7 @@ validatePackage :: [FetchedFile] -> Either [String] Manifest
 validatePackage files =
     case find ((== "termina.yaml") . fetchedPath) files of
         Nothing -> Left ["the package has no termina.yaml"]
-        Just yaml -> case either (Left . prettyPrintParseException) parseManifest (decodeEither' (fetchedBytes yaml)) of
+        Just yaml -> case decodeManifest (fetchedBytes yaml) of
             Left err -> Left ["termina.yaml: " ++ err]
             Right manifest -> case manifestNature manifest of
                 Application _ -> Left ["the package is an application: it has no exports, so it cannot be a dependency"]
@@ -39,9 +39,7 @@ validatePackage files =
 
     modes = M.fromList [(fetchedPath f, fetchedMode f) | f <- files]
 
-    externPaths manifest =
-        let extern = manifestExtern manifest
-        in externSources extern ++ concat (M.elems (externLibraries extern))
+    externPaths = externFiles . manifestExtern
 
     -- | A path dependency only exists on the machine of the author.
     pathErrors manifest =
@@ -56,7 +54,7 @@ validatePackage files =
 
         check p
             | "/" `isPrefixOf` p = ["extern/" ++ p ++ ": the extern section lists an absolute path"]
-            | ".." `elem` splitPath p =["extern/" ++ p ++ ": the extern section lists a path outside extern/"]
+            | ".." `elem` splitDirectories p = ["extern/" ++ p ++ ": the extern section lists a path outside extern/"]
             | M.member ("extern/" ++ p) modes = []
             | otherwise = ["extern/" ++ p ++ ": the extern section lists a file that the package does not have"]
 
@@ -70,12 +68,13 @@ validatePackage files =
 
       where
 
-        bases = ["src/" ++ T.unpack (T.intercalate "/" segments) | Prefix segments <- prefixes]
+        bases = map prefixFolder prefixes
 
         targets = "termina.yaml" : map ("extern/" ++) (externPaths manifest) ++ map (++ ".fin") bases ++ bases
 
+        -- A link is the file itself, a folder on the way to it, or lies under a prefix.
         related path target = path == target || (path ++ "/") `isPrefixOf` target
-            || any (\base -> (base ++ "/") `isPrefixOf` path) bases
+            || any (`ownsPath` path) prefixes
 
     -- | Two copied paths that differ only in case would be one file on
     -- macOS and Windows.
@@ -87,7 +86,3 @@ validatePackage files =
     joinAnd [a, b] = [a, "and", b]
     joinAnd (a : rest) = (a ++ ",") : joinAnd rest
     joinAnd [] = []
-
-    splitPath p = case break (== '/') p of
-        (s, []) -> [s]
-        (s, _ : rest) -> s : splitPath rest

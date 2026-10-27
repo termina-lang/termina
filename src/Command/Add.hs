@@ -15,7 +15,6 @@ import qualified Data.Map.Strict as M
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
-import Data.Yaml (decodeEither', prettyPrintParseException)
 import Options.Applicative
 import System.Directory
 import System.Exit
@@ -87,8 +86,7 @@ addDependency place root url tag mTest = do
 
     key = normalizeUrl url
 
-    parse yaml = either (Left . ("termina.yaml: " ++)) Right
-        (either (Left . prettyPrintParseException) parseManifest (decodeEither' yaml))
+    parse = either (Left . ("termina.yaml: " ++)) Right . decodeManifest
 
     utf8 = TE.encodeUtf8 . T.pack
 
@@ -136,14 +134,13 @@ addDependency place root url tag mTest = do
                     Right m -> Right (Obtained (lockedCommit locked) m [FetchedFile p "100644" b | (p, b) <- files])
 
     fromGit used u t = do
-        prefetched <- doesDirectoryExist (prefetchDir root u)
         fetched <- fetchTag root u t
         case fetched of
             Left err -> return (Left (FetchFailed err))
-            Right (sha, files) -> case validatePackage files of
+            Right (Fetched sha files fromPrefetch) -> case validatePackage files of
                 Left errs -> return (Left (InvalidPackage errs))
                 Right m -> do
-                    when prefetched (modifyIORef used (prefetchDir root u :))
+                    when fromPrefetch (modifyIORef used (prefetchDir root u :))
                     return (Right (Obtained sha m files))
 
     describeErrors errs =

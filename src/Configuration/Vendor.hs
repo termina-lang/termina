@@ -16,8 +16,7 @@ import Control.Monad
 import qualified Crypto.Hash.SHA256 as SHA256
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BC
-import Data.List (intercalate, isPrefixOf, isSuffixOf, sortOn)
-import qualified Data.Map.Strict as M
+import Data.List (isSuffixOf, sortOn)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import System.Directory
@@ -26,6 +25,7 @@ import System.FilePath
 import Configuration.Configuration
 import Configuration.Lock
 import Configuration.Manifest
+import Configuration.Prefix
 
 -- | A file of a package: its path from the root of the package, with "/"
 -- separators, and its bytes.
@@ -37,28 +37,16 @@ vendorDir root = root </> "vendor"
 
 -- | The folder of a package in "vendor/", named after its normalized URL.
 packageDir :: FilePath -> T.Text -> FilePath
-packageDir root url = vendorDir root </> joinPath (T.unpack <$> T.splitOn "/" (normalizeUrl url))
+packageDir root url = vendorDir root </> normalizedFolder url
 
 -- | Whether a file of a package goes to "vendor/": its "termina.yaml", the
 -- modules of its exported prefixes and the files that its "extern" section
 -- lists.
 isVendored :: Manifest -> String -> Bool
 isVendored manifest path =
-    path == "termina.yaml" || any exported prefixes || path `elem` externFiles
-
-  where
-
-    prefixes = case manifestNature manifest of
-        Library ps -> ps
-        Application _ -> []
-
-    exported (Prefix segments) =
-        let base = "src/" ++ intercalate "/" (map T.unpack segments)
-        in path == base ++ ".fin" || ((base ++ "/") `isPrefixOf` path && ".fin" `isSuffixOf` path)
-
-    extern = manifestExtern manifest
-
-    externFiles = map ("extern/" ++) (externSources extern ++ concat (M.elems (externLibraries extern)))
+    path == "termina.yaml"
+        || (".fin" `isSuffixOf` path && any (`ownsPath` path) (manifestPrefixes manifest))
+        || path `elem` map ("extern/" ++) (externFiles (manifestExtern manifest))
 
 -- | The hash of the content of a package: the SHA-256 of the lines that
 -- sha256sum writes for its files, "hex-digest  path", in the byte order of
@@ -86,7 +74,7 @@ writePackage root url files = do
     let dir = packageDir root url
     removePathForcibly dir
     forM_ files $ \(path, bytes) -> do
-        let target = dir </> joinPath (splitOnSlash path)
+        let target = dir </> joinPath (splitDirectories path)
         createDirectoryIfMissing True (takeDirectory target)
         BS.writeFile target bytes
     let attributes = vendorDir root </> ".gitattributes"
@@ -97,8 +85,6 @@ writePackage root url files = do
   where
 
     gitAttributes = "* -text\n"
-
-    splitOnSlash = map T.unpack . T.splitOn "/" . T.pack
 
 -- | The files of a package in "vendor/", to hash them again.
 readPackage :: FilePath -> T.Text -> IO [VendoredFile]

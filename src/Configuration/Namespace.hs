@@ -2,9 +2,10 @@
 module Configuration.Namespace (
     checkExports,
     exportedModules,
-    prefixText,
     hasLibraryPrefix,
-    parseModule
+    parseModule,
+    locationLine,
+    dottedName
 ) where
 
 import Control.Monad
@@ -21,16 +22,13 @@ import Text.Parsec (runParser)
 import Text.Parsec.Pos (sourceLine)
 
 import Configuration.Manifest
+import Configuration.Prefix
 import Core.AST
 import Parser.AST (TerminaModule)
 import Parser.Parsing (terminaModuleParser)
 import Parser.Types (ParserAnn)
 import Semantic.Environment (declaredNames)
 import Utils.Annotations
-
--- | The prefix as it is written in the manifest, such as "drivers.gaisler".
-prefixText :: Prefix -> String
-prefixText (Prefix segments) = T.unpack (T.intercalate (T.pack ".") segments)
 
 -- | A module of the "src" of the project, by the segments of its name, with
 -- its file and its tree, if it parses.
@@ -63,39 +61,35 @@ checkExports root manifest =
     overlapErrors prefixes =
         [ "the prefixes " ++ prefixText outer ++ " and " ++ prefixText inner ++ " of exports overlap: "
             ++ prefixText outer ++ " contains " ++ prefixText inner
-        | (a : rest) <- tails prefixes, b <- rest, (outer, inner) <- [(a, b), (b, a)], contains outer inner ]
+        | (a : rest) <- tails prefixes, b <- rest, overlaps a b
+        , let (outer, inner) = if ownsModule a (prefixSegments b) then (a, b) else (b, a) ]
 
-    contains (Prefix outer) (Prefix inner) = outer `isPrefixOf` inner && outer /= inner
-
-    -- | A prefix owns the module that it names and everything under the
-    -- folder of the same name.
-    emptyErrors sources p@(Prefix segments) =
-        let path = "src" </> joinPath (map T.unpack segments) in
+    emptyErrors sources p =
         ["the prefix " ++ prefixText p ++ " of exports has no module: there is no "
-            ++ path <.> "fin" ++ " and no .fin under " ++ path ++ "/"
-        | not (any (\m -> map T.unpack segments `isPrefixOf` moduleSegments m) sources)]
+            ++ prefixFolder p ++ ".fin and no .fin under " ++ prefixFolder p ++ "/"
+        | not (any (ownsModule p . moduleSegments) sources)]
 
     -- | An exported module has to import only exported modules of the
     -- library, and give every name the prefix of the library. One that does
     -- not parse is left to the type check of the library, which loads it and
     -- reports the error of the parser.
     exportedErrors prefixes sources m =
-        case owner prefixes (moduleSegments m) of
+        case find (`ownsModule` moduleSegments m) prefixes of
             Nothing -> []
-            Just (Prefix segments) -> case moduleParsed m of
+            Just p -> case moduleParsed m of
                 Nothing -> []
-                Just ast -> importErrors prefixes sources m ast ++ nameErrors (T.unpack (last segments)) m ast
+                Just ast -> importErrors prefixes sources m ast ++ nameErrors (last (prefixSegments p)) m ast
                     ++ testClassErrors m ast
 
     importErrors prefixes sources m ast =
-        [ at m (lineOf ann) ++ "the exported module " ++ dotted (moduleSegments m) ++ " imports "
-            ++ dotted imported ++ ", which is not exported"
+        [ at m (locationLine ann) ++ "the exported module " ++ dottedName (moduleSegments m) ++ " imports "
+            ++ dottedName imported ++ ", which is not exported"
         | ModuleImport imported ann <- modules ast
         , imported `S.member` moduleSet sources
-        , owner prefixes imported == Nothing ]
+        , not (any (`ownsModule` imported) prefixes) ]
 
     nameErrors segment m ast =
-        [ at m (lineOf loc) ++ "the name " ++ name ++ " of the exported module " ++ dotted (moduleSegments m)
+        [ at m (locationLine loc) ++ "the name " ++ name ++ " of the exported module " ++ dottedName (moduleSegments m)
             ++ " does not start with the prefix " ++ segment ++ " (" ++ segment ++ "_..., "
             ++ map toUpper segment ++ "_..., " ++ pascal segment ++ "...)"
         | (name, loc) <- M.toList (declaredNames (frags ast))
@@ -104,20 +98,13 @@ checkExports root manifest =
     -- | A test class holds the cases of one test, so a library does not
     -- publish it: what tests reuse is ordinary code.
     testClassErrors m ast =
-        [ at m (lineOf loc) ++ "the exported module " ++ dotted (moduleSegments m) ++ " declares the test class "
+        [ at m (locationLine loc) ++ "the exported module " ++ dottedName (moduleSegments m) ++ " declares the test class "
             ++ ident ++ ", which only a test or a module that is not exported may hold"
         | TypeDefinition (Class TestClass ident _ _ _) loc <- frags ast ]
 
     moduleSet sources = S.fromList (map moduleSegments sources)
 
-    owner prefixes ms = find (\(Prefix segments) -> map T.unpack segments `isPrefixOf` ms) prefixes
-
     at m line = moduleFile m ++ ":" ++ show line ++ ": "
-
-    lineOf (Position _ start _) = sourceLine start
-    lineOf _ = 0
-
-    dotted = intercalate "."
 
     pascal = concatMap capitalize . splitOn '_'
 
@@ -133,12 +120,20 @@ checkExports root manifest =
 -- application.
 exportedModules :: FilePath -> Manifest -> IO [QualifiedName]
 exportedModules root manifest =
-    case manifestNature manifest of
-        Application _ -> return []
-        Library prefixes -> do
+    case manifestPrefixes manifest of
+        [] -> return []
+        prefixes -> do
             sources <- sourceModules root
-            return [ joinPath (moduleSegments m) | m <- sources
-                   , any (\(Prefix segments) -> map T.unpack segments `isPrefixOf` moduleSegments m) prefixes ]
+            return [joinPath (moduleSegments m) | m <- sources, any (`ownsModule` moduleSegments m) prefixes]
+
+-- | The line where a location starts, or 0 when it has none.
+locationLine :: Location -> Int
+locationLine (Position _ start _) = sourceLine start
+locationLine _ = 0
+
+-- | A module name with dots, such as "pus.service1".
+dottedName :: [String] -> String
+dottedName = intercalate "."
 
 -- | Whether a name starts with the last segment of the prefix of its library:
 -- in snake case or upper case, the segment and "_" ("char_dev_send",
