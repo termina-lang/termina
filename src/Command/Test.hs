@@ -13,6 +13,8 @@ import Command.Types
 import Command.Utils
 import Configuration.Manifest
 import Core.AST
+import Core.TestCases (NumberedCase(caseLocation), numberCases)
+import qualified Core.TestCases as NC
 import Modules.Modules
 import Parser.AST
 import Parser.Types (ParserAnn)
@@ -110,24 +112,22 @@ loadTestCases testName = do
     either (die . errorMessage) return $
       testCases [parsedAST . metadata $ parsedProject M.! m | m <- orderedModules]
 
--- | The cases of a test, from its modules in the order in which they are
--- type checked: for each test instance in the order of declaration, the cases
--- of its class in the order of declaration.
+-- | The cases of a test in the order in which the harness numbers them.
 testCases :: [AnnotatedProgram ParserAnn] -> Either String [TestCase]
-testCases programs = concat <$> mapM casesOf instances
+testCases programs =
+    case numberCases instances testClasses of
+        Left (ident, cls) -> Left $ "the test instance " ++ ident ++ " is of type " ++ cls ++ ", which is not a test class"
+        Right cases -> Right [ TestCase (NC.caseInstance c) (NC.caseName c) (fileOf loc) (lineOf loc)
+                             | c <- cases, let loc = caseLocation c ]
 
   where
 
     elements = concat programs
 
-    instances = [ (ident, cls) | GlobalDeclaration (Test ident (TSDefinedType cls []) _ _ _) <- elements ]
+    instances = [ (ident, cls, ann) | GlobalDeclaration (Test ident (TSDefinedType cls []) _ _ ann) <- elements ]
 
-    testClasses = M.fromList [ (ident, members) | TypeDefinition (Class TestClass ident members _ _) _ <- elements ]
-
-    casesOf (ident, cls) =
-        case M.lookup cls testClasses of
-            Nothing -> Left $ "the test instance " ++ ident ++ " is of type " ++ cls ++ ", which is not a test class"
-            Just members -> Right [ TestCase ident cname (fileOf ann) (lineOf ann) | ClassCase _ cname _ _ ann <- members ]
+    testClasses = M.fromList [ (ident, [ (cname, ann) | ClassCase _ cname _ _ ann <- members ])
+                             | TypeDefinition (Class TestClass ident members _ _) _ <- elements ]
 
     fileOf (Position _ start _) = sourceName start
     fileOf _ = ""

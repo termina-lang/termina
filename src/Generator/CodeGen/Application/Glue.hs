@@ -19,7 +19,7 @@ import Generator.CodeGen.Application.Utils
 import Generator.CodeGen.Types
 import Semantic.AST
 import Control.Monad (forM, when)
-import Data.List (find, sortOn)
+import Data.List (find)
 import Data.Maybe (fromMaybe)
 import Generator.CodeGen.Expression
 import Generator.Monadic
@@ -27,6 +27,7 @@ import Control.Monad.State
 import qualified Data.Set as S
 import Utils.Annotations
 import Core.Utils (harnessTaskPriority)
+import Core.TestCases (NumberedCase(..))
 
 -- | Body of an initialization function that can fail, given the declarations of
 -- the local variables that its steps share and the steps. The status is an
@@ -656,28 +657,21 @@ genTestHarness progArchitecture = do
                 "port_id" @.= (dec 0 @: size_t)
             ] @.: cEventType
         cEventObj = eventParam @: cEventType
-    cCases <- concat <$> mapM casesOf (sortOn (getLocation . getAnnotation) (M.elems (testInstances progArchitecture)))
+    cCases <- case architectureCases progArchitecture of
+        Left (_, cls) -> throwError $ InternalError $ "Unknown test class: " ++ show cls
+        Right cases -> return cases
     return [pre_cr $ static_function testHarnessFunction ["arg" @: (_const . ptr $ void)] @-> void $
             trail_cr . block $
                 genDiscardedParameters [("arg", _const . ptr $ void)]
                 ++ [pre_cr $ var eventParam (_const cEventType) @:= cEvent]
-                ++ zipWith (genCaseBlock cEventObj) [1 ..] cCases
+                ++ map (genCaseBlock cEventObj) cCases
                 ++ [pre_cr $ termina__test__end @@ []]
         ]
 
     where
 
-        -- | The instances and the cases go in the order of declaration, all of them in the test.fin
-        casesOf :: TPTest SemanticAnn -> CGenerator [(Identifier, Identifier, Identifier)]
-        casesOf test =
-            case M.lookup (testInstanceClass test) (testClasses progArchitecture) of
-                Just cls -> return
-                    [ (testInstanceName test, testInstanceClass test, caseId)
-                    | TPFunction caseId _ _ _ _ <- sortOn (\(TPFunction _ _ _ _ ann) -> getLocation ann) (M.elems (classCases cls)) ]
-                Nothing -> throwError $ InternalError $ "Unknown test class: " ++ show (testInstanceClass test)
-
-        genCaseBlock :: CObject -> Integer -> (Identifier, Identifier, Identifier) -> CCompoundBlockItem
-        genCaseBlock cEventObj n (instanceId, classId, caseId) =
+        genCaseBlock :: CObject -> NumberedCase -> CCompoundBlockItem
+        genCaseBlock cEventObj (NumberedCase n instanceId classId caseId _) =
             let cCase = dec n @: uint16_t in
             pre_cr $ _if (termina__test__selected @@ [cCase]) $ trail_cr . block $ [
                     pre_cr $ termina__test__case_begin @@ [cCase],

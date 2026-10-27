@@ -14,10 +14,18 @@ import Data.Maybe (catMaybes, isJust)
 import qualified Data.Set as S
 import Utils.Graph (findDisjointPaths, reverseGraph)
 import Control.Monad.State
+import Core.TestCases (NumberedCase, numberCases)
 
 -- | A test with test instances is a unit test, and one without them is concurrent
 isUnitTest :: TerminaProgArch a -> Bool
 isUnitTest tp = not (M.null (testInstances tp))
+
+-- | The numbered cases of a unit test
+architectureCases :: Located a => TerminaProgArch a -> Either (Identifier, Identifier) [NumberedCase]
+architectureCases tp = numberCases instances classes
+  where
+    instances = [ (testInstanceName t, testInstanceClass t, getLocation (getAnnotation t)) | t <- M.elems (testInstances tp) ]
+    classes = M.map (\cls -> [ (name, getLocation ann) | TPFunction name _ _ _ ann <- M.elems (classCases cls) ]) (testClasses tp)
 
 getEmitterIdentifier :: TPEmitter a -> Identifier
 getEmitterIdentifier (TPInterruptEmitter ident _) = ident
