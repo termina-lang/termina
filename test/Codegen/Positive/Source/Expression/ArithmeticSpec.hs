@@ -64,13 +64,13 @@ spec = do
               "    \n" ++
               "    uint16_t foo = 0U;\n" ++ 
               "\n" ++
-              "    foo = foo + 1024U;\n" ++
+              "    foo = (uint16_t)(((uint32_t)foo + 1024U) & 0xFFFFU);\n" ++
               "\n" ++
-              "    foo = 1024U + foo;\n" ++ 
+              "    foo = (uint16_t)(((uint32_t)1024U + foo) & 0xFFFFU);\n" ++
               "\n" ++
-              "    foo = foo - 1024U;\n" ++ 
+              "    foo = (uint16_t)(((uint32_t)foo - 1024U) & 0xFFFFU);\n" ++
               "\n" ++
-              "    foo = 1024U - foo;\n" ++
+              "    foo = (uint16_t)(((uint32_t)1024U - foo) & 0xFFFFU);\n" ++
               "\n" ++
               "    foo = (uint16_t)((uint32_t)foo * 1024U & 0xFFFFU);\n" ++
               "\n" ++
@@ -115,13 +115,13 @@ spec = do
              "    termina__lock_t termina__lock = termina__resource__lock(&termina__ev->owner,\n" ++
              "                                                            &self->_lock_type);\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data + 1024U;\n" ++
+             "    *(uint16_t *)foo.data = (uint16_t)(((uint32_t)*(uint16_t *)foo.data + 1024U) & 0xFFFFU);\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = 1024U + *(uint16_t *)foo.data;\n" ++
+             "    *(uint16_t *)foo.data = (uint16_t)(((uint32_t)1024U + *(uint16_t *)foo.data) & 0xFFFFU);\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data - 1024U;\n" ++
+             "    *(uint16_t *)foo.data = (uint16_t)(((uint32_t)*(uint16_t *)foo.data - 1024U) & 0xFFFFU);\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = 1024U - *(uint16_t *)foo.data;\n" ++
+             "    *(uint16_t *)foo.data = (uint16_t)(((uint32_t)1024U - *(uint16_t *)foo.data) & 0xFFFFU);\n" ++
              "\n" ++
              "    *(uint16_t *)foo.data = (uint16_t)((uint32_t)*(uint16_t *)foo.data * 1024U & 0xFFFFU);\n" ++
              "\n" ++

@@ -37,7 +37,7 @@ spec = do
               "\n" ++ 
               "uint16_t func_test0_0(const uint16_t a) {\n" ++
               "    \n" ++
-              "    return a + 1U;\n" ++
+              "    return (uint16_t)(((uint32_t)a + 1U) & 0xFFFFU);\n" ++
               "\n" ++
               "}\n" ++
               "\n" ++

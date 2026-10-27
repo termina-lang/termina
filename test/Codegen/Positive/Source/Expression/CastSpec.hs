@@ -67,7 +67,7 @@ spec = do
               "                                                              (int32_t)bar_u8),\n" ++
               "                                      (int32_t)bar_u16);\n" ++
               "\n" ++
-              "    bar_u32 = (uint32_t)(uint16_t)((bar_u16 + bar_u16) & 0xFFFFU);\n" ++
+              "    bar_u32 = (uint32_t)(uint16_t)(((uint32_t)bar_u16 + bar_u16) & 0xFFFFU);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

@@ -71,28 +71,28 @@ spec = do
   describe "Pretty printing variable expression" $ do
     it "Prints the expression: var0 + 1024U : u16" $ do
       renderExpression var0PlusConstant `shouldBe`
-        pack "var0 + 1024U"
+        pack "(uint16_t)(((uint32_t)var0 + 1024U) & 0xFFFFU)"
     it "Prints the expression: var1 + 1024U : u16" $ do
       renderExpression var1PlusConstant `shouldBe`
-        pack "*(uint16_t *)var1.data + 1024U"
+        pack "(uint16_t)(((uint32_t)*(uint16_t *)var1.data + 1024U) & 0xFFFFU)"
     it "Prints the expression: 1024 : u16 + var0" $ do
       renderExpression constantPlusVar0 `shouldBe`
-        pack "1024U + var0"
+        pack "(uint16_t)(((uint32_t)1024U + var0) & 0xFFFFU)"
     it "Prints the expression: 1024 : u16 + var1" $ do
       renderExpression constantPlusVar1 `shouldBe`
-        pack "1024U + *(uint16_t *)var1.data"
+        pack "(uint16_t)(((uint32_t)1024U + *(uint16_t *)var1.data) & 0xFFFFU)"
     it "Prints the expression: var0 + var1 : u16" $ do
       renderExpression var0PlusVar1 `shouldBe`
-        pack "var0 + *(uint16_t *)var1.data"
+        pack "(uint16_t)(((uint32_t)var0 + *(uint16_t *)var1.data) & 0xFFFFU)"
     it "Prints the expression: var0 + var1 + 1024U : u16" $ do
       renderExpression var0PlusVar1PlusConstant `shouldBe`
-        pack "(uint16_t)((var0 + *(uint16_t *)var1.data) & 0xFFFFU) + 1024U"
+        pack "(uint16_t)(((uint32_t)(uint16_t)(((uint32_t)var0 + *(uint16_t *)var1.data) & 0xFFFFU) + 1024U) & 0xFFFFU)"
     it "Prints the expression: var0 - 1024 : u16" $ do
       renderExpression var0MinusConstant `shouldBe`
-        pack "var0 - 1024U"
+        pack "(uint16_t)(((uint32_t)var0 - 1024U) & 0xFFFFU)"
     it "Prints the expression: 1024 : u16 - var0" $ do
       renderExpression constantMinusVar0 `shouldBe`
-        pack "1024U - var0"
+        pack "(uint16_t)(((uint32_t)1024U - var0) & 0xFFFFU)"
     it "Prints the expression: var0 * 1024 : u16" $ do
       renderExpression var0MultConstant `shouldBe`
         pack "(uint16_t)((uint32_t)var0 * 1024U & 0xFFFFU)"
