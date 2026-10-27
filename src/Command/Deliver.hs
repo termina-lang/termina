@@ -11,6 +11,7 @@ module Command.Deliver (
 ) where
 
 import Command.Build
+import Command.Update (verifyProject)
 import Command.Utils
 import Configuration.Configuration
 import Configuration.Manifest
@@ -69,7 +70,10 @@ deliverCommand :: DeliverCmdArgs -> IO ()
 deliverCommand (DeliverCmdArgs chatty withTests archive withTrace) = do
     when (withTrace && not archive) $
       dieWithError $ "--with-trace adds a binary to the archive: use it with --archive"
-    manifest <- loadBuildProject chatty
+    -- A deliverable is built from the state in git, which verify checks without writing.
+    place <- currentPlace
+    verifyProject place "." >>= either dieWithFirstError return
+    manifest <- loadBuildProject chatty True
     let hasApp = isJust (appDeployment manifest)
         selection = case (withTests, hasApp) of
             (False, _) -> SelectApp
@@ -97,7 +101,7 @@ deliverDeployment chatty manifest archive withTrace deployment = do
         binary = "bin" </> T.unpack (name config)
     -- | The build with the #line pragmas gives the values of the Makefile,
     -- the dependency files and the binary to compare with
-    modules <- buildDeployment (BuildCmdArgs chatty False Nothing SelectApp Nothing Nothing) deployment
+    modules <- buildDeployment (BuildCmdArgs chatty False Nothing SelectApp Nothing Nothing True) deployment
     info <- deliverableInfo label built
     let value key = M.findWithDefault "" key info
         list key = words (value key)

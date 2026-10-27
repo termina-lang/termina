@@ -7,6 +7,7 @@ import Paths_termina (version)
 import Command.New
 import Command.Add
 import Command.Restore
+import Command.Update
 import Command.Build
 import Command.Deliver
 import Command.Test
@@ -25,6 +26,8 @@ data Command =
     | Sched SchedCmdArgs
     | Add AddCmdArgs
     | Restore RestoreCmdArgs
+    | Update UpdateCmdArgs
+    | Verify VerifyCmdArgs
     deriving Show
 
 newCommandParser :: Parser Command
@@ -38,6 +41,14 @@ addCommandParser = Add
 restoreCommandParser :: Parser Command
 restoreCommandParser = Restore
     <$> restoreCmdArgsParser
+
+updateCommandParser :: Parser Command
+updateCommandParser = Update
+    <$> updateCmdArgsParser
+
+verifyCommandParser :: Parser Command
+verifyCommandParser = Verify
+    <$> verifyCmdArgsParser
 
 generateCommandParser :: Parser Command
 generateCommandParser = Generate
@@ -72,6 +83,8 @@ commandParser = subparser
   ( command "new" (info newCommandParser ( progDesc "Setup a new project" ))
  <> command "add" (info addCommandParser ( progDesc "Add a dependency to the project or to one of its tests" ))
  <> command "restore" (info restoreCommandParser ( progDesc "Bring back the copies in vendor/ that do not match termina.lock" ))
+ <> command "update" (info updateCommandParser ( progDesc "Resolve the tags of termina.yaml again, also those that termina.lock already has" ))
+ <> command "verify" (info verifyCommandParser ( progDesc "Check without network that vendor/ and termina.lock match termina.yaml" ))
  <> command "generate" (info generateCommandParser ( progDesc "Generate the C code and the Makefile of the project" ))
  <> command "build" (info buildCommandParser ( progDesc "Generate and compile the project" ))
  <> command "deliver" (info deliverCommandParser ( progDesc "Build the self-contained deliverable of the project" ))
@@ -102,3 +115,5 @@ main = do
         Sched cmdargs -> schedCommand cmdargs
         Add cmdargs -> addCommand cmdargs
         Restore cmdargs -> restoreCommand cmdargs
+        Update cmdargs -> updateCommand cmdargs
+        Verify cmdargs -> verifyCommand cmdargs

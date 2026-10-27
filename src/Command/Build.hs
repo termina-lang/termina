@@ -8,7 +8,7 @@ module Command.Build (
 import Configuration.Configuration
 import Configuration.Manifest
 import Configuration.Namespace (exportedModules)
-import Command.Dependencies (Sync(..), syncDependencies, describeChange)
+import Command.Dependencies (Fetching(..), Sync(..), syncDependencies, describeChange)
 import Command.Sources (loadSources, localFolders)
 import Configuration.Local (LocalPackage(..), readLocalPackages)
 import Configuration.Lock (Lock(..), LockedPackage(..))
@@ -86,6 +86,7 @@ data BuildCmdArgs =
         Selection
         (Maybe Platform) -- ^ Only the tests on this platform
         (Maybe ProjectProfile) -- ^ Profile of the tests
+        Bool -- ^ Offline: fail instead of fetching when the lock does not match the manifest
     deriving Show
 
 -- | Parser for the "generate" and "build" command arguments
@@ -106,6 +107,8 @@ buildCmdArgsParser = BuildCmdArgs
           ( O.long "profile"
           <> O.metavar "debug|release"
           <> O.help "Profile of the tests (default: the one of the application, debug in a library)"))
+    <*> O.switch (O.long "offline"
+        <> O.help "Fail instead of fetching when termina.lock does not match termina.yaml")
 
   where
 
@@ -313,21 +316,23 @@ genMonadicHeaderFiles params plt monadicTypes = do
 
 -- | The deployments that the arguments select.
 selectedDeployments :: BuildCmdArgs -> IO [Deployment]
-selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile) = do
+selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile offline) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
-    manifest <- loadBuildProject chatty
+    manifest <- loadBuildProject chatty offline
     either dieWithError return $ selectDeployments manifest selection mPlatform mProfile
 
 -- | Load the project for a command that builds: the manifest, the folders, the
 -- prefixes of a library, the lock and vendor/ brought in line with the
--- manifest (each copy that does not change checked against its hash) and,
--- in a library, the types of its exported modules.
-loadBuildProject :: Bool -> IO Manifest
-loadBuildProject chatty = do
+-- manifest (each copy that does not change checked against its hash; offline,
+-- without fetching anything) and, in a library, the types of its exported
+-- modules.
+loadBuildProject :: Bool -> Bool -> IO Manifest
+loadBuildProject chatty offline = do
     manifest <- loadProject >>= either dieWithFirstError return
     lock <- loadLock "." >>= either dieWithFirstError return
     place <- currentPlace
-    Sync changes warnings <- syncDependencies place "termina build" "." manifest lock >>= either dieWithFirstError return
+    Sync changes warnings <- syncDependencies place "termina build" (if offline then Offline else Reuse) True "." manifest lock
+        >>= either dieWithFirstError return
     mapM_ (putStrLn . warnMessage) warnings
     mapM_ (putStrLn . infoMessage . ("termina.lock: " ++) . describeChange) changes
     -- The C of each package will be linked into its own object; until then a package with C cannot be built.
@@ -494,7 +499,7 @@ writeProvenance config modules = do
 -- | Generate the C and the Makefile of a deployment. It gives the modules of
 -- the deployment with their source files.
 generateDeployment :: BuildCmdArgs -> Deployment -> IO [(QualifiedName, FilePath)]
-generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _) deployment = do
+generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _) deployment = do
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
         mainFolder = deploymentMainFolder deployment

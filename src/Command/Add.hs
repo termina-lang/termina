@@ -58,7 +58,7 @@ addDependency place root url tag mTest = do
     case (,) <$> (text >>= either (Left . pure) Right . prepare) <*> lockResult of
         Left errs -> return (Left errs)
         Right ((newText, manifest), lock) -> do
-            synced <- syncDependencies place "termina add" root manifest lock
+            synced <- syncDependencies place "termina add" Reuse True root manifest lock
             case synced of
                 Left errs -> return (Left errs)
                 Right (Sync changes warnings) -> do

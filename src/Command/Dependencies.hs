@@ -4,10 +4,12 @@
 -- the manifest into the lock and "vendor/", and the description of what fails.
 module Command.Dependencies (
     PackageError(..),
+    Fetching(..),
     LockChange(..),
     Sync(..),
     syncDependencies,
     describeChange,
+    describePackageError,
     describeObtainErrors,
     credentialsMessage,
     overrideWarnings
@@ -38,7 +40,21 @@ data PackageError =
     -- | The copy in vendor/ of a locked package is missing or does not match
     -- its hash, and why.
     | VendorMismatch String
+    -- | The package has to be fetched, which the command may not do: the
+    -- tag that the lock has for it, if any.
+    | NeedsNetwork (Maybe T.Text)
   deriving (Eq, Show)
+
+-- | Where the packages of a synchronization come from.
+data Fetching =
+    -- | Only from vendor/: the lock has to have every package with its tag
+    Offline
+    -- | From vendor/ when the lock has the package with the same tag, and
+    -- from its repository otherwise
+    | Reuse
+    -- | From the repository for the packages that the function selects, by
+    -- normalized URL, and as Reuse for the rest
+    | Refresh (T.Text -> Bool)
 
 -- | How the lock changes: a package that enters it, one that moves to
 -- another tag or commit, and one that leaves it.
@@ -59,9 +75,9 @@ data Sync = Sync {
 -- vendor/ every package that the lock has with the same tag, fetch and
 -- validate the rest, check the graph and, only then, write the copies that
 -- change, remove those that left and write the lock. Nothing is written
--- when anything fails.
-syncDependencies :: Place -> String -> FilePath -> Manifest -> Lock -> IO (Either [String] Sync)
-syncDependencies place commandName root manifest lock = do
+-- when anything fails, nor when the caller only wants to know the changes.
+syncDependencies :: Place -> String -> Fetching -> Bool -> FilePath -> Manifest -> Lock -> IO (Either [String] Sync)
+syncDependencies place commandName fetching write root manifest lock = do
     used <- newIORef []
     localResult <- readLocalPackages [(root, p) | DepPath p <- allDependencies]
     case localResult of
@@ -85,8 +101,11 @@ syncDependencies place commandName root manifest lock = do
     oldPackages = M.fromList [(normalizeUrl (lockedUrl l), l) | l <- lockPackages lock]
 
     obtain used u t =
-        case M.lookup (normalizeUrl u) oldPackages of
-            Just locked | lockedRev locked == t -> fromVendor locked
+        let locked = M.lookup (normalizeUrl u) oldPackages
+        in case (fetching, locked) of
+            (Refresh selected, _) | selected (normalizeUrl u) -> fromGit used u t
+            (_, Just l) | lockedRev l == t -> fromVendor l
+            (Offline, _) -> return (Left (NeedsNetwork (lockedRev <$> locked)))
             _ -> fromGit used u t
 
     fromVendor locked = do
@@ -118,13 +137,13 @@ syncDependencies place commandName root manifest lock = do
                             Just l | l /= entry p -> Just (Changed l p)
                             _ -> Nothing] ]
                 ++ [Removed l | (k, l) <- M.toList oldPackages, not (M.member k (resolvedPackages res))]
-        unless (null changes) $ do
+        when (write && not (null changes)) $ do
             forM_ changes $ \change -> case change of
                 Added p -> writePackage root (resolvedUrl p) (vendored p)
                 Changed _ p -> writePackage root (resolvedUrl p) (vendored p)
                 Removed l -> removePackage (lockedUrl l)
             writeLockFile (root </> "termina.lock") (Lock (lockVersion emptyLock) (map entry packages))
-        readIORef used >>= mapM_ removePathForcibly
+        when write (readIORef used >>= mapM_ removePathForcibly)
         return (Sync changes (overrideWarnings res))
 
     -- | The folder of a package that left the lock, and the folders above it
@@ -164,6 +183,9 @@ describePackageError (FetchFailed (NeedsCredentials _ err)) = "git has no creden
 describePackageError (FetchFailed (GitFailed err)) = "git failed:\n" ++ err
 describePackageError (InvalidPackage errs) = "the package is not valid:\n" ++ intercalate "\n" (map ("  " ++) errs)
 describePackageError (VendorMismatch err) = err
+describePackageError (NeedsNetwork old) =
+    maybe "termina.lock does not have it" (\rev -> "termina.lock has " ++ T.unpack rev ++ " instead") old
+        ++ ", and fetching it needs the network. Run termina build without --offline, or termina update, to update termina.lock."
 
 -- | GitHub asks for credentials for a repository that does not exist, so as
 -- not to tell whether a private one has that name.

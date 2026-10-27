@@ -6,8 +6,9 @@
 module Configuration.AddSpec (spec) where
 
 import Command.Add
-import Command.Dependencies (Sync(..), credentialsMessage, describeChange, syncDependencies)
+import Command.Dependencies (Fetching(..), Sync(..), credentialsMessage, describeChange, syncDependencies)
 import Command.Restore (restoreVendor)
+import Command.Update (checkTags, updateDependencies, verifyProject)
 import Command.Utils (Place(..), loadLock)
 import Configuration.Lock
 import Configuration.Manifest (decodeManifest)
@@ -151,7 +152,7 @@ spec = do
     let sync project = do
           manifest <- either error id . decodeManifest <$> BS.readFile (project </> "termina.yaml")
           lock <- either (error . unlines) id <$> loadLock project
-          fmap (map describeChange . syncChanges) <$> syncDependencies Computer "termina build" project manifest lock
+          fmap (map describeChange . syncChanges) <$> syncDependencies Computer "termina build" Reuse True project manifest lock
         edit project from to = do
           text <- readFile (project </> "termina.yaml")
           length text `seq` writeFile (project </> "termina.yaml") (replace from to text)
@@ -193,6 +194,66 @@ spec = do
         sync project `shouldReturn` Right ["removed https://example.invalid/acme/tm v0.1.0"]
         doesFileExist (project </> "termina.lock") `shouldReturn` False
         doesDirectoryExist (project </> "vendor" </> "example.invalid") `shouldReturn` False
+
+  describe "termina update and termina verify" $ do
+
+    let moveTag repos name = do
+          let repo = repos </> "acme" </> name
+          BS.writeFile (repo </> "src" </> name </> "m.fin") "moved\n"
+          void $ git repo ["commit", "-q", "-a", "-m", "moved"]
+          void $ git repo ["tag", "-f", "v0.1.0"]
+        update project = updateDependencies Computer project
+        edit project from to = do
+          text <- readFile (project </> "termina.yaml")
+          length text `seq` writeFile (project </> "termina.yaml") (replace from to text)
+        replace from to s@(c : cs)
+          | from `isPrefixOf` s = to ++ replace from to (drop (length from) s)
+          | otherwise = c : replace from to cs
+        replace _ _ [] = []
+
+    it "adopts a tag that moved, of every dependency or of the one named" $
+      withProject "update" "" $ \repos project -> do
+        library repos "pus" [] "v0.1.0"
+        library repos "tm" [] "v0.1.0"
+        void $ add project "pus" "v0.1.0" Nothing
+        void $ add project "tm" "v0.1.0" Nothing
+        update project Nothing `shouldReturn` Right ([], ["termina.lock is up to date"])
+        moveTag repos "pus"
+        moveTag repos "tm"
+        fmap (map (takeWhile (/= ' ')) . snd) <$> update project (Just "pus") `shouldReturn` Right ["termina.lock:"]
+        BS.readFile (project </> "vendor" </> "example.invalid" </> "acme" </> "pus" </> "src" </> "pus" </> "m.fin") `shouldReturn` "moved\n"
+        BS.readFile (project </> "vendor" </> "example.invalid" </> "acme" </> "tm" </> "src" </> "tm" </> "m.fin") `shouldReturn` ""
+        update project (Just "hal") `shouldReturn` Left ["hal is not a dependency of this project."]
+
+    it "reports what update would change, without writing" $
+      withProject "update-check" "" $ \repos project -> do
+        library repos "pus" [] "v0.1.0"
+        void $ add project "pus" "v0.1.0" Nothing
+        checkTags project `shouldReturn` Right []
+        moveTag repos "pus"
+        edit project "\"v0.1.0\"" "\"v0.2.0\""
+        result <- checkTags project
+        case result of
+          Right [manifestDrift, tagDrift] -> do
+            manifestDrift `shouldBe` "termina.yaml asks for v0.2.0 of https://example.invalid/acme/pus, and termina.lock has v0.1.0"
+            tagDrift `shouldSatisfy` isPrefixOf "the tag v0.1.0 of https://example.invalid/acme/pus now points to "
+          other -> expectationFailure (show other)
+
+    it "checks without network that vendor/ and the lock match the manifest" $
+      withProject "verify" "" $ \repos project -> do
+        library repos "pus" [] "v0.1.0"
+        void $ add project "pus" "v0.1.0" Nothing
+        verifyProject Computer project `shouldReturn` Right ()
+        edit project "\"v0.1.0\"" "\"v0.2.0\""
+        verifyProject Computer project `shouldReturn` Left
+          [ "https://example.invalid/acme/pus v0.2.0 (required by app): termina.lock has v0.1.0 instead, and fetching it needs the network. "
+            ++ "Run termina build without --offline, or termina update, to update termina.lock." ]
+        edit project "dependencies:\n  - git: https://example.invalid/acme/pus\n    rev: \"v0.2.0\"\n" ""
+        verifyProject Computer project `shouldReturn` Left
+          [ "termina.lock has https://example.invalid/acme/pus v0.1.0, which termina.yaml no longer needs. "
+            ++ "Run termina build or termina update to update termina.lock." ]
+        edit project "profile: release\n" "profile: release\ndependencies:\n  - path: ../drivers\n"
+        verifyProject Computer project `shouldReturn` Left ["termina.yaml takes ../drivers from a local folder, which termina.lock cannot pin."]
 
   describe "termina restore" $ do
 
