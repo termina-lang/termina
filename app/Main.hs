@@ -61,7 +61,7 @@ commandParser = subparser
  <> command "generate" (info generateCommandParser ( progDesc "Generate the C code and the Makefile of the project" ))
  <> command "build" (info buildCommandParser ( progDesc "Generate and compile the project" ))
  <> command "deliver" (info deliverCommandParser ( progDesc "Build the self-contained deliverable of the project" ))
- <> command "test" (info testCommandParser ( progDesc "List the tests of the project" ))
+ <> command "test" (info testCommandParser ( progDesc "Build and run the tests of the project, or list them" ))
  <> command "try"(info tryCommandParser ( progDesc "Translate a single file" ))
  <> command "lsp" (info lspCommandParser ( progDesc "Start language server" ))
  <> command "sched" (info schedCommandParser ( progDesc "Generate scheduling models" ))
