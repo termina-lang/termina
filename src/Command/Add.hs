@@ -17,10 +17,9 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Options.Applicative
 import System.Directory
-import System.Exit
 import System.FilePath
 
-import Command.Utils (Place(..), currentPlace, errorMessage, warnMessage, infoMessage)
+import Command.Utils (Place(..), currentPlace, dieWithErrors, warnMessage, infoMessage)
 import Configuration.Fetch
 import Configuration.Graph
 import Configuration.Lock
@@ -57,7 +56,7 @@ addCommand (AddCmdArgs url tag mTest) = do
     place <- currentPlace
     result <- addDependency place "." (T.pack url) (T.pack tag) mTest
     case result of
-        Left errs -> mapM_ (putStrLn . errorMessage) errs >> exitFailure
+        Left errs -> dieWithErrors errs
         Right report -> do
             mapM_ (putStrLn . warnMessage) (reportWarnings report)
             mapM_ (putStrLn . infoMessage) (reportLines report)

@@ -8,19 +8,17 @@ import Configuration.Vendor
 
 import qualified Data.ByteString.Char8 as BS
 import Data.List (sort)
-import Data.Yaml (decodeEither')
 import System.Directory
 import System.FilePath
 import Test.Hspec
 
+import Configuration.Helpers
+
 package :: [VendoredFile]
 package = [("termina.yaml", "a\n"), ("src/pus/x.fin", "b\r\n")]
 
-manifestOf :: String -> Manifest
-manifestOf yaml = either error id (either (Left . show) parseManifest (decodeEither' (BS.pack yaml)))
-
 library :: Manifest
-library = manifestOf $ "project:\n  name: pus\n  version: 0.1.0\n  manifest-version: 1\n"
+library = manifestOf $ header "pus"
     ++ "exports:\n  - pus.service1\n  - ccsds\n"
     ++ "extern:\n  sources: [crc.c]\n  libraries:\n    posix-gcc: [posix/libcrc.a]\n"
 

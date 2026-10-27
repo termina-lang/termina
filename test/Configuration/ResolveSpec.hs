@@ -9,17 +9,11 @@ import Configuration.Manifest
 import Configuration.Resolve
 
 import Control.Monad.State
-import qualified Data.ByteString.Char8 as BS
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
-import Data.Yaml (decodeEither')
 import Test.Hspec
 
-manifestOf :: String -> Manifest
-manifestOf yaml = either error id (either (Left . show) parseManifest (decodeEither' (BS.pack yaml)))
-
-header :: String -> String
-header name = "project:\n  name: " ++ name ++ "\n  version: 0.1.0\n  manifest-version: 1\n"
+import Configuration.Helpers
 
 depsOf :: String -> [(String, String)] -> String
 depsOf _ [] = ""

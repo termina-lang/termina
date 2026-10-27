@@ -20,12 +20,7 @@ import System.FilePath
 import System.Process (readProcess)
 import Test.Hspec
 
-git :: FilePath -> [String] -> IO String
-git repo args = readProcess "git" (["-C", repo, "-c", "user.name=test", "-c", "user.email=test@test",
-    "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"] ++ args) ""
-
-header :: String -> String
-header name = "project:\n  name: " ++ name ++ "\n  version: 0.1.0\n  manifest-version: 1\n"
+import Configuration.Helpers
 
 url :: String -> T.Text
 url name = T.pack ("https://example.invalid/acme/" ++ name)

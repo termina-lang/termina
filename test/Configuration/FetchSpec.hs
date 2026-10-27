@@ -13,11 +13,7 @@ import System.FilePath
 import System.Process (readProcess)
 import Test.Hspec
 
--- | Run git in a repository, with an identity and no signing, whatever the
--- configuration of the machine.
-git :: FilePath -> [String] -> IO String
-git repo args = readProcess "git" (["-C", repo, "-c", "user.name=test", "-c", "user.email=test@test",
-    "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "-c", "core.autocrlf=false"] ++ args) ""
+import Configuration.Helpers (git)
 
 -- | A fresh repository with a module written with CRLF, a symbolic link and
 -- a commit tagged v0.1.0 (and v0.2.0, annotated), and its URL.

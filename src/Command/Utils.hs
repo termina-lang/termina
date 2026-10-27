@@ -350,38 +350,38 @@ runLoweredChecks chatty plt loweredProject = mapM_ runOne loweredChecks
         Nothing -> return ()
         Just failure -> TIO.putStrLn (failureMessage failure sourceFilesMap) >> exitFailure
 
--- | Load "termina.yaml" and check the folders of the project against it. The
--- error holds every problem found, one per line.
-loadManifest :: (MonadIO m) => m (Either String Manifest)
+-- | Load "termina.yaml" and check the folders of the project against it,
+-- giving every problem found.
+loadManifest :: (MonadIO m) => m (Either [String] Manifest)
 loadManifest = liftIO $ do
     result <- decodeManifestFile "termina.yaml"
     case result of
-        Left err -> return (Left ("termina.yaml: " ++ err))
+        Left err -> return (Left ["termina.yaml: " ++ err])
         Right manifest -> do
             layoutErrors <- checkLayout "." manifest
-            return $ if null layoutErrors then Right manifest else Left (intercalate "\n" layoutErrors)
+            return $ if null layoutErrors then Right manifest else Left layoutErrors
 
 -- | Load "termina.yaml" as "loadManifest" does and check also the prefixes
 -- that a library exports, for the commands that build: a new library has no
 -- module yet, and "termina new --test" has to work on it.
-loadProject :: (MonadIO m) => m (Either String Manifest)
+loadProject :: (MonadIO m) => m (Either [String] Manifest)
 loadProject = do
     result <- loadManifest
     case result of
-        Left err -> return (Left err)
+        Left errs -> return (Left errs)
         Right manifest -> do
             exportErrors <- liftIO $ checkExports "." manifest
-            return $ if null exportErrors then Right manifest else Left (intercalate "\n" exportErrors)
+            return $ if null exportErrors then Right manifest else Left exportErrors
 
--- | Print each line of the error as an error and stop.
-dieWithErrors :: String -> IO a
-dieWithErrors = die . intercalate "\n" . map errorMessage . lines
+-- | Print each error, which may take several lines, and stop.
+dieWithErrors :: [String] -> IO a
+dieWithErrors = die . intercalate "\n" . map errorMessage
 
 -- | The configuration of the application of the project.
-loadConfig :: (MonadIO m) => m (Either String TerminaConfig)
+loadConfig :: (MonadIO m) => m (Either [String] TerminaConfig)
 loadConfig = do
     result <- loadManifest
-    return $ result >>= maybe (Left "the project is a library and has no application") Right . appConfig
+    return $ result >>= maybe (Left ["the project is a library and has no application"]) Right . appConfig
 
 sortProjectDepsOrLoop
   :: ProjectDependencies

@@ -10,8 +10,10 @@ import qualified Data.ByteString.Char8 as BS
 import Data.Either (isRight)
 import Test.Hspec
 
+import Configuration.Helpers (header)
+
 manifest :: String -> FetchedFile
-manifest body = FetchedFile "termina.yaml" "100644" (BS.pack ("project:\n  name: pus\n  version: 0.1.0\n  manifest-version: 1\n" ++ body))
+manifest body = FetchedFile "termina.yaml" "100644" (BS.pack (header "pus" ++ body))
 
 library :: String
 library = "exports: [pus]\nextern:\n  sources: [crc.c]\n  libraries:\n    posix-gcc: [posix/libcrc.a]\n"
