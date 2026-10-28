@@ -55,6 +55,7 @@ verdictText verdict =
         Failed -> "failed"
         Raised -> "exception"
         TimedOut -> "timeout"
+        Interrupted -> "interrupted"
         NotRun -> "not run"
         Unrecorded -> "unrecorded"
 
@@ -207,7 +208,7 @@ renderJUnit evidence mDescriptor locations result =
         case testInvalid result of
             Just _ -> " tests=\"1\" failures=\"0\" errors=\"1\" skipped=\"0\""
             Nothing -> " tests=\"" ++ show (length (testCases result)) ++ "\" failures=\"" ++ show (tally [Failed])
-                       ++ "\" errors=\"" ++ show (tally [Raised, TimedOut, Unrecorded]) ++ "\" skipped=\"" ++ show (tally [NotRun]) ++ "\""
+                       ++ "\" errors=\"" ++ show (tally [Raised, TimedOut, Interrupted, Unrecorded]) ++ "\" skipped=\"" ++ show (tally [NotRun]) ++ "\""
 
     testcase r =
         let c = resultCase r
@@ -229,6 +230,7 @@ renderJUnit evidence mDescriptor locations result =
                 [] -> "check")
             Raised -> element "error" (maybe "exception" (exceptionName . exceptionDetail descriptor locations) (resultException r))
             TimedOut -> element "error" "timeout"
+            Interrupted -> element "error" "interrupted"
             Unrecorded -> element "error" "unrecorded"
             NotRun -> [open ++ ">", "      <skipped/>", "    </testcase>"]
 

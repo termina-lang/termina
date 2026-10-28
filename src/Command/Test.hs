@@ -13,7 +13,7 @@ import Command.Common (loadTerminaModule, loadModules)
 import Command.Deliver (deliverableInfo)
 import Configuration.Configuration
 import Configuration.Platform (Platform(..), callSite, checkPlatform, gdbServerPort, xsdbServerPort)
-import Runner.Analysis (TestResult(TestResult), Run(..), AddressKind(..), analyse, addressesOf, renderReport, exitCodeOf)
+import Runner.Analysis (TestResult(TestResult), Run(..), RunEnd(..), AddressKind(..), analyse, addressesOf, renderReport, exitCodeOf)
 import Runner.Descriptor (Descriptor(..), DescriptorCase, Symbols(..), readDescriptor)
 import qualified Runner.Descriptor as D
 import Runner.Gdb (GdbTarget(..), GdbEnd(..), GdbRun(..), runGdb)
@@ -24,7 +24,7 @@ import Runner.Symbols (locateAddresses, stampAddress)
 import Runner.Xsdb (prepareBoard)
 import qualified Runner.Symbols as S
 
-import Control.Exception (try)
+import Control.Exception (IOException, try)
 import Data.Bits (testBit)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
@@ -66,6 +66,7 @@ data TestCmdArgs =
         (Maybe ProjectProfile) -- ^ Profile of the tests
         (Maybe String) -- ^ Only this case
         Bool -- ^ Run each case in a process of its own
+        (Maybe FilePath) -- ^ The folder of a record dumped outside the runner
         (Maybe Executor) -- ^ How the binary of a test is run
         (Maybe Server) -- ^ The GDB server of the board
         (Maybe Server) -- ^ The XSDB command server of the PYNQ
@@ -91,6 +92,10 @@ testCmdArgsParser = TestCmdArgs
           <> O.help "Only this case"))
     <*> O.switch (O.long "isolated"
         <> O.help "Run each case in a process of its own")
+    <*> O.optional (O.strOption
+          ( O.long "record"
+          <> O.metavar "FOLDER"
+          <> O.help "Report the record that a debugging session dumped to FOLDER/header.bin and FOLDER/area.bin, without building nor running"))
     <*> O.optional (O.option (O.eitherReader readExecutor)
           ( O.long "executor"
           <> O.metavar "process|gdb"
@@ -156,29 +161,35 @@ data Mode =
     AllCases
     | OneCase String -- ^ only the case with this identifier
     | Isolated -- ^ each case in a process of its own
+    | Recorded FilePath -- ^ no run: the record dumped to this folder
   deriving (Eq, Show)
 
 -- | Command handler for the "test" command
 testCommand :: TestCmdArgs -> IO ()
-testCommand (TestCmdArgs mName mPlatform mProfile mCase isolated mExecutor mServer mXsdb list json) =
+testCommand (TestCmdArgs mName mPlatform mProfile mCase isolated mRecord mExecutor mServer mXsdb list json) =
     if list then listTests json
-    else either cannotRun (runTests mName mPlatform mProfile mExecutor mServer mXsdb) (modeOf mName mCase isolated)
+    else either cannotRun (runTests mName mPlatform mProfile mExecutor mServer mXsdb) (modeOf mName mCase isolated mRecord)
 
 -- | A test that cannot be run exits with 2
 cannotRun :: String -> IO a
 cannotRun reason = hPutStrLn stderr (errorMessage reason) >> exitWith (ExitFailure 2)
 
 -- | The mode of the run, from the options
-modeOf :: Maybe String -> Maybe String -> Bool -> Either String Mode
-modeOf mName mCase isolated =
-    case (mCase, isolated) of
-        (Nothing, False) -> Right AllCases
-        (Nothing, True) -> Right Isolated
-        (Just _, True) -> Left "--isolated runs every case and does not go with --case"
-        (Just c, False) ->
+modeOf :: Maybe String -> Maybe String -> Bool -> Maybe FilePath -> Either String Mode
+modeOf mName mCase isolated mRecord =
+    case (mCase, isolated, mRecord) of
+        (Nothing, False, Nothing) -> Right AllCases
+        (Nothing, True, Nothing) -> Right Isolated
+        (Just _, True, _) -> Left "--isolated runs every case and does not go with --case"
+        (Just c, False, Nothing) ->
             case mName of
                 Nothing -> Left "--case needs the name of the test"
                 Just _ -> Right (OneCase c)
+        (Nothing, False, Just folder) ->
+            case mName of
+                Nothing -> Left "--record needs the name of the test"
+                Just _ -> Right (Recorded folder)
+        (_, _, Just _) -> Left "--record reports the cases of the record, and does not go with --case nor --isolated"
 
 -- | Builds and runs each selected test on each of its platforms, and exits with
 -- the worst code of them: 0 when every case passes, 1 when one does not, 2 when
@@ -204,16 +215,21 @@ runTests mName mPlatform mProfile mExecutor mServer mXsdb mode = do
     host <- gdbHost mServer
     let servers = Servers (host, mServer >>= \(Server _ port) -> port)
                           (maybe host (\(Server h _) -> h) mXsdb, mXsdb >>= \(Server _ port) -> port)
-    codes <- forM deployments $ \deployment -> do
-        announce deployments ("Building " ++ deploymentLabel deployment)
-        built <- try (buildDeployment buildArgs deployment) :: IO (Either ExitCode [(QualifiedName, FilePath)])
-        case built of
-            Left _ -> do
-                let config = deploymentConfig deployment
-                createDirectoryIfMissing True (outputFolder config)
-                evidence <- evidenceOf config mode Nothing (executorOf (maybe ProcessExecutor id mExecutor) (deploymentPlatform deployment))
-                finish config evidence Nothing M.empty (invalid config "it does not build")
-            Right _ -> runDeployment (maybe ProcessExecutor id mExecutor) servers mode deployment
+    codes <- case (mode, deployments) of
+        -- | A record is decoded with the binary already built, which made it
+        (Recorded _, [deployment]) -> (: []) <$> runDeployment GdbExecutor servers mode deployment
+        (Recorded _, _) -> cannotRun ("--record decodes the record of one platform, and the test has "
+            ++ intercalate ", " (map (show . deploymentPlatform) deployments) ++ "; choose one with --platform")
+        _ -> forM deployments $ \deployment -> do
+            announce deployments ("Building " ++ deploymentLabel deployment)
+            built <- try (buildDeployment buildArgs deployment) :: IO (Either ExitCode [(QualifiedName, FilePath)])
+            case built of
+                Left _ -> do
+                    let config = deploymentConfig deployment
+                    createDirectoryIfMissing True (outputFolder config)
+                    evidence <- evidenceOf config mode Nothing (executorOf (maybe ProcessExecutor id mExecutor) (deploymentPlatform deployment))
+                    finish config evidence Nothing M.empty (invalid config "it does not build")
+                Right _ -> runDeployment (maybe ProcessExecutor id mExecutor) servers mode deployment
     let worst = maximum (0 : codes)
     if worst == 0 then exitSuccess else exitWith (ExitFailure worst)
 
@@ -296,9 +312,13 @@ runDeployment executor (Servers (host, mPort) (xsdbHost, mXsdbPort)) mode deploy
                 else if executor == GdbExecutor then UnderGdb "gdb" NativeProcess
                 else AsProcess
         hasScript <- doesFileExist xsdbScript
-        let prepared = case xsdbPort of
-                Nothing -> Right Nothing
-                Just port -> if hasScript then Right (Just port)
+        let fromRecord = case mode of
+                Recorded _ -> True
+                _ -> False
+            prepared = case (xsdbPort, fromRecord) of
+                (Nothing, _) -> Right Nothing
+                (_, True) -> Right Nothing
+                (Just port, False) -> if hasScript then Right (Just port)
                     else Left ("the " ++ show plt ++ " is prepared before each run with " ++ xsdbScript
                                ++ ", which resets the board, initializes its PS and loads its bitstream, and the project has none")
         case prepared >> plan folder descriptor of
@@ -313,7 +333,9 @@ runDeployment executor (Servers (host, mPort) (xsdbHost, mXsdbPort)) mode deploy
                         return $ either (\err -> Left ("the XSDB server at " ++ xsdbHost ++ ":" ++ show port
                             ++ " did not prepare the board: " ++ err ++ "; it is started from the root of the project with xsdb -eval \"xsdbserver start -port "
                             ++ show port ++ "; vwait forever\"")) Right done
-                run p = prepare >>= either (return . Left) (const (execute config launcher (platformLayout plt) descriptor binary (either (const Nothing) Just stamp) p))
+                run p = case mode of
+                    Recorded given -> readRecord (platformLayout plt) descriptor (either (const Nothing) Just stamp) given
+                    _ -> prepare >>= either (return . Left) (const (execute config launcher (platformLayout plt) descriptor binary (either (const Nothing) Just stamp) p))
             ran <- runAll run planned
             case ran of
               Left err -> finish config evidence (Just descriptor) M.empty (invalid config err)
@@ -333,10 +355,15 @@ runDeployment executor (Servers (host, mPort) (xsdbHost, mXsdbPort)) mode deploy
         let cases = D.descriptorCases descriptor
             record n = folder </> ("record" ++ n) <.> "bin"
             output n = folder </> ("test" ++ n) <.> "log"
-        in if mode /= AllCases && descriptorLevel descriptor /= "unit"
+            byCase = case mode of
+                OneCase _ -> True
+                Isolated -> True
+                _ -> False
+        in if byCase && descriptorLevel descriptor /= "unit"
             then Left "--case and --isolated run the cases of a unit test"
             else case mode of
                 AllCases -> Right [Planned 0 cases (record "") (output "")]
+                Recorded _ -> Right [Planned 0 cases (record "") (output "")]
                 OneCase c -> case [ dc | dc <- cases, D.caseId dc == c ] of
                     (dc : _) -> Right [Planned (D.caseNumber dc) [dc] (record "") (output "")]
                     [] -> Left ("the test has no case " ++ c ++ "; its cases are " ++ intercalate ", " (map D.caseId cases))
@@ -353,6 +380,45 @@ runDeployment executor (Servers (host, mPort) (xsdbHost, mXsdbPort)) mode deploy
                     Left err -> return (Left err)
                     Right done -> fmap (done :) <$> runAll run rest
 
+-- | Decodes the header followed by the area, checks that they come from the
+-- binary of the descriptor, and takes the load offset out of the addresses;
+-- the cases of the run come from the header
+decodeRun :: Layout -> Descriptor -> Maybe Integer -> (Header -> Either String [DescriptorCase]) -> String
+          -> BS.ByteString -> RunEnd -> [String] -> Either String (Run, Header)
+decodeRun layout descriptor stamp casesOf noRecord bytes end frames = do
+    header <- decodeHeader layout bytes
+    when (headerMagic header /= BS.pack (map (fromIntegral . fromEnum) "TRMTEST\0")) $
+        Left noRecord
+    when (headerStamp header /= descriptorStamp descriptor) $
+        Left ("the stamp of the record, 0x" ++ showHex (headerStamp header) ""
+              ++ ", is not the one of test.json, 0x" ++ showHex (descriptorStamp descriptor) "" ++ ": the binary is not the one of this descriptor")
+    cases <- casesOf header
+    let area = BS.take (fromIntegral (headerWriteOffset header)) (BS.drop (headerSize layout) bytes)
+        offset = maybe 0 (headerAnchor header -) stamp
+    records <- decodeRecords layout area
+    return (Run cases (map (relocate offset) records) end (testBit (headerFlags header) 1) (headerLastStep header) frames, header)
+
+-- | Reads the header and the area that a debugging session dumped to the
+-- folder, and decodes them with the cases that the header selected
+readRecord :: Layout -> Descriptor -> Maybe Integer -> FilePath -> IO (Either String (Run, Header))
+readRecord layout descriptor stamp folder = do
+    let files = [folder </> "header" <.> "bin", folder </> "area" <.> "bin"]
+    read' <- try (mapM BS.readFile files)
+    return $ case read' of
+        Left err -> Left ("the record cannot be read: " ++ show (err :: IOException))
+        Right parts -> decodeRun layout descriptor stamp selectedCases
+            ("the header in " ++ head files ++ " is not the one of a record of a test") (BS.concat parts) Dumped []
+
+  where
+
+    selectedCases header =
+        let cases = D.descriptorCases descriptor
+            selected = headerSelectedCase header
+        in if selected == 0 then Right cases
+           else case [ dc | dc <- cases, D.caseNumber dc == selected ] of
+                [] -> Left ("the record selects the case " ++ show selected ++ ", which test.json does not list")
+                found -> Right found
+
 -- | Runs the binary once and decodes its record, without the load offset in its addresses
 execute :: TerminaConfig -> Launcher -> Layout -> Descriptor -> FilePath -> Maybe Integer -> Planned -> IO (Either String (Run, Header))
 execute config launcher layout descriptor binary stamp (Planned selected cases recordFile logFile) = do
@@ -361,30 +427,21 @@ execute config launcher layout descriptor binary stamp (Planned selected cases r
             runPosix layout binary recordFile logFile (recordCapacity config) selected (descriptorTimeout descriptor)
         UnderGdb gdb target -> fmap fromGdb <$>
             runGdb gdb binary target (takeDirectory recordFile) logFile selected (descriptorTimeout descriptor)
-    return $ ran >>= \(bytes, killed, frames, noRecord) -> do
-        header <- decodeHeader layout bytes
-        when (headerMagic header /= BS.pack (map (fromIntegral . fromEnum) "TRMTEST\0")) $
-            Left noRecord
-        when (headerStamp header /= descriptorStamp descriptor) $
-            Left ("the stamp of the record, 0x" ++ showHex (headerStamp header) ""
-                  ++ ", is not the one of test.json, 0x" ++ showHex (descriptorStamp descriptor) "" ++ ": the binary is not the one of this descriptor")
-        let area = BS.take (fromIntegral (headerWriteOffset header)) (BS.drop (headerSize layout) bytes)
-            offset = maybe 0 (headerAnchor header -) stamp
-        records <- decodeRecords layout area
-        return (Run cases (map (relocate offset) records) killed (testBit (headerFlags header) 1) (headerLastStep header) frames, header)
+    return $ ran >>= \(bytes, end, frames, noRecord) ->
+        decodeRun layout descriptor stamp (const (Right cases)) noRecord bytes end frames
 
   where
 
-    -- | The bytes of the record, whether the run was stopped at the timeout,
-    -- the frames at an exception and why a record without header is empty
+    -- | The bytes of the record, how the run ended, the frames at an
+    -- exception and why a record without header is empty
     fromProcess posixRun =
-        (posixRecord posixRun, posixExit posixRun == Nothing, [],
+        (posixRecord posixRun, if posixExit posixRun == Nothing then Killed else Finished, [],
          "the binary wrote no record" ++ (case posixExit posixRun of
             Just (ExitFailure code) -> ", and exited with " ++ show code
             _ -> "") ++ "; its output is in " ++ logFile)
 
     fromGdb gdbRun =
-        (gdbRecord gdbRun, gdbEnd gdbRun == AtTimeout, gdbBacktrace gdbRun,
+        (gdbRecord gdbRun, if gdbEnd gdbRun == AtTimeout then Killed else Finished, gdbBacktrace gdbRun,
          "the binary did not initialize its record; the log of gdb is in " ++ logFile)
 
 -- | Writes the report on the console, results.json and report.xml, and gives the exit code
@@ -423,7 +480,8 @@ evidenceOf config mode seconds executor = do
         evidenceMode = case mode of
             AllCases -> "all"
             OneCase _ -> "case"
-            Isolated -> "isolated",
+            Isolated -> "isolated"
+            Recorded _ -> "record",
         evidenceExecutor = case executor of
             ProcessExecutor -> "process"
             GdbExecutor -> "gdb",

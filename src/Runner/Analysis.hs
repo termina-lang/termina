@@ -1,7 +1,7 @@
 -- | The verdict of each case of a test from its record, and the report of the
 -- console.
 module Runner.Analysis (
-    Verdict(..), CaseResult(..), TestResult(..), Run(..),
+    Verdict(..), CaseResult(..), TestResult(..), Run(..), RunEnd(..),
     FailureDetail(..), Shown(..), ExceptionDetail(..), AddressKind(..),
     analyse, addressesOf, failureDetail, exceptionDetail, caseDetailLines,
     renderReport, exitCodeOf
@@ -17,8 +17,9 @@ import qualified Data.Map.Strict as M
 import Numeric (showHex)
 import System.FilePath (takeFileName)
 
--- | Unrecorded is a case whose records were lost when the record overflowed
-data Verdict = Passed | Failed | Raised | TimedOut | NotRun | Unrecorded
+-- | Unrecorded is a case whose records were lost when the record overflowed,
+-- and Interrupted the case open in a record dumped by a debugging session
+data Verdict = Passed | Failed | Raised | TimedOut | Interrupted | NotRun | Unrecorded
   deriving (Eq, Show)
 
 data CaseResult = CaseResult {
@@ -27,7 +28,7 @@ data CaseResult = CaseResult {
     resultChecks :: Maybe Integer, -- ^ checks run, from the end of the case
     resultFailures :: [(String, Check)],
     resultException :: Maybe ExceptionInfo, -- ^ nothing when the process ended without a record of it
-    resultLastStep :: Maybe Integer, -- ^ the last step of a case that timed out
+    resultLastStep :: Maybe Integer, -- ^ the last step of a case that timed out or was interrupted
     resultBacktrace :: [String] -- ^ the frames of a case with an exception, when GDB gave them
   } deriving (Eq, Show)
 
@@ -38,13 +39,18 @@ data TestResult = TestResult {
     testOverflow :: Maybe (Integer, Integer) -- ^ cases ended and checks failed in all, when the record overflowed
   } deriving (Eq, Show)
 
--- | One run of the binary: the cases it runs, its records, whether the runner
--- killed it at the timeout, whether its record overflowed, its last step and
--- the frames where it stopped at an exception
+-- | How a run ended: by itself, killed by the runner at the timeout, or stopped
+-- by a debugging session that dumped its record
+data RunEnd = Finished | Killed | Dumped
+  deriving (Eq, Show)
+
+-- | One run of the binary: the cases it runs, its records, how it ended,
+-- whether its record overflowed, its last step and the frames where it
+-- stopped at an exception
 data Run = Run {
     runCases :: [DescriptorCase],
     runRecords :: [Record],
-    runKilled :: Bool,
+    runEnd :: RunEnd,
     runOverflow :: Bool,
     runLastStep :: Integer,
     runBacktrace :: [String]
@@ -63,12 +69,13 @@ analyse run =
 
     -- | The verdict of the case that was running when the records end
     interrupted =
-        if runKilled run then TimedOut
-        else if runOverflow run then Unrecorded
-        else Raised
+        case runEnd run of
+            Killed -> TimedOut
+            Dumped -> Interrupted
+            Finished -> if runOverflow run then Unrecorded else Raised
 
     close n verdict checks failures exception results =
-        let lastStep = if verdict == TimedOut then Just (runLastStep run) else Nothing
+        let lastStep = if verdict `elem` [TimedOut, Interrupted] then Just (runLastStep run) else Nothing
             frames = if verdict == Raised then runBacktrace run else []
         in case caseOf n of
             (c : _) -> M.insert n (CaseResult c verdict checks (reverse failures) exception lastStep frames) results
@@ -189,6 +196,7 @@ caseDetailLines descriptor locations r =
         Raised -> failures ++ [exceptionLine (exceptionDetail descriptor locations <$> resultException r)]
                   ++ (if null (resultBacktrace r) then [] else "backtrace:" : map ("  " ++) (resultBacktrace r))
         TimedOut -> failures ++ ["the case did not end before the timeout; last step " ++ maybe "0" show (resultLastStep r)]
+        Interrupted -> failures ++ ["the record ends in the middle of the case; last step " ++ maybe "0" show (resultLastStep r)]
         NotRun -> []
         Unrecorded -> failures ++ ["the record overflowed before the end of the case"]
 
@@ -242,6 +250,7 @@ renderReport descriptor locations result =
                 Failed -> "  FAIL     " ++ name ++ "    " ++ checksText (resultChecks r)
                 Raised -> "  EXCEPT   " ++ name
                 TimedOut -> "  TIMEOUT  " ++ name
+                Interrupted -> "  STOPPED  " ++ name
                 NotRun -> "  --       " ++ name ++ "    not run"
                 Unrecorded -> "  ??       " ++ name ++ "    without a record"
         in dropWhileEnd (== ' ') first : map ("           " ++) (caseDetailLines descriptor locations r)
@@ -262,6 +271,7 @@ renderReport descriptor locations result =
                 ++ [ show (count Failed) ++ " failed" | count Failed > 0 ]
                 ++ [ show (count Raised) ++ " with an exception" | count Raised > 0 ]
                 ++ [ show (count TimedOut) ++ " timed out" | count TimedOut > 0 ]
+                ++ [ show (count Interrupted) ++ " interrupted" | count Interrupted > 0 ]
                 ++ [ show (count NotRun) ++ " not run" | count NotRun > 0 ]
                 ++ [ show (count Unrecorded) ++ " without a record" | count Unrecorded > 0 ]
         in intercalate ", " parts

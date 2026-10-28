@@ -33,11 +33,11 @@ failure :: Check
 failure = Check 0 0x1000 (Just (Scalars 0 95))
 
 -- | A run of every case of the descriptor, whose last step is 7
-runOf :: [Record] -> Bool -> Run
-runOf records killed = Run (descriptorCases descriptor) records killed False 7 []
+runOf :: [Record] -> RunEnd -> Run
+runOf records end = Run (descriptorCases descriptor) records end False 7 []
 
-verdicts :: [Record] -> Bool -> [Verdict]
-verdicts records killed = map resultVerdict (analyse (runOf records killed))
+verdicts :: [Record] -> RunEnd -> [Verdict]
+verdicts records end = map resultVerdict (analyse (runOf records end))
 
 -- | The value at a path of keys of objects and positions of arrays
 at :: Value -> [Either Int String] -> Maybe Value
@@ -58,29 +58,35 @@ spec :: Spec
 spec = describe "Runner: verdicts and report" $ do
 
   it "gives passed, failed and not run" $
-    verdicts [CaseBegin 1, CaseEnd 1, CaseBegin 2, Failure "check_eq_u32" failure, CaseEnd 2, End] False
+    verdicts [CaseBegin 1, CaseEnd 1, CaseBegin 2, Failure "check_eq_u32" failure, CaseEnd 2, End] Finished
       `shouldBe` [Passed, Failed, NotRun, NotRun]
 
   it "leaves the cases after an exception as not run" $ do
     let info = ExceptionInfo 1 "EArithmeticOverflow" [("address", 0x2000)]
-        results = analyse (runOf [CaseBegin 1, CaseEnd 1, CaseBegin 2, Exception info] False)
+        results = analyse (runOf [CaseBegin 1, CaseEnd 1, CaseBegin 2, Exception info] Finished)
     map resultVerdict results `shouldBe` [Passed, Raised, NotRun, NotRun]
     resultException (results !! 1) `shouldBe` Just info
 
   it "gives a timeout and the last step to the case that was running when the process was killed" $ do
-    let results = analyse (runOf [CaseBegin 1, CaseEnd 2, CaseBegin 2] True)
+    let results = analyse (runOf [CaseBegin 1, CaseEnd 2, CaseBegin 2] Killed)
     map resultVerdict results `shouldBe` [Passed, TimedOut, NotRun, NotRun]
     map resultLastStep results `shouldBe` [Nothing, Just 7, Nothing, Nothing]
 
+  it "gives an interruption and the last step to the case open in a dumped record" $ do
+    let results = analyse (runOf [CaseBegin 1, CaseEnd 2, CaseBegin 2] Dumped)
+    map resultVerdict results `shouldBe` [Passed, Interrupted, NotRun, NotRun]
+    map resultLastStep results `shouldBe` [Nothing, Just 7, Nothing, Nothing]
+    caseDetailLines descriptor M.empty (results !! 1) `shouldBe` ["the record ends in the middle of the case; last step 7"]
+
   it "gives an exception to a case the process ended in without a record of it" $
-    verdicts [CaseBegin 1] False `shouldBe` [Raised, NotRun, NotRun, NotRun]
+    verdicts [CaseBegin 1] Finished `shouldBe` [Raised, NotRun, NotRun, NotRun]
 
   it "leaves the cases beyond an overflow of the record without a record" $
-    map resultVerdict (analyse (Run (descriptorCases descriptor) [CaseBegin 1, CaseEnd 1, CaseBegin 2] False True 0 []))
+    map resultVerdict (analyse (Run (descriptorCases descriptor) [CaseBegin 1, CaseEnd 1, CaseBegin 2] Finished True 0 []))
       `shouldBe` [Passed, Unrecorded, Unrecorded, Unrecorded]
 
   it "crosses the records only with the cases of the run" $
-    map resultVerdict (analyse (Run [descriptorCases descriptor !! 2] [CaseBegin 3, CaseEnd 1, End] False False 0 []))
+    map resultVerdict (analyse (Run [descriptorCases descriptor !! 2] [CaseBegin 3, CaseEnd 1, End] Finished False 0 []))
       `shouldBe` [Passed]
 
   it "subtracts the load offset from the addresses of a record" $ do
@@ -89,7 +95,7 @@ spec = describe "Runner: verdicts and report" $ do
       `shouldBe` Exception (ExceptionInfo 0 "ERuntimeFailure" [("address", 0), ("operation", 10), ("error", -2)])
 
   it "writes the report with the line and the text of a failed check" $ do
-    let results = analyse (runOf [CaseBegin 1, CaseEnd 0, CaseBegin 2, Failure "check_eq_u32" failure, CaseEnd 1, End] False)
+    let results = analyse (runOf [CaseBegin 1, CaseEnd 0, CaseBegin 2, Failure "check_eq_u32" failure, CaseEnd 1, End] Finished)
         locations = M.fromList [(0x1000, Just (Location "test.fin" 25))]
     renderReport descriptor locations (TestResult "hk (posix-gcc)" Nothing results Nothing) `shouldBe` [
         "hk (posix-gcc)",
@@ -104,7 +110,7 @@ spec = describe "Runner: verdicts and report" $ do
 
   it "writes an exception with its task and its fields" $ do
     let info = ExceptionInfo 0 "ERuntimeFailure" [("address", 0), ("operation", 10), ("error", -2)]
-        results = analyse (runOf [CaseBegin 1, Exception info] False)
+        results = analyse (runOf [CaseBegin 1, Exception info] Finished)
     take 3 (renderReport descriptor M.empty (TestResult "hk (posix-gcc)" Nothing results Nothing)) `shouldBe` [
         "hk (posix-gcc)",
         "  EXCEPT   t.a",
@@ -112,13 +118,13 @@ spec = describe "Runner: verdicts and report" $ do
       ]
 
   it "exits with 0, 1 or 2" $ do
-    let passed = analyse (runOf [ r | n <- [1 .. 4], r <- [CaseBegin n, CaseEnd 1] ] False)
+    let passed = analyse (runOf [ r | n <- [1 .. 4], r <- [CaseBegin n, CaseEnd 1] ] Finished)
     exitCodeOf (TestResult "" Nothing passed Nothing) `shouldBe` 0
-    exitCodeOf (TestResult "" Nothing (analyse (runOf [] False)) Nothing) `shouldBe` 1
+    exitCodeOf (TestResult "" Nothing (analyse (runOf [] Finished)) Nothing) `shouldBe` 1
     exitCodeOf (TestResult "" (Just "stamp") [] Nothing) `shouldBe` 2
 
   it "writes the values of a failure and its location into results.json" $ do
-    let results = analyse (runOf [CaseBegin 1, Failure "check_eq_u32" failure, CaseEnd 1, End] False)
+    let results = analyse (runOf [CaseBegin 1, Failure "check_eq_u32" failure, CaseEnd 1, End] Finished)
         locations = M.fromList [(0x1000, Just (Location "test.fin" 25))]
         json = resultsJson evidence (Just descriptor) locations (TestResult "hk (posix-gcc)" Nothing results Nothing)
         failed = [Right "cases", Left 0, Right "failures", Left 0]
@@ -131,7 +137,7 @@ spec = describe "Runner: verdicts and report" $ do
 
   it "writes a failure, an error and a skipped case into report.xml" $ do
     let info = ExceptionInfo 0 "EDivisionByZero" [("address", 0)]
-        results = analyse (runOf [CaseBegin 1, CaseEnd 1, CaseBegin 2, Failure "check_eq_u32" failure, CaseEnd 1, CaseBegin 3, Exception info] False)
+        results = analyse (runOf [CaseBegin 1, CaseEnd 1, CaseBegin 2, Failure "check_eq_u32" failure, CaseEnd 1, CaseBegin 3, Exception info] Finished)
         xml = renderJUnit evidence (Just descriptor) M.empty (TestResult "hk (posix-gcc)" Nothing results Nothing)
     xml `shouldSatisfy` isInfixOf "<testsuite name=\"hk (posix-gcc)\" tests=\"4\" failures=\"1\" errors=\"1\" skipped=\"1\">"
     xml `shouldSatisfy` isInfixOf "<testcase classname=\"hk.t\" name=\"a\" file=\"tests/hk/test.fin\" line=\"10\"/>"
@@ -142,9 +148,9 @@ spec = describe "Runner: verdicts and report" $ do
   it "takes the program counter of a processor fault as it is and every other address as a return address" $ do
     let fault = ExceptionInfo 0 "EProcessorFault" [("exception", 4), ("status", 1), ("address", 0x104476), ("fault_address", 0xa5a5a5b5)]
         overflow = ExceptionInfo 0 "EArithmeticOverflow" [("address", 0x2001)]
-    addressesOf (analyse (runOf [CaseBegin 1, Failure "check_eq_u32" failure, CaseEnd 1, CaseBegin 2, Exception fault] False))
+    addressesOf (analyse (runOf [CaseBegin 1, Failure "check_eq_u32" failure, CaseEnd 1, CaseBegin 2, Exception fault] Finished))
       `shouldBe` [(0x1000, ReturnAddress), (0x104476, FaultPc)]
-    addressesOf (analyse (runOf [CaseBegin 1, Exception overflow] False)) `shouldBe` [(0x2001, ReturnAddress)]
+    addressesOf (analyse (runOf [CaseBegin 1, Exception overflow] Finished)) `shouldBe` [(0x2001, ReturnAddress)]
 
   it "finds the call of a return address on each platform" $ do
     -- the blx at 0x105ab4 of the PYNQ, whose lr is 0x105ab7
