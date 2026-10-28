@@ -12,7 +12,7 @@ import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment
 import Command.Common (loadTerminaModule, loadModules)
 import Command.Deliver (deliverableInfo)
 import Configuration.Configuration
-import Configuration.Platform (Platform(..), callSite, checkPlatform, gdbServerPort)
+import Configuration.Platform (Platform(..), callSite, checkPlatform, gdbServerPort, xsdbServerPort)
 import Runner.Analysis (TestResult(TestResult), Run(..), AddressKind(..), analyse, addressesOf, renderReport, exitCodeOf)
 import Runner.Descriptor (Descriptor(..), DescriptorCase, Symbols(..), readDescriptor)
 import qualified Runner.Descriptor as D
@@ -21,6 +21,7 @@ import Runner.Posix (PosixRun(..), runPosix)
 import Runner.Record (Header(..), Layout, decodeHeader, decodeRecords, headerSize, platformLayout, relocate)
 import Runner.Results (Evidence(..), readProvenance, resultsJson, renderResults, renderJUnit)
 import Runner.Symbols (locateAddresses, stampAddress)
+import Runner.Xsdb (prepareBoard)
 import qualified Runner.Symbols as S
 
 import Control.Exception (try)
@@ -66,7 +67,8 @@ data TestCmdArgs =
         (Maybe String) -- ^ Only this case
         Bool -- ^ Run each case in a process of its own
         (Maybe Executor) -- ^ How the binary of a test is run
-        (Maybe GdbServer) -- ^ The GDB server of the board
+        (Maybe Server) -- ^ The GDB server of the board
+        (Maybe Server) -- ^ The XSDB command server of the PYNQ
         Bool -- ^ List the tests instead of running them
         Bool -- ^ Write the list in JSON
     deriving Show
@@ -93,10 +95,14 @@ testCmdArgsParser = TestCmdArgs
           ( O.long "executor"
           <> O.metavar "process|gdb"
           <> O.help "On posix-gcc, run the binary as a process (default) or under gdb, as on a board"))
-    <*> O.optional (O.option (O.eitherReader readGdbServer)
+    <*> O.optional (O.option (O.eitherReader (readServer "GDB server"))
           ( O.long "gdb"
           <> O.metavar "HOST[:PORT]"
           <> O.help "The GDB server of the board (default: localhost, or host.docker.internal in the container, at the port of the platform)"))
+    <*> O.optional (O.option (O.eitherReader (readServer "XSDB server"))
+          ( O.long "xsdb"
+          <> O.metavar "HOST[:PORT]"
+          <> O.help "The XSDB command server that prepares the PYNQ (default: the host of the GDB server, at the port of the platform)"))
     <*> O.switch (O.long "list"
         <> O.help "List the tests, their platforms and their cases, without building them")
     <*> O.switch (O.long "json"
@@ -119,22 +125,22 @@ testCmdArgsParser = TestCmdArgs
             other -> Left $ "Unknown executor: " ++ other ++ " (use process or gdb)"
 
     -- | A host, or a host and a port after the last colon
-    readGdbServer :: String -> Either String GdbServer
-    readGdbServer text =
+    readServer :: String -> String -> Either String Server
+    readServer kind text =
         let (port, rest) = break (== ':') (reverse text) in
         case rest of
             ':' : host ->
                 if not (null port) && all isDigit port && not (null host)
-                    then Right (GdbServer (reverse host) (Just (read (reverse port))))
-                    else Left ("the GDB server " ++ text ++ " is not HOST or HOST:PORT")
-            _ -> if null text then Left "the GDB server is empty" else Right (GdbServer text Nothing)
+                    then Right (Server (reverse host) (Just (read (reverse port))))
+                    else Left ("the " ++ kind ++ " " ++ text ++ " is not HOST or HOST:PORT")
+            _ -> if null text then Left ("the " ++ kind ++ " is empty") else Right (Server text Nothing)
 
 -- | How the binary of a test is run on posix: as a process of the host, or under GDB
 data Executor = ProcessExecutor | GdbExecutor
   deriving (Eq, Show)
 
--- | The host of a GDB server, and its port when it is not the one of the platform
-data GdbServer = GdbServer String (Maybe Int)
+-- | The host of a server of a board, and its port when it is not the one of the platform
+data Server = Server String (Maybe Int)
   deriving (Eq, Show)
 
 -- | A case of a test, named by its test instance
@@ -154,9 +160,9 @@ data Mode =
 
 -- | Command handler for the "test" command
 testCommand :: TestCmdArgs -> IO ()
-testCommand (TestCmdArgs mName mPlatform mProfile mCase isolated mExecutor mServer list json) =
+testCommand (TestCmdArgs mName mPlatform mProfile mCase isolated mExecutor mServer mXsdb list json) =
     if list then listTests json
-    else either cannotRun (runTests mName mPlatform mProfile mExecutor mServer) (modeOf mName mCase isolated)
+    else either cannotRun (runTests mName mPlatform mProfile mExecutor mServer mXsdb) (modeOf mName mCase isolated)
 
 -- | A test that cannot be run exits with 2
 cannotRun :: String -> IO a
@@ -177,8 +183,8 @@ modeOf mName mCase isolated =
 -- | Builds and runs each selected test on each of its platforms, and exits with
 -- the worst code of them: 0 when every case passes, 1 when one does not, 2 when
 -- a test cannot be built or read
-runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Maybe Executor -> Maybe GdbServer -> Mode -> IO ()
-runTests mName mPlatform mProfile mExecutor mServer mode = do
+runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Maybe Executor -> Maybe Server -> Maybe Server -> Mode -> IO ()
+runTests mName mPlatform mProfile mExecutor mServer mXsdb mode = do
     -- | The report goes in order with the output of make
     hSetBuffering stdout LineBuffering
     manifest <- loadManifest >>= either dieWithErrors return
@@ -190,10 +196,14 @@ runTests mName mPlatform mProfile mExecutor mServer mode = do
     when (mServer /= Nothing && length boards /= 1) $
         cannotRun ("--gdb names the GDB server of one board, and the command selects "
             ++ (if null boards then "none" else intercalate ", " (map show boards)) ++ "; choose one with --platform")
+    when (mXsdb /= Nothing && RTEMS6ZYNQ7000PYNQZ2 `notElem` boards) $
+        cannotRun ("--xsdb names the XSDB server that prepares " ++ show RTEMS6ZYNQ7000PYNQZ2 ++ ", which the command does not select")
     when (mExecutor == Just ProcessExecutor && not (null boards)) $
         cannotRun ("a board runs only under GDB, and the command selects "
             ++ intercalate ", " (map show boards) ++ "; choose " ++ show POSIXGCC ++ " with --platform")
     host <- gdbHost mServer
+    let servers = Servers (host, mServer >>= \(Server _ port) -> port)
+                          (maybe host (\(Server h _) -> h) mXsdb, mXsdb >>= \(Server _ port) -> port)
     codes <- forM deployments $ \deployment -> do
         announce deployments ("Building " ++ deploymentLabel deployment)
         built <- try (buildDeployment buildArgs deployment) :: IO (Either ExitCode [(QualifiedName, FilePath)])
@@ -203,7 +213,7 @@ runTests mName mPlatform mProfile mExecutor mServer mode = do
                 createDirectoryIfMissing True (outputFolder config)
                 evidence <- evidenceOf config mode Nothing (executorOf (maybe ProcessExecutor id mExecutor) (deploymentPlatform deployment))
                 finish config evidence Nothing M.empty (invalid config "it does not build")
-            Right _ -> runDeployment (maybe ProcessExecutor id mExecutor) (host, mServer >>= \(GdbServer _ port) -> port) mode deployment
+            Right _ -> runDeployment (maybe ProcessExecutor id mExecutor) servers mode deployment
     let worst = maximum (0 : codes)
     if worst == 0 then exitSuccess else exitWith (ExitFailure worst)
 
@@ -213,10 +223,10 @@ labelOf config = T.unpack (name config) ++ " (" ++ T.unpack (platform config) ++
 
 -- | The host of the GDB servers: the one of --gdb, the one of
 -- TERMINA_GDB_HOST, the host of the container, or the machine itself
-gdbHost :: Maybe GdbServer -> IO String
+gdbHost :: Maybe Server -> IO String
 gdbHost mServer =
     case mServer of
-        Just (GdbServer host _) -> return host
+        Just (Server host _) -> return host
         Nothing -> do
             fromEnvironment <- lookupEnv "TERMINA_GDB_HOST"
             marked <- lookupEnv "TERMINA_CONTAINER"
@@ -228,6 +238,15 @@ gdbHost mServer =
 -- | The executor of a test: a board runs only under GDB
 executorOf :: Executor -> Platform -> Executor
 executorOf executor plt = if plt /= POSIXGCC then GdbExecutor else executor
+
+-- | The host and the port of the GDB server of a board and of the XSDB server
+-- of the PYNQ, each port when it is not the one of the platform
+data Servers = Servers (String, Maybe Int) (String, Maybe Int)
+
+-- | The script of the project that resets the PYNQ, initializes its PS and
+-- loads its bitstream, which the XSDB server sources before each run
+xsdbScript :: FilePath
+xsdbScript = "assets" </> "xsdb" </> "init" <.> "tcl"
 
 -- | The commands of the console that reset a board and load the binary; the
 -- PYNQ is prepared before with the XSDB script of the project
@@ -251,15 +270,17 @@ data Launcher = AsProcess | UnderGdb FilePath GdbTarget
 
 -- | Runs a test that is built: on posix as a process or under gdb, and on a
 -- board under the GDB of its toolchain, through its GDB server at the host and
--- at the port of the platform or of --gdb
-runDeployment :: Executor -> (String, Maybe Int) -> Mode -> Deployment -> IO Int
-runDeployment executor (host, mPort) mode deployment = do
+-- at the port of the platform or of --gdb; the PYNQ is prepared before each
+-- run through its XSDB server
+runDeployment :: Executor -> Servers -> Mode -> Deployment -> IO Int
+runDeployment executor (Servers (host, mPort) (xsdbHost, mXsdbPort)) mode deployment = do
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
         folder = outputFolder config
         binary = folder </> "bin" </> T.unpack (name config)
         board = plt /= POSIXGCC
         address = host ++ ":" ++ maybe "" show (maybe (gdbServerPort plt) Just mPort)
+        xsdbPort = maybe (xsdbServerPort plt) Just mXsdbPort
     loaded <- readDescriptor (folder </> "test" <.> "json")
     case loaded of
       Left err -> do
@@ -274,20 +295,35 @@ runDeployment executor (host, mPort) mode deployment = do
                 if board then UnderGdb (prefix ++ "gdb") (RemoteServer address (launchSequence plt))
                 else if executor == GdbExecutor then UnderGdb "gdb" NativeProcess
                 else AsProcess
-        case plan folder descriptor (board && mode == Isolated && plt /= FreeRTOS10STM32L432NUCLEOL432KC) of
+        hasScript <- doesFileExist xsdbScript
+        let relaunched = plt `elem` [FreeRTOS10STM32L432NUCLEOL432KC, RTEMS6ZYNQ7000PYNQZ2]
+            prepared = case xsdbPort of
+                Nothing -> Right Nothing
+                Just port -> if hasScript then Right (Just port)
+                    else Left ("the " ++ show plt ++ " is prepared before each run with " ++ xsdbScript
+                               ++ ", which resets the board, initializes its PS and loads its bitstream, and the project has none")
+        case prepared >> plan folder descriptor (board && mode == Isolated && not relaunched) of
           Left err -> finish config evidence (Just descriptor) M.empty (invalid config err)
           Right planned -> do
             stamp <- stampAddress prefix binary
             either (putStrLn . warnMessage) (const (return ())) stamp
-            ran <- runAll (execute config launcher (platformLayout plt) descriptor binary (either (const Nothing) Just stamp)) planned
+            let prepare = case either (const Nothing) id prepared of
+                    Nothing -> return (Right ())
+                    Just port -> do
+                        done <- prepareBoard xsdbHost port xsdbScript
+                        return $ either (\err -> Left ("the XSDB server at " ++ xsdbHost ++ ":" ++ show port
+                            ++ " did not prepare the board: " ++ err ++ "; it is started from the root of the project with xsdb -eval \"xsdbserver start -port "
+                            ++ show port ++ "; vwait forever\"")) Right done
+                run p = prepare >>= either (return . Left) (const (execute config launcher (platformLayout plt) descriptor binary (either (const Nothing) Just stamp) p))
+            ran <- runAll run planned
             case ran of
               Left err -> finish config evidence (Just descriptor) M.empty (invalid config err)
               Right runs -> do
                 let results = concatMap (analyse . fst) runs
                     overflowed = [ (headerCasesEnded h, headerChecksFailed h) | (r, h) <- runs, runOverflow r ]
                     overflow = if null overflowed then Nothing else Just (sum (map fst overflowed), sum (map snd overflowed))
-                let lookups = [ (address, if kind == ReturnAddress then callSite plt address else address)
-                              | (address, kind) <- addressesOf results ]
+                let lookups = [ (recorded, if kind == ReturnAddress then callSite plt recorded else recorded)
+                              | (recorded, kind) <- addressesOf results ]
                 (locations, warning) <- locateAddresses prefix binary lookups
                 maybe (return ()) (putStrLn . warnMessage) warning
                 finish config evidence (Just descriptor) locations (TestResult (labelOf config) Nothing results overflow)

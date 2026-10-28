@@ -34,6 +34,12 @@ gdbServerPort FreeRTOS10STM32L432NUCLEOL432KC = Just 61234
 gdbServerPort RTEMS6ZYNQ7000PYNQZ2 = Just 3000
 gdbServerPort _ = Nothing
 
+-- | The default port of the XSDB command server that prepares a board before
+-- each run of termina test, on the boards that need one
+xsdbServerPort :: Platform -> Maybe Int
+xsdbServerPort RTEMS6ZYNQ7000PYNQZ2 = Just 3122
+xsdbServerPort _ = Nothing
+
 -- | An address inside the call instruction, from the value of
 -- __builtin_return_address(0) in the function it called: on x86-64 and
 -- AArch64 the value is the next instruction; on ARM in Thumb it is the next

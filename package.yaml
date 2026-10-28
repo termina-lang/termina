@@ -55,6 +55,8 @@ dependencies:
 - tar
 - zlib
 - cryptohash-sha256
+# The XSDB command server of the PYNQ
+- network
 
 ghc-options:
 - -Wall
