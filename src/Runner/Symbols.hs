@@ -27,7 +27,7 @@ locateAddresses _ [] = return (M.empty, Nothing)
 locateAddresses binary addresses = do
     let queries = [ hex (a - 1) | a <- addresses ]
     located <- if os == "darwin"
-        then runTool "atos" (["-o", binary] ++ queries) atosLocation
+        then runTool "atos" (["--fullPath", "-o", binary] ++ queries) atosLocation
         else runTool "addr2line" (["-e", binary] ++ queries) addr2lineLocation
     return $ case located of
         Left warning -> (M.fromList [ (a, Nothing) | a <- addresses ], Just warning)
@@ -59,7 +59,7 @@ stampAddress binary = do
                     _ -> Left ("nm gives an address that is not hexadecimal: " ++ address)
                 [] -> Left ("the binary " ++ binary ++ " has no termina__test__stamp")
 
--- | "function (in binary) (test.fin:228)": atos gives the name of the file without its folder
+-- | "function (in binary) (./tests/hk_fdir/test.fin:228)", with the path of the #line pragma
 atosLocation :: String -> Maybe Location
 atosLocation text =
     case reverse (words text) of

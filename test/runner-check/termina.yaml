@@ -1,0 +1,22 @@
+project:
+  name: runner
+  version: 0.1.0
+  manifest-version: 1
+
+exports:
+  - runner
+
+tests:
+  outcomes:
+    platforms: [posix-gcc]
+    timeout: 10
+  exception:
+    platforms: [posix-gcc]
+    timeout: 10
+  timeout:
+    platforms: [posix-gcc]
+    timeout: 1
+  overflow:
+    platforms: [posix-gcc]
+    timeout: 10
+    test-log-size: 64

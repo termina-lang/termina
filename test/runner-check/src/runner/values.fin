@@ -1,0 +1,9 @@
+// Functions under test
+
+function runner_sum(a : u32, b : u32) -> u32 {
+    return a + b;
+}
+
+function runner_at(values : &[u32; 4], i : usize) -> u32 {
+    return (*values)[i];
+}

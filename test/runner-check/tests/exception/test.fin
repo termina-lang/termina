@@ -1,0 +1,30 @@
+// A case that raises an exception, between one that passes and one that does not run
+
+import runner.values;
+
+test class CException {
+
+    t : access TestChecks;
+
+    case before(&mut self) {
+        self->t.check(true);
+        return;
+    }
+
+    case out_of_bounds(&mut self) {
+        var values : [u32; 4] = [0 : u32; 4];
+        let i : usize = 7 : usize;
+        self->t.check_eq_u32(runner_at(&values, i), 0 : u32);
+        return;
+    }
+
+    case after(&mut self) {
+        self->t.check(true);
+        return;
+    }
+
+};
+
+test exception_tests : CException = {
+    t <-> test_checks
+};

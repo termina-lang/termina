@@ -1,0 +1,11 @@
+outcomes (posix-gcc)
+  ok       outcomes_tests.passes               1 check
+  FAIL     outcomes_tests.fails_with_values    1 check
+           tests/outcomes/test.fin:15  self->t.check_eq_u32(runner_sum(2 : u32, 2 : u32), 5 : u32)  expected 5, got 4
+  FAIL     outcomes_tests.fails_in_loop        4 checks
+           tests/outcomes/test.fin:22  self->t.check(i != 2 : usize)  step 2
+  FAIL     outcomes_tests.fails_at_end         2 checks
+           tests/outcomes/test.fin:29  self->t.check_eq_i32(-3 : i32, 3 : i32)  expected 3, got -3
+  ok       outcomes_tests.no_checks            0 checks
+           warning: the case ran no checks
+  2 passed, 3 failed

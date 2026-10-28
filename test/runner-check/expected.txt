@@ -1,0 +1,31 @@
+exception (posix-gcc)
+  ok       exception_tests.before           1 check
+  EXCEPT   exception_tests.out_of_bounds
+           EArrayIndexOutOfBounds at src/runner/values.fin:8 in the task harness: size 4, index 7
+  --       exception_tests.after            not run
+  1 passed, 1 with an exception, 1 not run
+outcomes (posix-gcc)
+  ok       outcomes_tests.passes               1 check
+  FAIL     outcomes_tests.fails_with_values    1 check
+           tests/outcomes/test.fin:15  self->t.check_eq_u32(runner_sum(2 : u32, 2 : u32), 5 : u32)  expected 5, got 4
+  FAIL     outcomes_tests.fails_in_loop        4 checks
+           tests/outcomes/test.fin:22  self->t.check(i != 2 : usize)  step 2
+  FAIL     outcomes_tests.fails_at_end         2 checks
+           tests/outcomes/test.fin:29  self->t.check_eq_i32(-3 : i32, 3 : i32)  expected 3, got -3
+  ok       outcomes_tests.no_checks            0 checks
+           warning: the case ran no checks
+  2 passed, 3 failed
+overflow (posix-gcc)
+  FAIL     overflow_tests.floods    100 checks
+           tests/overflow/test.fin:9  self->t.check_eq_u32(i, 1000 : u32)  expected 1000, got 0
+           tests/overflow/test.fin:9  self->t.check_eq_u32(i, 1000 : u32)  expected 1000, got 1
+  ??       overflow_tests.after     without a record
+           the record overflowed before the end of the case
+  the record overflowed: 2 cases ended and 100 checks failed in all, and the failures beyond it are not detailed
+  0 passed, 1 failed, 1 without a record
+timeout (posix-gcc)
+  ok       timeout_tests.before    1 check
+  TIMEOUT  timeout_tests.hangs
+           the case did not end before the timeout; last step 7
+  --       timeout_tests.after     not run
+  1 passed, 1 timed out, 1 not run

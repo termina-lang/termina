@@ -1,0 +1,23 @@
+// More failures than the record holds
+
+test class COverflow {
+
+    t : access TestChecks;
+
+    case floods(&mut self) {
+        for i : u32 in 0 : u32 .. 100 : u32 {
+            self->t.check_eq_u32(i, 1000 : u32);
+        }
+        return;
+    }
+
+    case after(&mut self) {
+        self->t.check(true);
+        return;
+    }
+
+};
+
+test overflow_tests : COverflow = {
+    t <-> test_checks
+};

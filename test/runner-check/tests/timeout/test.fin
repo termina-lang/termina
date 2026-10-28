@@ -1,0 +1,30 @@
+// A case that does not end before the timeout
+
+test class CTimeout {
+
+    t : access TestChecks;
+
+    case before(&mut self) {
+        self->t.check(true);
+        return;
+    }
+
+    case hangs(&mut self) {
+        for i : u32 in 0 : u32 .. 0xFFFFFFFF : u32 {
+            for j : u32 in 0 : u32 .. 0xFFFFFFFF : u32 {
+                self->t.step(7 : usize);
+            }
+        }
+        return;
+    }
+
+    case after(&mut self) {
+        self->t.check(true);
+        return;
+    }
+
+};
+
+test timeout_tests : CTimeout = {
+    t <-> test_checks
+};

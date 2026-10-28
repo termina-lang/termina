@@ -12,7 +12,7 @@ import Runner.Record
 import Runner.Symbols (Location(..))
 
 import Data.Char (chr)
-import Data.List (intercalate)
+import Data.List (dropWhileEnd, intercalate)
 import qualified Data.Map.Strict as M
 import Numeric (showHex)
 import System.FilePath (takeFileName)
@@ -129,7 +129,7 @@ failureDetail descriptor locations (procedure, check) =
 
   where
 
-    -- | atos gives the name of the file without its folder, so the file matches by its name
+    -- | The file matches by its name too, for a tool that gives it without its folder
     checkAt (Location file line) =
         case [ c | c <- descriptorChecks descriptor, checkLine c == line,
                    checkFile c == file || takeFileName (checkFile c) == takeFileName file ] of
@@ -230,7 +230,7 @@ renderReport descriptor locations result =
                 TimedOut -> "  TIMEOUT  " ++ name
                 NotRun -> "  --       " ++ name ++ "    not run"
                 Unrecorded -> "  ??       " ++ name ++ "    without a record"
-        in first : map ("           " ++) (caseDetailLines descriptor locations r)
+        in dropWhileEnd (== ' ') first : map ("           " ++) (caseDetailLines descriptor locations r)
 
     checksText checks =
         case checks of

@@ -1,0 +1,42 @@
+// Cases that pass, that fail at known lines with known values, and that run no checks
+
+import runner.values;
+
+test class COutcomes {
+
+    t : access TestChecks;
+
+    case passes(&mut self) {
+        self->t.check_eq_u32(runner_sum(2 : u32, 3 : u32), 5 : u32);
+        return;
+    }
+
+    case fails_with_values(&mut self) {
+        self->t.check_eq_u32(runner_sum(2 : u32, 2 : u32), 5 : u32);
+        return;
+    }
+
+    case fails_in_loop(&mut self) {
+        for i : usize in 0 : usize .. 4 : usize {
+            self->t.step(i);
+            self->t.check(i != 2 : usize);
+        }
+        return;
+    }
+
+    case fails_at_end(&mut self) {
+        self->t.check_eq_bool(true, true);
+        self->t.check_eq_i32(-3 : i32, 3 : i32);
+        return;
+    }
+
+    case no_checks(&mut self) {
+        self->t.step(1 : usize);
+        return;
+    }
+
+};
+
+test outcomes_tests : COutcomes = {
+    t <-> test_checks
+};
