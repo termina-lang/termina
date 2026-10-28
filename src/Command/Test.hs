@@ -296,13 +296,12 @@ runDeployment executor (Servers (host, mPort) (xsdbHost, mXsdbPort)) mode deploy
                 else if executor == GdbExecutor then UnderGdb "gdb" NativeProcess
                 else AsProcess
         hasScript <- doesFileExist xsdbScript
-        let relaunched = plt `elem` [FreeRTOS10STM32L432NUCLEOL432KC, RTEMS6ZYNQ7000PYNQZ2]
-            prepared = case xsdbPort of
+        let prepared = case xsdbPort of
                 Nothing -> Right Nothing
                 Just port -> if hasScript then Right (Just port)
                     else Left ("the " ++ show plt ++ " is prepared before each run with " ++ xsdbScript
                                ++ ", which resets the board, initializes its PS and loads its bitstream, and the project has none")
-        case prepared >> plan folder descriptor (board && mode == Isolated && not relaunched) of
+        case prepared >> plan folder descriptor of
           Left err -> finish config evidence (Just descriptor) M.empty (invalid config err)
           Right planned -> do
             stamp <- stampAddress prefix binary
@@ -330,14 +329,12 @@ runDeployment executor (Servers (host, mPort) (xsdbHost, mXsdbPort)) mode deploy
 
   where
 
-    plan folder descriptor noRelaunch =
+    plan folder descriptor =
         let cases = D.descriptorCases descriptor
             record n = folder </> ("record" ++ n) <.> "bin"
             output n = folder </> ("test" ++ n) <.> "log"
         in if mode /= AllCases && descriptorLevel descriptor /= "unit"
             then Left "--case and --isolated run the cases of a unit test"
-            else if noRelaunch
-            then Left ("--isolated is not available on " ++ show (deploymentPlatform deployment) ++ " until a reliable relaunch of the board is checked")
             else case mode of
                 AllCases -> Right [Planned 0 cases (record "") (output "")]
                 OneCase c -> case [ dc | dc <- cases, D.caseId dc == c ] of
