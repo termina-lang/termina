@@ -40,6 +40,16 @@ spec = describe "Makefile: project configuration" $ do
       , "@cd $(TERMINA_PROJECT_DIR) && $(CC) $(CFLAGS)"
       ]
 
+  it "rebuilds every object and the binary when the tools or the flags change" $
+    mapM_ (\line -> makefileFor (defaultConfig "test" TestPlatform) `shouldContain` line)
+      [ "TERMINA_FLAGS_FILE:=$(TARGET_DIR_NAME)/flags\n"
+      , "TERMINA_FLAGS=$(CC) $(AS) $(CFLAGS) $(CPPFLAGS) $(ASMFLAGS) $(LDFLAGS)\n"
+      , "$(TERMINA_FLAGS_FILE): termina-flags\n"
+      , "$(TARGET_DIR_NAME)/termina/%.o: $(TERMINA_OSAL_DIR)/%.c $(TERMINA_FLAGS_FILE)\n"
+      , "$(TARGET_DIR_NAME)/%.o: $(R)/%.c $(TERMINA_FLAGS_FILE)\n"
+      , "$(TARGET): $(OBJS) $(TERMINA_FLAGS_FILE)\n"
+      ]
+
   it "deletes the target of a recipe that fails" $
     makefileFor (defaultConfig "test" TestPlatform) `shouldContain` ".DELETE_ON_ERROR:"
 
@@ -56,6 +66,6 @@ spec = describe "Makefile: project configuration" $ do
   it "adds the descriptor of a unit test to its binary" $ do
     let testConfig = (defaultConfig "test" TestPlatform) { deploymentKind = TestBuild (T.pack "hk") }
         unitMakefile = T.unpack . runMakefilePrinter $ genMakefile testConfig M.empty Nothing True
-    unitMakefile `shouldContain` "$(TARGET): $(OBJS) $R/test.json\n"
+    unitMakefile `shouldContain` "$(TARGET): $(OBJS) $(TERMINA_FLAGS_FILE) $R/test.json\n"
     unitMakefile `shouldContain` "$(OBJCOPY) --add-section .termina_test=$R/test.json $@;"
     makefileFor testConfig `shouldNotContain` "test.json"

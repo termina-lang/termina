@@ -47,6 +47,6 @@ spec = describe "Manifest: extern section" $ do
       [ "EXTERN_SRCS+=$R/extern/crc.c\n"
       , "EXTERN_LIBS+=$R/extern/leon3sf/libmcs.a\n"
       , "OBJS+=$(EXTERN_OBJ)\n"
-      , "$(EXTERN_OBJ): $(EXTERN_OBJS) $(EXTERN_LIBS) $R/Makefile\n"
+      , "$(EXTERN_OBJ): $(EXTERN_OBJS) $(EXTERN_LIBS) $R/Makefile $(TERMINA_FLAGS_FILE)\n"
       , "@$(call termina_extern_link,$@,$(EXTERN_OBJS),$(EXTERN_LIBS),$(EXTERN_SYMBOLS))\n"
       ]

@@ -48,6 +48,12 @@ genMakefile params loweredProject mExtern unitTest =
             MVariable MSimple "TARGET_DIR_NAME" [MFragment "$R/bin"],
             MVariable MSimple "TARGET" [MFragment "$(TARGET_DIR_NAME)/$(PROJECT_NAME)"]
         ],
+        -- | The tools and the flags of the build, which every object depends
+        -- on, so a change of profile or of platform flags rebuilds them all
+        MakeBlock [
+            MVariable MSimple "TERMINA_FLAGS_FILE" [MFragment "$(TARGET_DIR_NAME)/flags"],
+            MVariable MRecursive "TERMINA_FLAGS" [MFragment "$(CC) $(AS) $(CFLAGS) $(CPPFLAGS) $(ASMFLAGS) $(LDFLAGS)"]
+        ],
         -- The headers of the project are reached through -iquote and not -I,
         -- since every file that includes one of them, generated or of the OSAL,
         -- does it between quotes. 
@@ -79,17 +85,24 @@ genMakefile params loweredProject mExtern unitTest =
             -- | A recipe that fails leaves no target that make would take as
             -- up to date
             MRule ".DELETE_ON_ERROR" [] [],
-            MRule "$(TARGET_DIR_NAME)/termina/%.o" ["$(TERMINA_OSAL_DIR)/%.s"] [
+            -- | The file is rewritten only when its content changes, so its
+            -- date tells make when the flags changed
+            MRule ".PHONY" ["termina-flags"] [],
+            MRule "$(TERMINA_FLAGS_FILE)" ["termina-flags"] [
+                MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
+                MakeCommand False [MFragment "@if [ \"$$(cat $@ 2>/dev/null)\" != '$(subst ','\\'',$(TERMINA_FLAGS))' ]; then printf '%s\\n' '$(subst ','\\'',$(TERMINA_FLAGS))' > $@; fi"]
+            ],
+            MRule "$(TARGET_DIR_NAME)/termina/%.o" ["$(TERMINA_OSAL_DIR)/%.s", "$(TERMINA_FLAGS_FILE)"] [
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
                 MakeCommand False [MFragment "@cd $(TERMINA_PROJECT_DIR) && $(AS) $(ASMFLAGS) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
             ],
-            MRule "$(TARGET_DIR_NAME)/termina/%.o" ["$(TERMINA_OSAL_DIR)/%.c"] [
+            MRule "$(TARGET_DIR_NAME)/termina/%.o" ["$(TERMINA_OSAL_DIR)/%.c", "$(TERMINA_FLAGS_FILE)"] [
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
                 MakeCommand False [MFragment "@cd $(TERMINA_PROJECT_DIR) && $(CC) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
             ],
-            MRule "$(TARGET_DIR_NAME)/%.o" ["$(R)/%.c"] [
+            MRule "$(TARGET_DIR_NAME)/%.o" ["$(R)/%.c", "$(TERMINA_FLAGS_FILE)"] [
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
                 MakeCommand False [MFragment "@cd $(TERMINA_PROJECT_DIR) && $(CC) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
@@ -119,7 +132,7 @@ genMakefile params loweredProject mExtern unitTest =
                     MakeCommand False [MFragment "$(info CC_VERSION=$(shell $(CC) --version 2>/dev/null | head -n 1))"],
                     MakeCommand False [MFragment "$(foreach v,$(.VARIABLES),$(if $(findstring $$($(v)),$(value CROSS)),$(info VAR $(v)=$($(v)))))"]
                 ],
-            MRule "$(TARGET)" (["$(OBJS)"] ++ ["$R/test.json" | unitTest]) ([
+            MRule "$(TARGET)" (["$(OBJS)", "$(TERMINA_FLAGS_FILE)"] ++ ["$R/test.json" | unitTest]) ([
                 MakeCommand False [MFragment "@echo Linking $@"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
                 MakeCommand False [MFragment "@$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@"]
@@ -211,7 +224,7 @@ genMakefile params loweredProject mExtern unitTest =
         externRule = [
             -- | The Makefile holds the list of extern functions, so a new one
             -- relinks the object even when no C changed
-            MRule "$(EXTERN_OBJ)" ["$(EXTERN_OBJS)", "$(EXTERN_LIBS)", "$R/Makefile"] [
+            MRule "$(EXTERN_OBJ)" ["$(EXTERN_OBJS)", "$(EXTERN_LIBS)", "$R/Makefile", "$(TERMINA_FLAGS_FILE)"] [
                 MakeCommand False [MFragment "@echo Linking $@"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
                 MakeCommand False [MFragment "@$(call termina_extern_link,$@,$(EXTERN_OBJS),$(EXTERN_LIBS),$(EXTERN_SYMBOLS))"]
