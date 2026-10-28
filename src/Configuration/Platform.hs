@@ -4,6 +4,7 @@ module Configuration.Platform where
 
 import qualified Data.Map.Strict as M
 import Core.AST (Identifier)
+import Data.Bits (clearBit)
 
 data Platform =
     POSIXGCC
@@ -32,6 +33,17 @@ gdbServerPort RTEMS5LEON3SFNEXYSA7 = Just 2222
 gdbServerPort FreeRTOS10STM32L432NUCLEOL432KC = Just 61234
 gdbServerPort RTEMS6ZYNQ7000PYNQZ2 = Just 3000
 gdbServerPort _ = Nothing
+
+-- | An address inside the call instruction, from the value of
+-- __builtin_return_address(0) in the function it called: on x86-64 and
+-- AArch64 the value is the next instruction; on ARM in Thumb it is the next
+-- instruction with bit 0 set; on SPARC it is the call itself
+callSite :: Platform -> Integer -> Integer
+callSite RTEMS5LEON3SFNEXYSA7 address = address
+callSite FreeRTOS10STM32L432NUCLEOL432KC address = clearBit address 0 - 1
+callSite RTEMS6ZYNQ7000PYNQZ2 address = clearBit address 0 - 1
+callSite POSIXGCC address = address - 1
+callSite TestPlatform address = address - 1
 
 -- | The bit width of C @int@ on the target, which is what decides whether an
 -- operation on a narrower type is carried out in that narrower type or in

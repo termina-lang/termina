@@ -2,6 +2,7 @@
 -- files of the result and the reading of the output of atos and addr2line.
 module Runner.AnalysisSpec (spec) where
 
+import Configuration.Platform (Platform(..), callSite)
 import Runner.Analysis
 import Runner.Descriptor
 import Runner.Record
@@ -137,6 +138,21 @@ spec = describe "Runner: verdicts and report" $ do
     xml `shouldSatisfy` isInfixOf "<failure type=\"check_eq_u32\" message=\"0x1000  check_eq_u32  expected 95, got 0\">"
     xml `shouldSatisfy` isInfixOf "<error type=\"EDivisionByZero\""
     xml `shouldSatisfy` isInfixOf "<skipped/>"
+
+  it "takes the program counter of a processor fault as it is and every other address as a return address" $ do
+    let fault = ExceptionInfo 0 "EProcessorFault" [("exception", 4), ("status", 1), ("address", 0x104476), ("fault_address", 0xa5a5a5b5)]
+        overflow = ExceptionInfo 0 "EArithmeticOverflow" [("address", 0x2001)]
+    addressesOf (analyse (runOf [CaseBegin 1, Failure "check_eq_u32" failure, CaseEnd 1, CaseBegin 2, Exception fault] False))
+      `shouldBe` [(0x1000, ReturnAddress), (0x104476, FaultPc)]
+    addressesOf (analyse (runOf [CaseBegin 1, Exception overflow] False)) `shouldBe` [(0x2001, ReturnAddress)]
+
+  it "finds the call of a return address on each platform" $ do
+    -- the blx at 0x105ab4 of the PYNQ, whose lr is 0x105ab7
+    callSite RTEMS6ZYNQ7000PYNQZ2 0x105ab7 `shouldBe` 0x105ab5
+    callSite FreeRTOS10STM32L432NUCLEOL432KC 0x8001235 `shouldBe` 0x8001233
+    -- %o7 on SPARC is the address of the call
+    callSite RTEMS5LEON3SFNEXYSA7 0x40001000 `shouldBe` 0x40001000
+    callSite POSIXGCC 0x100003f55 `shouldBe` 0x100003f54
 
   it "reads the output of atos and of addr2line" $ do
     atosLocation "CHkFdirTests__high_severity_action (in hk_fdir) (test.fin:228)" `shouldBe` Just (Location "test.fin" 228)

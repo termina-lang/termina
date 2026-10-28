@@ -20,20 +20,21 @@ data Location = Location {
 
 -- | The location of each address of a binary, already without its load offset,
 -- with the addr2line of the toolchain whose programs start with the prefix, or
--- with atos for a binary of macOS, whose prefix is empty; one is subtracted
--- from each return address, which points after its call. It gives the
--- addresses it could not translate as nothing, and a warning when a tool is
--- missing.
-locateAddresses :: String -> FilePath -> [Integer] -> IO (M.Map Integer (Maybe Location), Maybe String)
+-- with atos for a binary of macOS, whose prefix is empty. Each address comes
+-- with the one to look up, which for a return address is inside its call. It
+-- gives the addresses it could not translate as nothing, and a warning when a
+-- tool is missing.
+locateAddresses :: String -> FilePath -> [(Integer, Integer)] -> IO (M.Map Integer (Maybe Location), Maybe String)
 locateAddresses _ _ [] = return (M.empty, Nothing)
 locateAddresses prefix binary addresses = do
-    let queries = [ hex (a - 1) | a <- addresses ]
+    let queries = [ hex query | (_, query) <- addresses ]
+        keys = map fst addresses
     located <- if null prefix && os == "darwin"
         then runTool "atos" (["--fullPath", "-o", binary] ++ queries) atosLocation
         else runTool (prefix ++ "addr2line") (["-e", binary] ++ queries) addr2lineLocation
     return $ case located of
-        Left warning -> (M.fromList [ (a, Nothing) | a <- addresses ], Just warning)
-        Right locations -> (M.fromList (zip addresses (locations ++ repeat Nothing)), Nothing)
+        Left warning -> (M.fromList [ (a, Nothing) | a <- keys ], Just warning)
+        Right locations -> (M.fromList (zip keys (locations ++ repeat Nothing)), Nothing)
 
   where
 

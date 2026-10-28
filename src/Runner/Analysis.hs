@@ -2,7 +2,7 @@
 -- console.
 module Runner.Analysis (
     Verdict(..), CaseResult(..), TestResult(..), Run(..),
-    FailureDetail(..), Shown(..), ExceptionDetail(..),
+    FailureDetail(..), Shown(..), ExceptionDetail(..), AddressKind(..),
     analyse, addressesOf, failureDetail, exceptionDetail, caseDetailLines,
     renderReport, exitCodeOf
 ) where
@@ -89,11 +89,20 @@ analyse run =
             ([], Just (n, failures)) -> close n interrupted Nothing failures Nothing results
             ([], Nothing) -> results
 
--- | The return addresses of the failures and the addresses of the exceptions, to translate them at once
-addressesOf :: [CaseResult] -> [Integer]
+-- | What an address of a record points to
+data AddressKind =
+    ReturnAddress -- ^ after the call that recorded it
+    | FaultPc -- ^ the instruction that failed
+  deriving (Eq, Show)
+
+-- | The addresses of the failures and of the exceptions, to translate them at
+-- once; the one of a processor fault is its program counter, and every other
+-- one is the return address of a function of the OSAL
+addressesOf :: [CaseResult] -> [(Integer, AddressKind)]
 addressesOf results =
-    [ checkWhere check | r <- results, (_, check) <- resultFailures r ]
-    ++ [ address | r <- results, Just info <- [resultException r], ("address", address) <- exceptionFields info, address /= 0 ]
+    [ (checkWhere check, ReturnAddress) | r <- results, (_, check) <- resultFailures r ]
+    ++ [ (address, if exceptionVariant info == "EProcessorFault" then FaultPc else ReturnAddress)
+       | r <- results, Just info <- [resultException r], ("address", address) <- exceptionFields info, address /= 0 ]
 
 -- | A failed check as the reports give it
 data FailureDetail = FailureDetail {

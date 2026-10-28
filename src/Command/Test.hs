@@ -12,8 +12,8 @@ import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment
 import Command.Common (loadTerminaModule, loadModules)
 import Command.Deliver (deliverableInfo)
 import Configuration.Configuration
-import Configuration.Platform (Platform(..), checkPlatform, gdbServerPort)
-import Runner.Analysis (TestResult(TestResult), Run(..), analyse, addressesOf, renderReport, exitCodeOf)
+import Configuration.Platform (Platform(..), callSite, checkPlatform, gdbServerPort)
+import Runner.Analysis (TestResult(TestResult), Run(..), AddressKind(..), analyse, addressesOf, renderReport, exitCodeOf)
 import Runner.Descriptor (Descriptor(..), DescriptorCase, Symbols(..), readDescriptor)
 import qualified Runner.Descriptor as D
 import Runner.Gdb (GdbTarget(..), GdbEnd(..), GdbRun(..), runGdb)
@@ -286,7 +286,9 @@ runDeployment executor (host, mPort) mode deployment = do
                 let results = concatMap (analyse . fst) runs
                     overflowed = [ (headerCasesEnded h, headerChecksFailed h) | (r, h) <- runs, runOverflow r ]
                     overflow = if null overflowed then Nothing else Just (sum (map fst overflowed), sum (map snd overflowed))
-                (locations, warning) <- locateAddresses prefix binary (addressesOf results)
+                let lookups = [ (address, if kind == ReturnAddress then callSite plt address else address)
+                              | (address, kind) <- addressesOf results ]
+                (locations, warning) <- locateAddresses prefix binary lookups
                 maybe (return ()) (putStrLn . warnMessage) warning
                 finish config evidence (Just descriptor) locations (TestResult (labelOf config) Nothing results overflow)
 
