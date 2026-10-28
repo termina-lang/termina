@@ -123,9 +123,13 @@ runGdb gdb binary target folder logFile selectedCase seconds = do
             Left err -> return (Left err)
             Right end -> do
                 frames <- if end == AtReboot || isCrash end then backtrace session else return []
+                -- | The area is declared without its size in the headers of the OSAL,
+                -- which an older GDB takes from the file it is stopped in
                 dumped <- sequenceAll session [
-                    console ("dump binary value " ++ headerFile ++ " termina__test__header"),
-                    console ("dump binary value " ++ areaFile ++ " termina__test__area") ]
+                    console ("dump binary memory " ++ headerFile
+                             ++ " (char*)&termina__test__header (char*)&termina__test__header+sizeof(termina__test__header)"),
+                    console ("dump binary memory " ++ areaFile
+                             ++ " (char*)&termina__test__area (char*)&termina__test__area+termina__test__capacity") ]
                 case dumped of
                     Left err -> return (Left ("the record could not be dumped: " ++ err))
                     Right () -> do
