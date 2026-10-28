@@ -253,7 +253,7 @@ xsdbScript = "assets" </> "xsdb" </> "init" <.> "tcl"
 launchSequence :: Platform -> [String]
 launchSequence plt =
     case plt of
-        FreeRTOS10STM32L432NUCLEOL432KC -> ["monitor reset halt", "load"]
+        FreeRTOS10STM32L432NUCLEOL432KC -> ["monitor reset", "load"]
         RTEMS5LEON3SFNEXYSA7 -> ["monitor reset", "load"]
         _ -> ["load"]
 
