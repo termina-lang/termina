@@ -46,7 +46,13 @@ import Control.Monad (forM_, unless, when)
 import Data.Maybe (listToMaybe, mapMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import System.Exit (die, exitFailure)
+import System.Exit (ExitCode(..), die, exitFailure)
+import Control.Exception (IOException, try)
+import System.Process (readProcessWithExitCode)
+import qualified Crypto.Hash.SHA256 as SHA256
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BL
+import Text.Printf (printf)
 
 -- | Error message formatter
 -- Prints error messages in the form "[error] <message>"
@@ -368,3 +374,15 @@ sortProjectDepsOrLoop = topErrorInternal . M.toList
           }
         )
         Right $ topSortFromDepList projectDependencies
+
+-- | Runs git with the given arguments, or reports why it could not.
+runGit :: [String] -> IO (Either String String)
+runGit args = do
+    result <- try (readProcessWithExitCode "git" args "")
+    return $ case result of
+        Left e -> Left (show (e :: IOException))
+        Right (ExitSuccess, out, _) -> Right out
+        Right (ExitFailure _, _, err) -> Left err
+
+sha256File :: FilePath -> IO String
+sha256File file = concatMap (printf "%02x") . BS.unpack . SHA256.hashlazy <$> BL.readFile file

@@ -6,7 +6,7 @@ module Runner.Posix (
 
 import Runner.Record (Layout(..), headerSize)
 
-import Control.Exception (IOException, try)
+import Control.Exception (IOException, onException, try)
 import Data.Bits (shiftR, (.&.))
 import qualified Data.ByteString as BS
 import System.Environment (getEnvironment)
@@ -35,9 +35,11 @@ runPosix layout binary recordFile logFile capacity selectedCase seconds = do
                 std_out = UseHandle logHandle,
                 std_err = UseHandle logHandle
             }
-        ended <- case seconds of
+        -- | An interrupted runner does not leave the process behind
+        ended <- (case seconds of
             Nothing -> Just <$> waitForProcess process
-            Just s -> timeout (fromIntegral s * 1000000) (waitForProcess process)
+            Just s -> timeout (fromIntegral s * 1000000) (waitForProcess process))
+            `onException` (terminateProcess process >> waitForProcess process)
         case ended of
             Just code -> return (Just code)
             Nothing -> terminateProcess process >> waitForProcess process >> return Nothing

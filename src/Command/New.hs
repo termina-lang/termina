@@ -3,7 +3,6 @@ module Command.New (
 ) where
 
 import Options.Applicative
-import Control.Exception (IOException, try)
 import Control.Monad
 import Configuration.Configuration
 import Configuration.Manifest (Manifest(..), newApplicationManifest, newLibraryManifest,
@@ -13,7 +12,6 @@ import Command.Utils
 import System.FilePath
 import System.Exit
 import System.Directory
-import System.Process (readProcessWithExitCode)
 import qualified Data.Text as T
 import Data.Char
 import Data.List (intercalate)
@@ -211,15 +209,6 @@ tasksContent buildCommandLine = unlines [
         "    ]",
         "}"
     ]
-
--- | Runs git with the given arguments, or reports why it could not.
-runGit :: [String] -> IO (Either String String)
-runGit args = do
-    result <- try (readProcessWithExitCode "git" args "")
-    return $ case result of
-        Left e -> Left (show (e :: IOException))
-        Right (ExitSuccess, out, _) -> Right out
-        Right (ExitFailure _, _, err) -> Left err
 
 -- | Initializes a git repository in the project, unless the project lies
 -- inside the working tree of another one. A failure is a warning: the project

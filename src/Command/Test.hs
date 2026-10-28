@@ -12,17 +12,25 @@ import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment
 import Command.Common (loadTerminaModule, loadModules)
 import Configuration.Configuration
 import Configuration.Platform (Platform(..), checkPlatform)
-import Runner.Analysis (TestResult(TestResult), analyse, addressesOf, renderReport, exitCodeOf)
-import Runner.Descriptor (Descriptor(..), Symbols(..), readDescriptor)
+import Runner.Analysis (TestResult(TestResult), Run(..), analyse, addressesOf, renderReport, exitCodeOf)
+import Runner.Descriptor (Descriptor(..), DescriptorCase, Symbols(..), readDescriptor)
+import qualified Runner.Descriptor as D
 import Runner.Posix (PosixRun(..), runPosix)
-import Runner.Record (Header(..), decodeHeader, decodeRecords, headerSize, platformLayout)
-import Runner.Symbols (locateAddresses)
+import Runner.Record (Header(..), Layout, decodeHeader, decodeRecords, headerSize, platformLayout, relocate)
+import Runner.Results (Evidence(..), readProvenance, resultsJson, renderResults, renderJUnit)
+import Runner.Symbols (locateAddresses, stampAddress)
+import qualified Runner.Symbols as S
 
 import Control.Exception (try)
 import Data.Bits (testBit)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BL
+import Data.List (intercalate)
+import Data.Maybe (fromMaybe)
 import Numeric (showHex)
-import System.IO (BufferMode(LineBuffering), hSetBuffering, stdout)
+import System.Directory (createDirectoryIfMissing, doesFileExist)
+import System.Info (os)
+import System.IO (BufferMode(LineBuffering), hPutStrLn, hSetBuffering, stderr, stdout)
 import Command.Types
 import Command.Utils
 import Configuration.Manifest
@@ -51,6 +59,8 @@ data TestCmdArgs =
         (Maybe String) -- ^ The test to run, or every test
         (Maybe Platform) -- ^ Only this platform
         (Maybe ProjectProfile) -- ^ Profile of the tests
+        (Maybe String) -- ^ Only this case
+        Bool -- ^ Run each case in a process of its own
         Bool -- ^ List the tests instead of running them
         Bool -- ^ Write the list in JSON
     deriving Show
@@ -67,6 +77,12 @@ testCmdArgsParser = TestCmdArgs
           ( O.long "profile"
           <> O.metavar "debug|release"
           <> O.help "Profile of the tests (default: the one of the application, debug in a library)"))
+    <*> O.optional (O.strOption
+          ( O.long "case"
+          <> O.metavar "INSTANCE.CASE"
+          <> O.help "Only this case"))
+    <*> O.switch (O.long "isolated"
+        <> O.help "Run each case in a process of its own")
     <*> O.switch (O.long "list"
         <> O.help "List the tests, their platforms and their cases, without building them")
     <*> O.switch (O.long "json"
@@ -89,90 +105,199 @@ data TestCase = TestCase {
     caseLine :: Int
   } deriving (Eq, Show)
 
+-- | How the cases of a test are run
+data Mode =
+    AllCases
+    | OneCase String -- ^ only the case with this identifier
+    | Isolated -- ^ each case in a process of its own
+  deriving (Eq, Show)
+
 -- | Command handler for the "test" command
 testCommand :: TestCmdArgs -> IO ()
-testCommand (TestCmdArgs mName mPlatform mProfile list json) =
-    if list then listTests json else runTests mName mPlatform mProfile
+testCommand (TestCmdArgs mName mPlatform mProfile mCase isolated list json) =
+    if list then listTests json
+    else either cannotRun (runTests mName mPlatform mProfile) (modeOf mName mCase isolated)
+
+-- | A test that cannot be run exits with 2
+cannotRun :: String -> IO a
+cannotRun reason = hPutStrLn stderr (errorMessage reason) >> exitWith (ExitFailure 2)
+
+-- | The mode of the run, from the options
+modeOf :: Maybe String -> Maybe String -> Bool -> Either String Mode
+modeOf mName mCase isolated =
+    case (mCase, isolated) of
+        (Nothing, False) -> Right AllCases
+        (Nothing, True) -> Right Isolated
+        (Just _, True) -> Left "--isolated runs every case and does not go with --case"
+        (Just c, False) ->
+            case mName of
+                Nothing -> Left "--case needs the name of the test"
+                Just _ -> Right (OneCase c)
 
 -- | Builds and runs each selected test on each of its platforms, and exits with
 -- the worst code of them: 0 when every case passes, 1 when one does not, 2 when
 -- a test cannot be built or read
-runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> IO ()
-runTests mName mPlatform mProfile = do
+runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Mode -> IO ()
+runTests mName mPlatform mProfile mode = do
     -- | The report goes in order with the output of make
     hSetBuffering stdout LineBuffering
     manifest <- loadManifest >>= either dieWithErrors return
     let selection = maybe SelectTests SelectTest mName
         buildArgs = BuildCmdArgs False False Nothing selection mPlatform mProfile
-    deployments <- either (die . errorMessage) return (selectDeployments manifest selection mPlatform mProfile)
+    deployments <- either cannotRun return (selectDeployments manifest selection mPlatform mProfile)
     codes <- forM deployments $ \deployment -> do
         announce deployments ("Building " ++ deploymentLabel deployment)
         built <- try (buildDeployment buildArgs deployment) :: IO (Either ExitCode [(QualifiedName, FilePath)])
         case built of
-            Left _ -> return 2
-            Right _ -> runDeployment deployment
+            Left _ -> do
+                let config = deploymentConfig deployment
+                createDirectoryIfMissing True (outputFolder config)
+                evidence <- evidenceOf config mode Nothing
+                finish config evidence Nothing M.empty (invalid config "it does not build")
+            Right _ -> runDeployment mode deployment
     let worst = maximum (0 : codes)
     if worst == 0 then exitSuccess else exitWith (ExitFailure worst)
 
+-- | The label of a test in the reports
+labelOf :: TerminaConfig -> String
+labelOf config = T.unpack (name config) ++ " (" ++ T.unpack (platform config) ++ ")"
+
+invalid :: TerminaConfig -> String -> TestResult
+invalid config reason = TestResult (labelOf config) (Just reason) [] Nothing
+
+-- | A run of the binary that the mode plans: the case to select, the cases of
+-- the descriptor it runs, and its files of the record and of the output
+data Planned = Planned Integer [DescriptorCase] FilePath FilePath
+
 -- | Runs a test that is built, on posix; a board comes with the executor of GDB
-runDeployment :: Deployment -> IO Int
-runDeployment deployment = do
+runDeployment :: Mode -> Deployment -> IO Int
+runDeployment mode deployment = do
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
         folder = outputFolder config
-        label = T.unpack (name config) ++ " (" ++ show plt ++ ")"
+        binary = folder </> "bin" </> T.unpack (name config)
     if plt /= POSIXGCC
       then do
-        putStrLn . warnMessage $ label ++ ": running on a board comes with the executor of GDB, the test is only built"
+        putStrLn . warnMessage $ labelOf config ++ ": running on a board comes with the executor of GDB, the test is only built"
         return 0
       else do
         loaded <- readDescriptor (folder </> "test" <.> "json")
         case loaded of
-          Left err -> report label Nothing ("its descriptor cannot be read: " ++ err)
+          Left err -> do
+            evidence <- evidenceOf config mode Nothing
+            finish config evidence Nothing M.empty (invalid config ("its descriptor cannot be read: " ++ err))
           Right descriptor -> do
-            let layout = platformLayout plt
-                binary = folder </> "bin" </> T.unpack (name config)
-                logFile = folder </> "test" <.> "log"
-            ran <- runPosix layout binary (folder </> "record" <.> "bin") logFile
-                     (recordCapacity config) 0 (descriptorTimeout descriptor)
-            case ran of
-              Left err -> report label (Just descriptor) err
-              Right posixRun -> readRun label descriptor layout binary logFile posixRun
+            evidence <- evidenceOf config mode (descriptorTimeout descriptor)
+            case plan folder descriptor of
+              Left err -> finish config evidence (Just descriptor) M.empty (invalid config err)
+              Right planned -> do
+                stamp <- stampAddress binary
+                either (putStrLn . warnMessage) (const (return ())) stamp
+                ran <- runAll (execute config (platformLayout plt) descriptor binary (either (const Nothing) Just stamp)) planned
+                case ran of
+                  Left err -> finish config evidence (Just descriptor) M.empty (invalid config err)
+                  Right runs -> do
+                    let results = concatMap (analyse . fst) runs
+                        overflowed = [ (headerCasesEnded h, headerChecksFailed h) | (r, h) <- runs, runOverflow r ]
+                        overflow = if null overflowed then Nothing else Just (sum (map fst overflowed), sum (map snd overflowed))
+                    (locations, warning) <- locateAddresses binary (addressesOf results)
+                    maybe (return ()) (putStrLn . warnMessage) warning
+                    finish config evidence (Just descriptor) locations (TestResult (labelOf config) Nothing results overflow)
 
   where
 
-    report label mDescriptor reason = do
-        let empty = Descriptor 1 0 "" "unit" "" Nothing [] [] M.empty M.empty (Symbols "" "" "" "")
-        mapM_ putStrLn (renderReport (maybe empty id mDescriptor) M.empty (TestResult label (Just reason) [] False 0))
-        return 2
+    plan folder descriptor =
+        let cases = D.descriptorCases descriptor
+            record n = folder </> ("record" ++ n) <.> "bin"
+            output n = folder </> ("test" ++ n) <.> "log"
+        in if mode /= AllCases && descriptorLevel descriptor /= "unit"
+            then Left "--case and --isolated run the cases of a unit test"
+            else case mode of
+                AllCases -> Right [Planned 0 cases (record "") (output "")]
+                OneCase c -> case [ dc | dc <- cases, D.caseId dc == c ] of
+                    (dc : _) -> Right [Planned (D.caseNumber dc) [dc] (record "") (output "")]
+                    [] -> Left ("the test has no case " ++ c ++ "; its cases are " ++ intercalate ", " (map D.caseId cases))
+                Isolated -> Right [ Planned (D.caseNumber dc) [dc] (record ("-" ++ show (D.caseNumber dc))) (output ("-" ++ show (D.caseNumber dc)))
+                                  | dc <- cases ]
 
-    readRun label descriptor layout binary logFile posixRun = do
+    -- | The runs one after another, up to the first that cannot be read
+    runAll run planned =
+        case planned of
+            [] -> return (Right [])
+            p : rest -> do
+                first <- run p
+                case first of
+                    Left err -> return (Left err)
+                    Right done -> fmap (done :) <$> runAll run rest
+
+-- | Runs the binary once and decodes its record, without the load offset in its addresses
+execute :: TerminaConfig -> Layout -> Descriptor -> FilePath -> Maybe Integer -> Planned -> IO (Either String (Run, Header))
+execute config layout descriptor binary stamp (Planned selected cases recordFile logFile) = do
+    ran <- runPosix layout binary recordFile logFile (recordCapacity config) selected (descriptorTimeout descriptor)
+    return $ ran >>= \posixRun -> do
         let bytes = posixRecord posixRun
-            killed = posixExit posixRun == Nothing
-        case decodeHeader layout bytes of
-          Left err -> report label (Just descriptor) err
-          Right header ->
-            if headerMagic header /= BS.pack (map (fromIntegral . fromEnum) "TRMTEST\0")
-              then report label (Just descriptor) (noRecord (posixExit posixRun) logFile)
-              else if headerStamp header /= descriptorStamp descriptor
-                then report label (Just descriptor) ("the stamp of the record, 0x" ++ showHex (headerStamp header) ""
-                       ++ ", is not the one of test.json, 0x" ++ showHex (descriptorStamp descriptor) "" ++ ": the binary is not the one of this descriptor")
-                else do
-                  let area = BS.take (fromIntegral (headerWriteOffset header)) (BS.drop (headerSize layout) bytes)
-                  case decodeRecords layout area of
-                    Left err -> report label (Just descriptor) err
-                    Right records -> do
-                      let results = analyse descriptor records killed
-                      (locations, warning) <- locateAddresses binary (headerAnchor header) (addressesOf results)
-                      maybe (return ()) (putStrLn . warnMessage) warning
-                      let result = TestResult label Nothing results (testBit (headerFlags header) 1) (headerLastStep header)
-                      mapM_ putStrLn (renderReport descriptor locations result)
-                      return (exitCodeOf result)
+        header <- decodeHeader layout bytes
+        when (headerMagic header /= BS.pack (map (fromIntegral . fromEnum) "TRMTEST\0")) $
+            Left (noRecord (posixExit posixRun))
+        when (headerStamp header /= descriptorStamp descriptor) $
+            Left ("the stamp of the record, 0x" ++ showHex (headerStamp header) ""
+                  ++ ", is not the one of test.json, 0x" ++ showHex (descriptorStamp descriptor) "" ++ ": the binary is not the one of this descriptor")
+        let area = BS.take (fromIntegral (headerWriteOffset header)) (BS.drop (headerSize layout) bytes)
+            offset = maybe 0 (headerAnchor header -) stamp
+        records <- decodeRecords layout area
+        return (Run cases (map (relocate offset) records) (posixExit posixRun == Nothing) (testBit (headerFlags header) 1) (headerLastStep header), header)
 
-    noRecord ended logFile =
+  where
+
+    noRecord ended =
         "the binary wrote no record" ++ (case ended of
             Just (ExitFailure code) -> ", and exited with " ++ show code
             _ -> "") ++ "; its output is in " ++ logFile
+
+-- | Writes the report on the console, results.json and report.xml, and gives the exit code
+finish :: TerminaConfig -> Evidence -> Maybe Descriptor -> M.Map Integer (Maybe S.Location) -> TestResult -> IO Int
+finish config evidence mDescriptor locations result = do
+    let folder = outputFolder config
+    mapM_ putStrLn (renderReport (fromMaybe emptyDescriptor mDescriptor) locations result)
+    BL.writeFile (folder </> "results" <.> "json") (renderResults (resultsJson evidence mDescriptor locations result))
+    writeFile (folder </> "report" <.> "xml") (renderJUnit evidence mDescriptor locations result)
+    return (exitCodeOf result)
+
+  where
+
+    emptyDescriptor = Descriptor 1 0 "" "unit" "" Nothing [] [] M.empty M.empty (Symbols "" "" "" "")
+
+-- | What ties the result to the build: the commit of the project, the hash of
+-- the binary and the hashes of provenance.json
+evidenceOf :: TerminaConfig -> Mode -> Maybe Integer -> IO Evidence
+evidenceOf config mode seconds = do
+    let folder = outputFolder config
+        binary = folder </> "bin" </> T.unpack (name config)
+        provenanceFile = folder </> "provenance" <.> "json"
+    sha <- runGit ["rev-parse", "HEAD"]
+    status <- runGit ["status", "--porcelain"]
+    hasBinary <- doesFileExist binary
+    binarySha <- if hasBinary then Just <$> sha256File binary else return Nothing
+    hasProvenance <- doesFileExist provenanceFile
+    provenance <- if hasProvenance then readProvenance provenanceFile else return Nothing
+    return Evidence {
+        evidenceName = T.unpack (name config),
+        evidencePlatform = T.unpack (platform config),
+        evidenceHost = os,
+        evidenceProfile = case profile config of
+            Debug -> "debug"
+            Release -> "release",
+        evidenceMode = case mode of
+            AllCases -> "all"
+            OneCase _ -> "case"
+            Isolated -> "isolated",
+        evidenceTimeout = seconds,
+        evidenceCommit = case (sha, status) of
+            (Right s, Right st) -> Just (concat (lines s), not (null (lines st)))
+            _ -> Nothing,
+        evidenceBinarySha = binarySha,
+        evidenceProvenance = provenance
+      }
 
 -- | Lists the tests, their platforms and their cases
 listTests :: Bool -> IO ()

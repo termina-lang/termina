@@ -3,7 +3,7 @@
 module Runner.Record (
     Layout(..), platformLayout,
     Header(..), Record(..), Check(..), Values(..), ExceptionInfo(..),
-    headerSize, decodeHeader, decodeRecords
+    headerSize, decodeHeader, decodeRecords, relocate
 ) where
 
 import Configuration.Platform (Platform(..), usizeWidth)
@@ -71,6 +71,20 @@ data Record =
     | Failure String Check -- ^ the procedure that failed
     | Elapsed Check -- ^ a measurement of check_elapsed, without verdict
   deriving (Eq, Show)
+
+-- | Subtracts the load offset from the addresses of the code in a record
+relocate :: Integer -> Record -> Record
+relocate offset record =
+    case record of
+        Failure procedure check -> Failure procedure check { checkWhere = checkWhere check - offset }
+        Elapsed check -> Elapsed check { checkWhere = checkWhere check - offset }
+        Exception info -> Exception info { exceptionFields = map field (exceptionFields info) }
+        _ -> record
+
+  where
+
+    field (name, value) =
+        if name == "address" && value /= 0 then (name, value - offset) else (name, value)
 
 -- | The size of the header, with the padding of termina__test__header_t
 headerSize :: Layout -> Int

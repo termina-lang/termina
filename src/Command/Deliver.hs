@@ -21,11 +21,9 @@ import Utils.Annotations (QualifiedName)
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
-import qualified Crypto.Hash.SHA256 as SHA256
 import Control.Monad
 import Data.Aeson (object, (.=))
 import Data.Aeson.Encode.Pretty (Config(..), defConfig, encodePretty', keyOrder)
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.Char (isSpace)
 import Data.List (intercalate, isPrefixOf, isSuffixOf, sortOn, nub, sort)
@@ -40,7 +38,6 @@ import System.Directory
 import System.Exit
 import System.FilePath
 import System.Process (proc, readCreateProcessWithExitCode)
-import Text.Printf (printf)
 
 -- | Data type for the "deliver" command arguments
 data DeliverCmdArgs =
@@ -515,9 +512,6 @@ readHashes file = do
 
     toPair [hash, path] = [(normalise path, hash)]
     toPair _ = []
-
-sha256File :: FilePath -> IO String
-sha256File file = concatMap (printf "%02x") . BS.unpack . SHA256.hashlazy <$> BL.readFile file
 
 readOsalVersion :: FilePath -> IO (Maybe String)
 readOsalVersion osalDir = do

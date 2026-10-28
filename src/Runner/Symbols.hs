@@ -1,7 +1,7 @@
 -- | The translation of the return addresses of a record to the file and the
 -- line of the .fin, with the tool of the system where the test ran.
 module Runner.Symbols (
-    Location(..), locateAddresses, atosLocation, addr2lineLocation
+    Location(..), locateAddresses, stampAddress, atosLocation, addr2lineLocation
 ) where
 
 import Control.Exception (IOException, try)
@@ -18,30 +18,22 @@ data Location = Location {
     locationLine :: Integer
   } deriving (Eq, Show)
 
--- | The location of each address of a posix binary that the runtime loaded at
--- the anchor: the load offset comes from the address of termina__test__stamp,
--- and one is subtracted from each return address, which points after its call.
+-- | The location of each address of a binary, already without its load offset;
+-- one is subtracted from each return address, which points after its call.
 -- It gives the addresses it could not translate as nothing, and a warning when
 -- a tool is missing.
-locateAddresses :: FilePath -> Integer -> [Integer] -> IO (M.Map Integer (Maybe Location), Maybe String)
-locateAddresses _ _ [] = return (M.empty, Nothing)
-locateAddresses binary anchor addresses = do
-    stamp <- stampAddress binary
-    case stamp of
-        Left warning -> return (unknown, Just warning)
-        Right address -> do
-            let offset = anchor - address
-                queries = [ hex (a - 1 - offset) | a <- addresses ]
-            located <- if os == "darwin"
-                then runTool "atos" (["-o", binary] ++ queries) atosLocation
-                else runTool "addr2line" (["-e", binary] ++ queries) addr2lineLocation
-            return $ case located of
-                Left warning -> (unknown, Just warning)
-                Right locations -> (M.fromList (zip addresses (locations ++ repeat Nothing)), Nothing)
+locateAddresses :: FilePath -> [Integer] -> IO (M.Map Integer (Maybe Location), Maybe String)
+locateAddresses _ [] = return (M.empty, Nothing)
+locateAddresses binary addresses = do
+    let queries = [ hex (a - 1) | a <- addresses ]
+    located <- if os == "darwin"
+        then runTool "atos" (["-o", binary] ++ queries) atosLocation
+        else runTool "addr2line" (["-e", binary] ++ queries) addr2lineLocation
+    return $ case located of
+        Left warning -> (M.fromList [ (a, Nothing) | a <- addresses ], Just warning)
+        Right locations -> (M.fromList (zip addresses (locations ++ repeat Nothing)), Nothing)
 
   where
-
-    unknown = M.fromList [ (a, Nothing) | a <- addresses ]
 
     hex value = "0x" ++ showHex value ""
 
@@ -53,7 +45,8 @@ runTool tool args readLine = do
         Left err -> Left (tool ++ " not found: the failures are given without their line (" ++ show (err :: IOException) ++ ")")
         Right (_, out, _) -> Right (map readLine (lines out))
 
--- | The address of termina__test__stamp in the symbol table, which macOS writes with an underscore
+-- | The address of termina__test__stamp in the symbol table, which macOS
+-- writes with an underscore; the anchor of the header minus it is the load offset
 stampAddress :: FilePath -> IO (Either String Integer)
 stampAddress binary = do
     result <- try (readProcessWithExitCode "nm" [binary] "")
