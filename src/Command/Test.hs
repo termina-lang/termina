@@ -15,6 +15,7 @@ import Configuration.Platform (Platform(..), checkPlatform)
 import Runner.Analysis (TestResult(TestResult), Run(..), analyse, addressesOf, renderReport, exitCodeOf)
 import Runner.Descriptor (Descriptor(..), DescriptorCase, Symbols(..), readDescriptor)
 import qualified Runner.Descriptor as D
+import Runner.Gdb (GdbTarget(..), GdbEnd(..), GdbRun(..), runGdb)
 import Runner.Posix (PosixRun(..), runPosix)
 import Runner.Record (Header(..), Layout, decodeHeader, decodeRecords, headerSize, platformLayout, relocate)
 import Runner.Results (Evidence(..), readProvenance, resultsJson, renderResults, renderJUnit)
@@ -61,6 +62,7 @@ data TestCmdArgs =
         (Maybe ProjectProfile) -- ^ Profile of the tests
         (Maybe String) -- ^ Only this case
         Bool -- ^ Run each case in a process of its own
+        (Maybe Executor) -- ^ How the binary of a test is run
         Bool -- ^ List the tests instead of running them
         Bool -- ^ Write the list in JSON
     deriving Show
@@ -83,6 +85,10 @@ testCmdArgsParser = TestCmdArgs
           <> O.help "Only this case"))
     <*> O.switch (O.long "isolated"
         <> O.help "Run each case in a process of its own")
+    <*> O.optional (O.option (O.eitherReader readExecutor)
+          ( O.long "executor"
+          <> O.metavar "process|gdb"
+          <> O.help "On posix-gcc, run the binary as a process (default) or under gdb, as on a board"))
     <*> O.switch (O.long "list"
         <> O.help "List the tests, their platforms and their cases, without building them")
     <*> O.switch (O.long "json"
@@ -96,6 +102,17 @@ testCmdArgsParser = TestCmdArgs
             "debug" -> Right Debug
             "release" -> Right Release
             other -> Left $ "Unknown profile: " ++ other ++ " (use debug or release)"
+
+    readExecutor :: String -> Either String Executor
+    readExecutor executorName =
+        case executorName of
+            "process" -> Right ProcessExecutor
+            "gdb" -> Right GdbExecutor
+            other -> Left $ "Unknown executor: " ++ other ++ " (use process or gdb)"
+
+-- | How the binary of a test is run: as a process of the host, or under GDB
+data Executor = ProcessExecutor | GdbExecutor
+  deriving (Eq, Show)
 
 -- | A case of a test, named by its test instance
 data TestCase = TestCase {
@@ -114,9 +131,9 @@ data Mode =
 
 -- | Command handler for the "test" command
 testCommand :: TestCmdArgs -> IO ()
-testCommand (TestCmdArgs mName mPlatform mProfile mCase isolated list json) =
+testCommand (TestCmdArgs mName mPlatform mProfile mCase isolated mExecutor list json) =
     if list then listTests json
-    else either cannotRun (runTests mName mPlatform mProfile) (modeOf mName mCase isolated)
+    else either cannotRun (runTests mName mPlatform mProfile mExecutor) (modeOf mName mCase isolated)
 
 -- | A test that cannot be run exits with 2
 cannotRun :: String -> IO a
@@ -137,8 +154,8 @@ modeOf mName mCase isolated =
 -- | Builds and runs each selected test on each of its platforms, and exits with
 -- the worst code of them: 0 when every case passes, 1 when one does not, 2 when
 -- a test cannot be built or read
-runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Mode -> IO ()
-runTests mName mPlatform mProfile mode = do
+runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Maybe Executor -> Mode -> IO ()
+runTests mName mPlatform mProfile mExecutor mode = do
     -- | The report goes in order with the output of make
     hSetBuffering stdout LineBuffering
     manifest <- loadManifest >>= either dieWithErrors return
@@ -154,7 +171,7 @@ runTests mName mPlatform mProfile mode = do
                 createDirectoryIfMissing True (outputFolder config)
                 evidence <- evidenceOf config mode Nothing
                 finish config evidence Nothing M.empty (invalid config "it does not build")
-            Right _ -> runDeployment mode deployment
+            Right _ -> runDeployment (maybe ProcessExecutor id mExecutor) mode deployment
     let worst = maximum (0 : codes)
     if worst == 0 then exitSuccess else exitWith (ExitFailure worst)
 
@@ -170,8 +187,8 @@ invalid config reason = TestResult (labelOf config) (Just reason) [] Nothing
 data Planned = Planned Integer [DescriptorCase] FilePath FilePath
 
 -- | Runs a test that is built, on posix; a board comes with the executor of GDB
-runDeployment :: Mode -> Deployment -> IO Int
-runDeployment mode deployment = do
+runDeployment :: Executor -> Mode -> Deployment -> IO Int
+runDeployment executor mode deployment = do
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
         folder = outputFolder config
@@ -193,7 +210,7 @@ runDeployment mode deployment = do
               Right planned -> do
                 stamp <- stampAddress binary
                 either (putStrLn . warnMessage) (const (return ())) stamp
-                ran <- runAll (execute config (platformLayout plt) descriptor binary (either (const Nothing) Just stamp)) planned
+                ran <- runAll (execute config executor (platformLayout plt) descriptor binary (either (const Nothing) Just stamp)) planned
                 case ran of
                   Left err -> finish config evidence (Just descriptor) M.empty (invalid config err)
                   Right runs -> do
@@ -231,28 +248,38 @@ runDeployment mode deployment = do
                     Right done -> fmap (done :) <$> runAll run rest
 
 -- | Runs the binary once and decodes its record, without the load offset in its addresses
-execute :: TerminaConfig -> Layout -> Descriptor -> FilePath -> Maybe Integer -> Planned -> IO (Either String (Run, Header))
-execute config layout descriptor binary stamp (Planned selected cases recordFile logFile) = do
-    ran <- runPosix layout binary recordFile logFile (recordCapacity config) selected (descriptorTimeout descriptor)
-    return $ ran >>= \posixRun -> do
-        let bytes = posixRecord posixRun
+execute :: TerminaConfig -> Executor -> Layout -> Descriptor -> FilePath -> Maybe Integer -> Planned -> IO (Either String (Run, Header))
+execute config executor layout descriptor binary stamp (Planned selected cases recordFile logFile) = do
+    ran <- case executor of
+        ProcessExecutor -> fmap fromProcess <$>
+            runPosix layout binary recordFile logFile (recordCapacity config) selected (descriptorTimeout descriptor)
+        GdbExecutor -> fmap fromGdb <$>
+            runGdb "gdb" binary NativeProcess (takeDirectory recordFile) logFile selected (descriptorTimeout descriptor)
+    return $ ran >>= \(bytes, killed, frames, noRecord) -> do
         header <- decodeHeader layout bytes
         when (headerMagic header /= BS.pack (map (fromIntegral . fromEnum) "TRMTEST\0")) $
-            Left (noRecord (posixExit posixRun))
+            Left noRecord
         when (headerStamp header /= descriptorStamp descriptor) $
             Left ("the stamp of the record, 0x" ++ showHex (headerStamp header) ""
                   ++ ", is not the one of test.json, 0x" ++ showHex (descriptorStamp descriptor) "" ++ ": the binary is not the one of this descriptor")
         let area = BS.take (fromIntegral (headerWriteOffset header)) (BS.drop (headerSize layout) bytes)
             offset = maybe 0 (headerAnchor header -) stamp
         records <- decodeRecords layout area
-        return (Run cases (map (relocate offset) records) (posixExit posixRun == Nothing) (testBit (headerFlags header) 1) (headerLastStep header), header)
+        return (Run cases (map (relocate offset) records) killed (testBit (headerFlags header) 1) (headerLastStep header) frames, header)
 
   where
 
-    noRecord ended =
-        "the binary wrote no record" ++ (case ended of
+    -- | The bytes of the record, whether the run was stopped at the timeout,
+    -- the frames at an exception and why a record without header is empty
+    fromProcess posixRun =
+        (posixRecord posixRun, posixExit posixRun == Nothing, [],
+         "the binary wrote no record" ++ (case posixExit posixRun of
             Just (ExitFailure code) -> ", and exited with " ++ show code
-            _ -> "") ++ "; its output is in " ++ logFile
+            _ -> "") ++ "; its output is in " ++ logFile)
+
+    fromGdb gdbRun =
+        (gdbRecord gdbRun, gdbEnd gdbRun == AtTimeout, gdbBacktrace gdbRun,
+         "the binary did not initialize its record; the log of gdb is in " ++ logFile)
 
 -- | Writes the report on the console, results.json and report.xml, and gives the exit code
 finish :: TerminaConfig -> Evidence -> Maybe Descriptor -> M.Map Integer (Maybe S.Location) -> TestResult -> IO Int

@@ -107,7 +107,8 @@ resultsJson evidence mDescriptor locations result =
             "verifies" .= caseVerifies c,
             "failures" .= map failureJson (resultFailures r),
             "exception" .= fmap exceptionJson (resultException r),
-            "last_step" .= resultLastStep r
+            "last_step" .= resultLastStep r,
+            "backtrace" .= resultBacktrace r
         ]
 
     failureJson failure =
@@ -168,7 +169,7 @@ renderResults = encodePretty' defConfig { confCompare = keyOrder keys }
         "procedure", "variant", "task", "file", "line", "verdict", "invalid", "stamp", "commit", "sha", "dirty",
         "binary", "module", "origin", "source", "object", "path", "sha256", "stripped-sha256", "modules",
         "bench", "run", "mode", "timeout", "overflow", "cases", "checks", "verifies", "failures",
-        "text", "step", "expected", "obtained", "address", "exception", "last_step", "fields", "elapsed", "requirements"
+        "text", "step", "expected", "obtained", "address", "exception", "last_step", "backtrace", "fields", "elapsed", "requirements"
       ]
 
 -- | report.xml: the test is a testsuite and each case a testcase; a failed

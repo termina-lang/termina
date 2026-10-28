@@ -33,7 +33,7 @@ failure = Check 0 0x1000 (Just (Scalars 0 95))
 
 -- | A run of every case of the descriptor, whose last step is 7
 runOf :: [Record] -> Bool -> Run
-runOf records killed = Run (descriptorCases descriptor) records killed False 7
+runOf records killed = Run (descriptorCases descriptor) records killed False 7 []
 
 verdicts :: [Record] -> Bool -> [Verdict]
 verdicts records killed = map resultVerdict (analyse (runOf records killed))
@@ -75,11 +75,11 @@ spec = describe "Runner: verdicts and report" $ do
     verdicts [CaseBegin 1] False `shouldBe` [Raised, NotRun, NotRun, NotRun]
 
   it "leaves the cases beyond an overflow of the record without a record" $
-    map resultVerdict (analyse (Run (descriptorCases descriptor) [CaseBegin 1, CaseEnd 1, CaseBegin 2] False True 0))
+    map resultVerdict (analyse (Run (descriptorCases descriptor) [CaseBegin 1, CaseEnd 1, CaseBegin 2] False True 0 []))
       `shouldBe` [Passed, Unrecorded, Unrecorded, Unrecorded]
 
   it "crosses the records only with the cases of the run" $
-    map resultVerdict (analyse (Run [descriptorCases descriptor !! 2] [CaseBegin 3, CaseEnd 1, End] False False 0))
+    map resultVerdict (analyse (Run [descriptorCases descriptor !! 2] [CaseBegin 3, CaseEnd 1, End] False False 0 []))
       `shouldBe` [Passed]
 
   it "subtracts the load offset from the addresses of a record" $ do

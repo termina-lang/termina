@@ -1,0 +1,6 @@
+exception (posix-gcc)
+  ok       exception_tests.before           1 check
+  EXCEPT   exception_tests.out_of_bounds
+           EArrayIndexOutOfBounds at src/runner/values.fin:8 in the task harness: size 4, index 7
+  --       exception_tests.after            not run
+  1 passed, 1 with an exception, 1 not run

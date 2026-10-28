@@ -6,12 +6,13 @@ TERMINA="${TERMINA:-termina}"
 
 cd "$(dirname "$0")" || exit 2
 
-# The lines of the report, without the output of make
+# The lines of the report, without the output of make nor the frames of a backtrace, whose paths depend on the host
 report() {
-    grep -E '^([a-z_]+ \(posix-gcc\)$|  )'
+    grep -E '^([a-z_]+ \(posix-gcc\)$|  )' | grep -v -E '^           (backtrace:|  #[0-9]+ )'
 }
 
 failed=0
+output=""
 
 # Each run has cases that fail, so termina test exits with 1
 check() {
@@ -29,8 +30,27 @@ check() {
     fi
 }
 
+# A frame that the backtrace of the last run must have
+frame() {
+    if ! printf '%s\n' "$output" | grep -q -E "^             #[0-9]+ $1\$"; then
+        echo "the backtrace has no frame $1"
+        failed=1
+    fi
+}
+
 check expected.txt
 check expected-isolated.txt outcomes --isolated
+
+# The executor of the boards, under the native gdb
+if command -v gdb >/dev/null 2>&1; then
+    check expected.txt --executor gdb
+    check expected-isolated.txt outcomes --isolated --executor gdb
+    check expected-exception.txt exception --executor gdb
+    frame "runner_at at src/runner/values.fin:8"
+    frame "CException__out_of_bounds at tests/exception/test.fin:17"
+else
+    echo "gdb not found: the executor of gdb is not checked"
+fi
 
 if [ "$failed" -eq 0 ]; then
     echo "the report of termina test is the expected one"
