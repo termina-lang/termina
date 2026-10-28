@@ -125,8 +125,30 @@ orderTest =
     "test b_tests : CTickerTests = { tick <-> tick };\n" ++
     "test a_tests : CTickerTests = { tick <-> tick };\n"
 
+-- | A test of a function, whose test.fin declares only a test class and its instance
+functionTest :: String
+functionTest =
+    "function sum(a : u32, b : u32) -> u32 {\n" ++
+    "    return a + b;\n" ++
+    "}\n" ++
+    "test class CSumTests {\n" ++
+    "    t : access TestChecks;\n" ++
+    "    case adds(&mut self) {\n" ++
+    "        self->t.check_eq_u32(sum(2 : u32, 3 : u32), 5 : u32);\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "};\n" ++
+    "test sum_tests : CSumTests = { t <-> test_checks };\n"
+
 spec :: Spec
 spec = describe "Full pipeline: the components of a unit test" $ do
+  it "includes the module of the test instances in the main file" $
+    case runTestApp functionTest of
+      Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
+      Right (progArch, _) ->
+        either (expectationFailure . unpack)
+          (\c -> unpack c `shouldContain` "#include \"test.h\"")
+          (renderTestMainFile progArch)
   it "sets up the test pool, the test channel and the test emitter in the main file" $
     case runTestApp unitTest of
       Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)

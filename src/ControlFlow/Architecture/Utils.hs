@@ -348,8 +348,11 @@ getGlobDeclModules progArchitecture =
     ++ atomicModules
     ++ atomicArrayModules
     ++ dequeModules
+    ++ testModules
   where
     taskModules = map taskModule $ M.elems (tasks progArchitecture)
+    testModules = map testInstanceModule (M.elems (testInstances progArchitecture))
+      ++ map poolModule (M.elems (testPools progArchitecture))
     handlerModules = map handlerModule $ M.elems (handlers progArchitecture)
     resourceModules = map resourceModule $ M.elems (resources progArchitecture)
     poolModules = map poolModule $ M.elems (pools progArchitecture)
