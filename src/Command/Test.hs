@@ -10,8 +10,9 @@ module Command.Test (
 
 import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, selectDeployments)
 import Command.Common (loadTerminaModule, loadModules)
+import Command.Deliver (deliverableInfo)
 import Configuration.Configuration
-import Configuration.Platform (Platform(..), checkPlatform)
+import Configuration.Platform (Platform(..), checkPlatform, gdbServerPort)
 import Runner.Analysis (TestResult(TestResult), Run(..), analyse, addressesOf, renderReport, exitCodeOf)
 import Runner.Descriptor (Descriptor(..), DescriptorCase, Symbols(..), readDescriptor)
 import qualified Runner.Descriptor as D
@@ -26,10 +27,12 @@ import Control.Exception (try)
 import Data.Bits (testBit)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
-import Data.List (intercalate)
+import Data.Char (isDigit)
+import Data.List (intercalate, nub)
 import Data.Maybe (fromMaybe)
 import Numeric (showHex)
 import System.Directory (createDirectoryIfMissing, doesFileExist)
+import System.Environment (lookupEnv)
 import System.Info (os)
 import System.IO (BufferMode(LineBuffering), hPutStrLn, hSetBuffering, stderr, stdout)
 import Command.Types
@@ -63,6 +66,7 @@ data TestCmdArgs =
         (Maybe String) -- ^ Only this case
         Bool -- ^ Run each case in a process of its own
         (Maybe Executor) -- ^ How the binary of a test is run
+        (Maybe GdbServer) -- ^ The GDB server of the board
         Bool -- ^ List the tests instead of running them
         Bool -- ^ Write the list in JSON
     deriving Show
@@ -89,6 +93,10 @@ testCmdArgsParser = TestCmdArgs
           ( O.long "executor"
           <> O.metavar "process|gdb"
           <> O.help "On posix-gcc, run the binary as a process (default) or under gdb, as on a board"))
+    <*> O.optional (O.option (O.eitherReader readGdbServer)
+          ( O.long "gdb"
+          <> O.metavar "HOST[:PORT]"
+          <> O.help "The GDB server of the board (default: localhost, or host.docker.internal in the container, at the port of the platform)"))
     <*> O.switch (O.long "list"
         <> O.help "List the tests, their platforms and their cases, without building them")
     <*> O.switch (O.long "json"
@@ -110,8 +118,23 @@ testCmdArgsParser = TestCmdArgs
             "gdb" -> Right GdbExecutor
             other -> Left $ "Unknown executor: " ++ other ++ " (use process or gdb)"
 
--- | How the binary of a test is run: as a process of the host, or under GDB
+    -- | A host, or a host and a port after the last colon
+    readGdbServer :: String -> Either String GdbServer
+    readGdbServer text =
+        let (port, rest) = break (== ':') (reverse text) in
+        case rest of
+            ':' : host ->
+                if not (null port) && all isDigit port && not (null host)
+                    then Right (GdbServer (reverse host) (Just (read (reverse port))))
+                    else Left ("the GDB server " ++ text ++ " is not HOST or HOST:PORT")
+            _ -> if null text then Left "the GDB server is empty" else Right (GdbServer text Nothing)
+
+-- | How the binary of a test is run on posix: as a process of the host, or under GDB
 data Executor = ProcessExecutor | GdbExecutor
+  deriving (Eq, Show)
+
+-- | The host of a GDB server, and its port when it is not the one of the platform
+data GdbServer = GdbServer String (Maybe Int)
   deriving (Eq, Show)
 
 -- | A case of a test, named by its test instance
@@ -131,9 +154,9 @@ data Mode =
 
 -- | Command handler for the "test" command
 testCommand :: TestCmdArgs -> IO ()
-testCommand (TestCmdArgs mName mPlatform mProfile mCase isolated mExecutor list json) =
+testCommand (TestCmdArgs mName mPlatform mProfile mCase isolated mExecutor mServer list json) =
     if list then listTests json
-    else either cannotRun (runTests mName mPlatform mProfile mExecutor) (modeOf mName mCase isolated)
+    else either cannotRun (runTests mName mPlatform mProfile mExecutor mServer) (modeOf mName mCase isolated)
 
 -- | A test that cannot be run exits with 2
 cannotRun :: String -> IO a
@@ -154,14 +177,23 @@ modeOf mName mCase isolated =
 -- | Builds and runs each selected test on each of its platforms, and exits with
 -- the worst code of them: 0 when every case passes, 1 when one does not, 2 when
 -- a test cannot be built or read
-runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Maybe Executor -> Mode -> IO ()
-runTests mName mPlatform mProfile mExecutor mode = do
+runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Maybe Executor -> Maybe GdbServer -> Mode -> IO ()
+runTests mName mPlatform mProfile mExecutor mServer mode = do
     -- | The report goes in order with the output of make
     hSetBuffering stdout LineBuffering
     manifest <- loadManifest >>= either dieWithErrors return
     let selection = maybe SelectTests SelectTest mName
         buildArgs = BuildCmdArgs False False Nothing selection mPlatform mProfile
     deployments <- either cannotRun return (selectDeployments manifest selection mPlatform mProfile)
+    -- | A port in --gdb is the port of one board
+    let boards = nub [ deploymentPlatform d | d <- deployments, deploymentPlatform d /= POSIXGCC ]
+    when (mServer /= Nothing && length boards /= 1) $
+        cannotRun ("--gdb names the GDB server of one board, and the command selects "
+            ++ (if null boards then "none" else intercalate ", " (map show boards)) ++ "; choose one with --platform")
+    when (mExecutor == Just ProcessExecutor && not (null boards)) $
+        cannotRun ("a board runs only under GDB, and the command selects "
+            ++ intercalate ", " (map show boards) ++ "; choose " ++ show POSIXGCC ++ " with --platform")
+    host <- gdbHost mServer
     codes <- forM deployments $ \deployment -> do
         announce deployments ("Building " ++ deploymentLabel deployment)
         built <- try (buildDeployment buildArgs deployment) :: IO (Either ExitCode [(QualifiedName, FilePath)])
@@ -169,15 +201,42 @@ runTests mName mPlatform mProfile mExecutor mode = do
             Left _ -> do
                 let config = deploymentConfig deployment
                 createDirectoryIfMissing True (outputFolder config)
-                evidence <- evidenceOf config mode Nothing
+                evidence <- evidenceOf config mode Nothing (executorOf (maybe ProcessExecutor id mExecutor) (deploymentPlatform deployment))
                 finish config evidence Nothing M.empty (invalid config "it does not build")
-            Right _ -> runDeployment (maybe ProcessExecutor id mExecutor) mode deployment
+            Right _ -> runDeployment (maybe ProcessExecutor id mExecutor) (host, mServer >>= \(GdbServer _ port) -> port) mode deployment
     let worst = maximum (0 : codes)
     if worst == 0 then exitSuccess else exitWith (ExitFailure worst)
 
 -- | The label of a test in the reports
 labelOf :: TerminaConfig -> String
 labelOf config = T.unpack (name config) ++ " (" ++ T.unpack (platform config) ++ ")"
+
+-- | The host of the GDB servers: the one of --gdb, the one of
+-- TERMINA_GDB_HOST, the host of the container, or the machine itself
+gdbHost :: Maybe GdbServer -> IO String
+gdbHost mServer =
+    case mServer of
+        Just (GdbServer host _) -> return host
+        Nothing -> do
+            fromEnvironment <- lookupEnv "TERMINA_GDB_HOST"
+            marked <- lookupEnv "TERMINA_CONTAINER"
+            docker <- doesFileExist "/.dockerenv"
+            return $ case fromEnvironment of
+                Just host -> host
+                Nothing -> if marked /= Nothing || docker then "host.docker.internal" else "localhost"
+
+-- | The executor of a test: a board runs only under GDB
+executorOf :: Executor -> Platform -> Executor
+executorOf executor plt = if plt /= POSIXGCC then GdbExecutor else executor
+
+-- | The commands of the console that reset a board and load the binary; the
+-- PYNQ is prepared before with the XSDB script of the project
+launchSequence :: Platform -> [String]
+launchSequence plt =
+    case plt of
+        FreeRTOS10STM32L432NUCLEOL432KC -> ["monitor reset halt", "load"]
+        RTEMS5LEON3SFNEXYSA7 -> ["monitor reset", "load"]
+        _ -> ["load"]
 
 invalid :: TerminaConfig -> String -> TestResult
 invalid config reason = TestResult (labelOf config) (Just reason) [] Nothing
@@ -186,49 +245,61 @@ invalid config reason = TestResult (labelOf config) (Just reason) [] Nothing
 -- the descriptor it runs, and its files of the record and of the output
 data Planned = Planned Integer [DescriptorCase] FilePath FilePath
 
--- | Runs a test that is built, on posix; a board comes with the executor of GDB
-runDeployment :: Executor -> Mode -> Deployment -> IO Int
-runDeployment executor mode deployment = do
+-- | How execute starts the binary: as a process of posix, or under the GDB of
+-- the toolchain, natively or through the GDB server of a board
+data Launcher = AsProcess | UnderGdb FilePath GdbTarget
+
+-- | Runs a test that is built: on posix as a process or under gdb, and on a
+-- board under the GDB of its toolchain, through its GDB server at the host and
+-- at the port of the platform or of --gdb
+runDeployment :: Executor -> (String, Maybe Int) -> Mode -> Deployment -> IO Int
+runDeployment executor (host, mPort) mode deployment = do
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
         folder = outputFolder config
         binary = folder </> "bin" </> T.unpack (name config)
-    if plt /= POSIXGCC
-      then do
-        putStrLn . warnMessage $ labelOf config ++ ": running on a board comes with the executor of GDB, the test is only built"
-        return 0
-      else do
-        loaded <- readDescriptor (folder </> "test" <.> "json")
-        case loaded of
-          Left err -> do
-            evidence <- evidenceOf config mode Nothing
-            finish config evidence Nothing M.empty (invalid config ("its descriptor cannot be read: " ++ err))
-          Right descriptor -> do
-            evidence <- evidenceOf config mode (descriptorTimeout descriptor)
-            case plan folder descriptor of
+        board = plt /= POSIXGCC
+        address = host ++ ":" ++ maybe "" show (maybe (gdbServerPort plt) Just mPort)
+    loaded <- readDescriptor (folder </> "test" <.> "json")
+    case loaded of
+      Left err -> do
+        evidence <- evidenceOf config mode Nothing (executorOf executor plt)
+        finish config evidence Nothing M.empty (invalid config ("its descriptor cannot be read: " ++ err))
+      Right descriptor -> do
+        evidence <- evidenceOf config mode (descriptorTimeout descriptor) (executorOf executor plt)
+        prefix <- if board
+            then M.findWithDefault "" "EXPANDED_CROSS" <$> deliverableInfo (labelOf config) folder
+            else return ""
+        let launcher =
+                if board then UnderGdb (prefix ++ "gdb") (RemoteServer address (launchSequence plt))
+                else if executor == GdbExecutor then UnderGdb "gdb" NativeProcess
+                else AsProcess
+        case plan folder descriptor (board && mode == Isolated && plt /= FreeRTOS10STM32L432NUCLEOL432KC) of
+          Left err -> finish config evidence (Just descriptor) M.empty (invalid config err)
+          Right planned -> do
+            stamp <- stampAddress prefix binary
+            either (putStrLn . warnMessage) (const (return ())) stamp
+            ran <- runAll (execute config launcher (platformLayout plt) descriptor binary (either (const Nothing) Just stamp)) planned
+            case ran of
               Left err -> finish config evidence (Just descriptor) M.empty (invalid config err)
-              Right planned -> do
-                stamp <- stampAddress binary
-                either (putStrLn . warnMessage) (const (return ())) stamp
-                ran <- runAll (execute config executor (platformLayout plt) descriptor binary (either (const Nothing) Just stamp)) planned
-                case ran of
-                  Left err -> finish config evidence (Just descriptor) M.empty (invalid config err)
-                  Right runs -> do
-                    let results = concatMap (analyse . fst) runs
-                        overflowed = [ (headerCasesEnded h, headerChecksFailed h) | (r, h) <- runs, runOverflow r ]
-                        overflow = if null overflowed then Nothing else Just (sum (map fst overflowed), sum (map snd overflowed))
-                    (locations, warning) <- locateAddresses binary (addressesOf results)
-                    maybe (return ()) (putStrLn . warnMessage) warning
-                    finish config evidence (Just descriptor) locations (TestResult (labelOf config) Nothing results overflow)
+              Right runs -> do
+                let results = concatMap (analyse . fst) runs
+                    overflowed = [ (headerCasesEnded h, headerChecksFailed h) | (r, h) <- runs, runOverflow r ]
+                    overflow = if null overflowed then Nothing else Just (sum (map fst overflowed), sum (map snd overflowed))
+                (locations, warning) <- locateAddresses prefix binary (addressesOf results)
+                maybe (return ()) (putStrLn . warnMessage) warning
+                finish config evidence (Just descriptor) locations (TestResult (labelOf config) Nothing results overflow)
 
   where
 
-    plan folder descriptor =
+    plan folder descriptor noRelaunch =
         let cases = D.descriptorCases descriptor
             record n = folder </> ("record" ++ n) <.> "bin"
             output n = folder </> ("test" ++ n) <.> "log"
         in if mode /= AllCases && descriptorLevel descriptor /= "unit"
             then Left "--case and --isolated run the cases of a unit test"
+            else if noRelaunch
+            then Left ("--isolated is not available on " ++ show (deploymentPlatform deployment) ++ " until a reliable relaunch of the board is checked")
             else case mode of
                 AllCases -> Right [Planned 0 cases (record "") (output "")]
                 OneCase c -> case [ dc | dc <- cases, D.caseId dc == c ] of
@@ -248,13 +319,13 @@ runDeployment executor mode deployment = do
                     Right done -> fmap (done :) <$> runAll run rest
 
 -- | Runs the binary once and decodes its record, without the load offset in its addresses
-execute :: TerminaConfig -> Executor -> Layout -> Descriptor -> FilePath -> Maybe Integer -> Planned -> IO (Either String (Run, Header))
-execute config executor layout descriptor binary stamp (Planned selected cases recordFile logFile) = do
-    ran <- case executor of
-        ProcessExecutor -> fmap fromProcess <$>
+execute :: TerminaConfig -> Launcher -> Layout -> Descriptor -> FilePath -> Maybe Integer -> Planned -> IO (Either String (Run, Header))
+execute config launcher layout descriptor binary stamp (Planned selected cases recordFile logFile) = do
+    ran <- case launcher of
+        AsProcess -> fmap fromProcess <$>
             runPosix layout binary recordFile logFile (recordCapacity config) selected (descriptorTimeout descriptor)
-        GdbExecutor -> fmap fromGdb <$>
-            runGdb "gdb" binary NativeProcess (takeDirectory recordFile) logFile selected (descriptorTimeout descriptor)
+        UnderGdb gdb target -> fmap fromGdb <$>
+            runGdb gdb binary target (takeDirectory recordFile) logFile selected (descriptorTimeout descriptor)
     return $ ran >>= \(bytes, killed, frames, noRecord) -> do
         header <- decodeHeader layout bytes
         when (headerMagic header /= BS.pack (map (fromIntegral . fromEnum) "TRMTEST\0")) $
@@ -296,8 +367,8 @@ finish config evidence mDescriptor locations result = do
 
 -- | What ties the result to the build: the commit of the project, the hash of
 -- the binary and the hashes of provenance.json
-evidenceOf :: TerminaConfig -> Mode -> Maybe Integer -> IO Evidence
-evidenceOf config mode seconds = do
+evidenceOf :: TerminaConfig -> Mode -> Maybe Integer -> Executor -> IO Evidence
+evidenceOf config mode seconds executor = do
     let folder = outputFolder config
         binary = folder </> "bin" </> T.unpack (name config)
         provenanceFile = folder </> "provenance" <.> "json"
@@ -318,6 +389,9 @@ evidenceOf config mode seconds = do
             AllCases -> "all"
             OneCase _ -> "case"
             Isolated -> "isolated",
+        evidenceExecutor = case executor of
+            ProcessExecutor -> "process"
+            GdbExecutor -> "gdb",
         evidenceTimeout = seconds,
         evidenceCommit = case (sha, status) of
             (Right s, Right st) -> Just (concat (lines s), not (null (lines st)))

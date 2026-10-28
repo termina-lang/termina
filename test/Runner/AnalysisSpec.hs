@@ -51,7 +51,7 @@ at value path =
         _ -> Nothing
 
 evidence :: Evidence
-evidence = Evidence "hk" "posix-gcc" "linux" "debug" "all" (Just 10) (Just ("773e607", False)) (Just "ab") Nothing
+evidence = Evidence "hk" "posix-gcc" "linux" "debug" "all" "process" (Just 10) (Just ("773e607", False)) (Just "ab") Nothing
 
 spec :: Spec
 spec = describe "Runner: verdicts and report" $ do
@@ -122,6 +122,7 @@ spec = describe "Runner: verdicts and report" $ do
         json = resultsJson evidence (Just descriptor) locations (TestResult "hk (posix-gcc)" Nothing results Nothing)
         failed = [Right "cases", Left 0, Right "failures", Left 0]
     at json [Right "verdict"] `shouldBe` Just (toJSON ("failed" :: String))
+    at json [Right "run", Right "executor"] `shouldBe` Just (toJSON ("process" :: String))
     at json [Right "cases", Left 0, Right "verdict"] `shouldBe` Just (toJSON ("failed" :: String))
     at json (failed ++ [Right "line"]) `shouldBe` Just (toJSON (25 :: Int))
     at json (failed ++ [Right "expected"]) `shouldBe` Just (toJSON ("95" :: String))

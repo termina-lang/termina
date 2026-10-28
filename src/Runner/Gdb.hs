@@ -86,7 +86,7 @@ runGdb gdb binary target folder logFile selectedCase seconds = do
                     NativeProcess -> ["-gdb-set startup-with-shell off",
                                       console "handle SIGALRM SIGUSR1 SIGUSR2 SIGSEGV SIGBUS SIGFPE SIGILL nostop noprint pass"]
                     RemoteServer address launch ->
-                        ("-target-select extended-remote " ++ address) : map console launch)
+                        ["-gdb-set tcp auto-retry off", "-target-select extended-remote " ++ address] ++ map console launch)
             ++ [ "-break-insert " ++ symbol | symbol <- ["termina__test__init", "termina__test__end", "termina__exec__reboot"] ]
             ++ [ case target of
                     NativeProcess -> "-exec-run"

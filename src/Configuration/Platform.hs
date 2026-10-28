@@ -25,6 +25,14 @@ usizeWidth FreeRTOS10STM32L432NUCLEOL432KC = 32
 usizeWidth RTEMS6ZYNQ7000PYNQZ2            = 32
 usizeWidth TestPlatform                    = 32
 
+-- | The default port of the GDB server of a board, which the debug
+-- configurations of termina new and the runner of termina test use
+gdbServerPort :: Platform -> Maybe Int
+gdbServerPort RTEMS5LEON3SFNEXYSA7 = Just 2222
+gdbServerPort FreeRTOS10STM32L432NUCLEOL432KC = Just 61234
+gdbServerPort RTEMS6ZYNQ7000PYNQZ2 = Just 3000
+gdbServerPort _ = Nothing
+
 -- | The bit width of C @int@ on the target, which is what decides whether an
 -- operation on a narrower type is carried out in that narrower type or in
 -- @int@: C promotes an operand whose type is narrower than @int@, so the

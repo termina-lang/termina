@@ -1,5 +1,5 @@
 -- | The translation of the return addresses of a record to the file and the
--- line of the .fin, with the tool of the system where the test ran.
+-- line of the .fin, with the tools of the toolchain of the test.
 module Runner.Symbols (
     Location(..), locateAddresses, stampAddress, atosLocation, addr2lineLocation
 ) where
@@ -18,17 +18,19 @@ data Location = Location {
     locationLine :: Integer
   } deriving (Eq, Show)
 
--- | The location of each address of a binary, already without its load offset;
--- one is subtracted from each return address, which points after its call.
--- It gives the addresses it could not translate as nothing, and a warning when
--- a tool is missing.
-locateAddresses :: FilePath -> [Integer] -> IO (M.Map Integer (Maybe Location), Maybe String)
-locateAddresses _ [] = return (M.empty, Nothing)
-locateAddresses binary addresses = do
+-- | The location of each address of a binary, already without its load offset,
+-- with the addr2line of the toolchain whose programs start with the prefix, or
+-- with atos for a binary of macOS, whose prefix is empty; one is subtracted
+-- from each return address, which points after its call. It gives the
+-- addresses it could not translate as nothing, and a warning when a tool is
+-- missing.
+locateAddresses :: String -> FilePath -> [Integer] -> IO (M.Map Integer (Maybe Location), Maybe String)
+locateAddresses _ _ [] = return (M.empty, Nothing)
+locateAddresses prefix binary addresses = do
     let queries = [ hex (a - 1) | a <- addresses ]
-    located <- if os == "darwin"
+    located <- if null prefix && os == "darwin"
         then runTool "atos" (["--fullPath", "-o", binary] ++ queries) atosLocation
-        else runTool "addr2line" (["-e", binary] ++ queries) addr2lineLocation
+        else runTool (prefix ++ "addr2line") (["-e", binary] ++ queries) addr2lineLocation
     return $ case located of
         Left warning -> (M.fromList [ (a, Nothing) | a <- addresses ], Just warning)
         Right locations -> (M.fromList (zip addresses (locations ++ repeat Nothing)), Nothing)
@@ -45,13 +47,15 @@ runTool tool args readLine = do
         Left err -> Left (tool ++ " not found: the failures are given without their line (" ++ show (err :: IOException) ++ ")")
         Right (_, out, _) -> Right (map readLine (lines out))
 
--- | The address of termina__test__stamp in the symbol table, which macOS
--- writes with an underscore; the anchor of the header minus it is the load offset
-stampAddress :: FilePath -> IO (Either String Integer)
-stampAddress binary = do
-    result <- try (readProcessWithExitCode "nm" [binary] "")
+-- | The address of termina__test__stamp in the symbol table, read with the nm
+-- of the toolchain, which macOS writes with an underscore; the anchor of the
+-- header minus it is the load offset
+stampAddress :: String -> FilePath -> IO (Either String Integer)
+stampAddress prefix binary = do
+    let nm = prefix ++ "nm"
+    result <- try (readProcessWithExitCode nm [binary] "")
     return $ case result of
-        Left err -> Left ("nm not found: the failures are given without their line (" ++ show (err :: IOException) ++ ")")
+        Left err -> Left (nm ++ " not found: the failures are given without their line (" ++ show (err :: IOException) ++ ")")
         Right (_, out, _) ->
             case [ address | [address, _, name] <- map words (lines out), name `elem` ["termina__test__stamp", "_termina__test__stamp"] ] of
                 (address : _) -> case readHex address of

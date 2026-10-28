@@ -7,7 +7,7 @@
 -- the #line pragmas.
 module Command.Deliver (
     deliverCmdArgsParser, deliverCommand, DeliverCmdArgs,
-    dependencies, inFolder, pathsIn, relocate, toolchainVariables
+    dependencies, inFolder, pathsIn, relocate, toolchainVariables, deliverableInfo
 ) where
 
 import Command.Build
