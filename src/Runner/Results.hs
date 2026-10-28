@@ -28,6 +28,7 @@ data Evidence = Evidence {
     evidenceProfile :: String,
     evidenceMode :: String, -- ^ all, case or isolated
     evidenceExecutor :: String, -- ^ process or gdb
+    evidenceDebugger :: Maybe String, -- ^ the first line of --version of the GDB that ran the test
     evidenceTimeout :: Maybe Integer,
     evidenceCommit :: Maybe (String, Bool), -- ^ the commit of the project and whether its tree has changes
     evidenceBinarySha :: Maybe String,
@@ -85,6 +86,7 @@ resultsJson evidence mDescriptor locations result =
         "run" .= object [
             "mode" .= evidenceMode evidence,
             "executor" .= evidenceExecutor evidence,
+            "debugger" .= evidenceDebugger evidence,
             "timeout" .= evidenceTimeout evidence,
             "overflow" .= (testOverflow result /= Nothing)
           ],
@@ -170,7 +172,7 @@ renderResults = encodePretty' defConfig { confCompare = keyOrder keys }
         "version", "number", "id", "name", "instance", "case", "level", "platform", "host", "profile",
         "procedure", "variant", "task", "file", "line", "verdict", "invalid", "stamp", "commit", "sha", "dirty",
         "binary", "module", "origin", "source", "object", "path", "sha256", "stripped-sha256", "modules",
-        "run", "mode", "executor", "timeout", "overflow", "cases", "checks", "verifies", "failures",
+        "run", "mode", "executor", "debugger", "timeout", "overflow", "cases", "checks", "verifies", "failures",
         "text", "step", "expected", "obtained", "address", "exception", "last_step", "backtrace", "fields", "elapsed", "requirements"
       ]
 

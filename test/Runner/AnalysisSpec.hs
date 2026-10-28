@@ -52,7 +52,7 @@ at value path =
         _ -> Nothing
 
 evidence :: Evidence
-evidence = Evidence "hk" "posix-gcc" "linux" "debug" "all" "process" (Just 10) (Just ("773e607", False)) (Just "ab") Nothing
+evidence = Evidence "hk" "posix-gcc" "linux" "debug" "all" "process" Nothing (Just 10) (Just ("773e607", False)) (Just "ab") Nothing
 
 spec :: Spec
 spec = describe "Runner: verdicts and report" $ do

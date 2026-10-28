@@ -32,9 +32,10 @@ import Data.Char (isDigit)
 import Data.List (intercalate, nub)
 import Data.Maybe (fromMaybe)
 import Numeric (showHex)
-import System.Directory (createDirectoryIfMissing, doesFileExist)
+import System.Directory (createDirectoryIfMissing, doesFileExist, findExecutable)
 import System.Environment (lookupEnv)
 import System.Info (os)
+import System.Process (readProcessWithExitCode)
 import System.IO (BufferMode(LineBuffering), hPutStrLn, hSetBuffering, stderr, stdout)
 import Command.Types
 import Command.Utils
@@ -303,25 +304,35 @@ runDeployment executor (Servers (host, mPort) (xsdbHost, mXsdbPort)) mode deploy
         evidence <- evidenceOf config mode Nothing (executorOf executor plt)
         finish config evidence Nothing M.empty (invalid config ("its descriptor cannot be read: " ++ err))
       Right descriptor -> do
-        evidence <- evidenceOf config mode (descriptorTimeout descriptor) (executorOf executor plt)
         prefix <- if board
             then M.findWithDefault "" "EXPANDED_CROSS" <$> deliverableInfo (labelOf config) folder
             else return ""
-        let launcher =
-                if board then UnderGdb (prefix ++ "gdb") (RemoteServer address (launchSequence plt))
-                else if executor == GdbExecutor then UnderGdb "gdb" NativeProcess
-                else AsProcess
-        hasScript <- doesFileExist xsdbScript
         let fromRecord = case mode of
                 Recorded _ -> True
                 _ -> False
+            -- The boards run under gdb-multiarch, and posix under the gdb of the host
+            debugger = if board then "gdb-multiarch" else "gdb"
+            usesGdb = (board || executor == GdbExecutor) && not fromRecord
+            launcher =
+                if board then UnderGdb debugger (RemoteServer address (launchSequence plt))
+                else if executor == GdbExecutor then UnderGdb debugger NativeProcess
+                else AsProcess
+        found <- if usesGdb then findExecutable debugger else return Nothing
+        version <- maybe (return Nothing) debuggerVersion found
+        evidence <- (\e -> e { evidenceDebugger = version })
+            <$> evidenceOf config mode (descriptorTimeout descriptor) (executorOf executor plt)
+        hasScript <- doesFileExist xsdbScript
+        let available = if usesGdb && found == Nothing
+                then Left (debugger ++ ", which runs the test" ++ (if board then " on the board" else "")
+                           ++ ", is not in the PATH")
+                else Right ()
             prepared = case (xsdbPort, fromRecord) of
                 (Nothing, _) -> Right Nothing
                 (_, True) -> Right Nothing
                 (Just port, False) -> if hasScript then Right (Just port)
                     else Left ("the " ++ show plt ++ " is prepared before each run with " ++ xsdbScript
                                ++ ", which resets the board, initializes its PS and loads its bitstream, and the project has none")
-        case prepared >> plan folder descriptor of
+        case available >> prepared >> plan folder descriptor of
           Left err -> finish config evidence (Just descriptor) M.empty (invalid config err)
           Right planned -> do
             stamp <- stampAddress prefix binary
@@ -485,6 +496,7 @@ evidenceOf config mode seconds executor = do
         evidenceExecutor = case executor of
             ProcessExecutor -> "process"
             GdbExecutor -> "gdb",
+        evidenceDebugger = Nothing,
         evidenceTimeout = seconds,
         evidenceCommit = case (sha, status) of
             (Right s, Right st) -> Just (concat (lines s), not (null (lines st)))
@@ -492,6 +504,17 @@ evidenceOf config mode seconds executor = do
         evidenceBinarySha = binarySha,
         evidenceProvenance = provenance
       }
+
+-- | The first line of --version of a GDB, if it gives one
+debuggerVersion :: FilePath -> IO (Maybe String)
+debuggerVersion gdb = do
+    ran <- try (readProcessWithExitCode gdb ["--version"] "")
+    return $ case ran of
+        Right (ExitSuccess, out, _) -> case lines out of
+            (first : _) -> Just first
+            [] -> Nothing
+        Right _ -> Nothing
+        Left err -> const Nothing (err :: IOException)
 
 -- | Lists the tests, their platforms and their cases
 listTests :: Bool -> IO ()
