@@ -9,7 +9,6 @@ import qualified Data.Text as T
 import Configuration.Configuration
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
-import Modules.Modules (TerminaModuleData(fullPath))
 
 
 -- | The flag says whether the deployment is a unit test, which reads the test clock
@@ -106,7 +105,7 @@ genMakefile params loweredProject mExtern unitTest =
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
                 MakeCommand False [MFragment "@cd $(TERMINA_PROJECT_DIR) && $(CC) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
-            ]] ++ testModuleFlags ++ [
+            ],
             -- | The SHA-256 of the binary and of each module object without
             -- their debugging information, which the build writes into
             -- provenance.json
@@ -162,14 +161,6 @@ genMakefile params loweredProject mExtern unitTest =
         -- | The folder of the project seen from the output folder of the
         -- deployment, which is always inside it
         projectRoot = joinPath (map (const "..") (splitDirectories (outputFolder params)))
-
-        -- | The modules of the test itself, in its folder, keep each call as a
-        -- call, so the return address of a check points to its line
-        testModuleFlags =
-            [ MRule ("$(TARGET_DIR_NAME)" </> "src" </> qname <.> "o") ["CFLAGS+=-fno-optimize-sibling-calls"] []
-            | isTestBuild params
-            , (qname, m) <- M.toList loweredProject
-            , "tests" `elem` take 1 (splitDirectories (fullPath m)) ]
 
         hasExtern = maybe False (const True) mExtern
 
