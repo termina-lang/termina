@@ -1,8 +1,8 @@
--- | The C of the project: the sources and the precompiled libraries that the
--- manifest lists in its "extern" section, all of them under the "extern"
--- folder of the project. They are checked against the folder, copied to the
--- output folder, and linked into a single relocatable object in which only
--- the extern functions stay global.
+-- | The C of the project: the sources, their headers and the precompiled
+-- libraries that the manifest lists in its "extern" section, under the
+-- "extern" folder of the project. They are checked against the folder, copied
+-- to the output folder, and linked into a single relocatable object in which
+-- only the extern functions stay global.
 module Command.Extern (
     ExternBuild(..),
     externFolder,
@@ -59,44 +59,58 @@ prepareExtern config folders = do
 -- | Check the "extern" section against its folder, and give the files that
 -- the selected platform needs, relative to the folder.
 checkExtern :: TerminaConfig -> FilePath -> ExternConfig -> IO [FilePath]
-checkExtern config externFolderPath (ExternConfig srcs libs) = do
-  -- | The C of a project is versioned with it, so it lies in its extern folder
-  forM_ (externFiles (ExternConfig srcs libs)) $ \file ->
-    unless (insideFolder file) $
-      dieWithError $ "The extern file \"" ++ file ++ "\" is outside the folder \"" ++ externFolderPath ++ "\""
+checkExtern config externFolderPath (ExternConfig moduleEntries) = do
   folderExists <- doesDirectoryExist externFolderPath
-  presentSources <- if folderExists then listCSources externFolderPath else return []
-  -- | Every source of the folder is listed, so that no C is left uncompiled
-  forM_ presentSources $ \src ->
-    unless (src `elem` srcs) $
-      dieWithError $ "The C source \"" ++ externFolderPath </> src ++ "\" is not listed in its \"extern\" section of \"termina.yaml\""
-  forM_ srcs $ \src -> do
-    unless (takeExtension src == ".c") $
-      dieWithError $ "The extern source \"" ++ src ++ "\" is not a C source file"
-    exists <- doesFileExist (externFolderPath </> src)
-    unless exists $
-      dieWithError $ "The extern source \"" ++ externFolderPath </> src ++ "\" does not exist"
-  forM_ (M.toList libs) $ \(pltName, pltLibs) -> do
-    when (checkPlatform (T.unpack pltName) == Nothing) $
-      dieWithError $ "Unknown platform \"" ++ T.unpack pltName ++ "\" in the extern libraries"
-    forM_ pltLibs $ \lib -> do
-      unless (takeExtension lib == ".a") $
-        dieWithError $ "The extern library \"" ++ lib ++ "\" is not a static library"
-      exists <- doesFileExist (externFolderPath </> lib)
-      unless exists $
-        dieWithError $ "The extern library \"" ++ externFolderPath </> lib ++ "\" does not exist"
-  -- | The libraries of a project are tied to the platforms they were compiled
-  -- for, so a project that has some has to have them for the selected one
-  pltLibs <- if M.null libs
-    then return []
-    else case M.lookup (platform config) libs of
-      Just ls -> return ls
-      Nothing -> dieWithError $ "The folder \"" ++ externFolderPath ++ "\" provides no extern libraries for the platform \"" ++ T.unpack (platform config) ++ "\""
-  return (srcs ++ pltLibs)
+  present <- if folderExists then listFiles externFolderPath else return []
+  -- | The sources, the headers and the libraries of each platform have a folder each
+  forM_ present $ \file ->
+    unless (inItsFolder file) $
+      dieWithError $ "The file \"" ++ externFolderPath </> file ++ "\" is not in its folder: "
+        ++ "\"extern\" holds the C sources in \"src\", their headers in \"include\" and the libraries of each platform in \"lib/<platform>\""
+  -- | Each listed path names a file, and no file twice in the same list
+  listed <- fmap concat . forM (M.toList moduleEntries) $ \(modName, ExternEntry srcs hdrs libs) ->
+    fmap concat . forM (listsOf srcs hdrs libs) $ \entries -> do
+      let named = [ (entry, listedFiles present entry) | entry <- entries ]
+      forM_ named $ \(entry, files) ->
+        when (null files) $
+          dieWithError $ "The extern entry of " ++ T.unpack modName ++ " lists \"" ++ externFolderPath </> entry ++ "\", which "
+            ++ (if '*' `elem` entry then "matches no file" else "does not exist")
+      let files = concatMap snd named
+      forM_ (nub (files \\ nub files)) $ \file ->
+        dieWithError $ "The extern entry of " ++ T.unpack modName ++ " names \"" ++ externFolderPath </> file ++ "\" twice"
+      return files
+  -- | Every file of the folder is listed, so that no C is left uncompiled and
+  -- a package carries every header and library
+  forM_ present $ \file ->
+    unless (file `elem` listed) $
+      dieWithError $ "The file \"" ++ externFolderPath </> file ++ "\" is not listed under any module in its \"extern\" section of \"termina.yaml\""
+  -- | The libraries of a module are tied to the platforms they were compiled
+  -- for, so a module that has some has to have them for the selected one
+  forM_ (M.toList moduleEntries) $ \(modName, entry) ->
+    unless (M.null (entryLibraries entry) || M.member (platform config) (entryLibraries entry)) $
+      dieWithError $ "The extern entry of " ++ T.unpack modName ++ " has no libraries for the platform \"" ++ T.unpack (platform config) ++ "\""
+  return . nub $ concat
+    [ concatMap (listedFiles present . (externSourceFolder </>)) srcs
+      ++ concatMap (listedFiles present . (externHeaderFolder </>)) hdrs
+      ++ [ externLibraryFolder </> T.unpack (platform config) </> lib | lib <- M.findWithDefault [] (platform config) libs ]
+    | ExternEntry srcs hdrs libs <- M.elems moduleEntries ]
 
--- | The C sources under a folder, as paths relative to it.
-listCSources :: FilePath -> IO [FilePath]
-listCSources root = go ""
+  where
+
+    listsOf srcs hdrs libs =
+      [map (externSourceFolder </>) srcs, map (externHeaderFolder </>) hdrs]
+      ++ [ map ((externLibraryFolder </> T.unpack plt) </>) pltLibs | (plt, pltLibs) <- M.toList libs ]
+
+    inItsFolder file =
+      case splitDirectories file of
+        (folder : _ : _) | folder == externSourceFolder -> takeExtension file == ".c"
+        (folder : _ : _) | folder == externHeaderFolder -> takeExtension file == ".h"
+        (folder : plt : _ : _) | folder == externLibraryFolder -> checkPlatform plt /= Nothing && takeExtension file == ".a"
+        _ -> False
+
+-- | The files under a folder, as paths relative to it.
+listFiles :: FilePath -> IO [FilePath]
+listFiles root = go ""
 
   where
 
@@ -105,9 +119,7 @@ listCSources root = go ""
       concat <$> forM entries (\entry -> do
         let relEntry = if null rel then entry else rel </> entry
         isDir <- doesDirectoryExist (root </> relEntry)
-        if isDir
-          then go relEntry
-          else return [relEntry | takeExtension entry == ".c"])
+        if isDir then go relEntry else return [relEntry])
 
 -- | Copy the files, each one given by its folder and its path relative to it,
 -- to the output folder. A file is written only when its content changed, so
@@ -131,17 +143,6 @@ copyExtern destination folderFiles = do
     let listed = S.fromList files
     forM_ present $ \file ->
       unless (file `S.member` listed) $ removeFile (destination </> file)
-
-  where
-
-    listFiles root = go root ""
-
-    go root rel = do
-      entries <- listDirectory (root </> rel)
-      concat <$> forM entries (\entry -> do
-        let relEntry = if null rel then entry else rel </> entry
-        isDir <- doesDirectoryExist (root </> relEntry)
-        if isDir then go root relEntry else return [relEntry])
 
 -- | The names of the extern functions of the project, which are the only
 -- global symbols that its C keeps.

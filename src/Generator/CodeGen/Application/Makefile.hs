@@ -107,7 +107,7 @@ genMakefile params loweredProject mExtern unitTest =
             MRule "$(OBJ_DIR_NAME)/%.o" ["$(R)/%.c", "$(TERMINA_FLAGS_FILE)"] [
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
-                MakeCommand False [MFragment "@cd $(TERMINA_PROJECT_DIR) && $(CC) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
+                MakeCommand False [MFragment "@cd $(TERMINA_PROJECT_DIR) && $(CC) $(CFLAGS) $(TERMINA_EXTERN_CPPFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
             ],
             -- | The SHA-256 of the binary and of each module object without
             -- their debugging information, which the build writes into
@@ -215,11 +215,14 @@ genMakefile params loweredProject mExtern unitTest =
                     ]
                 ]
 
-        externRule = [
+        externRule = concat [ [
+            -- | The headers of the project come before the generated ones, for
+            -- its C only
+            MRule "$(EXTERN_OBJS)" ["TERMINA_EXTERN_CPPFLAGS:=-iquote $R" </> externFolder </> externHeaderFolder] [],
             -- | The Makefile holds the list of extern functions, so a new one
             -- relinks the object even when no C changed
             MRule "$(EXTERN_OBJ)" ["$(EXTERN_OBJS)", "$(EXTERN_LIBS)", "$R/Makefile", "$(TERMINA_FLAGS_FILE)"] [
                 MakeCommand False [MFragment "@echo Linking $@"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
                 MakeCommand False [MFragment "@$(call termina_extern_link,$@,$(EXTERN_OBJS),$(EXTERN_LIBS),$(EXTERN_SYMBOLS))"]
-            ] | hasExtern]
+            ] ] | hasExtern]

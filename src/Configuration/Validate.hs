@@ -54,15 +54,15 @@ validateFiles local files =
         [ "the package declares the path dependency " ++ p ++ ", which only exists on the machine of its author"
         | not local, DepPath p <- manifestDependencies manifest ]
 
-    -- | Each file of the extern section lies inside "extern/" and is in the
-    -- commit; a link in its place is reported with the others.
+    -- | Each file of the extern section is in the commit, and each pattern
+    -- matches some file; a link in its place is reported with the others.
     externErrors manifest = concatMap check (externPaths manifest)
 
       where
 
         check p
-            | not (insideFolder p) = ["the extern section lists " ++ p ++ ", which is outside extern/"]
-            | M.member ("extern/" ++ p) modes = []
+            | any (listedMatches ("extern/" ++ p)) (M.keys modes) = []
+            | '*' `elem` p = ["extern/" ++ p ++ ": the extern section lists a pattern that matches no file of the package"]
             | otherwise = ["extern/" ++ p ++ ": the extern section lists a file that the package does not have"]
 
     -- | A symbolic link or a submodule where the build reads: in an exported
@@ -80,7 +80,7 @@ validateFiles local files =
         targets = "termina.yaml" : map ("extern/" ++) (externPaths manifest) ++ map (++ ".fin") bases ++ bases
 
         -- A link is the file itself, a folder on the way to it, or lies under a prefix.
-        related path target = path == target || (path ++ "/") `isPrefixOf` target
+        related path target = listedMatches target path || (path ++ "/") `isPrefixOf` target
             || any (`ownsPath` path) prefixes
 
     -- | Two copied paths that differ only in case would be one file on

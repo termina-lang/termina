@@ -11,6 +11,7 @@ module Command.Deliver (
 ) where
 
 import Command.Build
+import Command.Extern (externFolder)
 import Command.Update (verifyProject)
 import Command.Utils
 import Configuration.Configuration
@@ -127,7 +128,9 @@ deliverDeployment chatty manifest archive withTrace deployment = do
     externSrcs <- fromOutput (list "EXTERN_SRCS")
     externLibs <- fromOutput (list "EXTERN_LIBS")
     headers <- map (makeRelative plain) . filter ((== ".h") . takeExtension) <$> filesUnder (plain </> "include")
-    forM_ (sources ++ headers ++ externSrcs ++ externLibs) $ \file -> copyInto (plain </> file) (folder </> file)
+    -- | The headers of the C of the project, which its sources include
+    externHeaders <- map (makeRelative plain) <$> filesUnder (plain </> externFolder </> externHeaderFolder)
+    forM_ (sources ++ headers ++ externSrcs ++ externHeaders ++ externLibs) $ \file -> copyInto (plain </> file) (folder </> file)
     -- | The files of the OSAL that the build opens, as the dependency files
     -- of its objects list them, and those named in the flags, such as a
     -- linker script. Each one goes to the same path under "osal", so the
@@ -340,7 +343,7 @@ genDeliverableMakefile config info osalSources sources externSrcs externLibs tes
             MRule "$(OBJ_DIR_NAME)/%.o" ["%.c"] [
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@mkdir -p $(@D)"],
-                MakeCommand False [MFragment "@$(CC) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
+                MakeCommand False [MFragment "@$(CC) $(CFLAGS) $(TERMINA_EXTERN_CPPFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
             ]] ++ testModuleFlags ++ [
             MRule ".PHONY" ["stripped-hashes"] [],
             MRule "stripped-hashes" ["$(TARGET)", "$(MODULE_OBJS)"] [
@@ -406,15 +409,16 @@ genDeliverableMakefile config info osalSources sources externSrcs externLibs tes
             ]
         | hasExtern ]
 
-    externRule =
-        [ MRule "$(EXTERN_OBJ)" ["$(EXTERN_OBJS)", "$(EXTERN_LIBS)"] [
+    externRule = concat
+        [ [ MRule "$(EXTERN_OBJS)" ["TERMINA_EXTERN_CPPFLAGS:=-iquote " ++ externFolder </> externHeaderFolder] [],
+          MRule "$(EXTERN_OBJ)" ["$(EXTERN_OBJS)", "$(EXTERN_LIBS)"] [
             MakeCommand False [MFragment "@echo Linking $@"],
             MakeCommand False [MFragment "@mkdir -p $(@D)"],
             MakeCommand False [MFragment $ unwords [
                 "@CC='$(CC)' CFLAGS='$(CFLAGS)' LD='$(LD)' OBJCOPY='$(OBJCOPY)' NM='$(NM)' OBJDUMP='$(OBJDUMP)'",
                 "LIBC='$(TERMINA_EXTERN_LIBC)'",
                 "sh osal/tools/extern/link.sh '$@' '$(EXTERN_OBJS)' '$(EXTERN_LIBS)' '$(EXTERN_SYMBOLS)'"]]
-          ]
+          ] ]
         | hasExtern ]
 
     -- | As in the build of the project, the modules of the test itself keep

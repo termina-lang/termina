@@ -16,7 +16,7 @@ manifest :: String -> FetchedFile
 manifest body = FetchedFile "termina.yaml" "100644" (BS.pack (header "pus" ++ body))
 
 library :: String
-library = "exports: [pus]\nextern:\n  sources: [crc.c]\n  libraries:\n    posix-gcc: [posix/libcrc.a]\n"
+library = "exports: [pus]\nextern:\n  pus.crc:\n    sources: [crc.c]\n    libraries:\n      posix-gcc: [libcrc.a]\n"
 
 file :: String -> FetchedFile
 file path = FetchedFile path "100644" ""
@@ -25,7 +25,7 @@ link :: String -> FetchedFile
 link path = FetchedFile path "120000" "../elsewhere"
 
 package :: [FetchedFile]
-package = [manifest library, file "src/pus/service1.fin", file "extern/crc.c", file "extern/posix/libcrc.a",
+package = [manifest library, file "src/pus/service1.fin", file "extern/src/crc.c", file "extern/lib/posix-gcc/libcrc.a",
     file "extern/notes.txt", file "README.md"]
 
 errorsOf :: [FetchedFile] -> [String]
@@ -50,21 +50,24 @@ spec = do
       errorsOf (manifest "exports: [pus]\ndependencies:\n  - path: ../hal\n" : [file "src/pus/service1.fin"])
         `shouldBe` ["the package declares the path dependency ../hal, which only exists on the machine of its author"]
 
-  describe "extern" $
+  describe "extern" $ do
 
-    it "rejects an absolute path, a path outside extern/ and a missing file" $
-      errorsOf (manifest "exports: [pus]\nextern:\n  sources: [/etc/crc.c, ../crc.c, crc.c]\n" : file "src/pus/service1.fin" : [])
-        `shouldBe` [ "the extern section lists /etc/crc.c, which is outside extern/"
-                   , "the extern section lists ../crc.c, which is outside extern/"
-                   , "extern/crc.c: the extern section lists a file that the package does not have" ]
+    it "rejects a missing file and a pattern that matches none" $
+      errorsOf (manifest "exports: [pus]\nextern:\n  pus.crc:\n    sources: [crc.c, \"spi/*.c\"]\n" : file "src/pus/service1.fin" : [])
+        `shouldBe` [ "extern/src/crc.c: the extern section lists a file that the package does not have"
+                   , "extern/src/spi/*.c: the extern section lists a pattern that matches no file of the package" ]
+
+    it "accepts a pattern that matches some file" $
+      validatePackage [manifest "exports: [pus]\nextern:\n  pus.crc:\n    sources: [\"spi/*.c\"]\n", file "src/pus/service1.fin", file "extern/src/spi/a.c"]
+        `shouldSatisfy` isRight
 
   describe "links and submodules" $ do
 
     it "rejects them where files are copied, and on the way there" $
-      errorsOf (package ++ [link "src/pus/drivers", FetchedFile "src/pus/sub" "160000" "", link "extern/posix"])
+      errorsOf (package ++ [link "src/pus/drivers", FetchedFile "src/pus/sub" "160000" "", link "extern/lib/posix-gcc"])
         `shouldBe` [ "src/pus/drivers: a symbolic link, which a package cannot hold where its files are copied"
                    , "src/pus/sub: a submodule, which a package cannot hold where its files are copied"
-                   , "extern/posix: a symbolic link, which a package cannot hold where its files are copied" ]
+                   , "extern/lib/posix-gcc: a symbolic link, which a package cannot hold where its files are copied" ]
 
     it "ignores them where nothing is copied" $
       validatePackage (package ++ [link "docs/latest", link "src/util/crc.fin", link "extern/old.c"])

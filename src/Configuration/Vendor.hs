@@ -48,7 +48,7 @@ isVendored :: Manifest -> String -> Bool
 isVendored manifest path =
     path == "termina.yaml"
         || (".fin" `isSuffixOf` path && any (`ownsPath` path) (manifestPrefixes manifest))
-        || path `elem` map ("extern/" ++) (externFiles (manifestExtern manifest))
+        || any (\listed -> listedMatches ("extern/" ++ listed) path) (externFiles (manifestExtern manifest))
 
 -- | The hash of the content of a package: the SHA-256 of the lines that
 -- sha256sum writes for its files, "hex-digest  path", in the byte order of

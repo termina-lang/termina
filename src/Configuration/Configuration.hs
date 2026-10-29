@@ -3,8 +3,14 @@
 module Configuration.Configuration (
     TerminaConfig(..),
     ExternConfig(..),
+    ExternEntry(..),
     emptyExternConfig,
+    externSourceFolder,
+    externHeaderFolder,
+    externLibraryFolder,
     externFiles,
+    listedMatches,
+    listedFiles,
     insideFolder,
     ProjectProfile(..),
     defaultConfig,
@@ -23,43 +29,71 @@ module Configuration.Configuration (
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
 import Data.Yaml
-import System.FilePath (isRelative, splitDirectories)
+import Data.List (nub, tails)
+import System.FilePath (isRelative, splitDirectories, takeDirectory, takeFileName, (</>))
 
 import Configuration.Platform
 
 data ProjectProfile = Debug | Release deriving (Eq, Show)
 
--- | The C of the project, in the "extern" folder: the sources compiled with
--- the generated code, and the precompiled libraries of each platform. The
--- paths are relative to the "extern" folder.
-data ExternConfig = ExternConfig {
-    externSources :: ![FilePath],
-    externLibraries :: !(M.Map T.Text [FilePath])
+-- | The C of the project, in the "extern" folder, under the module whose
+-- extern functions it defines, named with dots as in an import.
+newtype ExternConfig = ExternConfig {
+    externModules :: M.Map T.Text ExternEntry
+  } deriving (Eq, Show)
+
+-- | The C of one module: the sources of "extern/src", the headers of
+-- "extern/include" and the archives of "extern/lib/<platform>", each list
+-- relative to its folder.
+data ExternEntry = ExternEntry {
+    entrySources :: ![FilePath],
+    entryHeaders :: ![FilePath],
+    entryLibraries :: !(M.Map T.Text [FilePath])
   } deriving (Eq, Show)
 
 emptyExternConfig :: ExternConfig
-emptyExternConfig = ExternConfig [] M.empty
+emptyExternConfig = ExternConfig M.empty
+
+-- | The folders of "extern": sources, headers and the archives of each platform.
+externSourceFolder, externHeaderFolder, externLibraryFolder :: FilePath
+externSourceFolder = "src"
+externHeaderFolder = "include"
+externLibraryFolder = "lib"
 
 -- | Every file that the section lists, the libraries of all the platforms
--- included, relative to the "extern" folder.
+-- included, relative to the "extern" folder and once each.
 externFiles :: ExternConfig -> [FilePath]
-externFiles extern = externSources extern ++ concat (M.elems (externLibraries extern))
+externFiles (ExternConfig modules) = nub $ concatMap entryFiles (M.elems modules)
+
+  where
+
+    entryFiles (ExternEntry srcs hdrs libs) =
+        map (externSourceFolder </>) srcs
+        ++ map (externHeaderFolder </>) hdrs
+        ++ [ externLibraryFolder </> T.unpack plt </> lib | (plt, pltLibs) <- M.toList libs, lib <- pltLibs ]
+
+-- | Whether a listed path, a file or a pattern whose * matches any part of a
+-- file name, names the path.
+listedMatches :: FilePath -> FilePath -> Bool
+listedMatches listed path
+    | '*' `elem` listed = takeDirectory listed == takeDirectory path && matches (takeFileName listed) (takeFileName path)
+    | otherwise = listed == path
+
+  where
+
+    matches ('*' : ps) s = any (matches ps) (tails s)
+    matches (p : ps) (c : cs) = p == c && matches ps cs
+    matches [] [] = True
+    matches _ _ = False
+
+-- | The paths that a listed path names among the given ones.
+listedFiles :: [FilePath] -> FilePath -> [FilePath]
+listedFiles present listed = filter (listedMatches listed) present
 
 -- | Whether a path of an extern section stays inside the extern folder: it
 -- is relative and does not go up with "..".
 insideFolder :: FilePath -> Bool
 insideFolder path = isRelative path && ".." `notElem` splitDirectories path
-
-instance FromJSON ExternConfig where
-  parseJSON (Object o) =
-    ExternConfig <$>
-    o .:? "sources" .!= [] <*>
-    o .:? "libraries" .!= M.empty
-  parseJSON _ = fail "Expected extern object"
-
-instance ToJSON ExternConfig where
-  toJSON (ExternConfig srcs libs) = object $
-    ["sources" .= srcs | not (null srcs)] <> ["libraries" .= libs | not (M.null libs)]
 
 defaultSysPrintOutputBufferSize, defaultSysReadInputBufferSize :: Integer
 defaultSysPrintOutputBufferSize = 256

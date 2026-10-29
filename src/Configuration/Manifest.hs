@@ -301,10 +301,46 @@ tickParser (Just ticks) =
 positive :: String -> Integer -> Parser Integer
 positive what n = if n > 0 then return n else fail $ what ++ " must be positive"
 
+-- | The extern section: the C of each module, under its name with dots.
 externParser :: Value -> Parser ExternConfig
-externParser v = do
-    withObject "extern" (onlyFields "extern" ["sources", "libraries"]) v
-    parseJSON v
+externParser = withObject "extern" $ \o -> do
+    -- | Until 0.7.0 the section listed its files without their module
+    when (oldForm o) $
+        fail "the extern section lists the files under the module that declares their extern functions, as in crc.crc: {sources: [crc.c]}"
+    ExternConfig . M.fromList <$> mapM entryParser (KM.toList o)
+
+  where
+
+    oldForm o = case (KM.lookup "sources" o, KM.lookup "libraries" o) of
+        (Just (Array _), _) -> True
+        (_, Just (Object libs)) -> any ((/= Nothing) . checkPlatform . K.toString) (KM.keys libs)
+        _ -> False
+
+    entryParser (key, v) = do
+        let modName = K.toText key
+            what = "the extern entry of " ++ T.unpack modName
+        unless (all (isSnakeCase . T.unpack) (T.splitOn "." modName)) $
+            fail $ "the extern section names " ++ T.unpack modName ++ ", which is not the name of a module"
+        entry <- withObject what (\eo -> do
+            onlyFields what ["sources", "headers", "libraries"] eo
+            srcs <- eo .:? "sources" .!= [] >>= mapM (listedPath what ".c" True)
+            hdrs <- eo .:? "headers" .!= [] >>= mapM (listedPath what ".h" True)
+            libs <- eo .:? "libraries" .!= M.empty
+            forM_ (M.toList libs) $ \(plt, pltLibs) ->
+                platformParser plt >> mapM_ (listedPath what ".a" False) pltLibs
+            when (null srcs && M.null libs) $
+                fail $ what ++ " has neither sources nor libraries"
+            return (ExternEntry srcs hdrs libs)) v
+        return (modName, entry)
+
+    -- | A path inside its folder and with its extension; a source or a header
+    -- may have a * in its file name, which matches the files of one folder.
+    listedPath what ext patterns path
+        | not (insideFolder path) = fail $ what ++ " lists " ++ path ++ ", which is outside its folder"
+        | takeExtension path /= ext = fail $ what ++ " lists " ++ path ++ ", which is not a " ++ ext ++ " file"
+        | '*' `elem` takeDirectory path = fail $ what ++ " lists " ++ path ++ ", whose * is in a folder: a pattern matches the files of one folder"
+        | not patterns && '*' `elem` path = fail $ what ++ " lists " ++ path ++ ", and the libraries take no patterns"
+        | otherwise = return path
 
 appParser :: Value -> Parser AppDeployment
 appParser = withObject "app" $ \o -> do

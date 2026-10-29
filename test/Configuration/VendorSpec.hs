@@ -22,7 +22,7 @@ package = [("termina.yaml", "a\n"), ("src/pus/x.fin", "b\r\n")]
 library :: Manifest
 library = manifestOf $ header "pus"
     ++ "exports:\n  - pus.service1\n  - ccsds\n"
-    ++ "extern:\n  sources: [crc.c]\n  libraries:\n    posix-gcc: [posix/libcrc.a]\n"
+    ++ "extern:\n  pus.service1:\n    sources: [crc.c, \"spi/*.c\"]\n    headers: [crc.h]\n    libraries:\n      posix-gcc: [libcrc.a]\n"
 
 spec :: Spec
 spec = do
@@ -42,10 +42,11 @@ spec = do
     it "keeps the manifest, the modules of the exported prefixes and the listed extern files" $
       filter (isVendored library) [
           "termina.yaml", "src/pus/service1.fin", "src/pus/service1/tm.fin", "src/ccsds/tc/frame.fin",
-          "src/pus/service2.fin", "src/test_support/fake.fin", "src/ccsds/README.md", "extern/crc.c",
-          "extern/posix/libcrc.a", "extern/notes.c", "tests/t1/test.fin", "README.md"
+          "src/pus/service2.fin", "src/test_support/fake.fin", "src/ccsds/README.md", "extern/src/crc.c",
+          "extern/src/spi/a.c", "extern/src/spi/sub/b.c", "extern/include/crc.h", "extern/lib/posix-gcc/libcrc.a",
+          "extern/src/notes.c", "tests/t1/test.fin", "README.md"
         ] `shouldBe` ["termina.yaml", "src/pus/service1.fin", "src/pus/service1/tm.fin", "src/ccsds/tc/frame.fin",
-          "extern/crc.c", "extern/posix/libcrc.a"]
+          "extern/src/crc.c", "extern/src/spi/a.c", "extern/include/crc.h", "extern/lib/posix-gcc/libcrc.a"]
 
   describe "check against the lock" $
 
