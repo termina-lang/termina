@@ -1,0 +1,53 @@
+// A concurrent test that starts on system_init and ends after the third tick
+
+handler class CStarter {
+    init_ev : sink TimeVal triggers go;
+    start_out : out TimeVal;
+
+    action go(&priv self, now : TimeVal) {
+        self->start_out.send(now);
+        return;
+    }
+};
+
+task class CScenario {
+    start_in : in TimeVal triggers start;
+    tick_in : sink TimeVal triggers tick;
+    chk : access TestChecks;
+    scn : access TestScenario;
+    t0 : TimeVal;
+    count : u32;
+
+    action start(&priv self, now : TimeVal) {
+        self->t0 = now;
+        self->chk.step(1 : usize);
+        return;
+    }
+
+    action tick(&priv self, _now : TimeVal) {
+        self->count = self->count + 1 : u32;
+        self->chk.step(2 : usize);
+        if self->count == 3 : u32 {
+            self->chk.check_eq_u32(self->count, 3 : u32);
+            self->chk.check_elapsed(self->t0, {tv_sec = 1, tv_usec = 0} : TimeVal);
+            self->scn.finish();
+        }
+        return;
+    }
+};
+
+channel start : MsgQueue<TimeVal; 1>;
+
+handler starter : CStarter = { init_ev <- system_init, start_out -> start };
+
+emitter timer : PeriodicTimer = { period = {tv_sec = 0, tv_usec = 100000} };
+
+#[priority(10)]
+task scenario : CScenario = {
+    start_in <- start,
+    tick_in <- timer,
+    chk <-> test_checks,
+    scn <-> test_scenario,
+    t0 = {tv_sec = 0, tv_usec = 0},
+    count = 0
+};

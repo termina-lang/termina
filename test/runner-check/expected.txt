@@ -4,6 +4,14 @@ exception (posix-gcc)
            EArrayIndexOutOfBounds at src/runner/values.fin:8 in the task harness: size 4, index 7
   --       exception_tests.after            not run
   1 passed, 1 with an exception, 1 not run
+fault (posix-gcc)
+  EXCEPT   fault
+           EArrayIndexOutOfBounds at tests/fault/test.fin:12 in the task fault: size 4, index 4
+  0 passed, 1 with an exception
+never (posix-gcc)
+  TIMEOUT  never
+           the case did not end before the timeout; last step 4
+  0 passed, 1 timed out
 outcomes (posix-gcc)
   ok       outcomes_tests.passes               1 check
   FAIL     outcomes_tests.fails_with_values    1 check
@@ -23,6 +31,14 @@ overflow (posix-gcc)
            the record overflowed before the end of the case
   the record overflowed: 2 cases ended and 100 checks failed in all, and the failures beyond it are not detailed
   0 passed, 1 failed, 1 without a record
+restless (posix-gcc)
+  TIMEOUT  restless
+           finish() was called, but the system did not come to rest before the timeout; last step 6
+  0 passed, 1 timed out
+scenario (posix-gcc)
+  ok       scenario    1 check
+           tests/scenario/test.fin:32  self->chk.check_elapsed(self->t0, {tv_sec = 1, tv_usec = 0} : TimeVal)  took TIME, limit 1 s 0 us, measured without a verdict
+  1 passed
 timeout (posix-gcc)
   ok       timeout_tests.before    1 check
   TIMEOUT  timeout_tests.hangs

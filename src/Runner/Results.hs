@@ -91,7 +91,6 @@ resultsJson evidence mDescriptor locations result =
             "overflow" .= (testOverflow result /= Nothing)
           ],
         "cases" .= map caseJson (testCases result),
-        "elapsed" .= ([] :: [Value]),
         "requirements" .= requirements
     ]
 
@@ -112,7 +111,23 @@ resultsJson evidence mDescriptor locations result =
             "failures" .= map failureJson (resultFailures r),
             "exception" .= fmap exceptionJson (resultException r),
             "last_step" .= resultLastStep r,
-            "backtrace" .= resultBacktrace r
+            "backtrace" .= resultBacktrace r,
+            "elapsed" .= map measureJson (resultElapsed r)
+        ]
+
+    -- | A measurement of check_elapsed without a verdict
+    measureJson measure =
+        let detail = failureDetailOf measure
+            (limit, took) = case detailValues detail of
+                Just (ShownElapsed t l) -> (Just l, Just t)
+                _ -> (Nothing, Nothing)
+        in object [
+            "file" .= fmap locationFile (detailPlace detail),
+            "line" .= fmap locationLine (detailPlace detail),
+            "text" .= detailText detail,
+            "took" .= took,
+            "limit" .= limit,
+            "address" .= hex (detailAddress detail)
         ]
 
     failureJson failure =
@@ -173,7 +188,7 @@ renderResults = encodePretty' defConfig { confCompare = keyOrder keys }
         "procedure", "variant", "task", "file", "line", "verdict", "invalid", "stamp", "commit", "sha", "dirty",
         "binary", "module", "origin", "source", "object", "path", "sha256", "stripped-sha256", "modules",
         "run", "mode", "executor", "debugger", "timeout", "overflow", "cases", "checks", "verifies", "failures",
-        "text", "step", "expected", "obtained", "address", "exception", "last_step", "backtrace", "fields", "elapsed", "requirements"
+        "text", "step", "expected", "obtained", "took", "limit", "address", "exception", "last_step", "backtrace", "fields", "elapsed", "requirements"
       ]
 
 -- | report.xml: the test is a testsuite and each case a testcase; a failed
@@ -214,7 +229,9 @@ renderJUnit evidence mDescriptor locations result =
 
     testcase r =
         let c = resultCase r
-            open = "    <testcase classname=\"" ++ escape (evidenceName evidence ++ "." ++ caseInstance c)
+            -- A concurrent test has no instance, and its classname is the name of the test
+            classname = evidenceName evidence ++ (if null (caseInstance c) then "" else "." ++ caseInstance c)
+            open = "    <testcase classname=\"" ++ escape classname
                    ++ "\" name=\"" ++ escape (caseName c) ++ "\" file=\"" ++ escape (caseFile c)
                    ++ "\" line=\"" ++ show (caseLine c) ++ "\""
             details = caseDetailLines descriptor locations r

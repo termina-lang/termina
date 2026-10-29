@@ -20,3 +20,15 @@ tests:
     platforms: [posix-gcc]
     timeout: 10
     test-log-size: 64
+  scenario:
+    platforms: [posix-gcc]
+    timeout: 5
+  never:
+    platforms: [posix-gcc]
+    timeout: 1
+  restless:
+    platforms: [posix-gcc]
+    timeout: 1
+  fault:
+    platforms: [posix-gcc]
+    timeout: 5

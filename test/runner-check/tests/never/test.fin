@@ -1,0 +1,19 @@
+// A concurrent test that never calls finish()
+
+task class CNever {
+    tick_in : sink TimeVal triggers tick;
+    chk : access TestChecks;
+
+    action tick(&priv self, _now : TimeVal) {
+        self->chk.step(4 : usize);
+        return;
+    }
+};
+
+emitter timer : PeriodicTimer = { period = {tv_sec = 0, tv_usec = 100000} };
+
+#[priority(10)]
+task never : CNever = {
+    tick_in <- timer,
+    chk <-> test_checks
+};

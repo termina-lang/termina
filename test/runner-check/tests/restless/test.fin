@@ -1,0 +1,39 @@
+// A concurrent test that calls finish() and then never lets the system come to rest
+
+handler class CStarter {
+    init_ev : sink TimeVal triggers go;
+    start_out : out TimeVal;
+
+    action go(&priv self, now : TimeVal) {
+        self->start_out.send(now);
+        return;
+    }
+};
+
+task class CRestless {
+    start_in : in TimeVal triggers start;
+    chk : access TestChecks;
+    scn : access TestScenario;
+
+    action start(&priv self, _now : TimeVal) {
+        self->chk.step(5 : usize);
+        self->scn.finish();
+        for i : u32 in 0 : u32 .. 0xFFFFFFFF : u32 {
+            for j : u32 in 0 : u32 .. 0xFFFFFFFF : u32 {
+                self->chk.step(6 : usize);
+            }
+        }
+        return;
+    }
+};
+
+channel start : MsgQueue<TimeVal; 1>;
+
+handler starter : CStarter = { init_ev <- system_init, start_out -> start };
+
+#[priority(10)]
+task restless : CRestless = {
+    start_in <- start,
+    chk <-> test_checks,
+    scn <-> test_scenario
+};

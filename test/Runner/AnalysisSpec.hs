@@ -34,7 +34,7 @@ failure = Check 0 0x1000 (Just (Scalars 0 95))
 
 -- | A run of every case of the descriptor, whose last step is 7
 runOf :: [Record] -> RunEnd -> Run
-runOf records end = Run (descriptorCases descriptor) records end False 7 []
+runOf records end = Run (descriptorCases descriptor) records end False 7 [] False
 
 verdicts :: [Record] -> RunEnd -> [Verdict]
 verdicts records end = map resultVerdict (analyse (runOf records end))
@@ -72,6 +72,21 @@ spec = describe "Runner: verdicts and report" $ do
     map resultVerdict results `shouldBe` [Passed, TimedOut, NotRun, NotRun]
     map resultLastStep results `shouldBe` [Nothing, Just 7, Nothing, Nothing]
 
+  it "keeps the records after finish() in the scenario, with its measurements of check_elapsed" $ do
+    let measure = Check 0 0x1200 (Just (TimeVals (0, 300000) (1, 0)))
+        results = analyse (runOf [CaseBegin 1, Finish, Elapsed measure, CaseEnd 2, End] Finished)
+    map resultVerdict results `shouldBe` [Passed, NotRun, NotRun, NotRun]
+    resultElapsed (head results) `shouldBe` [("check_elapsed", measure)]
+    caseDetailLines descriptor M.empty (head results)
+      `shouldBe` ["0x1200  check_elapsed  took 0 s 300000 us, limit 1 s 0 us, measured without a verdict"]
+
+  it "tells a timeout after finish() from one that never reached it" $ do
+    let run = (runOf [CaseBegin 1, Finish] Killed) { runFinishCalled = True }
+        results = analyse run
+    map resultVerdict results `shouldBe` [TimedOut, NotRun, NotRun, NotRun]
+    caseDetailLines descriptor M.empty (head results)
+      `shouldBe` ["finish() was called, but the system did not come to rest before the timeout; last step 7"]
+
   it "gives an interruption and the last step to the case open in a dumped record" $ do
     let results = analyse (runOf [CaseBegin 1, CaseEnd 2, CaseBegin 2] Dumped)
     map resultVerdict results `shouldBe` [Passed, Interrupted, NotRun, NotRun]
@@ -82,11 +97,11 @@ spec = describe "Runner: verdicts and report" $ do
     verdicts [CaseBegin 1] Finished `shouldBe` [Raised, NotRun, NotRun, NotRun]
 
   it "leaves the cases beyond an overflow of the record without a record" $
-    map resultVerdict (analyse (Run (descriptorCases descriptor) [CaseBegin 1, CaseEnd 1, CaseBegin 2] Finished True 0 []))
+    map resultVerdict (analyse (Run (descriptorCases descriptor) [CaseBegin 1, CaseEnd 1, CaseBegin 2] Finished True 0 [] False))
       `shouldBe` [Passed, Unrecorded, Unrecorded, Unrecorded]
 
   it "crosses the records only with the cases of the run" $
-    map resultVerdict (analyse (Run [descriptorCases descriptor !! 2] [CaseBegin 3, CaseEnd 1, End] Finished False 0 []))
+    map resultVerdict (analyse (Run [descriptorCases descriptor !! 2] [CaseBegin 3, CaseEnd 1, End] Finished False 0 [] False))
       `shouldBe` [Passed]
 
   it "subtracts the load offset from the addresses of a record" $ do

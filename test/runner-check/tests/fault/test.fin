@@ -1,0 +1,25 @@
+// A concurrent test whose task indexes an array out of bounds, which the hook records
+
+task class CFault {
+    tick_in : sink TimeVal triggers tick;
+    chk : access TestChecks;
+    values : [u32; 4];
+    index : usize;
+
+    action tick(&priv self, _now : TimeVal) {
+        self->chk.step(8 : usize);
+        self->index = self->index + 2 : usize;
+        self->chk.check(self->values[self->index] == 0 : u32);
+        return;
+    }
+};
+
+emitter timer : PeriodicTimer = { period = {tv_sec = 0, tv_usec = 100000} };
+
+#[priority(10)]
+task fault : CFault = {
+    tick_in <- timer,
+    chk <-> test_checks,
+    values = [0 : u32; 4],
+    index = 0
+};

@@ -6,9 +6,11 @@ TERMINA="${TERMINA:-termina}"
 
 cd "$(dirname "$0")" || exit 2
 
-# The lines of the report, without the output of make nor the frames of a backtrace, whose paths depend on the host
+# The lines of the report, without the output of make nor the frames of a backtrace, whose paths depend on the host,
+# and with TIME for the time that a check_elapsed measures, which changes from run to run
 report() {
-    grep -E '^([a-z_]+ \(posix-gcc\)$|  )' | grep -v -E '^           (backtrace:|  #[0-9]+ )'
+    grep -E '^([a-z_]+ \(posix-gcc\)$|  )' | grep -v -E '^           (backtrace:|  #[0-9]+ )' \
+        | sed -E 's/took [0-9]+ s [0-9]+ us, limit/took TIME, limit/'
 }
 
 failed=0

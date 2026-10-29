@@ -29,7 +29,9 @@ data CaseResult = CaseResult {
     resultFailures :: [(String, Check)],
     resultException :: Maybe ExceptionInfo, -- ^ nothing when the process ended without a record of it
     resultLastStep :: Maybe Integer, -- ^ the last step of a case that timed out or was interrupted
-    resultBacktrace :: [String] -- ^ the frames of a case with an exception, when GDB gave them
+    resultBacktrace :: [String], -- ^ the frames of a case with an exception, when GDB gave them
+    resultElapsed :: [(String, Check)], -- ^ the measurements of check_elapsed without a verdict
+    resultFinishCalled :: Bool -- ^ whether a concurrent test called finish() before it timed out
   } deriving (Eq, Show)
 
 data TestResult = TestResult {
@@ -45,22 +47,23 @@ data RunEnd = Finished | Killed | Dumped
   deriving (Eq, Show)
 
 -- | One run of the binary: the cases it runs, its records, how it ended,
--- whether its record overflowed, its last step and the frames where it
--- stopped at an exception
+-- whether its record overflowed, its last step, the frames where it stopped
+-- at an exception and whether the scenario called finish()
 data Run = Run {
     runCases :: [DescriptorCase],
     runRecords :: [Record],
     runEnd :: RunEnd,
     runOverflow :: Bool,
     runLastStep :: Integer,
-    runBacktrace :: [String]
+    runBacktrace :: [String],
+    runFinishCalled :: Bool
   } deriving (Eq, Show)
 
 -- | The cases of a run crossed with its records
 analyse :: Run -> [CaseResult]
 analyse run =
     let ended = walk Nothing (runRecords run) M.empty
-        missing c = CaseResult c (if runOverflow run then Unrecorded else NotRun) Nothing [] Nothing Nothing []
+        missing c = CaseResult c (if runOverflow run then Unrecorded else NotRun) Nothing [] Nothing Nothing [] [] False
     in [ M.findWithDefault (missing c) (caseNumber c) ended | c <- runCases run ]
 
   where
@@ -74,26 +77,31 @@ analyse run =
             Dumped -> Interrupted
             Finished -> if runOverflow run then Unrecorded else Raised
 
-    close n verdict checks failures exception results =
+    close n verdict checks (failures, measures) exception results =
         let lastStep = if verdict `elem` [TimedOut, Interrupted] then Just (runLastStep run) else Nothing
             frames = if verdict == Raised then runBacktrace run else []
+            finishCalled = verdict == TimedOut && runFinishCalled run
         in case caseOf n of
-            (c : _) -> M.insert n (CaseResult c verdict checks (reverse failures) exception lastStep frames) results
+            (c : _) -> M.insert n (CaseResult c verdict checks (reverse failures) exception lastStep frames
+                                      (reverse measures) finishCalled) results
             [] -> results
 
-    -- | The case begun and its failures, in reverse order
-    walk :: Maybe (Integer, [(String, Check)]) -> [Record] -> M.Map Integer CaseResult -> M.Map Integer CaseResult
+    -- | The case begun, its failures and its measurements, in reverse order;
+    -- the records after FINISH still belong to the scenario
+    walk :: Maybe (Integer, ([(String, Check)], [(String, Check)])) -> [Record] -> M.Map Integer CaseResult -> M.Map Integer CaseResult
     walk current rest results =
         case (rest, current) of
-            (CaseBegin n : more, _) -> walk (Just (n, [])) more results
-            (Failure procedure check : more, Just (n, failures)) -> walk (Just (n, (procedure, check) : failures)) more results
-            (CaseEnd checks : more, Just (n, failures)) ->
-                walk Nothing more (close n (if null failures then Passed else Failed) (Just checks) failures Nothing results)
-            (Exception info : _, Just (n, failures)) -> close n Raised Nothing failures (Just info) results
+            (CaseBegin n : more, _) -> walk (Just (n, ([], []))) more results
+            (Failure procedure check : more, Just (n, (failures, measures))) ->
+                walk (Just (n, ((procedure, check) : failures, measures))) more results
+            (Elapsed check : more, Just (n, (failures, measures))) ->
+                walk (Just (n, (failures, ("check_elapsed", check) : measures))) more results
+            (CaseEnd checks : more, Just (n, recorded@(failures, _))) ->
+                walk Nothing more (close n (if null failures then Passed else Failed) (Just checks) recorded Nothing results)
+            (Exception info : _, Just (n, recorded)) -> close n Raised Nothing recorded (Just info) results
             (End : _, _) -> results
-            (Finish : _, _) -> results
             (_ : more, _) -> walk current more results
-            ([], Just (n, failures)) -> close n interrupted Nothing failures Nothing results
+            ([], Just (n, recorded)) -> close n interrupted Nothing recorded Nothing results
             ([], Nothing) -> results
 
 -- | What an address of a record points to
@@ -107,7 +115,7 @@ data AddressKind =
 -- one is the return address of a function of the OSAL
 addressesOf :: [CaseResult] -> [(Integer, AddressKind)]
 addressesOf results =
-    [ (checkWhere check, ReturnAddress) | r <- results, (_, check) <- resultFailures r ]
+    [ (checkWhere check, ReturnAddress) | r <- results, (_, check) <- resultFailures r ++ resultElapsed r ]
     ++ [ (address, if exceptionVariant info == "EProcessorFault" then FaultPc else ReturnAddress)
        | r <- results, Just info <- [resultException r], ("address", address) <- exceptionFields info, address /= 0 ]
 
@@ -189,18 +197,32 @@ exceptionDetail descriptor locations info =
 -- | The lines that explain a case that did not pass, without indentation
 caseDetailLines :: Descriptor -> M.Map Integer (Maybe Location) -> CaseResult -> [String]
 caseDetailLines descriptor locations r =
-    let failures = map (failureLine . failureDetail descriptor locations) (resultFailures r) in
+    let failures = map (failureLine . failureDetail descriptor locations) (resultFailures r)
+        measures = map (measureLine . failureDetail descriptor locations) (resultElapsed r)
+        lastStep = maybe "0" show (resultLastStep r)
+        timedOut = if resultFinishCalled r
+            then "finish() was called, but the system did not come to rest before the timeout; last step " ++ lastStep
+            else "the case did not end before the timeout; last step " ++ lastStep
+    in
     case resultVerdict r of
-        Passed -> [ "warning: the case ran no checks" | resultChecks r == Just 0 ]
-        Failed -> failures
-        Raised -> failures ++ [exceptionLine (exceptionDetail descriptor locations <$> resultException r)]
+        Passed -> [ "warning: the case ran no checks" | resultChecks r == Just 0 ] ++ measures
+        Failed -> failures ++ measures
+        Raised -> failures ++ measures ++ [exceptionLine (exceptionDetail descriptor locations <$> resultException r)]
                   ++ (if null (resultBacktrace r) then [] else "backtrace:" : map ("  " ++) (resultBacktrace r))
-        TimedOut -> failures ++ ["the case did not end before the timeout; last step " ++ maybe "0" show (resultLastStep r)]
-        Interrupted -> failures ++ ["the record ends in the middle of the case; last step " ++ maybe "0" show (resultLastStep r)]
+        TimedOut -> failures ++ measures ++ [timedOut]
+        Interrupted -> failures ++ measures ++ ["the record ends in the middle of the case; last step " ++ lastStep]
         NotRun -> []
-        Unrecorded -> failures ++ ["the record overflowed before the end of the case"]
+        Unrecorded -> failures ++ measures ++ ["the record overflowed before the end of the case"]
 
   where
+
+    -- | A measurement of check_elapsed on a platform without timing guarantees
+    measureLine detail =
+        let took = case detailValues detail of
+                Just (ShownElapsed t limit) -> "  took " ++ t ++ ", limit " ++ limit
+                _ -> ""
+        in placeText (detailPlace detail) (detailAddress detail) ++ "  " ++ detailText detail ++ took
+           ++ ", measured without a verdict"
 
     failureLine detail =
         let step = if detailStep detail /= 0 then "  step " ++ show (detailStep detail) else "" in

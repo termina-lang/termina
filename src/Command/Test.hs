@@ -407,7 +407,8 @@ decodeRun layout descriptor stamp casesOf noRecord bytes end frames = do
     let area = BS.take (fromIntegral (headerWriteOffset header)) (BS.drop (headerSize layout) bytes)
         offset = maybe 0 (headerAnchor header -) stamp
     records <- decodeRecords layout area
-    return (Run cases (map (relocate offset) records) end (testBit (headerFlags header) 1) (headerLastStep header) frames, header)
+    return (Run cases (map (relocate offset) records) end (testBit (headerFlags header) 1) (headerLastStep header) frames
+                (testBit (headerFlags header) 0), header)
 
 -- | Reads the header and the area that a debugging session dumped to the
 -- folder, and decodes them with the cases that the header selected
