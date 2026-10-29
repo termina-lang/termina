@@ -37,6 +37,10 @@ spec = describe "Manifest: extern section" $ do
        "      - leon3sf/libmcs.a\n"))
       `shouldBe` Just (ExternConfig ["crc.c"] (M.fromList [(T.pack "rtems5-leon3sf-nexysa7", ["leon3sf/libmcs.a"])]))
 
+  it "keeps the files of the section inside the extern folder" $
+    map insideFolder ["crc.c", "leon3sf/libmcs.a", "../crc.c", "lib/../../crc.c", "/etc/crc.c"]
+      `shouldBe` [True, True, False, False, False]
+
   it "has no C when the section is absent" $
     parsedExtern (manifest "") `shouldBe` Just (ExternConfig [] M.empty)
 

@@ -1,0 +1,163 @@
+{-# LANGUAGE OverloadedStrings #-}
+
+-- | The lock of a project, "termina.lock": the exact resolution of its graph
+-- of dependencies, written by the tool and committed with "vendor/".
+module Configuration.Lock (
+    Lock(..),
+    LockedPackage(..),
+    knownLockVersions,
+    emptyLock,
+    normalizeUrl,
+    normalizedFolder,
+    parseLock,
+    decodeLockFile,
+    renderLock,
+    writeLockFile
+) where
+
+import Control.Monad
+import qualified Data.Aeson as A
+import qualified Data.Aeson.Key as K
+import qualified Data.Aeson.KeyMap as KM
+import qualified Data.ByteString.Lazy as BL
+import Data.Char (isDigit)
+import Data.List (group, sort, sortOn)
+import Data.Maybe (fromMaybe)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
+import Data.Yaml
+import System.Directory
+import System.FilePath (joinPath)
+
+-- | The versions of the format of the lock that this transpiler reads.
+knownLockVersions :: [Int]
+knownLockVersions = [1]
+
+data Lock = Lock {
+    lockVersion :: !Int,
+    lockPackages :: ![LockedPackage]
+  } deriving (Eq, Show)
+
+data LockedPackage = LockedPackage {
+    -- | The URL as written in the first manifest that names the package.
+    lockedUrl :: !T.Text,
+    -- | The tag.
+    lockedRev :: !T.Text,
+    -- | The full SHA that the tag resolved to.
+    lockedCommit :: !T.Text,
+    -- | "sha256:" and the hash of the vendored content.
+    lockedContentHash :: !T.Text
+  } deriving (Eq, Show)
+
+-- | The lock of a project without one.
+emptyLock :: Lock
+emptyLock = Lock (maximum knownLockVersions) []
+
+-- | The identity of a package: the URL without "https://", with the host in
+-- lowercase and without a trailing "/" or ".git". The path goes to lowercase
+-- only on the hosts that ignore its case.
+normalizeUrl :: T.Text -> T.Text
+normalizeUrl url = host <> caseOf (stripGit (T.dropWhileEnd (== '/') path))
+
+  where
+
+    (rawHost, path) = T.breakOn "/" (fromMaybe url (T.stripPrefix "https://" url))
+
+    host = T.toLower rawHost
+
+    stripGit p = fromMaybe p (T.stripSuffix ".git" p)
+
+    caseOf p
+        | host `elem` ["github.com", "gitlab.com"] = T.toLower p
+        | otherwise = p
+
+-- | The folders named after the normalized URL of a package, such as
+-- "github.com/termina-lang/pus", under "vendor/" or ".termina/fetch/".
+normalizedFolder :: T.Text -> FilePath
+normalizedFolder url = joinPath (T.unpack <$> T.splitOn "/" (normalizeUrl url))
+
+-- | Parse a lock. The version of the format is checked first, as in the
+-- manifest.
+parseLock :: Value -> Either String Lock
+parseLock v = do
+    ver <- parseEither (withObject "lock" (.: "version")) v
+    unless (ver `elem` knownLockVersions) $
+        Left $ "termina.lock version " ++ show ver ++ " is not supported by this version of termina (supported: "
+            ++ unwords (map show knownLockVersions) ++ ")"
+    lock <- parseEither lockParser v
+    case [u | (u : _ : _) <- group (sort (map (normalizeUrl . lockedUrl) (lockPackages lock)))] of
+        (u : _) -> Left $ "the package " ++ T.unpack u ++ " appears twice in termina.lock"
+        [] -> return lock
+
+-- | Read the lock of a project. A project without "termina.lock" has the empty
+-- lock.
+decodeLockFile :: FilePath -> IO (Either String Lock)
+decodeLockFile path = do
+    exists <- doesFileExist path
+    if not exists
+        then return (Right emptyLock)
+        else do
+            result <- decodeFileEither path
+            return $ case result of
+                Left err -> Left (prettyPrintParseException err)
+                Right v -> parseLock v
+
+-- | Fail on a field that the object does not admit.
+onlyLockFields :: String -> [K.Key] -> Object -> Parser ()
+onlyLockFields what allowed o =
+    case filter (`notElem` allowed) (KM.keys o) of
+        [] -> return ()
+        (k : _) -> fail $ "unknown field \"" ++ K.toString k ++ "\" in " ++ what
+
+lockParser :: Value -> Parser Lock
+lockParser = withObject "lock" $ \o -> do
+    onlyLockFields "termina.lock" ["version", "packages"] o
+    Lock <$> o .: "version" <*> (o .:? "packages" .!= [] >>= mapM packageParser)
+
+packageParser :: Value -> Parser LockedPackage
+packageParser = withObject "locked package" $ \o -> do
+    onlyLockFields "a package of termina.lock" ["git", "rev", "resolved-rev", "content-hash"] o
+    url <- o .: "git"
+    unless ("https://" `T.isPrefixOf` url) $
+        fail $ "the repository " ++ T.unpack url ++ " of termina.lock is not an https:// URL"
+    rev <- o .: "rev"
+    commit <- o .: "resolved-rev"
+    unless (isHex 40 commit) $
+        fail $ "the resolved-rev of " ++ T.unpack url ++ " is not a full commit SHA (40 lowercase hexadecimal digits)"
+    hash <- o .: "content-hash"
+    unless (maybe False (isHex 64) (T.stripPrefix "sha256:" hash)) $
+        fail $ "the content-hash of " ++ T.unpack url ++ " is not sha256: and 64 lowercase hexadecimal digits"
+    return (LockedPackage url rev commit hash)
+
+  where
+
+    isHex n t = T.length t == n && T.all (\c -> isDigit c || c `elem` ['a' .. 'f']) t
+
+-- | The text of a lock, the same for the same resolution: the packages go in
+-- the order of their identity, and the tag is quoted so that one such as 1.0
+-- reads back as text.
+renderLock :: Lock -> String
+renderLock lock = unlines $ [
+        "# termina.lock: generated by termina, do not edit. Commit it with vendor/.",
+        "version: " ++ show (lockVersion lock)
+    ] ++ (if null pkgs then [] else "packages:" : concatMap package pkgs)
+
+  where
+
+    pkgs = sortOn (normalizeUrl . lockedUrl) (lockPackages lock)
+
+    package p = [
+        "  - git: " ++ T.unpack (lockedUrl p),
+        "    rev: " ++ T.unpack (TE.decodeUtf8 (BL.toStrict (A.encode (lockedRev p)))),
+        "    resolved-rev: " ++ T.unpack (lockedCommit p),
+        "    content-hash: " ++ T.unpack (lockedContentHash p)
+      ]
+
+-- | Write the lock of a project, or remove "termina.lock" when the lock has no
+-- packages.
+writeLockFile :: FilePath -> Lock -> IO ()
+writeLockFile path lock
+    | null (lockPackages lock) = do
+        exists <- doesFileExist path
+        when exists (removeFile path)
+    | otherwise = writeFile path (renderLock lock)

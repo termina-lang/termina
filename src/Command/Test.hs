@@ -8,9 +8,10 @@ module Command.Test (
     TestCase(..), testCases
 ) where
 
-import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, selectDeployments)
+import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, loadBuildProject, selectDeployments)
 import Command.Common (loadTerminaModule, loadModules)
 import Command.Deliver (deliverableInfo)
+import Command.Sources (loadSources)
 import Configuration.Configuration
 import Configuration.Platform (Platform(..), callSite, checkPlatform, gdbServerPort, xsdbServerPort)
 import Runner.Analysis (TestResult(TestResult), Run(..), RunEnd(..), AddressKind(..), analyse, addressesOf, renderReport, exitCodeOf)
@@ -30,7 +31,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.Char (isDigit)
 import Data.List (intercalate, nub)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import Numeric (showHex)
 import System.Directory (createDirectoryIfMissing, doesFileExist, findExecutable)
 import System.Environment (lookupEnv)
@@ -40,6 +41,7 @@ import System.IO (BufferMode(LineBuffering), hPutStrLn, hSetBuffering, stderr, s
 import Command.Types
 import Command.Utils
 import Configuration.Manifest
+import Configuration.Namespace (locationLine)
 import Core.AST
 import Core.TestCases (NumberedCase(caseLocation), numberCases)
 import qualified Core.TestCases as NC
@@ -57,7 +59,7 @@ import qualified Data.Text as T
 import qualified Options.Applicative as O
 import System.Exit
 import System.FilePath
-import Text.Parsec.Pos (sourceLine, sourceName)
+import Text.Parsec.Pos (sourceName)
 
 -- | Data type for the "test" command arguments
 data TestCmdArgs =
@@ -71,6 +73,7 @@ data TestCmdArgs =
         (Maybe Executor) -- ^ How the binary of a test is run
         (Maybe Server) -- ^ The GDB server of the board
         (Maybe Server) -- ^ The XSDB command server of the PYNQ
+        Bool -- ^ Fail instead of fetching the dependencies
         Bool -- ^ List the tests instead of running them
         Bool -- ^ Write the list in JSON
     deriving Show
@@ -109,6 +112,8 @@ testCmdArgsParser = TestCmdArgs
           ( O.long "xsdb"
           <> O.metavar "HOST[:PORT]"
           <> O.help "The XSDB command server that prepares the PYNQ (default: the host of the GDB server, at the port of the platform)"))
+    <*> O.switch (O.long "offline"
+        <> O.help "Fail instead of fetching when termina.lock does not match termina.yaml")
     <*> O.switch (O.long "list"
         <> O.help "List the tests, their platforms and their cases, without building them")
     <*> O.switch (O.long "json"
@@ -167,21 +172,32 @@ data Mode =
 
 -- | Command handler for the "test" command
 testCommand :: TestCmdArgs -> IO ()
-testCommand (TestCmdArgs mName mPlatform mProfile mCase isolated mRecord mExecutor mServer mXsdb list json) =
-    if list then listTests json
-    else either cannotRun (runTests mName mPlatform mProfile mExecutor mServer mXsdb) (modeOf mName mCase isolated mRecord)
+testCommand (TestCmdArgs mName mPlatform mProfile mCase isolated mRecord mExecutor mServer mXsdb offline list json)
+    | list = either cannotRun (const (listTests json)) (listOnly [
+        (isJust mName, "the name of a test"), (isJust mPlatform, "--platform"), (isJust mProfile, "--profile"),
+        (isJust mCase, "--case"), (isolated, "--isolated"), (isJust mRecord, "--record"),
+        (isJust mExecutor, "--executor"), (isJust mServer, "--gdb"), (isJust mXsdb, "--xsdb"), (offline, "--offline")])
+    | json = cannotRun "--json needs --list"
+    | otherwise = either cannotRun (runTests mName mPlatform mProfile mExecutor mServer mXsdb offline) (modeOf mName mCase isolated mRecord offline)
 
 -- | A test that cannot be run exits with 2
 cannotRun :: String -> IO a
 cannotRun reason = hPutStrLn stderr (errorMessage reason) >> exitWith (ExitFailure 2)
 
+-- | --list takes only --json: the first other option given is an error
+listOnly :: [(Bool, String)] -> Either String ()
+listOnly given =
+    case [ option | (True, option) <- given ] of
+        [] -> Right ()
+        option : _ -> Left ("--list cannot be used with " ++ option)
+
 -- | The mode of the run, from the options
-modeOf :: Maybe String -> Maybe String -> Bool -> Maybe FilePath -> Either String Mode
-modeOf mName mCase isolated mRecord =
+modeOf :: Maybe String -> Maybe String -> Bool -> Maybe FilePath -> Bool -> Either String Mode
+modeOf mName mCase isolated mRecord offline =
     case (mCase, isolated, mRecord) of
         (Nothing, False, Nothing) -> Right AllCases
         (Nothing, True, Nothing) -> Right Isolated
-        (Just _, True, _) -> Left "--isolated runs every case and does not go with --case"
+        (Just _, True, _) -> Left "--case and --isolated cannot be used together"
         (Just c, False, Nothing) ->
             case mName of
                 Nothing -> Left "--case needs the name of the test"
@@ -189,19 +205,24 @@ modeOf mName mCase isolated mRecord =
         (Nothing, False, Just folder) ->
             case mName of
                 Nothing -> Left "--record needs the name of the test"
-                Just _ -> Right (Recorded folder)
-        (_, _, Just _) -> Left "--record reports the cases of the record, and does not go with --case nor --isolated"
+                Just _ -> if offline then Left "--record and --offline cannot be used together" else Right (Recorded folder)
+        (_, _, Just _) -> Left "--record cannot be used with --case or --isolated"
 
 -- | Builds and runs each selected test on each of its platforms, and exits with
 -- the worst code of them: 0 when every case passes, 1 when one does not, 2 when
--- a test cannot be built or read
-runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Maybe Executor -> Maybe Server -> Maybe Server -> Mode -> IO ()
-runTests mName mPlatform mProfile mExecutor mServer mXsdb mode = do
+-- a test cannot be built or read, also when the project cannot be loaded. A
+-- record is decoded with the binary already built, so its project is read
+-- without bringing the lock and vendor/ in line.
+runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Maybe Executor -> Maybe Server -> Maybe Server -> Bool -> Mode -> IO ()
+runTests mName mPlatform mProfile mExecutor mServer mXsdb offline mode = do
     -- | The report goes in order with the output of make
     hSetBuffering stdout LineBuffering
-    manifest <- loadManifest >>= either dieWithErrors return
+    loaded <- try (case mode of
+        Recorded _ -> loadManifest >>= either dieWithFirstError return
+        _ -> loadBuildProject False offline) :: IO (Either ExitCode Manifest)
+    manifest <- either (const (exitWith (ExitFailure 2))) return loaded
     let selection = maybe SelectTests SelectTest mName
-        buildArgs = BuildCmdArgs False False Nothing selection mPlatform mProfile
+        buildArgs = BuildCmdArgs False False Nothing selection mPlatform mProfile offline
     deployments <- either cannotRun return (selectDeployments manifest selection mPlatform mProfile)
     -- | A port in --gdb is the port of one board
     let boards = nub [ deploymentPlatform d | d <- deployments, deploymentPlatform d /= POSIXGCC ]
@@ -520,9 +541,9 @@ debuggerVersion gdb = do
 -- | Lists the tests, their platforms and their cases
 listTests :: Bool -> IO ()
 listTests json = do
-    manifest <- loadManifest >>= either dieWithErrors return
+    manifest <- loadManifest >>= either dieWithFirstError return
     listed <- forM (M.toList (manifestTests manifest)) $ \(testName, entry) -> do
-      cases <- loadTestCases (T.unpack testName)
+      cases <- loadTestCases manifest (T.unpack testName)
       return (testName, entry, cases)
     if json
       then BLC.putStrLn $ encodePretty' defConfig { confCompare = keyOrder keys } (object [
@@ -559,18 +580,18 @@ listTests json = do
     joinWith sep = foldr1 (\a b -> a ++ sep ++ b)
 
 -- | Parse the modules of a test and read its cases
-loadTestCases :: String -> IO [TestCase]
-loadTestCases testName = do
+loadTestCases :: Manifest -> String -> IO [TestCase]
+loadTestCases manifest testName = do
     let testFolder = "tests" </> testName
-        sources = ["src", testFolder </> "src"]
-    testModule <- loadTerminaModule testFolder "test" sources
-    parsedModules <- loadModules (importedModules testModule) sources
+    sources <- loadSources manifest (Just testName) testFolder
+    testModule <- loadTerminaModule sources testFolder "test"
+    parsedModules <- loadModules sources testFolder (importedModules testModule)
     let parsedProject = M.insert (qualifiedName testModule) testModule parsedModules
     orderedModules <- either
-        (\cycleFiles -> die . errorMessage $ "Detected cycle between the source files of the test " ++ testName ++ ": " ++ show cycleFiles)
+        (\cycleFiles -> dieWithError $ "Detected cycle between the source files of the test " ++ testName ++ ": " ++ show cycleFiles)
         return
         (sortProjectDepsOrLoop (M.map importedModules parsedProject))
-    either (die . errorMessage) return $
+    either dieWithError return $
       testCases [parsedAST . metadata $ parsedProject M.! m | m <- orderedModules]
 
 -- | The cases of a test in the order in which the harness numbers them.
@@ -578,7 +599,7 @@ testCases :: [AnnotatedProgram ParserAnn] -> Either String [TestCase]
 testCases programs =
     case numberCases instances testClasses of
         Left (ident, cls) -> Left $ "the test instance " ++ ident ++ " is of type " ++ cls ++ ", which is not a test class"
-        Right cases -> Right [ TestCase (NC.caseInstance c) (NC.caseName c) (fileOf loc) (lineOf loc)
+        Right cases -> Right [ TestCase (NC.caseInstance c) (NC.caseName c) (fileOf loc) (locationLine loc)
                              | c <- cases, let loc = caseLocation c ]
 
   where
@@ -592,6 +613,3 @@ testCases programs =
 
     fileOf (Position _ start _) = sourceName start
     fileOf _ = ""
-
-    lineOf (Position _ start _) = sourceLine start
-    lineOf _ = 0

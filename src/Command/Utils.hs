@@ -4,11 +4,6 @@ import Command.Types
 
 import System.FilePath
 
-import qualified Parser.AST as PAST
-import Core.AST
-
-import Parser.Types
-
 import Lowering
 
 import Modules.Modules
@@ -23,8 +18,9 @@ import ControlFlow.SideEffects.Errors (SideEffectsError)
 import Configuration.Platform (Platform)
 import ControlFlow.ExitPaths
 import Configuration.Configuration
+import Configuration.Lock (Lock, decodeLockFile)
 import Configuration.Manifest
-import Data.List (intercalate)
+import Configuration.Namespace (checkExports)
 import System.Directory
 import Utils.Annotations
 import ControlFlow.ExitPaths.Errors (PathsCheckError)
@@ -34,19 +30,18 @@ import ControlFlow.VarScope.Errors (VarScopeError)
 import Lowering.Errors (LoweringError)
 import Elaboration (ElaborationReport, provers, elaborateProgram)
 import Elaboration.Prover.Value (valueProver)
-import Parser.Errors
 import Control.Monad.IO.Class
-import Data.Functor ((<&>))
 import qualified Data.Map.Strict as M
 import Semantic.Environment (DeclaredEnv, declaredNames)
 import Utils.Graph (TopSortError(..), topSortFromDepList)
 import Utils.Errors (ErrorMessage(toText, errorIdent))
-import Modules.Utils
 import Control.Monad (forM_, unless, when)
 import Data.Maybe (listToMaybe, mapMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import System.Exit (ExitCode(..), die, exitFailure)
+import System.IO (stderr)
+import System.Environment (getEnvironment)
 import Control.Exception (IOException, try)
 import System.Process (readProcessWithExitCode)
 import qualified Crypto.Hash.SHA256 as SHA256
@@ -73,6 +68,21 @@ warnMessage msg = "\x1b[33m[warning]\x1b[0m " ++ msg
 -- Prints info messages in the form "[info] <message>"
 infoMessage :: String -> String
 infoMessage msg = "\x1b[34m[info]\x1b[0m " ++ msg
+
+-- | Where termina runs, which decides what git can reach and what the
+-- messages suggest.
+data Place = Computer | VSCodeContainer | CommandLineContainer
+  deriving (Eq, Show)
+
+-- | The image sets TERMINA_CONTAINER, and VS Code sets REMOTE_CONTAINERS in
+-- the container it opens.
+currentPlace :: IO Place
+currentPlace = do
+    env <- getEnvironment
+    return $ case (lookup "TERMINA_CONTAINER" env, lookup "REMOTE_CONTAINERS" env) of
+        (Nothing, _) -> Computer
+        (Just _, Just _) -> VSCodeContainer
+        (Just _, Nothing) -> CommandLineContainer
 
 getVisibleModules ::  M.Map QualifiedName [QualifiedName] -> [ModuleDependency] -> [QualifiedName]
 getVisibleModules prevModsMap importedMods =
@@ -118,45 +128,6 @@ removeStaleFiles folder extensions expected = do
       concat <$> mapM (\e -> do
         isDir <- doesDirectoryExist e
         if isDir then listFilesRecursive e else return [e]) entries
-
--- | The folder, among the source folders of a deployment, that holds a
--- module. The layout check guarantees that at most one holds it.
-findModuleRoot :: [FilePath] -> QualifiedName -> IO (Maybe FilePath)
-findModuleRoot [] _ = return Nothing
-findModuleRoot (root : roots) qname = do
-    exists <- doesFileExist (root </> qname <.> "fin")
-    if exists then return (Just root) else findModuleRoot roots qname
-
-getModuleImports :: Maybe FilePath -> PAST.TerminaModule ParserAnn -> IO (Either ParsingErrors [ModuleDependency])
-getModuleImports (Just srcPath) m = getModuleImportsFrom [srcPath] m
-getModuleImports Nothing m =
-    case modules m of
-        [] -> return $ Right []
-        ((ModuleImport modName ann):_) -> do
-            let mname = buildModuleName ann modName
-            case mname of
-                Left err -> return $ Left err
-                Right qname -> do
-                    return $ Left (annotateError ann (EImportedFileNotFound (qname <.> "fin")))
-
--- | The modules a module imports, each one looked up in the source folders of
--- the deployment.
-getModuleImportsFrom :: [FilePath] -> PAST.TerminaModule ParserAnn -> IO (Either ParsingErrors [ModuleDependency])
-getModuleImportsFrom roots m =
-    mapM buildAndTest (modules m) <&> sequence
-    where
-
-        buildAndTest :: PAST.ModuleImport ParserAnn -> IO (Either ParsingErrors ModuleDependency)
-        buildAndTest (ModuleImport modName ann) = do
-            let mname = buildModuleName ann modName
-            case mname of
-                Left err -> return $ Left err
-                Right qname -> do
-                    mRoot <- findModuleRoot roots qname
-                    case mRoot of
-                        Just _ -> return $ Right (ModuleDependency qname ann)
-                        Nothing ->
-                            return $ Left (annotateError ann (EImportedFileNotFound (head (roots ++ ["."]) </> qname <.> "fin")))
 
 boxUsageCheckModules :: LoweredProject -> Maybe BoxUsageError
 boxUsageCheckModules = check . M.elems
@@ -337,28 +308,54 @@ runLoweredChecks chatty plt loweredProject = mapM_ runOne loweredChecks
       when chatty (putStrLn . debugMessage $ checkMessage check)
       case runCheck check plt loweredProject of
         Nothing -> return ()
-        Just failure -> TIO.putStrLn (failureMessage failure sourceFilesMap) >> exitFailure
+        Just failure -> dieWithReport (failureMessage failure sourceFilesMap)
 
--- | Load "termina.yaml" and check the folders of the project against it. The
--- error holds every problem found, one per line.
-loadManifest :: (MonadIO m) => m (Either String Manifest)
+-- | Load "termina.yaml" and check the folders of the project against it,
+-- giving every problem found.
+loadManifest :: (MonadIO m) => m (Either [String] Manifest)
 loadManifest = liftIO $ do
     result <- decodeManifestFile "termina.yaml"
     case result of
-        Left err -> return (Left ("termina.yaml: " ++ err))
+        Left err -> return (Left ["termina.yaml: " ++ err])
         Right manifest -> do
             layoutErrors <- checkLayout "." manifest
-            return $ if null layoutErrors then Right manifest else Left (intercalate "\n" layoutErrors)
+            return $ if null layoutErrors then Right manifest else Left layoutErrors
 
--- | Print each line of the error as an error and stop.
-dieWithErrors :: String -> IO a
-dieWithErrors = die . intercalate "\n" . map errorMessage . lines
+-- | Load the "termina.lock" of a project, which is empty when there is none.
+loadLock :: FilePath -> IO (Either [String] Lock)
+loadLock root = either (Left . pure . ("termina.lock: " ++)) Right <$> decodeLockFile (root </> "termina.lock")
+
+-- | Load "termina.yaml" as "loadManifest" does and check also the prefixes
+-- that a library exports, for the commands that build: a new library has no
+-- module yet, and "termina new --test" has to work on it.
+loadProject :: (MonadIO m) => m (Either [String] Manifest)
+loadProject = do
+    result <- loadManifest
+    case result of
+        Left errs -> return (Left errs)
+        Right manifest -> do
+            exportErrors <- liftIO $ checkExports "." manifest
+            return $ if null exportErrors then Right manifest else Left exportErrors
+
+-- | Print an error, which may take several lines, and stop.
+dieWithError :: String -> IO a
+dieWithError = die . errorMessage
+
+-- | Print a report of the transpiler, which carries its own tag, on the
+-- error output and stop.
+dieWithReport :: T.Text -> IO a
+dieWithReport report = TIO.hPutStrLn stderr report >> exitFailure
+
+-- | Print the first error and stop. The errors are reported one at a time,
+-- as the type checker does.
+dieWithFirstError :: [String] -> IO a
+dieWithFirstError = dieWithError . concat . take 1
 
 -- | The configuration of the application of the project.
-loadConfig :: (MonadIO m) => m (Either String TerminaConfig)
+loadConfig :: (MonadIO m) => m (Either [String] TerminaConfig)
 loadConfig = do
     result <- loadManifest
-    return $ result >>= maybe (Left "the project is a library and has no application") Right . appConfig
+    return $ result >>= maybe (Left ["the project is a library and has no application"]) Right . appConfig
 
 sortProjectDepsOrLoop
   :: ProjectDependencies

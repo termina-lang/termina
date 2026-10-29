@@ -2,11 +2,17 @@
 
 module Command.Build (
     buildCmdArgsParser, buildCommand, generateCommand, BuildCmdArgs(..),
-    Selection(..), selectDeployments, buildDeployment, announce, runMake
+    Selection(..), selectDeployments, buildDeployment, announce, runMake, loadBuildProject
 ) where
 
 import Configuration.Configuration
 import Configuration.Manifest
+import Configuration.Namespace (exportedModules)
+import Command.Dependencies (Fetching(..), Sync(..), syncDependencies, describeChange)
+import Command.Sources (loadSources, localFolders)
+import Configuration.Local (LocalPackage(..), readLocalPackages)
+import Configuration.Lock (Lock(..), LockedPackage(..))
+import Configuration.Vendor (packageDir)
 import Command.Utils
 import Control.Exception (IOException, try)
 import Data.Maybe (fromMaybe, isJust)
@@ -80,6 +86,7 @@ data BuildCmdArgs =
         Selection
         (Maybe Platform) -- ^ Only the tests on this platform
         (Maybe ProjectProfile) -- ^ Profile of the tests
+        Bool -- ^ Offline: fail instead of fetching when the lock does not match the manifest
     deriving Show
 
 -- | Parser for the "generate" and "build" command arguments
@@ -100,6 +107,8 @@ buildCmdArgsParser = BuildCmdArgs
           ( O.long "profile"
           <> O.metavar "debug|release"
           <> O.help "Profile of the tests (default: the one of the application, debug in a library)"))
+    <*> O.switch (O.long "offline"
+        <> O.help "Fail instead of fetching when termina.lock does not match termina.yaml")
 
   where
 
@@ -216,7 +225,7 @@ genComponentDiagramFile params progArch param = do
             CmpDiagramParamFlag -> Nothing
             CmpDiagramParamRange range -> Just range
     case result of
-        Left err -> die . errorMessage $ T.unpack err
+        Left err -> dieWithError $ T.unpack err
         Right diagram -> do
             createDirectoryIfMissing True (takeDirectory cmpFile)
             TIO.writeFile cmpFile $ runPlantUMLPrinter diagram
@@ -254,7 +263,7 @@ genModules params plt initialMonadicTypes loweredProject =
           sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
           tAST = elaboratedAST . metadata $ bbModule
       case runGenSourceFile params plt (qualifiedName bbModule) tAST of
-        Left err -> die. errorMessage $ show err
+        Left err -> dieWithError $ show err
         Right cSourceFile -> writeIfChanged sourceFile $ runCPrinter (lineDirectives params) cSourceFile
 
     printHeader :: MonadicTypes -> ElaboratedModule -> IO MonadicTypes
@@ -263,7 +272,7 @@ genModules params plt initialMonadicTypes loweredProject =
           tAST = elaboratedAST . metadata $ bbModule
           moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
       case runGenHeaderFile params plt (qualifiedName bbModule) moduleDeps tAST currentMonadicTypes of
-        Left err -> die . errorMessage $ show err
+        Left err -> dieWithError $ show err
         Right (cHeaderFile, newMonadicTypes) -> do
           let headerFile = destinationPath </> "include" </> qualifiedName bbModule <.> "h"
           writeIfChanged headerFile $ runCPrinter (lineDirectives params) cHeaderFile
@@ -274,7 +283,7 @@ genInitFile params plt loweredProject = do
   let initFile = outputFolder params </> "init" <.> "c"
       projectModules = M.toList $ elaboratedAST . metadata <$> loweredProject
   case runGenInitFile params plt initFile projectModules of
-    Left err -> die . errorMessage $ show err
+    Left err -> dieWithError $ show err
     Right cInitFile -> writeIfChanged initFile $ runCPrinter False cInitFile
 
 -- | The headers of the option, status and result types, each when the project
@@ -294,7 +303,7 @@ genMonadicHeaderFiles params plt monadicTypes = do
       | otherwise = do
           let file = outputFolder params </> "include" </> headerName <.> "h"
           case generator params plt file monadicTypes of
-            Left err -> die . errorMessage $ show err
+            Left err -> dieWithError $ show err
             Right cFile -> writeIfChanged file (runCPrinter (lineDirectives params) cFile) >> return [file]
 
     notStructOrEnum (TStruct _) = False
@@ -307,10 +316,72 @@ genMonadicHeaderFiles params plt monadicTypes = do
 
 -- | The deployments that the arguments select.
 selectedDeployments :: BuildCmdArgs -> IO [Deployment]
-selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile) = do
+selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile offline) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
-    manifest <- loadManifest >>= either dieWithErrors return
-    either (die . errorMessage) return $ selectDeployments manifest selection mPlatform mProfile
+    manifest <- loadBuildProject chatty offline
+    either dieWithError return $ selectDeployments manifest selection mPlatform mProfile
+
+-- | Load the project for a command that builds: the manifest, the folders, the
+-- prefixes of a library, the lock and vendor/ brought in line with the
+-- manifest (each copy that does not change checked against its hash; offline,
+-- without fetching anything) and, in a library, the types of its exported
+-- modules.
+loadBuildProject :: Bool -> Bool -> IO Manifest
+loadBuildProject chatty offline = do
+    manifest <- loadProject >>= either dieWithFirstError return
+    lock <- loadLock "." >>= either dieWithFirstError return
+    place <- currentPlace
+    Sync changes warnings <- syncDependencies place "termina build" (if offline then Offline else Reuse) True "." manifest lock
+        >>= either dieWithFirstError return
+    mapM_ (putStrLn . warnMessage) warnings
+    mapM_ (putStrLn . infoMessage . ("termina.lock: " ++) . describeChange) changes
+    -- The C of each package will be linked into its own object; until then a package with C cannot be built.
+    lockAfter <- loadLock "." >>= either dieWithFirstError return
+    locals <- readLocalPackages [(".", p) | DepPath p <- manifestDependencies manifest ++ concatMap testDependencies (M.elems (manifestTests manifest))]
+        >>= either dieWithFirstError return
+    vendored <- forM (lockPackages lockAfter) $ \locked ->
+        (,) (T.unpack (lockedUrl locked)) <$> decodeManifestFile (packageDir "." (lockedUrl locked) </> "termina.yaml")
+    forM_ ([(origin, m) | (origin, Right m) <- vendored] ++ [(folder, localManifest l) | (folder, l) <- M.toList locals]) $ \(origin, m) ->
+        unless (null (externFiles (manifestExtern m))) $
+            dieWithError $ T.unpack (projectName (manifestProject m)) ++ " (" ++ origin
+                ++ ") has C in its extern section, and termina cannot build the C of a dependency yet."
+    checkLibrary chatty manifest
+    return manifest
+
+-- | Type check the exported modules of a library together, with what they
+-- import, on each platform of its tests, or on the platform of the test suite
+-- when it has none. A library has no app.fin that says what is loaded, and a
+-- consumer may load any exported module, so an exported module that no test
+-- imports is checked too, and the names of all of them meet (SE-081, SE-133).
+-- It is checked as a test, so that a module that is not exported may hold a
+-- test class that several tests share.
+checkLibrary :: Bool -> Manifest -> IO ()
+checkLibrary chatty manifest =
+    case manifestNature manifest of
+        Application _ -> return ()
+        Library _ -> do
+            roots <- exportedModules "." manifest
+            sources <- loadSources manifest Nothing "src"
+            parsedModules <- loadModules sources "src" [ModuleDependency root Internal | root <- roots]
+            orderedModules <- either
+                (\files -> dieWithError $ "Detected cycle between the exported modules of the library: " ++ show files)
+                return
+                (sortProjectDepsOrLoop (M.map importedModules parsedModules))
+            forM_ libraryPlatforms $ \plt -> do
+                when chatty (putStrLn . debugMessage $ "Type checking the exported modules on " ++ show plt)
+                let config = (defaultConfig (T.unpack (projectName (manifestProject manifest))) plt) {
+                        sysPrintOutputBufferSize = manifestPrintBufSize manifest,
+                        sysReadInputBufferSize = manifestReadBufSize manifest,
+                        deploymentKind = TestBuild "library"
+                      }
+                void (typeModules parsedModules (makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)) orderedModules)
+
+  where
+
+    libraryPlatforms =
+        case foldr (\plt acc -> if plt `elem` acc then acc else plt : acc) [] (concatMap testPlatforms (M.elems (manifestTests manifest))) of
+            [] -> [TestPlatform]
+            plts -> plts
 
 selectDeployments :: Manifest -> Selection -> Maybe Platform -> Maybe ProjectProfile -> Either String [Deployment]
 selectDeployments manifest selection mPlatform mProfile =
@@ -381,9 +452,9 @@ runMake :: String -> FilePath -> [String] -> IO ()
 runMake label folder targets = do
     result <- try (rawSystem "make" (["-C", folder] ++ targets))
     case result of
-        Left err -> die . errorMessage $ "Could not run make: " ++ show (err :: IOException)
+        Left err -> dieWithError $ "Could not run make: " ++ show (err :: IOException)
         Right ExitSuccess -> return ()
-        Right (ExitFailure _) -> die . errorMessage $ "make failed for " ++ label ++ " in " ++ folder
+        Right (ExitFailure _) -> dieWithError $ "make failed for " ++ label ++ " in " ++ folder
 
 -- | Write provenance.json of a build: its binary and each module, where its
 -- source comes from, with the SHA-256 of their objects without debugging
@@ -428,18 +499,29 @@ writeProvenance config modules = do
 -- | Generate the C and the Makefile of a deployment. It gives the modules of
 -- the deployment with their source files.
 generateDeployment :: BuildCmdArgs -> Deployment -> IO [(QualifiedName, FilePath)]
-generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _) deployment = do
+generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _) deployment = do
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
-        sources = deploymentSources deployment
+        mainFolder = deploymentMainFolder deployment
+        -- The main module of a test is in tests/<name>
+        mTest = case splitDirectories mainFolder of
+            ["tests", testName] -> Just testName
+            _ -> Nothing
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
+    manifest <- decodeManifestFile "termina.yaml" >>= either (dieWithError . ("termina.yaml: " ++)) return
+    sources <- loadSources manifest mTest mainFolder
+    -- A library of a local folder is not in the lock, so the build cannot be reproduced.
+    forM_ (localFolders sources) $ \folder -> case profile config of
+        Release -> dieWithError $ folder ++ " is a local folder, and a release is built only from tagged dependencies. "
+            ++ "Point it to a tag of its repository."
+        Debug -> putStrLn . warnMessage $ folder ++ " is a local folder, so this build cannot be reproduced from termina.lock."
     -- | Load the module that wires the deployment
-    let mainModulePath = deploymentMainFolder deployment </> deploymentMainModule deployment <.> "fin"
+    let mainModulePath = mainFolder </> deploymentMainModule deployment <.> "fin"
     when chatty (putStrLn . debugMessage $ "Loading the main module: \"" ++ mainModulePath ++ "\"")
-    appModule <- loadTerminaModule (deploymentMainFolder deployment) (deploymentMainModule deployment) sources
+    appModule <- loadTerminaModule sources mainFolder (deploymentMainModule deployment)
     -- | Load the project
     when chatty (putStrLn . debugMessage $ "Loading project modules")
-    parsedModules <- loadModules (importedModules appModule) sources
+    parsedModules <- loadModules sources mainFolder (importedModules appModule)
     let parsedProject = M.insert (qualifiedName appModule) appModule parsedModules
     -- | Detect any possible loops in the project
     when chatty (putStrLn . debugMessage $ "Ordering project modules")
@@ -447,8 +529,7 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _) 
     orderedDependencies <-
       either
         (\files ->
-          let msg = "\x1b[31m[error]\x1b[0m: Detected cycle between project source files: " <> T.intercalate " -> " (map (T.pack . show) files) in
-          TIO.putStrLn msg >> exitFailure)
+          dieWithError . T.unpack $ "Detected cycle between project source files: " <> T.intercalate " -> " (map (T.pack . show) files))
         return
         $ sortProjectDepsOrLoop projectDependencies
     when chatty (putStrLn. debugMessage $ "Type checking project modules")
@@ -463,7 +544,7 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _) 
     rawLoweredProject <-
       either
         (\err ->
-          TIO.putStrLn (toText err M.empty) >> exitFailure)
+          dieWithReport (toText err M.empty))
         return
         $ lowerProject typedProject
     runLoweredChecks chatty plt rawLoweredProject

@@ -80,9 +80,20 @@ spec = describe "Manifest" $ do
     it "rejects a project with neither exports nor app" $
       project `failsWith` "needs either exports"
 
+    it "rejects an SSH dependency, with its https:// form and the rule to keep SSH" $ do
+      let ssh = "Use https://github.com/uah/drivers instead.\n"
+            ++ "If you want git to clone it over SSH, run this once on your computer:\n"
+            ++ "  git config --global url.\"git@github.com:\".insteadOf \"https://github.com/\"\n"
+      (project ++ app ++ "dependencies:\n  - git: git@github.com:uah/drivers\n    rev: v1\n") `failsWith` ssh
+      (project ++ app ++ "dependencies:\n  - git: ssh://git@github.com/uah/drivers\n    rev: v1\n") `failsWith` ssh
+
+    it "rejects a rev that YAML reads as a number" $
+      (project ++ app ++ "dependencies:\n  - git: https://github.com/a/b\n    rev: 1.10\n")
+        `failsWith` "the rev of https://github.com/a/b is read as a number. Write the tag in quotes, as in rev: \"1.10\""
+
     it "rejects a dependency that is not https" $
-      (project ++ app ++ "dependencies:\n  - git: git@github.com:a/b\n    rev: v1\n")
-        `failsWith` "is not an https:// URL"
+      (project ++ app ++ "dependencies:\n  - git: http://example.com/a/b\n    rev: v1\n")
+        `failsWith` "http://example.com/a/b is not an https:// URL, and dependencies are fetched with https://"
 
     it "rejects a tick that does not divide 1000000" $
       (project ++ "app:\n  platform: posix-gcc\n  profile: release\n  microseconds-per-tick: 7\n")
@@ -99,7 +110,7 @@ spec = describe "Manifest" $ do
     it "reads the entry of a test" $
       fmap (M.toList . manifestTests)
         (parsed (project ++ app ++ "tests:\n  hk:\n    platforms: [posix-gcc, rtems5-leon3sf-nexysa7]\n    timeout: 10\n"))
-        `shouldBe` Right [(T.pack "hk", TestEntry [POSIXGCC, RTEMS5LEON3SFNEXYSA7] 10 defaultTestLogSize Nothing Nothing emptyExternConfig [] [])]
+        `shouldBe` Right [(T.pack "hk", TestEntry [POSIXGCC, RTEMS5LEON3SFNEXYSA7] 10 defaultTestLogSize Nothing Nothing emptyExternConfig [])]
 
   describe "deployments" $ do
 
@@ -216,3 +227,43 @@ spec = describe "Manifest" $ do
 
     it "refuses a tests section in flow style" $
       addTestEntry (project ++ app ++ "tests: {}\n") "hk" [POSIXGCC] 10 `shouldSatisfy` isLeft
+
+  describe "new dependencies" $ do
+
+    let nexys = project ++ app
+        pus = T.pack "https://github.com/acme/pus"
+        v1 = T.pack "v0.3.1"
+        hk = "tests:\n  hk:\n    platforms: [posix-gcc]\n    timeout: 10\n"
+
+    it "adds a dependencies section at the end when there is none" $
+      addDependencyEntry nexys Nothing pus v1
+        `shouldBe` Right (nexys ++ "\ndependencies:\n  - git: https://github.com/acme/pus\n    rev: \"v0.3.1\"\n")
+
+    it "adds the entry at the end of the dependencies, keeping the rest" $ do
+      let original = project ++ "dependencies:   # flight\n    - git: https://github.com/acme/ccsds\n      rev: v1.0\n\n# the application\n" ++ app
+      addDependencyEntry original Nothing pus v1
+        `shouldBe` Right (project ++ "dependencies:   # flight\n    - git: https://github.com/acme/ccsds\n      rev: v1.0\n"
+          ++ "    - git: https://github.com/acme/pus\n      rev: \"v0.3.1\"\n\n# the application\n" ++ app)
+
+    it "adds the entry to an indentless sequence" $
+      addDependencyEntry (nexys ++ "dependencies:\n- git: https://github.com/acme/ccsds\n  rev: v1.0\n") Nothing pus v1
+        `shouldBe` Right (nexys ++ "dependencies:\n- git: https://github.com/acme/ccsds\n  rev: v1.0\n- git: https://github.com/acme/pus\n  rev: \"v0.3.1\"\n")
+
+    it "adds the dependencies of a test, keeping the tests after it" $
+      addDependencyEntry (nexys ++ hk ++ "  tm:\n    platforms: [posix-gcc]\n    timeout: 10\n") (Just "hk") pus v1
+        `shouldBe` Right (nexys ++ hk ++ "    dependencies:\n      - git: https://github.com/acme/pus\n        rev: \"v0.3.1\"\n"
+          ++ "  tm:\n    platforms: [posix-gcc]\n    timeout: 10\n")
+
+    it "gives a manifest that reads back with the new dependency" $ do
+      let deps m = (manifestDependencies m, map testDependencies (M.elems (manifestTests m)))
+          dep = DepGit (GitDependency pus v1)
+      fmap deps (addDependencyEntry (nexys ++ hk) Nothing pus v1 >>= parsed) `shouldBe` Right ([dep], [[]])
+      fmap deps (addDependencyEntry (nexys ++ hk) (Just "hk") pus v1 >>= parsed) `shouldBe` Right ([], [[dep]])
+
+    it "refuses a dependencies section in flow style, and a test that does not exist" $ do
+      addDependencyEntry (nexys ++ "dependencies: []\n") Nothing pus v1 `shouldSatisfy` isLeft
+      addDependencyEntry (nexys ++ hk) (Just "tm") pus v1 `shouldBe` Left "the manifest declares no test tm"
+
+    it "rejects the overrides of a test, which apply to the whole project" $
+      (nexys ++ hk ++ "    overrides:\n      - git: https://github.com/acme/pus\n        rev: v1\n")
+        `failsWith` "they go at the top level of the manifest"

@@ -33,6 +33,7 @@ data NewCmdArgs =
         String -- ^ Name of the new project
         (Maybe String) -- ^ Target platform
         NewKind
+        (Maybe String) -- ^ Prefix exported by a new library
         Vcs -- ^ Version control system
         Bool -- ^ Generate the VS Code configuration
         Bool -- ^ Verbose mode
@@ -60,6 +61,9 @@ newCmdArgsParser = newTestParser <|> newProjectParser
             <> help "Target platform of the application (default: posix-gcc)"))
         <*> (flag' NewLib (long "lib" <> help "Create a library")
             <|> flag NewApp NewApp (long "app" <> help "Create an application (default)"))
+        <*> optional (strOption (long "exports"
+            <> metavar "PREFIX"
+            <> help "Module prefix exported by a new library (default: the name of the project)"))
         <*> option (eitherReader readVcs) (long "vcs"
             <> value VcsGit
             <> metavar "git|none"
@@ -85,7 +89,8 @@ showSupportedPlatforms =
 
 validateProjectName :: String -> IO ()
 validateProjectName project =
-    unless (all (\x -> isAlphaNum x || x == '_' || x == '-') project) (die . errorMessage $ "Project name must contain only letters, digits, '_' and '-'")
+    unless (not (null project) && all (\x -> isAsciiLower x || isAsciiUpper x || isDigit x || x == '_' || x == '-') project)
+        (dieWithError $ "Project name must be one or more ASCII letters, digits, '_' and '-'")
 
 emptyAppModuleContent :: String -> String
 emptyAppModuleContent projectName = unlines [
@@ -97,10 +102,12 @@ manifestFile :: FilePath
 manifestFile = "termina" <.> "yaml"
 
 -- | Content of the .gitignore of a new project: the whole output, which the
--- transpiler generates again from the project and the deliverable keeps.
+-- transpiler generates again from the project and the deliverable keeps, and
+-- the clones that the user leaves in .termina/fetch/ for "termina add".
 gitignoreContent :: String
 gitignoreContent = unlines [
         "/" ++ outputFolderName ++ "/",
+        "/.termina/",
         ".DS_Store"
     ]
 
@@ -207,7 +214,8 @@ tasksContent buildCommandLine = unlines [
         "}"
     ]
 
--- | Initializes a git repository in the project, unless the project lies
+-- | Initializes a git repository in the project, with main as the initial
+-- branch independently of init.defaultBranch, unless the project lies
 -- inside the working tree of another one. A failure is a warning: the project
 -- is created anyway.
 initRepository :: Bool -> FilePath -> IO ()
@@ -220,7 +228,7 @@ initRepository chatty project = do
                 "The project is inside a git repository: no repository created")
         _ -> do
             when chatty (putStrLn . debugMessage $ "Initializing git repository")
-            initResult <- runGit ["init", "-q", project]
+            initResult <- runGit ["init", "-q", "-b", "main", project]
             case initResult of
                 Right _ -> return ()
                 Left err -> putStrLn . warnMessage $
@@ -229,23 +237,31 @@ initRepository chatty project = do
 -- | Command handler for the "new" command
 newCommand :: NewCmdArgs -> IO ()
 newCommand (NewTest testName chatty) = newTestCommand testName chatty
-newCommand (NewProject project mPltName kind vcs vscode chatty) = do
+newCommand (NewProject project mPltName kind mExports vcs vscode chatty) = do
     validateProjectName project
     plt <- case (kind, mPltName) of
-        (NewLib, Just _) -> die . errorMessage $ "A library has no platform: its tests choose theirs"
+        (NewLib, Just _) -> dieWithError $ "A library has no platform: its tests choose theirs"
         (_, Nothing) -> return POSIXGCC
         (NewApp, Just pltName) -> maybe (
                 putStrLn (errorMessage $ "Unsupported platform: " ++ show pltName) >>
                 showSupportedPlatforms >> exitFailure
             ) return $ checkPlatform pltName
-    -- | The prefix that a new library exports, named after the project
-    let prefix = map (\c -> if c == '-' then '_' else toLower c) project
-    when (kind == NewLib && not (isSnakeCase prefix)) $
-        die . errorMessage $ "The name of a library has to make a module prefix: \"" ++ prefix ++ "\" is not lowercase snake_case"
+    -- | The prefix that a new library exports, by default named after the project
+    prefix <- case (kind, mExports) of
+        (NewApp, Just _) -> dieWithError $ "An application exports nothing: --exports is only for a library"
+        (_, Just given) -> do
+            unless (all (isSnakeCase . T.unpack) (T.splitOn (T.pack ".") (T.pack given))) $
+                dieWithError $ "The prefix \"" ++ given ++ "\" is not a module prefix (lowercase snake_case segments separated by dots)"
+            return given
+        (_, Nothing) -> do
+            let named = map (\c -> if c == '-' then '_' else toLower c) project
+            when (kind == NewLib && not (isSnakeCase named)) $
+                dieWithError $ "The name of a library has to make a module prefix: \"" ++ named ++ "\" is not lowercase snake_case (choose one with --exports)"
+            return named
     when chatty (putStrLn . debugMessage $ "Creating new project: " ++ project)
     -- Check if the directory already exists
     exists <- doesPathExist project
-    when exists (die . errorMessage $ "Path already exists: " ++ project)
+    when exists (dieWithError $ "Path already exists: " ++ project)
     -- | Create the project directory
     when chatty (putStrLn . debugMessage $ "Creating project directory: " ++ project)
     createDirectory project
@@ -260,7 +276,8 @@ newCommand (NewProject project mPltName kind vcs vscode chatty) = do
         NewLib -> newLibraryManifest project prefix
     when chatty (putStrLn . debugMessage $ "Creating project source modules directory: " ++ sourceModulesFolderPath)
     createDirectory sourceModulesFolderPath
-    when (kind == NewLib) $ createDirectory (sourceModulesFolderPath </> prefix)
+    when (kind == NewLib) $
+        createDirectoryIfMissing True (sourceModulesFolderPath </> joinPath (map T.unpack (T.splitOn (T.pack ".") (T.pack prefix))))
     when (kind == NewApp) $ do
         let appFolderPath = project </> appFolder
         when chatty (putStrLn . debugMessage $ "Creating project application directory: " ++ appFolderPath)
@@ -290,17 +307,17 @@ newCommand (NewProject project mPltName kind vcs vscode chatty) = do
 -- read back, both are undone.
 newTestCommand :: String -> Bool -> IO ()
 newTestCommand testName chatty = do
-    manifest <- loadManifest >>= either dieWithErrors return
+    manifest <- loadManifest >>= either dieWithFirstError return
     unless (isSnakeCase testName) $
-        die . errorMessage $ "The name of a test is lowercase snake_case: \"" ++ testName ++ "\""
+        dieWithError $ "The name of a test is lowercase snake_case: \"" ++ testName ++ "\""
     when (T.pack testName `M.member` manifestTests manifest) $
-        die . errorMessage $ "The manifest already declares the test " ++ testName
+        dieWithError $ "The manifest already declares the test " ++ testName
     let testFolder = "tests" </> testName
         testFile = testFolder </> "test" <.> "fin"
     exists <- doesPathExist testFolder
-    when exists (die . errorMessage $ "Path already exists: " ++ testFolder)
+    when exists (dieWithError $ "Path already exists: " ++ testFolder)
     original <- readFileStrict manifestFile
-    updated <- either (die . errorMessage) return $
+    updated <- either dieWithError return $
         addTestEntry original testName (defaultTestPlatforms manifest) 10
     when chatty (putStrLn . debugMessage $ "Creating " ++ testFile)
     createDirectoryIfMissing True testFolder
@@ -314,7 +331,7 @@ newTestCommand testName chatty = do
             writeFile manifestFile original
             removeFile testFile
             removeDirectory testFolder
-            dieWithErrors err
+            dieWithFirstError err
 
   where
 
