@@ -18,7 +18,8 @@ import Control.Monad.Except
 import Generator.CodeGen.Application.Utils
 import Generator.CodeGen.Types
 import Semantic.AST
-import Control.Monad (forM, when)
+import Control.Monad (forM)
+import ControlFlow.Architecture.Errors (TestLevel(..))
 import Data.List (find)
 import Data.Maybe (fromMaybe)
 import Generator.CodeGen.Expression
@@ -68,7 +69,8 @@ genInitTasks :: TerminaProgArch a -> CGenerator [CFileItem]
 genInitTasks progArchitecture = do
     let progTasks = M.elems $ tasks progArchitecture
     initTasks <- mapM genOSALTaskInit progTasks
-    initHarness <- if isUnitTest progArchitecture then (: []) <$> genHarnessInit else return []
+    testBuild <- gets (isTestBuild . configParams)
+    initHarness <- if testBuild then (: []) <$> genHarnessInit else return []
     let steps = initTasks ++ initHarness
     return [pre_cr $ static_function (terminafy $ "app" <::> "init_tasks") ["status" @: (_const . ptr $ termina__error_code_t)] @-> void $
             trail_cr . block $ genStatusSteps [] steps | not (null steps)]
@@ -122,8 +124,12 @@ genInitTasks progArchitecture = do
 -- function is called AFTER the initialization of the tasks and handlers.
 genInitEmitters :: TerminaProgArch SemanticAnn -> CGenerator [CFileItem]
 genInitEmitters progArchitecture = do
+    testBuild <- gets (isTestBuild . configParams)
     let progEmitters = M.elems $ emitters progArchitecture
     let installedEmitters = filter (\case { TPSystemInitEmitter {} -> False; _ -> True }) progEmitters
+        -- | A test without a handler of its author on system_except gets the hook of the runtime
+        authorExcept = any (\case { TPSystemExceptEmitter {} -> True; _ -> False }) installedEmitters
+        hookExcept = testBuild && not authorExcept
         -- | The OSAL copies the connection, so all the timers share one
         -- connection variable and all the interrupts share another one
         declarations =
@@ -132,20 +138,19 @@ genInitEmitters progArchitecture = do
             ++ [pre_cr $ var "interrupt_connection" termina__interrupt_connection_t
                 | any (\case { TPInterruptEmitter {} -> True; _ -> False }) installedEmitters]
             ++ [pre_cr $ var "except_connection" termina__system_except_connection_t
-                | any (\case { TPSystemExceptEmitter {} -> True; _ -> False }) installedEmitters
-                    || isUnitTest progArchitecture]
+                | authorExcept || hookExcept]
     initEmitter <- mapM genEmitterConnection installedEmitters
     let progTestEmitters = M.elems $ testEmitters progArchitecture
     initTestEmitters <- mapM genTestEmitterConnection progTestEmitters
     fireFunctions <- concat <$> mapM genTestFireFunction progTestEmitters
-    initHook <- if isUnitTest progArchitecture then (: []) <$> genExceptHookConnection else return []
+    initHook <- if hookExcept then (: []) <$> genExceptHookConnection else return []
     let steps = initEmitter ++ initTestEmitters ++ initHook
     return $ fireFunctions ++ [pre_cr $ static_function (terminafy $ "app" <::> "init_emitters") ["status" @: (_const . ptr $ termina__error_code_t)] @-> void $
             trail_cr . block $ genStatusSteps declarations steps | not (null steps)]
 
     where
 
-        -- | In a unit test the hook of the runtime attends system_except
+        -- | The hook of the runtime attends system_except
         genExceptHookConnection :: CGenerator [CCompoundBlockItem]
         genExceptHookConnection = do
             handlerId <- genDefineHandlerIdLabel "system_except"
@@ -497,6 +502,15 @@ genInitMessageQueues queues = do
         -- | Steps that initialize a message queue: one step, or none if the
         -- queue does not need a definition
         genOSALMsgQueueInit :: OSALMsgQueue -> CGenerator [[CCompoundBlockItem]]
+        -- | The runtime creates the queue of the harness and opens the scenario as case 1
+        genOSALMsgQueueInit OSALTestHarnessMsgQueue = do
+            msgQueueId <- genDefineMsgQueueIdLabel OSALTestHarnessMsgQueue
+            return [[
+                    pre_cr $ termina__test__scenario__init @@ [
+                        msgQueueId @: termina__id_t,
+                        "status" @: (_const . ptr $ termina__error_code_t)
+                    ]
+                ]]
         genOSALMsgQueueInit mq = do
             elements <- msgQueueElements mq
             case elements of
@@ -606,7 +620,7 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
             ]]
 genInitalEventFunction _ _ = throwError $ InternalError "Invalid event emitter"
 
--- | The record of a unit test, with the stamp of its descriptor
+-- | The record of a test, with the stamp of its descriptor
 genTestRecord :: Word32 -> CGenerator [CFileItem]
 genTestRecord stamp = do
     capacity <- gets (recordCapacity . configParams)
@@ -643,6 +657,15 @@ genTestReset progArchitecture hasPools hasProtection = do
                             "status" @: termina__error_code_t
                         ]
                     ] | hasPools]
+        ]
+
+-- | The task of the harness of a concurrent test, which the runtime ends after finish()
+genScenarioHarness :: CGenerator [CFileItem]
+genScenarioHarness =
+    return [pre_cr $ static_function testHarnessFunction ["arg" @: (_const . ptr $ void)] @-> void $
+            trail_cr . block $
+                genDiscardedParameters [("arg", _const . ptr $ void)]
+                ++ [pre_cr $ termina__test__scenario__harness @@ []]
         ]
 
 -- | The task of the harness, which runs each selected case after the reset
@@ -751,8 +774,11 @@ genMainFile mName stamp progArchitecture = do
     initEmitters <- genInitEmitters progArchitecture
     initPools <- genInitPools (M.elems $ pools progArchitecture) (M.elems $ testPools progArchitecture)
     initMutexes <- genInitMutexes mutexes
+    testBuild <- gets (isTestBuild . configParams)
+    let level = testLevelOf testBuild progArchitecture
+
     initMessageQueues <- genInitMessageQueues (taskMessageQueues ++ sinkPortMessageQueues ++ channelMessageQueues
-        ++ getTestChannelsMessageQueues progArchitecture)
+        ++ getTestChannelsMessageQueues progArchitecture ++ getTestHarnessMessageQueues level)
 
     channelConnections <- genChannelConnections progArchitecture
     enableProtection <- genEnableProtection progArchitecture
@@ -762,19 +788,18 @@ genMainFile mName stamp progArchitecture = do
             genInitalEventFunction progArchitecture systemInitEmitter
         _ -> return [])
 
-    -- | A unit test adds its record, the reset and the harness
-    testBuild <- gets (isTestBuild . configParams)
-    let unitTest = isUnitTest progArchitecture
-    when (testBuild && not unitTest) $
-        throwError $ InternalError "concurrent tests are not supported yet"
-    testRecord <- if unitTest then genTestRecord stamp else return []
-    testReset <- if unitTest then genTestReset progArchitecture (not (null initPools)) (not (null enableProtection)) else return []
-    testHarnessTask <- if unitTest then genTestHarness progArchitecture else return []
+    -- | A test adds its record and its harness, and a unit test the reset
+    testRecord <- if testBuild then genTestRecord stamp else return []
+    testReset <- if level == Just UnitTest then genTestReset progArchitecture (not (null initPools)) (not (null enableProtection)) else return []
+    testHarnessTask <- case level of
+        Just UnitTest -> genTestHarness progArchitecture
+        Just ConcurrentTest -> genScenarioHarness
+        Nothing -> return []
     let harnessDeclaration = [
                 pre_cr $ CExtDecl (CEDFunction (Just CStatic) [] void testHarnessFunction
                     [CDecl (CTypeSpec (_const . ptr $ void)) (Just "arg") Nothing])
                     (internalAnn (CDeclarationAnn True))
-            | unitTest ]
+            | testBuild ]
 
     -- | The steps are listed in the order in which they are called
     appInit <- genAppInit [

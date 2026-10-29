@@ -20,6 +20,14 @@ import Core.TestCases (NumberedCase, numberCases)
 isUnitTest :: TerminaProgArch a -> Bool
 isUnitTest tp = not (M.null (testInstances tp))
 
+-- | The level of a build: none for an application, which has the same
+-- architecture as a concurrent test
+testLevelOf :: Bool -> TerminaProgArch a -> Maybe TestLevel
+testLevelOf testBuild tp =
+    if not testBuild then Nothing
+    else if isUnitTest tp then Just UnitTest
+    else Just ConcurrentTest
+
 -- | The numbered cases of a unit test
 architectureCases :: Located a => TerminaProgArch a -> Either (Identifier, Identifier) [NumberedCase]
 architectureCases tp = numberCases instances classes

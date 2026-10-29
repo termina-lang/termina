@@ -82,10 +82,22 @@ spec = describe "Full pipeline: the test resources" $ do
             unpack c `shouldContain` "ender.s._that = &test_scenario;"
             unpack c `shouldContain` "ender.s.finish = &TestScenarioEntry__finish;")
           (renderInitFile prjprogs)
-      it "does not generate the main file of a concurrent test yet" $
-        either (\e -> unpack e `shouldContain` "concurrent tests are not supported yet")
-          (const (expectationFailure "the main file of a concurrent test was generated"))
+      it "creates the queue of the harness, the harness and the hook of a concurrent test" $
+        either (expectationFailure . unpack)
+          (\c -> do
+            unpack c `shouldContain` "termina__test__scenario__init(termina__test__harness__msg_queue_id,\n                                      status);"
+            unpack c `shouldContain` "termina__task__init(termina__test__harness__task_id, 254, 4096U,\n                            &termina__app__test_harness, NULL, status);"
+            unpack c `shouldContain` "termina__test__scenario__harness();"
+            unpack c `shouldContain` "except_connection.handler_action = &termina__test__except_hook;"
+            unpack c `shouldContain` "termina__test__header_t termina__test__header;")
           (renderTestMainFile progArch)
+      it "gives the harness and its queue their identifiers in a concurrent test" $
+        either (expectationFailure . unpack)
+          (\c -> do
+            unpack c `shouldContain` "#define checker__task_id 0\n#define ender__task_id 1\n#define termina__test__harness__task_id 2\n"
+            unpack c `shouldContain` "#define termina__test__harness__msg_queue_id 4\n"
+            unpack c `shouldNotContain` "termina__test__harness__emitter_id")
+          (renderTestConfigFile progArch)
   case runTestApp unitTest of
     Left err ->
       it "builds a unit test" $

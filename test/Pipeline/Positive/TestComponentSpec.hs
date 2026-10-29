@@ -240,7 +240,7 @@ spec = describe "Full pipeline: the components of a unit test" $ do
             unpack c `shouldContain` "#define TERMINA__APP_CONFIG__POOLS 1\n"
             unpack c `shouldContain` "#define TERMINA__APP_CONFIG__TASKS 2\n"
             unpack c `shouldContain` "#define TERMINA__APP_CONFIG__MESSAGE_QUEUES 4\n")
-          (renderConfigFile progArch)
+          (renderTestConfigFile progArch)
   it "creates the two queues of the test channel" $
     case runTestApp unitTest of
       Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)

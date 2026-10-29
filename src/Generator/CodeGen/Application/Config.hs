@@ -28,7 +28,8 @@ genConfigFile ::
     -> CGenerator CFile
 genConfigFile mName config progArchitecture = do
     let periodicTimers = M.filter (\case { TPPeriodicTimerEmitter {} -> True; _ -> False }) (emitters progArchitecture)
-        taskIds = taskIdOrder progArchitecture
+        testBuild = isTestBuild config
+        taskIds = taskIdOrder testBuild progArchitecture
         emitterIds = emitterIdOrder progArchitecture
         poolIds = M.keys (pools progArchitecture) ++ M.keys (testPools progArchitecture)
 
@@ -41,6 +42,7 @@ genConfigFile mName config progArchitecture = do
     taskMessageQueues <- getTasksMessageQueues progArchitecture (sinkPortMessageQueues ++ channelMessageQueues)
     let testChannelMessageQueues = getTestChannelsMessageQueues progArchitecture
         msgQueues = taskMessageQueues ++ sinkPortMessageQueues ++ channelMessageQueues ++ testChannelMessageQueues
+            ++ getTestHarnessMessageQueues (testLevelOf testBuild progArchitecture)
 
     cEmitterDefines <- genDefineEmitterId emitterIds
     cMutexDefines <- genDefineMutexId (M.keys mutexes)

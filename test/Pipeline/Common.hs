@@ -8,6 +8,7 @@ module Pipeline.Common
   , renderMainFileOn
   , renderInitFile
   , renderConfigFile
+  , renderTestConfigFile
   , buildAndRenderModule
   , compileErrorCode
   , compileTestErrorCode
@@ -209,8 +210,15 @@ renderMainFileWithOn cfg plt progArch =
 -- | Render the generated @config.h@ (the identifiers of the deployment) from a
 -- program architecture, collapsing a codegen failure into the returned 'Text'.
 renderConfigFile :: TerminaProgArch SemanticAnn -> Either Text Text
-renderConfigFile progArch =
-  case runGenConfigFile configParams TestPlatform "config" progArch of
+renderConfigFile = renderConfigFileWith configParams
+
+-- | 'renderConfigFile' for the deployment of a test.
+renderTestConfigFile :: TerminaProgArch SemanticAnn -> Either Text Text
+renderTestConfigFile = renderConfigFileWith testConfigParams
+
+renderConfigFileWith :: TerminaConfig -> TerminaProgArch SemanticAnn -> Either Text Text
+renderConfigFileWith cfg progArch =
+  case runGenConfigFile cfg TestPlatform "config" progArch of
     Left err -> Left . T.pack $ show err
     Right cFile -> Right $ runCPrinter False cFile
 

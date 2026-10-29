@@ -187,6 +187,20 @@ termina__test__end :: CExpression
 termina__test__end = "termina__test__end" @:
     CTFunction void []
 
+termina__test__scenario__init :: CExpression
+termina__test__scenario__init = "termina__test__scenario__init" @:
+    CTFunction void
+        [
+            -- | const termina__id_t msg_queue_id
+            _const termina__id_t,
+            -- | termina__error_code_t * const status
+            _const . ptr $ termina__error_code_t
+        ]
+
+termina__test__scenario__harness :: CExpression
+termina__test__scenario__harness = "termina__test__scenario__harness" @:
+    CTFunction void []
+
 termina__test__clock__reset :: CExpression
 termina__test__clock__reset = "termina__test__clock__reset" @:
     CTFunction void []

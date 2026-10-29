@@ -52,7 +52,7 @@ data Error =
 -- | The level of a test, which its deployment decides: a unit test has test
 -- instances and a concurrent test has none
 data TestLevel = UnitTest | ConcurrentTest
-    deriving Show
+    deriving (Eq, Show)
 
 type ArchitectureError = AnnotatedError Error Location
 

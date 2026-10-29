@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | The descriptor of a unit test, test.json: its cases, its checks, the
+-- | The descriptor of a test, test.json: its cases, its checks, the
 -- tasks and the emitters by identifier, and the symbols the runner stops at.
 -- Its stamp is the first 32 bits of the SHA-256 of the rest.
 module Generator.TestDescriptor (
@@ -10,7 +10,7 @@ module Generator.TestDescriptor (
 import Command.Types (LoweredProject)
 import Configuration.Configuration
 import ControlFlow.Architecture.Types
-import ControlFlow.Architecture.Utils (architectureCases, blocksIn, classMemberFunctions)
+import ControlFlow.Architecture.Utils (architectureCases, blocksIn, classMemberFunctions, isUnitTest)
 import Core.TestCases (NumberedCase(..))
 import Generator.CodeGen.Application.Utils (emitterIdOrder, taskIdOrder)
 import Generator.CodeGen.Common (testHarness)
@@ -30,6 +30,7 @@ import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Data.Word (Word32)
 import Text.Parsec.Pos (SourcePos, sourceColumn, sourceLine, sourceName)
+import System.FilePath ((</>))
 import Text.Printf (printf)
 
 -- | The text of the descriptor and its stamp
@@ -37,15 +38,16 @@ genTestDescriptor :: TerminaConfig -> LoweredProject -> TerminaProgArch Semantic
 genTestDescriptor config loweredProject progArchitecture = do
     cases <- either (\(ident, cls) -> Left $ "the test instance " ++ ident ++ " is of type " ++ cls ++ ", which is not a test class")
         Right (architectureCases progArchitecture)
-    let rest = [
+    let unitTest = isUnitTest progArchitecture
+        rest = [
             "version" .= (1 :: Integer),
             "name" .= testName,
-            "level" .= ("unit" :: T.Text),
+            "level" .= (if unitTest then "unit" else "concurrent" :: T.Text),
             "platform" .= platform config,
             "timeout" .= runTimeout config,
-            "cases" .= map caseEntry cases,
+            "cases" .= (if unitTest then map caseEntry cases else [scenarioEntry]),
             "checks" .= checks,
-            "tasks" .= numbered (taskIdOrder progArchitecture),
+            "tasks" .= numbered (taskIdOrder True progArchitecture),
             "emitters" .= numbered (emitterIdOrder progArchitecture),
             "symbols" .= object [
                 "header" .= ("termina__test__header" :: T.Text),
@@ -77,6 +79,17 @@ genTestDescriptor config loweredProject progArchitecture = do
                 "case" .= caseName c,
                 "file" .= fileOf (caseLocation c),
                 "line" .= lineOf (caseLocation c),
+                "verifies" .= ([] :: [T.Text])
+            ]
+
+        -- | A concurrent test is case 1 of its record, named after the test
+        scenarioEntry = object [
+                "number" .= (1 :: Integer),
+                "id" .= testName,
+                "instance" .= ("" :: T.Text),
+                "case" .= testName,
+                "file" .= ("tests" </> T.unpack testName </> "test.fin"),
+                "line" .= (1 :: Integer),
                 "verifies" .= ([] :: [T.Text])
             ]
 

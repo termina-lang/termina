@@ -26,7 +26,7 @@ import qualified Data.Text.Encoding as TE
 genPlatformCode :: TerminaConfig -> Platform -> LoweredProject -> TerminaProgArch SemanticAnn -> Maybe ExternBuild -> IO ()
 genPlatformCode _ TestPlatform _ _ _ = return ()
 genPlatformCode params plt loweredProject progArchitecture mExtern = do
-  stamp <- if isUnitTest progArchitecture
+  stamp <- if isTestBuild params
     then case genTestDescriptor params loweredProject progArchitecture of
       Left err -> die . errorMessage $ err
       Right (descriptor, stamp) -> do

@@ -17,10 +17,11 @@ import Generator.CodeGen.Expression
 import Generator.CodeGen.Types
 import Utils.Annotations
 import ControlFlow.Architecture.Utils (isUnitTest)
+import ControlFlow.Architecture.Errors (TestLevel(..))
 
--- | The tasks in the order of their identifiers, the harness of a unit test last
-taskIdOrder :: TerminaProgArch a -> [Identifier]
-taskIdOrder tp = M.keys (tasks tp) ++ [testHarness | isUnitTest tp]
+-- | The tasks in the order of their identifiers, the harness of a test last
+taskIdOrder :: Bool -> TerminaProgArch a -> [Identifier]
+taskIdOrder testBuild tp = M.keys (tasks tp) ++ [testHarness | testBuild]
 
 -- | The emitters in the order of their identifiers: system_except, the emitters
 -- of the deployment, the harness of a unit test and its test emitters
@@ -57,6 +58,8 @@ data OSALMsgQueue =
     | OSALTestEventMsgQueue
       Identifier -- ^ name of the channel
       (Expression SemanticAnn) -- ^ message queue size
+    -- | The queue on which the harness of a concurrent test waits for finish()
+    | OSALTestHarnessMsgQueue
     deriving Show
 
 -- | This function generates the list of OSAL message queues that must be created
@@ -82,6 +85,7 @@ getTasksMessageQueues progArchitecture msgqs = do
             OSALSinkPortMsgQueue target _ _ _ _  -> return $ target == identifier;
             OSALTestChannelMsgQueue {} -> return False;
             OSALTestEventMsgQueue {} -> return False;
+            OSALTestHarnessMsgQueue -> return False;
         }) msgqs
         curr <- getTaskMessageQueue identifier classId filteredQueues
         return $ curr : acc) [] (tasks progArchitecture)
@@ -125,12 +129,18 @@ msgQueueElements (OSALChannelMsgQueue _ ty size _ _) = Just . (size,) <$> genTyp
 msgQueueElements (OSALSinkPortMsgQueue _ _ _ ty size) = Just . (size,) <$> genType noqual ty
 msgQueueElements (OSALTestChannelMsgQueue _ ty size) = Just . (size,) <$> genType noqual ty
 msgQueueElements (OSALTestEventMsgQueue _ size) = return $ Just (size, termina__event_t)
+msgQueueElements OSALTestHarnessMsgQueue =
+    return $ Just (Constant (I (TInteger 1 DecRepr) Nothing) (buildExpAnn Internal (TConstSubtype TUSize)), uint8_t)
 
 -- | The queue of the messages and the queue of the events of each TestChannel
 getTestChannelsMessageQueues :: TerminaProgArch SemanticAnn -> [OSALMsgQueue]
 getTestChannelsMessageQueues progArchitecture =
     concat [ [OSALTestChannelMsgQueue identifier ts size, OSALTestEventMsgQueue identifier size]
            | TPMsgQueue identifier ts size _ _ <- M.elems (testChannels progArchitecture) ]
+
+-- | The queue of the harness, only in a concurrent test
+getTestHarnessMessageQueues :: Maybe TestLevel -> [OSALMsgQueue]
+getTestHarnessMessageQueues level = [OSALTestHarnessMsgQueue | level == Just ConcurrentTest]
 
 genVariantForPort ::
     -- | Name of the task class
@@ -315,6 +325,7 @@ genDefineMsgQueueIdLabel (OSALChannelMsgQueue c _ _ _ _) = genDefineChannelMsgQu
 genDefineMsgQueueIdLabel (OSALSinkPortMsgQueue t _ p _ _) = genDefineSinkMsgQueueIdLabel t p
 genDefineMsgQueueIdLabel (OSALTestChannelMsgQueue c _ _) = genDefineChannelMsgQueueIdLabel c
 genDefineMsgQueueIdLabel (OSALTestEventMsgQueue c _) = genDefineTestEventMsgQueueIdLabel c
+genDefineMsgQueueIdLabel OSALTestHarnessMsgQueue = return $ testHarness <::> "msg_queue_id"
 
 genDefineTestEventMsgQueueIdLabel :: Identifier -> CGenerator Identifier
 genDefineTestEventMsgQueueIdLabel c = return $ c <::> "event_msg_queue_id"
