@@ -161,7 +161,7 @@ deliverDeployment chatty manifest archive withTrace deployment = do
     -- | provenance.json of the deliverable
     fileHashes <- mapM (\f -> (f,) <$> sha256File (folder </> f)) delivered
     osalVersion <- readOsalVersion osalDir
-    let objectOf qname = "bin" </> "src" </> qname <.> "o"
+    let objectOf qname = "obj" </> "src" </> qname <.> "o"
         moduleEntry (qname, _) = object [
             "module" .= map (\c -> if c == '/' then '.' else c) qname,
             "object" .= objectOf qname,
@@ -314,14 +314,15 @@ genDeliverableMakefile config info osalSources sources externSrcs externLibs tes
         MakeBlock $ map (\src -> MVariable MAppend "SRCS" [MFragment src]) sources,
         MakeBlock [
             MVariable MSimple "TARGET_DIR_NAME" [MFragment "bin"],
+            MVariable MSimple "OBJ_DIR_NAME" [MFragment "obj"],
             MVariable MSimple "TARGET" [MFragment "$(TARGET_DIR_NAME)/$(PROJECT_NAME)"]
         ]
         ] ++ externVariables ++ [
         MakeBlock $ [
             -- | The objects are linked in the order of the build of the
             -- project, which the comparison of the binaries needs
-            MVariable MSimple "OBJS" [MFunction "patsubst" [MFragment "%", MFragment "$(TARGET_DIR_NAME)/%.o", MFunction "basename" [MFragment "$(OSAL_SRCS) $(SRCS)"]]],
-            MVariable MSimple "MODULE_OBJS" [MFunction "patsubst" [MFragment "%.c", MFragment "$(TARGET_DIR_NAME)/%.o", MFunction "filter" [MFragment "src/%", MFragment "$(SRCS)"]]]
+            MVariable MSimple "OBJS" [MFunction "patsubst" [MFragment "%", MFragment "$(OBJ_DIR_NAME)/%.o", MFunction "basename" [MFragment "$(OSAL_SRCS) $(SRCS)"]]],
+            MVariable MSimple "MODULE_OBJS" [MFunction "patsubst" [MFragment "%.c", MFragment "$(OBJ_DIR_NAME)/%.o", MFunction "filter" [MFragment "src/%", MFragment "$(SRCS)"]]]
         ] ++ [MVariable MAppend "OBJS" [MFragment "$(EXTERN_OBJ)"] | hasExtern],
         MakeBlock [
             MVariable MSimple "DEPS" [MFunction "patsubst" [MFragment "%.o", MFragment "%.d",
@@ -331,12 +332,12 @@ genDeliverableMakefile config info osalSources sources externSrcs externLibs tes
             MRule "all" ["$(TARGET)"] [],
             MRule ".DELETE_ON_ERROR" [] []
             ] ++ [
-            MRule "$(TARGET_DIR_NAME)/%.o" ["%.s"] [
+            MRule "$(OBJ_DIR_NAME)/%.o" ["%.s"] [
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@mkdir -p $(@D)"],
                 MakeCommand False [MFragment "@$(AS) $(ASMFLAGS) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
             ] | hasAssembly ] ++ [
-            MRule "$(TARGET_DIR_NAME)/%.o" ["%.c"] [
+            MRule "$(OBJ_DIR_NAME)/%.o" ["%.c"] [
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@mkdir -p $(@D)"],
                 MakeCommand False [MFragment "@$(CC) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
@@ -358,7 +359,7 @@ genDeliverableMakefile config info osalSources sources externSrcs externLibs tes
         ] ++ externRule ++ [
             MRule ".PHONY" ["clean"] [],
             MRule "clean" [] [
-                MakeCommand False [MFragment "@$(RM) -r $(TARGET_DIR_NAME)"]
+                MakeCommand False [MFragment "@$(RM) -r $(TARGET_DIR_NAME) $(OBJ_DIR_NAME)"]
             ],
             MInclude False "$(DEPS)"
         ]
@@ -400,8 +401,8 @@ genDeliverableMakefile config info osalSources sources externSrcs externLibs tes
             ++ [
                 MVariable MSimple "EXTERN_SYMBOLS" [MFragment (value "EXTERN_SYMBOLS")],
                 MVariable MSimple "TERMINA_EXTERN_LIBC" [MFragment (value "TERMINA_EXTERN_LIBC")],
-                MVariable MSimple "EXTERN_OBJS" [MFunction "patsubst" [MFragment "%.c", MFragment "$(TARGET_DIR_NAME)/%.o", MFragment "$(EXTERN_SRCS)"]],
-                MVariable MSimple "EXTERN_OBJ" [MFragment "$(TARGET_DIR_NAME)/$(PROJECT_NAME).ext.o"]
+                MVariable MSimple "EXTERN_OBJS" [MFunction "patsubst" [MFragment "%.c", MFragment "$(OBJ_DIR_NAME)/%.o", MFragment "$(EXTERN_SRCS)"]],
+                MVariable MSimple "EXTERN_OBJ" [MFragment "$(OBJ_DIR_NAME)/$(PROJECT_NAME).ext.o"]
             ]
         | hasExtern ]
 
@@ -419,7 +420,7 @@ genDeliverableMakefile config info osalSources sources externSrcs externLibs tes
     -- | As in the build of the project, the modules of the test itself keep
     -- each call as a call
     testModuleFlags =
-        [ MRule ("$(TARGET_DIR_NAME)" </> "src" </> qname <.> "o") ["CFLAGS+=-fno-optimize-sibling-calls"] []
+        [ MRule ("$(OBJ_DIR_NAME)" </> "src" </> qname <.> "o") ["CFLAGS+=-fno-optimize-sibling-calls"] []
         | qname <- testQNames ]
 
 -- | The modules of a test that are in its own folder.

@@ -43,14 +43,17 @@ genMakefile params loweredProject mExtern unitTest =
             MVariable MSimple "TERMINA_PROJECT_DIR" [MFunction "abspath" [MFragment $ "$R" </> projectRoot]],
             MVariable MAppend "CFLAGS" [MFragment "-ffile-prefix-map=$(TERMINA_PROJECT_DIR)=."]
         ],
+        -- | The binary goes alone in bin, so its name cannot be the one of a
+        -- folder or a file of the build, which go in obj
         MakeBlock [
             MVariable MSimple "TARGET_DIR_NAME" [MFragment "$R/bin"],
+            MVariable MSimple "OBJ_DIR_NAME" [MFragment "$R/obj"],
             MVariable MSimple "TARGET" [MFragment "$(TARGET_DIR_NAME)/$(PROJECT_NAME)"]
         ],
         -- | The tools and the flags of the build, which every object depends
         -- on, so a change of profile or of platform flags rebuilds them all
         MakeBlock [
-            MVariable MSimple "TERMINA_FLAGS_FILE" [MFragment "$(TARGET_DIR_NAME)/flags"],
+            MVariable MSimple "TERMINA_FLAGS_FILE" [MFragment "$(OBJ_DIR_NAME)/flags"],
             MVariable MRecursive "TERMINA_FLAGS" [MFragment "$(CC) $(AS) $(CFLAGS) $(CPPFLAGS) $(ASMFLAGS) $(LDFLAGS)"]
         ],
         -- The headers of the project are reached through -iquote and not -I,
@@ -67,9 +70,9 @@ genMakefile params loweredProject mExtern unitTest =
             MVariable MAppend "OBJS" [MFunction "patsubst"
                 [MFragment "%.c", MFragment "%.o", MFunction "patsubst"
                     [MFragment "%.s", MFragment "%.o", MFunction "patsubst"
-                        [MFragment "$(TERMINA_OSAL_DIR)/%", MFragment "$(TARGET_DIR_NAME)/termina/%", MFunction "wildcard" [MFragment "$(OSAL_SRCS)"]]]]],
-            MVariable MAppend "OBJS" [MFunction "patsubst" [MFragment "%.c", MFragment "%.o", MFunction "patsubst" [MFragment "$R/%", MFragment "$(TARGET_DIR_NAME)/%", MFragment "$(SRCS)"]]],
-            MVariable MSimple "MODULE_OBJS" [MFunction "patsubst" [MFragment "$R/%.c", MFragment "$(TARGET_DIR_NAME)/%.o", MFunction "filter" [MFragment "$R/src/%", MFragment "$(SRCS)"]]]
+                        [MFragment "$(TERMINA_OSAL_DIR)/%", MFragment "$(OBJ_DIR_NAME)/termina/%", MFunction "wildcard" [MFragment "$(OSAL_SRCS)"]]]]],
+            MVariable MAppend "OBJS" [MFunction "patsubst" [MFragment "%.c", MFragment "%.o", MFunction "patsubst" [MFragment "$R/%", MFragment "$(OBJ_DIR_NAME)/%", MFragment "$(SRCS)"]]],
+            MVariable MSimple "MODULE_OBJS" [MFunction "patsubst" [MFragment "$R/%.c", MFragment "$(OBJ_DIR_NAME)/%.o", MFunction "filter" [MFragment "$R/src/%", MFragment "$(SRCS)"]]]
         ] ++ [MVariable MAppend "OBJS" [MFragment "$(EXTERN_OBJ)"] | hasExtern],
         MakeBlock [
             MVariable MAppend "CPPFLAGS" [MFunction "patsubst" [MFragment "%", MFragment "-iquote %", MFragment "$(PROJECT_INCLUDE_DIRS)"]],
@@ -91,17 +94,17 @@ genMakefile params loweredProject mExtern unitTest =
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
                 MakeCommand False [MFragment "@if [ \"$$(cat $@ 2>/dev/null)\" != '$(subst ','\\'',$(TERMINA_FLAGS))' ]; then printf '%s\\n' '$(subst ','\\'',$(TERMINA_FLAGS))' > $@; fi"]
             ],
-            MRule "$(TARGET_DIR_NAME)/termina/%.o" ["$(TERMINA_OSAL_DIR)/%.s", "$(TERMINA_FLAGS_FILE)"] [
+            MRule "$(OBJ_DIR_NAME)/termina/%.o" ["$(TERMINA_OSAL_DIR)/%.s", "$(TERMINA_FLAGS_FILE)"] [
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
                 MakeCommand False [MFragment "@cd $(TERMINA_PROJECT_DIR) && $(AS) $(ASMFLAGS) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
             ],
-            MRule "$(TARGET_DIR_NAME)/termina/%.o" ["$(TERMINA_OSAL_DIR)/%.c", "$(TERMINA_FLAGS_FILE)"] [
+            MRule "$(OBJ_DIR_NAME)/termina/%.o" ["$(TERMINA_OSAL_DIR)/%.c", "$(TERMINA_FLAGS_FILE)"] [
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
                 MakeCommand False [MFragment "@cd $(TERMINA_PROJECT_DIR) && $(CC) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
             ],
-            MRule "$(TARGET_DIR_NAME)/%.o" ["$(R)/%.c", "$(TERMINA_FLAGS_FILE)"] [
+            MRule "$(OBJ_DIR_NAME)/%.o" ["$(R)/%.c", "$(TERMINA_FLAGS_FILE)"] [
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
                 MakeCommand False [MFragment "@cd $(TERMINA_PROJECT_DIR) && $(CC) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
@@ -144,7 +147,7 @@ genMakefile params loweredProject mExtern unitTest =
             ],
             MRule "dist-clean" ["clean"] [
                 MakeCommand False [MFragment "@echo Mr. Proper is cleaning up"],
-                MakeCommand False [MFragment "@$(RM) -rf $(TARGET_DIR_NAME)"]
+                MakeCommand False [MFragment "@$(RM) -rf $(TARGET_DIR_NAME) $(OBJ_DIR_NAME) $(CPPCHECK_BUILD_DIR) $(CPPCHECK_MISRA_BUILD_DIR)"]
             ],
             MInclude False "$(DEPS)"
         ],
@@ -207,8 +210,8 @@ genMakefile params loweredProject mExtern unitTest =
                     ++ map (\lib -> MVariable MAppend "EXTERN_LIBS" [MFragment $ "$R" </> externFolder </> lib]) libs
                     ++ [
                         MVariable MSimple "EXTERN_SYMBOLS" [MFragment . unwords $ externSymbols loweredProject],
-                        MVariable MSimple "EXTERN_OBJS" [MFunction "patsubst" [MFragment "$R/%.c", MFragment "$(TARGET_DIR_NAME)/%.o", MFragment "$(EXTERN_SRCS)"]],
-                        MVariable MSimple "EXTERN_OBJ" [MFragment "$(TARGET_DIR_NAME)/$(PROJECT_NAME).ext.o"]
+                        MVariable MSimple "EXTERN_OBJS" [MFunction "patsubst" [MFragment "$R/%.c", MFragment "$(OBJ_DIR_NAME)/%.o", MFragment "$(EXTERN_SRCS)"]],
+                        MVariable MSimple "EXTERN_OBJ" [MFragment "$(OBJ_DIR_NAME)/$(PROJECT_NAME).ext.o"]
                     ]
                 ]
 

@@ -42,12 +42,20 @@ spec = describe "Makefile: project configuration" $ do
 
   it "rebuilds every object and the binary when the tools or the flags change" $
     mapM_ (\line -> makefileFor (defaultConfig "test" TestPlatform) `shouldContain` line)
-      [ "TERMINA_FLAGS_FILE:=$(TARGET_DIR_NAME)/flags\n"
+      [ "TERMINA_FLAGS_FILE:=$(OBJ_DIR_NAME)/flags\n"
       , "TERMINA_FLAGS=$(CC) $(AS) $(CFLAGS) $(CPPFLAGS) $(ASMFLAGS) $(LDFLAGS)\n"
       , "$(TERMINA_FLAGS_FILE): termina-flags\n"
-      , "$(TARGET_DIR_NAME)/termina/%.o: $(TERMINA_OSAL_DIR)/%.c $(TERMINA_FLAGS_FILE)\n"
-      , "$(TARGET_DIR_NAME)/%.o: $(R)/%.c $(TERMINA_FLAGS_FILE)\n"
+      , "$(OBJ_DIR_NAME)/termina/%.o: $(TERMINA_OSAL_DIR)/%.c $(TERMINA_FLAGS_FILE)\n"
+      , "$(OBJ_DIR_NAME)/%.o: $(R)/%.c $(TERMINA_FLAGS_FILE)\n"
       , "$(TARGET): $(OBJS) $(TERMINA_FLAGS_FILE)\n"
+      ]
+
+  it "puts the binary alone in bin and the files of the build in obj" $
+    mapM_ (\line -> makefileFor (defaultConfig "test" TestPlatform) `shouldContain` line)
+      [ "TARGET_DIR_NAME:=$R/bin\n"
+      , "OBJ_DIR_NAME:=$R/obj\n"
+      , "TARGET:=$(TARGET_DIR_NAME)/$(PROJECT_NAME)\n"
+      , "MODULE_OBJS:=$(patsubst $R/%.c, $(OBJ_DIR_NAME)/%.o, $(filter $R/src/%, $(SRCS)))\n"
       ]
 
   it "deletes the target of a recipe that fails" $

@@ -468,7 +468,7 @@ writeProvenance config modules = do
     hashes <- if hashesExist
         then M.fromList . concatMap (toPair . words) . lines <$> readFile hashesFile
         else return M.empty
-    let objectOf qname = "bin" </> "src" </> qname <.> "o"
+    let objectOf qname = "obj" </> "src" </> qname <.> "o"
         originOf source = if take 1 (splitDirectories source) == ["tests"] then "test" else "project" :: String
         moduleEntry (qname, source) = object [
             "module" .= map (\c -> if c == '/' then '.' else c) qname,
