@@ -18,6 +18,7 @@ import qualified Data.Set as S
 import Utils.Annotations
 import Generator.CodeGen.Types
 import Generator.CodeGen.Expression
+import Generator.CodeGen.Application.Config (genConfigPathName)
 
 genInitializeObj :: Location -> Bool -> Global SemanticAnn -> CGenerator [CCompoundBlockItem]
 genInitializeObj loc before (Resource identifier ty@(TAtomic {}) (Just expr) _ _) = do
@@ -96,7 +97,7 @@ genInitFile mName prjprogs = do
 
         -- | The identifiers of the deployment. The OSAL API does not include
         -- config.h, so that the modules do not depend on it.
-        includeConfig = CPPDirective (CPPInclude False ("config" <.> "h")) (internalAnn (CPPDirectiveAnn False))
+        includeConfig = CPPDirective (CPPInclude False genConfigPathName) (internalAnn (CPPDirectiveAnn False))
 
         -- Generate include preprocessor directives for the modules
         genIncludes :: [QualifiedName] -> [CFileItem]

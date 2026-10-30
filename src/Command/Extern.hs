@@ -18,6 +18,10 @@ import Command.Types
 import Command.Utils
 import Configuration.Namespace (locationLine)
 import Core.AST
+import Generator.CodeGen.Application.Config (genConfigPathName)
+import Generator.CodeGen.Application.Option (genOptionPathName)
+import Generator.CodeGen.Application.Status (genStatusPathName)
+import Generator.CodeGen.Application.Result (genResultPathName)
 import Modules.Modules
 import Modules.Utils (qualifiedToModuleName)
 
@@ -125,7 +129,7 @@ checkExtern config loaded externFolderPath (ExternConfig moduleEntries) = do
     seenFolders = nub [sourceFolderOf externFolderPath, sourceFolderOf externFolder]
 
     -- | The headers that the transpiler generates besides those of the modules
-    generatedHeaders = ["config.h", "option.h", "status.h", "result.h", "app.h", "test.h"]
+    generatedHeaders = [genConfigPathName, genOptionPathName, genStatusPathName, genResultPathName, appFilename <.> "h", testFilename <.> "h"]
 
     listsOf srcs hdrs libs =
       [map (externSourceFolder </>) srcs, map (externHeaderFolder </>) hdrs]

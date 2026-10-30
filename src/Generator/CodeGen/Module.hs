@@ -10,6 +10,9 @@ import Configuration.Platform (Platform, maxIdentifierLength)
 import Generator.CodeGen.TypeDefinition
 import Generator.CodeGen.Global
 import Generator.CodeGen.Function
+import Generator.CodeGen.Application.Option (genOptionPathName)
+import Generator.CodeGen.Application.Status (genStatusPathName)
+import Generator.CodeGen.Application.Result (genResultPathName)
 import Data.Text (unpack, pack, intercalate, replace, toUpper)
 import System.FilePath
 import qualified Data.Map.Strict as M
@@ -68,9 +71,9 @@ genHeaderFile includeOptionH includeStatusH includeResultH mName imports program
                 CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False) Internal),
                 CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True) Internal)
             ] ++ includeList
-            ++ ([CPPDirective (CPPInclude False "option.h") (LocatedElement (CPPDirectiveAnn True) Internal) | includeOptionH])
-            ++ ([CPPDirective (CPPInclude False "status.h") (LocatedElement (CPPDirectiveAnn False) Internal) | includeStatusH])
-            ++ ([CPPDirective (CPPInclude False "result.h") (LocatedElement (CPPDirectiveAnn False) Internal) | includeResultH])
+            ++ ([CPPDirective (CPPInclude False genOptionPathName) (LocatedElement (CPPDirectiveAnn True) Internal) | includeOptionH])
+            ++ ([CPPDirective (CPPInclude False genStatusPathName) (LocatedElement (CPPDirectiveAnn False) Internal) | includeStatusH])
+            ++ ([CPPDirective (CPPInclude False genResultPathName) (LocatedElement (CPPDirectiveAnn False) Internal) | includeResultH])
             ++ items
             ++ [
                 CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) Internal)

@@ -49,4 +49,4 @@ genPlatformCode params plt loweredProject progArchitecture mExtern = do
 
     destinationPath = outputFolder params
     mainFile = destinationPath </> "main" <.> "c"
-    configFile = destinationPath </> "include" </> "config" <.> "h"
+    configFile = destinationPath </> "include" </> genConfigPathName

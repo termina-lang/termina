@@ -35,7 +35,8 @@ import Data.List (foldl')
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Generator.LanguageC.Printer (runCPrinter)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
-import Generator.CodeGen.Application.Option (runGenOptionHeaderFile)
+import Generator.CodeGen.Application.Option (runGenOptionHeaderFile, genOptionPathName)
+import Generator.CodeGen.Application.Config (genConfigPathName)
 import Core.AST
     ( TerminaType'(TEnum, TStruct) )
 import Generator.Environment
@@ -45,8 +46,8 @@ import Utils.Errors
 import Utils.Annotations
 import Semantic.Environment
 import qualified Data.Set as S
-import Generator.CodeGen.Application.Status (runGenStatusHeaderFile)
-import Generator.CodeGen.Application.Result (runGenResultHeaderFile)
+import Generator.CodeGen.Application.Status (runGenStatusHeaderFile, genStatusPathName)
+import Generator.CodeGen.Application.Result (runGenResultHeaderFile, genResultPathName)
 import Data.Aeson (object, (.=))
 import Data.Aeson.Encode.Pretty (Config(..), defConfig, encodePretty', keyOrder)
 import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
@@ -291,9 +292,9 @@ genInitFile params plt loweredProject = do
 -- output folder.
 genMonadicHeaderFiles :: TerminaConfig -> Platform -> MonadicTypes -> IO [FilePath]
 genMonadicHeaderFiles params plt monadicTypes = do
-  option <- gen "option" usesOptions runGenOptionHeaderFile
-  status <- gen "status" usesStatus runGenStatusHeaderFile
-  result <- gen "result" usesResults runGenResultHeaderFile
+  option <- gen genOptionPathName usesOptions runGenOptionHeaderFile
+  status <- gen genStatusPathName usesStatus runGenStatusHeaderFile
+  result <- gen genResultPathName usesResults runGenResultHeaderFile
   return (option ++ status ++ result)
 
   where
@@ -301,7 +302,7 @@ genMonadicHeaderFiles params plt monadicTypes = do
     gen headerName needed generator
       | not needed = return []
       | otherwise = do
-          let file = outputFolder params </> "include" </> headerName <.> "h"
+          let file = outputFolder params </> "include" </> headerName
           case generator params plt file monadicTypes of
             Left err -> dieWithError $ show err
             Right cFile -> writeIfChanged file (runCPrinter (lineDirectives params) cFile) >> return [file]
@@ -589,7 +590,7 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
           moduleNames = M.keys elaboratedProject
       removeStaleFiles (out </> "src") [".c"] [out </> "src" </> m <.> "c" | m <- moduleNames]
       removeStaleFiles (out </> "include") [".h"]
-        ([out </> "include" </> m <.> "h" | m <- moduleNames] ++ [out </> "include" </> "config" <.> "h"] ++ monadicHeaders)
+        ([out </> "include" </> m <.> "h" | m <- moduleNames] ++ [out </> "include" </> genConfigPathName] ++ monadicHeaders)
     genChecksReportFile config loweredProject checksReports
     when genTransactionalWCEPs $
       when chatty (putStrLn . debugMessage $ "Generating transactional worst-case execution paths") >>

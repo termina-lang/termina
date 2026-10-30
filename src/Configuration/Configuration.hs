@@ -22,6 +22,7 @@ module Configuration.Configuration (
     defaultTestLogSize,
     appFolder,
     appFilename,
+    testFilename,
     outputFolderName,
     efpFolderName
 ) where
@@ -113,6 +114,10 @@ defaultMicrosecondsPerTick = 10000
 appFolder, appFilename :: FilePath
 appFolder = "app"
 appFilename = "app"
+
+-- | Name of the module that wires a test, in the folder of the test.
+testFilename :: FilePath
+testFilename = "test"
 
 -- | Folders of the generated output and of the files of the schedulability
 -- analysis, both in the project and fixed like the rest of its layout. The

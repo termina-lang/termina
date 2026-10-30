@@ -20,6 +20,10 @@ import Control.Monad.State
 import qualified Data.Set as S
 import Utils.Annotations
 import Utils.Printer
+import System.FilePath
+
+genConfigPathName :: FilePath
+genConfigPathName = "config" <.> "h"
 
 genConfigFile ::
     QualifiedName

@@ -16,6 +16,7 @@ import ControlFlow.Architecture.Utils
 import System.FilePath
 import Control.Monad.Except
 import Generator.CodeGen.Application.Utils
+import Generator.CodeGen.Application.Config (genConfigPathName)
 import Generator.CodeGen.Types
 import Semantic.AST
 import Control.Monad (forM)
@@ -819,7 +820,7 @@ genMainFile mName stamp progArchitecture = do
             includeTermina,
             -- | The identifiers of the deployment. The OSAL API does not
             -- include config.h, so that the modules do not depend on it.
-            CPPDirective (CPPInclude False "config.h") (internalAnn (CPPDirectiveAnn False))
+            CPPDirective (CPPInclude False genConfigPathName) (internalAnn (CPPDirectiveAnn False))
         ] ++ includes
         ++ testRecord
         ++ cPoolMemoryAreas
