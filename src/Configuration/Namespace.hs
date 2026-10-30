@@ -42,19 +42,20 @@ data SourceModule = SourceModule {
   }
 
 -- | Check the prefixes of the exports of a library against each other and
--- against its sources, and the exported modules against the prefixes, and
--- give every problem found. An application exports nothing and has nothing
--- to check.
+-- against the names of its modules, and the exported modules against the
+-- prefixes, and give every problem found. Only the exported modules are read.
+-- An application exports nothing and has nothing to check.
 checkExports :: FilePath -> Manifest -> IO [String]
 checkExports root manifest =
     case manifestNature manifest of
         Application _ -> return []
         Library [] -> return ["a library exports at least one prefix"]
         Library prefixes -> do
-            sources <- sourceModules root
+            names <- moduleNames root "src"
+            exported <- mapM (readModule root "src") [ segments | segments <- names, any (`ownsModule` segments) prefixes ]
             return $ repeatedErrors prefixes ++ overlapErrors (nub prefixes)
-                ++ concatMap (emptyErrors sources) (nub prefixes)
-                ++ concatMap (exportedErrors (nub prefixes) sources) sources
+                ++ concatMap (emptyErrors names) (nub prefixes)
+                ++ concatMap (exportedErrors (nub prefixes) names) exported
 
   where
 
@@ -67,28 +68,28 @@ checkExports root manifest =
         | (a : rest) <- tails prefixes, b <- rest, overlaps a b
         , let (outer, inner) = if ownsModule a (prefixSegments b) then (a, b) else (b, a) ]
 
-    emptyErrors sources p =
+    emptyErrors names p =
         ["the prefix " ++ prefixText p ++ " of exports has no module: there is no "
             ++ prefixFolder p ++ ".fin and no .fin under " ++ prefixFolder p ++ "/"
-        | not (any (ownsModule p . moduleSegments) sources)]
+        | not (any (ownsModule p) names)]
 
     -- | An exported module has to import only exported modules of the
     -- library, and give every name the prefix of the library. One that does
     -- not parse is left to the type check of the library, which loads it and
     -- reports the error of the parser.
-    exportedErrors prefixes sources m =
+    exportedErrors prefixes names m =
         case find (`ownsModule` moduleSegments m) prefixes of
             Nothing -> []
             Just p -> case moduleParsed m of
                 Nothing -> []
-                Just ast -> importErrors prefixes sources m ast ++ nameErrors (last (prefixSegments p)) m ast
+                Just ast -> importErrors prefixes names m ast ++ nameErrors (last (prefixSegments p)) m ast
                     ++ testClassErrors m ast
 
-    importErrors prefixes sources m ast =
+    importErrors prefixes names m ast =
         [ at m (locationLine ann) ++ "the exported module " ++ dottedName (moduleSegments m) ++ " imports "
             ++ dottedName imported ++ ", which is not exported"
         | ModuleImport imported ann <- modules ast
-        , imported `S.member` moduleSet sources
+        , imported `S.member` S.fromList names
         , not (any (`ownsModule` imported) prefixes) ]
 
     nameErrors segment m ast =
@@ -105,8 +106,6 @@ checkExports root manifest =
             ++ ident ++ ", which only a test or a module that is not exported may hold"
         | TypeDefinition (Class TestClass ident _ _ _) loc <- frags ast ]
 
-    moduleSet sources = S.fromList (map moduleSegments sources)
-
     at m line = moduleFile m ++ ":" ++ show line ++ ": "
 
     pascal = concatMap capitalize . splitOn '_'
@@ -119,15 +118,14 @@ checkExports root manifest =
         (part, _ : rest) -> part : splitOn sep rest
 
 -- | The exported modules of a library, by their qualified name
--- ("pus/service1"), those that do not parse included, and none in an
--- application.
+-- ("pus/service1"), without reading them, and none in an application.
 exportedModules :: FilePath -> Manifest -> IO [QualifiedName]
 exportedModules root manifest =
     case manifestPrefixes manifest of
         [] -> return []
         prefixes -> do
-            sources <- sourceModules root
-            return [joinPath (moduleSegments m) | m <- sources, any (`ownsModule` moduleSegments m) prefixes]
+            names <- moduleNames root "src"
+            return [joinPath segments | segments <- names, any (`ownsModule` segments) prefixes]
 
 -- | The line where a location starts, or 0 when it has none.
 locationLine :: Location -> Int
@@ -161,10 +159,6 @@ parseModule qname file bytes =
     case TE.decodeUtf8' bytes of
         Left _ -> Nothing
         Right text -> either (const Nothing) Just (runParser terminaModuleParser qname file (T.unpack text))
-
--- | Every module under "src", parsed when it can be.
-sourceModules :: FilePath -> IO [SourceModule]
-sourceModules root = moduleNames root "src" >>= mapM (readModule root "src")
 
 -- | Read and parse the module of a source folder with the given segments.
 readModule :: FilePath -> FilePath -> [String] -> IO SourceModule
