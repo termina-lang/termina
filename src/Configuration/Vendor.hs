@@ -7,6 +7,7 @@ module Configuration.Vendor (
     vendorDir,
     packageDir,
     isVendored,
+    exportedExtern,
     contentHash,
     writePackage,
     readPackage,
@@ -19,6 +20,7 @@ import qualified Crypto.Hash.SHA256 as SHA256
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BC
 import Data.List (isSuffixOf, sortOn)
+import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import System.Directory
@@ -43,12 +45,22 @@ packageDir root url = vendorDir root </> normalizedFolder url
 
 -- | Whether a file of a package goes to "vendor/": its "termina.yaml", the
 -- modules of its exported prefixes and the files that its "extern" section
--- lists.
+-- lists under those modules.
 isVendored :: Manifest -> String -> Bool
 isVendored manifest path =
     path == "termina.yaml"
         || (".fin" `isSuffixOf` path && any (`ownsPath` path) (manifestPrefixes manifest))
-        || any (\listed -> listedMatches ("extern/" ++ listed) path) (externFiles (manifestExtern manifest))
+        || any (\listed -> listedMatches ("extern/" ++ listed) path) (externFiles (exportedExtern manifest))
+
+-- | The entries of the "extern" section of a package whose module is in one
+-- of its exported prefixes, the only ones that a consumer gets.
+exportedExtern :: Manifest -> ExternConfig
+exportedExtern manifest = ExternConfig $ M.filterWithKey
+    (\modName _ -> any (`ownsModule` map T.unpack (T.splitOn "." modName)) (manifestPrefixes manifest)) entries
+
+  where
+
+    ExternConfig entries = manifestExtern manifest
 
 -- | The hash of the content of a package: the SHA-256 of the lines that
 -- sha256sum writes for its files, "hex-digest  path", in the byte order of

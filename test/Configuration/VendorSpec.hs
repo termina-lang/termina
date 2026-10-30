@@ -23,6 +23,7 @@ library :: Manifest
 library = manifestOf $ header "pus"
     ++ "exports:\n  - pus.service1\n  - ccsds\n"
     ++ "extern:\n  pus.service1:\n    sources: [crc.c, \"spi/*.c\"]\n    headers: [crc.h]\n    libraries:\n      posix-gcc: [libcrc.a]\n"
+    ++ "  test_support.fake:\n    sources: [fake.c, crc.c]\n"
 
 spec :: Spec
 spec = do
@@ -39,12 +40,12 @@ spec = do
 
   describe "files that go to vendor" $
 
-    it "keeps the manifest, the modules of the exported prefixes and the listed extern files" $
+    it "keeps the manifest, the modules of the exported prefixes and the extern files listed under them" $
       filter (isVendored library) [
           "termina.yaml", "src/pus/service1.fin", "src/pus/service1/tm.fin", "src/ccsds/tc/frame.fin",
           "src/pus/service2.fin", "src/test_support/fake.fin", "src/ccsds/README.md", "extern/src/crc.c",
           "extern/src/spi/a.c", "extern/src/spi/sub/b.c", "extern/include/crc.h", "extern/lib/posix-gcc/libcrc.a",
-          "extern/src/notes.c", "tests/t1/test.fin", "README.md"
+          "extern/src/notes.c", "extern/src/fake.c", "tests/t1/test.fin", "README.md"
         ] `shouldBe` ["termina.yaml", "src/pus/service1.fin", "src/pus/service1/tm.fin", "src/ccsds/tc/frame.fin",
           "extern/src/crc.c", "extern/src/spi/a.c", "extern/include/crc.h", "extern/lib/posix-gcc/libcrc.a"]
 

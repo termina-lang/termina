@@ -12,7 +12,7 @@ import Command.Dependencies (Fetching(..), Sync(..), syncDependencies, describeC
 import Command.Sources (loadSources, localFolders)
 import Configuration.Local (LocalPackage(..), readLocalPackages)
 import Configuration.Lock (Lock(..), LockedPackage(..))
-import Configuration.Vendor (packageDir)
+import Configuration.Vendor (packageDir, exportedExtern)
 import Command.Utils
 import Control.Exception (IOException, try)
 import Data.Maybe (fromMaybe, isJust)
@@ -343,7 +343,7 @@ loadBuildProject chatty offline = do
     vendored <- forM (lockPackages lockAfter) $ \locked ->
         (,) (T.unpack (lockedUrl locked)) <$> decodeManifestFile (packageDir "." (lockedUrl locked) </> "termina.yaml")
     forM_ ([(origin, m) | (origin, Right m) <- vendored] ++ [(folder, localManifest l) | (folder, l) <- M.toList locals]) $ \(origin, m) ->
-        unless (null (externFiles (manifestExtern m))) $
+        unless (null (externFiles (exportedExtern m))) $
             dieWithError $ T.unpack (projectName (manifestProject m)) ++ " (" ++ origin
                 ++ ") has C in its extern section, and termina cannot build the C of a dependency yet."
     checkLibrary chatty manifest
