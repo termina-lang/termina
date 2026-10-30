@@ -11,7 +11,6 @@ module Command.Deliver (
 ) where
 
 import Command.Build
-import Command.Extern (externFolder)
 import Command.Update (verifyProject)
 import Command.Utils
 import Configuration.Configuration

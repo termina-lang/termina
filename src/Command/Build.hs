@@ -53,7 +53,8 @@ import Data.Aeson.Encode.Pretty (Config(..), defConfig, encodePretty', keyOrder)
 import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
 import EFP.Schedulability.WCEPath.Printer
 import Command.Common
-import Command.Extern (externFolder, prepareExtern, checkExternModules)
+import Command.Extern (prepareExtern, checkLoadedExterns, parsedExterns)
+import Configuration.ExternCheck (projectSections, sectionErrors, moduleErrors)
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.PlantUML
 import Extras.PlantUML.Printer
@@ -331,6 +332,11 @@ selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile offlin
 loadProject :: Bool -> Bool -> IO Manifest
 loadProject chatty offline = do
     manifest <- loadManifest >>= either dieWithFirstError return
+    -- | The extern sections, reading only the modules that their entries
+    -- name; one of them that does not parse stops with the report of the parser
+    (sections, unparsed) <- projectSections "." manifest
+    forM_ unparsed $ uncurry parseTerminaFile
+    unless (null (sectionErrors sections)) $ dieWithFirstError (sectionErrors sections)
     exportErrors <- checkExports "." manifest
     unless (null exportErrors) $ dieWithFirstError exportErrors
     lock <- loadLock "." >>= either dieWithFirstError return
@@ -367,6 +373,10 @@ checkLibrary chatty manifest =
             roots <- exportedModules "." manifest
             sources <- loadSources manifest Nothing "src"
             parsedModules <- loadModules sources "src" [ModuleDependency root Internal | root <- roots]
+            -- | Whoever imports the library may load any exported module, so each one with extern functions has its entry
+            case moduleErrors "the project" "src" (manifestExtern manifest) Nothing (map parsedExterns (M.elems parsedModules)) of
+                [] -> return ()
+                errs -> dieWithFirstError errs
             orderedModules <- either
                 (\files -> dieWithError $ "Detected cycle between the exported modules of the library: " ++ show files)
                 return
@@ -527,8 +537,8 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
     when chatty (putStrLn . debugMessage $ "Loading project modules")
     parsedModules <- loadModules sources mainFolder (importedModules appModule)
     let parsedProject = M.insert (qualifiedName appModule) appModule parsedModules
-    -- | Check the extern sections of the manifest against the modules
-    checkExternModules appModule (maybe externFolder (\t -> "tests" </> t </> externFolder) mTest)
+    -- | The modules of the deployment with extern functions have their entries
+    checkLoadedExterns appModule (maybe externFolder (\t -> "tests" </> t </> externFolder) mTest)
       parsedProject (deploymentExterns deployment)
     -- | Detect any possible loops in the project
     when chatty (putStrLn . debugMessage $ "Ordering project modules")

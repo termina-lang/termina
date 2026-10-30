@@ -5,6 +5,7 @@ module Configuration.Configuration (
     ExternConfig(..),
     ExternEntry(..),
     emptyExternConfig,
+    externFolder,
     externSourceFolder,
     externHeaderFolder,
     externLibraryFolder,
@@ -54,6 +55,10 @@ data ExternEntry = ExternEntry {
 
 emptyExternConfig :: ExternConfig
 emptyExternConfig = ExternConfig M.empty
+
+-- | The folder of the C of a project or of a test.
+externFolder :: FilePath
+externFolder = "extern"
 
 -- | The folders of "extern": sources, headers and the archives of each platform.
 externSourceFolder, externHeaderFolder, externLibraryFolder :: FilePath

@@ -1,5 +1,8 @@
 -- | The namespaces of a project: the prefixes that a library exports.
 module Configuration.Namespace (
+    SourceModule(..),
+    readModule,
+    moduleNames,
     checkExports,
     exportedModules,
     hasLibraryPrefix,
@@ -30,8 +33,8 @@ import Parser.Types (ParserAnn)
 import Semantic.Environment (declaredNames)
 import Utils.Annotations
 
--- | A module of the "src" of the project, by the segments of its name, with
--- its file and its tree, if it parses.
+-- | A module of a source folder, by the segments of its name, with its file
+-- and its tree, if it parses.
 data SourceModule = SourceModule {
     moduleSegments :: ![String],
     moduleFile :: !FilePath,
@@ -161,13 +164,19 @@ parseModule qname file bytes =
 
 -- | Every module under "src", parsed when it can be.
 sourceModules :: FilePath -> IO [SourceModule]
-sourceModules root = do
-    files <- finFiles (root </> "src") ""
-    forM (sort files) $ \rel -> do
-        let file = "src" </> rel
-            segments = splitDirectories (dropExtension rel)
-            qname = joinPath segments
-        SourceModule segments file . parseModule qname file <$> BS.readFile (root </> file)
+sourceModules root = moduleNames root "src" >>= mapM (readModule root "src")
+
+-- | Read and parse the module of a source folder with the given segments.
+readModule :: FilePath -> FilePath -> [String] -> IO SourceModule
+readModule root folder segments = do
+    let qname = joinPath segments
+        file = folder </> qname <.> "fin"
+    SourceModule segments file . parseModule qname file <$> BS.readFile (root </> file)
+
+-- | The modules under a source folder of the project, such as "src" or
+-- "tests/hk/src", by the segments of their names, without reading them.
+moduleNames :: FilePath -> FilePath -> IO [[String]]
+moduleNames root folder = map (splitDirectories . dropExtension) . sort <$> finFiles (root </> folder) ""
 
   where
 
