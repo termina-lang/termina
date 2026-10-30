@@ -5,7 +5,7 @@ module Configuration.ExternSpec (spec) where
 import Configuration.Configuration
 import Configuration.Manifest
 import Configuration.Platform (Platform(TestPlatform))
-import Command.Extern (ExternBuild(..))
+import Command.Extern (ExternGroup(..))
 import Generator.CodeGen.Application.Makefile (genMakefile)
 import Generator.Makefile.Printer (runMakefilePrinter)
 
@@ -83,18 +83,18 @@ spec = describe "Manifest: extern section" $ do
 
   it "links the C into a relocatable object listed among the objects" $ do
     let config = defaultConfig "test" TestPlatform
-        makefile = runMakefilePrinter (genMakefile config M.empty (Just (ExternBuild ["src/crc.c"] ["lib/rtems5-leon3sf-nexysa7/libmcs.a"])) False)
+        makefile = runMakefilePrinter (genMakefile config M.empty
+          [ExternGroup "test" "" "extern" ["src/crc.c"] ["lib/rtems5-leon3sf-nexysa7/libmcs.a"] ["crc16"]] False)
     mapM_ (\line -> T.unpack makefile `shouldContain` line)
-      [ "EXTERN_SRCS+=$R/extern/src/crc.c\n"
-      , "EXTERN_LIBS+=$R/extern/lib/rtems5-leon3sf-nexysa7/libmcs.a\n"
-      , "OBJS+=$(EXTERN_OBJ)\n"
-      , "$(EXTERN_OBJ): $(EXTERN_OBJS) $(EXTERN_LIBS) $R/Makefile $(TERMINA_FLAGS_FILE)\n"
-      , "@$(call termina_extern_link,$@,$(EXTERN_OBJS),$(EXTERN_LIBS),$(EXTERN_SYMBOLS))\n"
+      [ "EXTERN_OBJS:=$(OBJ_DIR_NAME)/extern/src/crc.o\n"
+      , "OBJS+=$(OBJ_DIR_NAME)/test.ext.o\n"
+      , "$(OBJ_DIR_NAME)/test.ext.o: $(EXTERN_OBJS) $R/extern/lib/rtems5-leon3sf-nexysa7/libmcs.a $R/Makefile $(TERMINA_FLAGS_FILE)\n"
+      , "@$(call termina_extern_link,$@,$(EXTERN_OBJS),$R/extern/lib/rtems5-leon3sf-nexysa7/libmcs.a,crc16)\n"
       ]
 
   it "compiles the C with its own headers before the generated ones" $ do
     let config = defaultConfig "test" TestPlatform
-        makefile = runMakefilePrinter (genMakefile config M.empty (Just (ExternBuild ["src/crc.c"] [])) False)
+        makefile = runMakefilePrinter (genMakefile config M.empty [ExternGroup "test" "" "extern" ["src/crc.c"] [] ["crc16"]] False)
     mapM_ (\line -> T.unpack makefile `shouldContain` line)
       [ "$(EXTERN_OBJS): TERMINA_EXTERN_CPPFLAGS:=-iquote $R/extern/include\n"
       , "$(CC) $(CFLAGS) $(TERMINA_EXTERN_CPPFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"

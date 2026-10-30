@@ -16,16 +16,16 @@ import Command.Types
 import Configuration.Platform
 import Generator.CodeGen.Application.Glue
 import Generator.CodeGen.Application.Makefile
-import Command.Extern (ExternBuild)
+import Command.Extern (ExternGroup)
 import Generator.Makefile.Printer
 import Generator.CodeGen.Application.Config
 import Generator.TestDescriptor (genTestDescriptor)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text.Encoding as TE
 
-genPlatformCode :: TerminaConfig -> Platform -> LoweredProject -> TerminaProgArch SemanticAnn -> Maybe ExternBuild -> IO ()
+genPlatformCode :: TerminaConfig -> Platform -> LoweredProject -> TerminaProgArch SemanticAnn -> [ExternGroup] -> IO ()
 genPlatformCode _ TestPlatform _ _ _ = return ()
-genPlatformCode params plt loweredProject progArchitecture mExtern = do
+genPlatformCode params plt loweredProject progArchitecture externs = do
   stamp <- if isTestBuild params
     then case genTestDescriptor params loweredProject progArchitecture of
       Left err -> die . errorMessage $ err
@@ -43,7 +43,7 @@ genPlatformCode params plt loweredProject progArchitecture mExtern = do
     Right cConfigFile -> writeIfChanged configFile $ runCPrinter (lineDirectives params) cConfigFile
 
   writeIfChanged (destinationPath </> "Makefile") $
-    runMakefilePrinter (genMakefile params loweredProject mExtern (isUnitTest progArchitecture))
+    runMakefilePrinter (genMakefile params loweredProject externs (isUnitTest progArchitecture))
 
   where
 

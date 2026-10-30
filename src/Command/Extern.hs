@@ -6,11 +6,12 @@
 -- project is loaded (Configuration.ExternCheck); what is left here depends on
 -- the build.
 module Command.Extern (
-    ExternBuild(..),
+    ExternGroup(..),
+    groupObject,
+    groupObjects,
     prepareExtern,
     checkLoadedExterns,
-    parsedExterns,
-    externSymbols
+    parsedExterns
 ) where
 
 import Configuration.Configuration
@@ -30,20 +31,38 @@ import qualified Data.Text as T
 import System.Directory
 import System.FilePath
 
--- | What the build of the C of the project needs: the sources and the
--- libraries of the selected platform, as paths relative to the "extern"
--- folder.
-data ExternBuild = ExternBuild {
-    buildSources :: [FilePath],
-    buildLibraries :: [FilePath]
+-- | The C of one manifest that a deployment uses, linked into an object of
+-- its own in which only its extern functions stay global.
+data ExternGroup = ExternGroup {
+    -- | The name of its object: the one of the binary for the project
+    groupName :: String,
+    -- | The prefix of the variable of its objects in the Makefile, empty for
+    -- the project
+    groupVariable :: String,
+    -- | Its folder in the output, relative to it
+    groupFolder :: FilePath,
+    -- | The sources and the libraries of the selected platform, relative to
+    -- its folder
+    groupSources :: [FilePath],
+    groupLibraries :: [FilePath],
+    -- | Its extern functions
+    groupSymbols :: [Identifier]
   } deriving (Show)
+
+-- | The object of a group, relative to the folder of the objects.
+groupObject :: ExternGroup -> FilePath
+groupObject g = normalise (takeDirectory (groupFolder g) </> groupName g <.> "ext.o")
+
+-- | The variable that holds the objects of the sources of a group.
+groupObjects :: ExternGroup -> String
+groupObjects g = if null (groupVariable g) then "EXTERN_OBJS" else groupVariable g ++ "_EXTERN_OBJS"
 
 -- | Copy the files of each "extern" section, the one of the project and, in
 -- a test, the one of the test, that the modules of the build need on the
--- selected platform to the output folder. A file that both folders have would
--- overwrite the other in the output folder, so it is an error. A deployment
--- with no C returns Nothing.
-prepareExtern :: TerminaConfig -> ParsedProject -> [(FilePath, ExternConfig)] -> IO (Maybe ExternBuild)
+-- selected platform to the output folder, and give the group of the project,
+-- if it has C. A file that both folders have would overwrite the other in the
+-- output folder, so it is an error.
+prepareExtern :: TerminaConfig -> ParsedProject -> [(FilePath, ExternConfig)] -> IO [ExternGroup]
 prepareExtern config project folders = do
   checked <- mapM (\(folder, extern) -> map (folder,) <$> usedFiles config (loadedFrom project folder) folder extern) folders
   let files = concat checked
@@ -55,11 +74,11 @@ prepareExtern config project folders = do
           ++ file ++ ", and the two would go to the same place in the output folder"
       _ -> return ()
   copyExtern (outputFolder config </> externFolder) files
-  let srcs = filter ((== ".c") . takeExtension) relFiles
-      libs = filter ((== ".a") . takeExtension) relFiles
-  if null relFiles
-    then return Nothing
-    else return . Just $ ExternBuild srcs libs
+  let symbols = S.toList (S.fromList [ ident | (folder, _) <- folders, m <- M.elems project, isFrom folder m
+                                             , (ident, _) <- externDeclared (parsedExterns m) ])
+  return [ ExternGroup (T.unpack (name config)) "" externFolder
+             (filter ((== ".c") . takeExtension) relFiles) (filter ((== ".a") . takeExtension) relFiles) symbols
+         | not (null relFiles) ]
 
 -- | The files of an "extern" section that the loaded modules need on the
 -- selected platform, relative to its folder. A loaded module that has
@@ -137,12 +156,3 @@ copyExtern destination folderFiles = do
     let listed = S.fromList files
     forM_ present $ \file ->
       unless (file `S.member` listed) $ removeFile (destination </> file)
-
--- | The names of the extern functions of the project, which are the only
--- global symbols that its C keeps.
-externSymbols :: LoweredProject -> [Identifier]
-externSymbols project =
-  S.toList . S.fromList $
-    [ ident
-    | m <- M.elems project
-    , ExternFunction ident _ _ _ _ _ <- loweredAST (metadata m) ]

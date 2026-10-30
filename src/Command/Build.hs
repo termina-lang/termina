@@ -53,7 +53,7 @@ import Data.Aeson.Encode.Pretty (Config(..), defConfig, encodePretty', keyOrder)
 import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
 import EFP.Schedulability.WCEPath.Printer
 import Command.Common
-import Command.Extern (prepareExtern, checkLoadedExterns, parsedExterns)
+import Command.Extern (ExternGroup, prepareExtern, checkLoadedExterns, parsedExterns)
 import Configuration.ExternCheck (projectSections, sectionErrors, moduleErrors)
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.PlantUML
@@ -447,15 +447,15 @@ buildCommand args = do
 
 -- | Generate a deployment, run make on the folder of its C with the #line
 -- pragmas and write its provenance.json. It gives the modules of the
--- deployment with their source files.
-buildDeployment :: BuildCmdArgs -> Deployment -> IO [(QualifiedName, FilePath)]
+-- deployment with their source files, and its groups of C.
+buildDeployment :: BuildCmdArgs -> Deployment -> IO ([(QualifiedName, FilePath)], [ExternGroup])
 buildDeployment args deployment = do
-    modules <- generateDeployment args deployment
+    built@(modules, _) <- generateDeployment args deployment
     let config = deploymentConfig deployment
     runMake (deploymentLabel deployment) (outputFolder config) []
     runMake (deploymentLabel deployment) (outputFolder config) ["-s", "stripped-hashes"]
     writeProvenance config modules
-    return modules
+    return built
 
 -- | Say which deployment comes next when there are several.
 announce :: [Deployment] -> String -> IO ()
@@ -511,8 +511,8 @@ writeProvenance config modules = do
     toPair _ = []
 
 -- | Generate the C and the Makefile of a deployment. It gives the modules of
--- the deployment with their source files.
-generateDeployment :: BuildCmdArgs -> Deployment -> IO [(QualifiedName, FilePath)]
+-- the deployment with their source files, and its groups of C.
+generateDeployment :: BuildCmdArgs -> Deployment -> IO ([(QualifiedName, FilePath)], [ExternGroup])
 generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _) deployment = do
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
@@ -588,14 +588,15 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
     checkActivationCycles loweredProject programArchitecture
     checkTestDeployment loweredProject programArchitecture
     checkProjectBoxSources loweredProject programArchitecture
-    -- | Generate the code with the #line pragmas and the plain C
-    forM_ [deploymentConfig deployment, deploymentPlainConfig deployment] $ \outConfig -> do
+    -- | Generate the code with the #line pragmas and the plain C, which have
+    -- the same groups of C
+    externsOf <- forM [deploymentConfig deployment, deploymentPlainConfig deployment] $ \outConfig -> do
       when chatty (putStrLn . debugMessage $ "Generating code into \"" ++ outputFolder outConfig ++ "\"")
-      -- | Check the C of the deployment and copy it to the output folder
-      mExtern <- prepareExtern outConfig parsedProject (deploymentExterns deployment)
+      -- | Copy the C of the deployment to the output folder
+      externs <- prepareExtern outConfig parsedProject (deploymentExterns deployment)
       genModules outConfig plt monadicTypes elaboratedProject
       genInitFile outConfig plt elaboratedProject
-      genPlatformCode outConfig plt loweredProject programArchitecture mExtern
+      genPlatformCode outConfig plt loweredProject programArchitecture externs
       monadicHeaders <- genMonadicHeaderFiles outConfig plt monadicTypes
       -- | The C of a module that is no longer in the project would still be
       -- compiled and linked
@@ -604,6 +605,7 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
       removeStaleFiles (out </> "src") [".c"] [out </> "src" </> m <.> "c" | m <- moduleNames]
       removeStaleFiles (out </> "include") [".h"]
         ([out </> "include" </> m <.> "h" | m <- moduleNames] ++ [out </> "include" </> genConfigPathName] ++ monadicHeaders)
+      return externs
     genChecksReportFile config loweredProject checksReports
     when genTransactionalWCEPs $
       when chatty (putStrLn . debugMessage $ "Generating transactional worst-case execution paths") >>
@@ -614,4 +616,4 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
         when chatty (putStrLn . debugMessage $ "Generating component diagram") >>
         genComponentDiagramFile config programArchitecture param
     when chatty (putStrLn . debugMessage $ "Build completed successfully")
-    return [(qualifiedName m, fullPath m) | m <- M.elems elaboratedProject]
+    return ([(qualifiedName m, fullPath m) | m <- M.elems elaboratedProject], concat (take 1 externsOf))

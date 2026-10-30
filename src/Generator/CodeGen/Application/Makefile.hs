@@ -12,8 +12,8 @@ import qualified Data.Set as S
 
 
 -- | The flag says whether the deployment is a unit test, which reads the test clock
-genMakefile :: TerminaConfig -> LoweredProject -> Maybe ExternBuild -> Bool -> Makefile
-genMakefile params loweredProject mExtern unitTest =
+genMakefile :: TerminaConfig -> LoweredProject -> [ExternGroup] -> Bool -> Makefile
+genMakefile params loweredProject externs unitTest =
     Makefile $ [
         MakeBlock [
             MVariable MSimple "R" [MFragment "$(shell pwd)"]
@@ -73,14 +73,13 @@ genMakefile params loweredProject mExtern unitTest =
                         [MFragment "$(TERMINA_OSAL_DIR)/%", MFragment "$(OBJ_DIR_NAME)/termina/%", MFunction "wildcard" [MFragment "$(OSAL_SRCS)"]]]]],
             MVariable MAppend "OBJS" [MFunction "patsubst" [MFragment "%.c", MFragment "%.o", MFunction "patsubst" [MFragment "$R/%", MFragment "$(OBJ_DIR_NAME)/%", MFragment "$(SRCS)"]]],
             MVariable MSimple "MODULE_OBJS" [MFunction "patsubst" [MFragment "$R/%.c", MFragment "$(OBJ_DIR_NAME)/%.o", MFunction "filter" [MFragment "$R/src/%", MFragment "$(SRCS)"]]]
-        ] ++ [MVariable MAppend "OBJS" [MFragment "$(EXTERN_OBJ)"] | hasExtern],
+        ] ++ [MVariable MAppend "OBJS" [MFragment ("$(OBJ_DIR_NAME)" </> groupObject g)] | g <- externs],
         MakeBlock [
             MVariable MAppend "CPPFLAGS" [MFunction "patsubst" [MFragment "%", MFragment "-iquote %", MFragment "$(PROJECT_INCLUDE_DIRS)"]],
             MVariable MAppend "CPPFLAGS" [MFunction "patsubst" [MFragment "%", MFragment "-I %", MFragment "$(INCLUDE_DIRS)"]]
         ],
         MakeBlock [
-            MVariable MSimple "DEPS" [MFunction "patsubst" [MFragment "%.o", MFragment "%.d",
-                MFragment (if hasExtern then "$(OBJS) $(EXTERN_OBJS)" else "$(OBJS)")]]
+            MVariable MSimple "DEPS" [MFunction "patsubst" [MFragment "%.o", MFragment "%.d", MFragment (unwords ("$(OBJS)" : externObjects))]]
         ],
         MakeBlock $ [
             MRule "all" ["$(TARGET)"] [],
@@ -142,8 +141,7 @@ genMakefile params loweredProject mExtern unitTest =
         ] ++ externRule ++ [
             MRule "clean" [] [
                 MakeCommand False [MFragment "@echo Cleaning up"],
-                MakeCommand False [MFragment
-                    (if hasExtern then "@$(RM) $(OBJS) $(EXTERN_OBJS) $(DEPS) $(TARGET) $(TARGET).map" else "@$(RM) $(OBJS) $(DEPS) $(TARGET) $(TARGET).map")]
+                MakeCommand False [MFragment (unwords (["@$(RM)", "$(OBJS)"] ++ externObjects ++ ["$(DEPS)", "$(TARGET)", "$(TARGET).map"]))]
             ],
             MRule "dist-clean" ["clean"] [
                 MakeCommand False [MFragment "@echo Mr. Proper is cleaning up"],
@@ -165,7 +163,8 @@ genMakefile params loweredProject mExtern unitTest =
         -- deployment, which is always inside it
         projectRoot = joinPath (map (const "..") (splitDirectories (outputFolder params)))
 
-        hasExtern = maybe False (const True) mExtern
+        -- | The variables of the objects of the sources of each group
+        externObjects = [ "$(" ++ groupObjects g ++ ")" | g <- externs ]
 
         -- | The descriptor of a test goes into a section of the binary that is not loaded
         descriptorSection = [
@@ -184,8 +183,7 @@ genMakefile params loweredProject mExtern unitTest =
 
         deliverableVariables = [
             "R", "TERMINA_OSAL_DIR", "TERMINA_PROJECT_DIR", "CC", "AS", "LD", "OBJCOPY", "NM", "OBJDUMP",
-            "TERMINA_EXTERN_LIBC", "CFLAGS", "CPPFLAGS", "ASMFLAGS", "LDFLAGS", "SRCS",
-            "EXTERN_SRCS", "EXTERN_LIBS", "EXTERN_SYMBOLS", "DEPS"]
+            "TERMINA_EXTERN_LIBC", "CFLAGS", "CPPFLAGS", "ASMFLAGS", "LDFLAGS", "SRCS", "DEPS"]
 
         -- | The buffer sizes of sys_print and sys_read appear in the headers of
         -- the OSAL API, so every module sees them. They belong to the project
@@ -198,31 +196,27 @@ genMakefile params loweredProject mExtern unitTest =
             [] -> []
             flags -> [MakeBlock flags]
 
-        -- | The C of the project is linked into a single relocatable object in
-        -- which only the extern functions stay global. How it is linked and
-        -- checked depends on the toolchain, so the platform files of the OSAL
-        -- define termina_extern_link.
-        externVariables = case mExtern of
-            Nothing -> []
-            Just (ExternBuild srcs libs) -> [
-                MakeBlock $
-                    map (\src -> MVariable MAppend "EXTERN_SRCS" [MFragment $ "$R" </> externFolder </> src]) srcs
-                    ++ map (\lib -> MVariable MAppend "EXTERN_LIBS" [MFragment $ "$R" </> externFolder </> lib]) libs
-                    ++ [
-                        MVariable MSimple "EXTERN_SYMBOLS" [MFragment . unwords $ externSymbols loweredProject],
-                        MVariable MSimple "EXTERN_OBJS" [MFunction "patsubst" [MFragment "$R/%.c", MFragment "$(OBJ_DIR_NAME)/%.o", MFragment "$(EXTERN_SRCS)"]],
-                        MVariable MSimple "EXTERN_OBJ" [MFragment "$(OBJ_DIR_NAME)/$(PROJECT_NAME).ext.o"]
-                    ]
-                ]
+        -- | The C of each group is linked into a relocatable object of its own
+        -- in which only its extern functions stay global. How it is linked
+        -- and checked depends on the toolchain, so the platform files of the
+        -- OSAL define termina_extern_link.
+        externVariables =
+            [ MakeBlock [MVariable MSimple (groupObjects g)
+                [MFragment (unwords [ "$(OBJ_DIR_NAME)" </> groupFolder g </> replaceExtension src "o" | src <- groupSources g ])]]
+            | g <- externs ]
 
         externRule = concat [ [
-            -- | The headers of the project come before the generated ones, for
+            -- | The headers of the group come before the generated ones, for
             -- its C only
-            MRule "$(EXTERN_OBJS)" ["TERMINA_EXTERN_CPPFLAGS:=-iquote $R" </> externFolder </> externHeaderFolder] [],
+            MRule ("$(" ++ groupObjects g ++ ")") ["TERMINA_EXTERN_CPPFLAGS:=-iquote $R" </> groupFolder g </> externHeaderFolder] []
+            | not (null (groupSources g)) ] ++ [
             -- | The Makefile holds the list of extern functions, so a new one
             -- relinks the object even when no C changed
-            MRule "$(EXTERN_OBJ)" ["$(EXTERN_OBJS)", "$(EXTERN_LIBS)", "$R/Makefile", "$(TERMINA_FLAGS_FILE)"] [
+            MRule ("$(OBJ_DIR_NAME)" </> groupObject g) (["$(" ++ groupObjects g ++ ")"] ++ libraries ++ ["$R/Makefile", "$(TERMINA_FLAGS_FILE)"]) [
                 MakeCommand False [MFragment "@echo Linking $@"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
-                MakeCommand False [MFragment "@$(call termina_extern_link,$@,$(EXTERN_OBJS),$(EXTERN_LIBS),$(EXTERN_SYMBOLS))"]
-            ] ] | hasExtern]
+                MakeCommand False [MFragment $ "@$(call termina_extern_link,$@,$(" ++ groupObjects g ++ "),"
+                    ++ unwords libraries ++ "," ++ unwords (groupSymbols g) ++ ")"]
+            ] ]
+          | g <- externs
+          , let libraries = [ "$R" </> groupFolder g </> lib | lib <- groupLibraries g ] ]

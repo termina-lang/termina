@@ -244,7 +244,7 @@ runTests mName mPlatform mProfile mExecutor mServer mXsdb offline mode = do
             ++ intercalate ", " (map (show . deploymentPlatform) deployments) ++ "; choose one with --platform")
         _ -> forM deployments $ \deployment -> do
             announce deployments ("Building " ++ deploymentLabel deployment)
-            built <- try (buildDeployment buildArgs deployment) :: IO (Either ExitCode [(QualifiedName, FilePath)])
+            built <- try (void (buildDeployment buildArgs deployment)) :: IO (Either ExitCode ())
             case built of
                 Left _ -> do
                     let config = deploymentConfig deployment

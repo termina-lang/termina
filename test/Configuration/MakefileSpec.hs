@@ -12,7 +12,7 @@ import qualified Data.Text as T
 import Test.Hspec
 
 makefileFor :: TerminaConfig -> String
-makefileFor config = T.unpack . runMakefilePrinter $ genMakefile config M.empty Nothing False
+makefileFor config = T.unpack . runMakefilePrinter $ genMakefile config M.empty [] False
 
 spec :: Spec
 spec = describe "Makefile: project configuration" $ do
@@ -63,8 +63,8 @@ spec = describe "Makefile: project configuration" $ do
 
   it "builds the test runtime only in a test, and the test clock only in a unit test" $ do
     let testConfig = (defaultConfig "test" TestPlatform) { deploymentKind = TestBuild (T.pack "hk") }
-        unitMakefile = T.unpack . runMakefilePrinter $ genMakefile testConfig M.empty Nothing True
-        concurrentMakefile = T.unpack . runMakefilePrinter $ genMakefile testConfig M.empty Nothing False
+        unitMakefile = T.unpack . runMakefilePrinter $ genMakefile testConfig M.empty [] True
+        concurrentMakefile = T.unpack . runMakefilePrinter $ genMakefile testConfig M.empty [] False
     -- Before the platform.mk, which reads it
     unitMakefile `shouldContain` "TERMINA_TEST:=1\nCFLAGS+=-DTERMINA__TEST__CLOCK\n"
     concurrentMakefile `shouldContain` "TERMINA_TEST:=1\n"
@@ -73,7 +73,7 @@ spec = describe "Makefile: project configuration" $ do
 
   it "adds the descriptor of a test of either level to its binary" $ do
     let testConfig = (defaultConfig "test" TestPlatform) { deploymentKind = TestBuild (T.pack "hk") }
-        unitMakefile = T.unpack . runMakefilePrinter $ genMakefile testConfig M.empty Nothing True
+        unitMakefile = T.unpack . runMakefilePrinter $ genMakefile testConfig M.empty [] True
         concurrentMakefile = makefileFor testConfig
     unitMakefile `shouldContain` "$(TARGET): $(OBJS) $(TERMINA_FLAGS_FILE) $R/test.json\n"
     unitMakefile `shouldContain` "$(OBJCOPY) --add-section .termina_test=$R/test.json $@;"

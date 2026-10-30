@@ -11,6 +11,7 @@ module Command.Deliver (
 ) where
 
 import Command.Build
+import Command.Extern (ExternGroup(..), groupObject, groupObjects)
 import Command.Update (verifyProject)
 import Command.Utils
 import Configuration.Configuration
@@ -98,7 +99,7 @@ deliverDeployment chatty manifest archive withTrace deployment = do
         binary = "bin" </> T.unpack (name config)
     -- | The build with the #line pragmas gives the values of the Makefile,
     -- the dependency files and the binary to compare with
-    modules <- buildDeployment (BuildCmdArgs chatty False Nothing SelectApp Nothing Nothing True) deployment
+    (modules, externs) <- buildDeployment (BuildCmdArgs chatty False Nothing SelectApp Nothing Nothing True) deployment
     info <- deliverableInfo label built
     let value key = M.findWithDefault "" key info
         list key = words (value key)
@@ -124,11 +125,11 @@ deliverDeployment chatty manifest archive withTrace deployment = do
     -- | The plain C of the deployment, which is what the build with the #line
     -- pragmas compiles without them
     sources <- fromOutput (list "SRCS")
-    externSrcs <- fromOutput (list "EXTERN_SRCS")
-    externLibs <- fromOutput (list "EXTERN_LIBS")
+    let externSrcs = [ groupFolder g </> src | g <- externs, src <- groupSources g ]
+        externLibs = [ groupFolder g </> lib | g <- externs, lib <- groupLibraries g ]
     headers <- map (makeRelative plain) . filter ((== ".h") . takeExtension) <$> filesUnder (plain </> "include")
-    -- | The headers of the C of the project, which its sources include
-    externHeaders <- map (makeRelative plain) <$> filesUnder (plain </> externFolder </> externHeaderFolder)
+    -- | The headers of each group of C, which its sources include
+    externHeaders <- concat <$> forM externs (\g -> map (makeRelative plain) <$> filesUnder (plain </> groupFolder g </> externHeaderFolder))
     forM_ (sources ++ headers ++ externSrcs ++ externHeaders ++ externLibs) $ \file -> copyInto (plain </> file) (folder </> file)
     -- | The files of the OSAL that the build opens, as the dependency files
     -- of its objects list them, and those named in the flags, such as a
@@ -138,13 +139,12 @@ deliverDeployment chatty manifest archive withTrace deployment = do
     opened <- concatMap (dependencies . T.unpack) <$> mapM TIO.readFile depFiles
     named <- filterM doesFileExist (filter (inFolder osalDir) (concatMap pathsIn (list "CFLAGS" ++ list "LDFLAGS")))
     let osalSources = list "OSAL_SRCS"
-        externScript = [osalDir </> "tools" </> "extern" </> "link.sh" | not (null externSrcs && null externLibs)]
+        externScript = [osalDir </> "tools" </> "extern" </> "link.sh" | not (null externs)]
         osalUsed = nub . sort . filter (inFolder osalDir) $ osalSources ++ opened ++ named ++ externScript
     licenses <- licenseFiles osalDir osalUsed
     forM_ (map (relativeTo osalDir) (osalUsed ++ licenses)) $ \file -> copyInto (osalDir </> file) (folder </> "osal" </> file)
     let makefile = runMakefilePrinter $
-            genDeliverableMakefile config info (map relocated osalSources) sources
-                externSrcs externLibs (testModules config modules)
+            genDeliverableMakefile config info (map relocated osalSources) sources externs (testModules config modules)
     TIO.writeFile (folder </> "Makefile") makefile
     -- | The files delivered, as they are on disk
     delivered <- map (makeRelative folder) <$> filesUnder folder
@@ -287,8 +287,8 @@ relocate substitutions = concatMap relocatePart . wordParts
 
 -- | The flat Makefile of the deliverable: the toolchain, the flags and the
 -- explicit list of sources, resolved for the platform and the profile.
-genDeliverableMakefile :: TerminaConfig -> M.Map String String -> [FilePath] -> [FilePath] -> [FilePath] -> [FilePath] -> [QualifiedName] -> Makefile
-genDeliverableMakefile config info osalSources sources externSrcs externLibs testQNames =
+genDeliverableMakefile :: TerminaConfig -> M.Map String String -> [FilePath] -> [FilePath] -> [ExternGroup] -> [QualifiedName] -> Makefile
+genDeliverableMakefile config info osalSources sources externs testQNames =
     Makefile $ [
         MakeBlock [
             MVariable MSimple "PROJECT_NAME" [MFragment . T.unpack . name $ config],
@@ -325,10 +325,10 @@ genDeliverableMakefile config info osalSources sources externSrcs externLibs tes
             -- project, which the comparison of the binaries needs
             MVariable MSimple "OBJS" [MFunction "patsubst" [MFragment "%", MFragment "$(OBJ_DIR_NAME)/%.o", MFunction "basename" [MFragment "$(OSAL_SRCS) $(SRCS)"]]],
             MVariable MSimple "MODULE_OBJS" [MFunction "patsubst" [MFragment "%.c", MFragment "$(OBJ_DIR_NAME)/%.o", MFunction "filter" [MFragment "src/%", MFragment "$(SRCS)"]]]
-        ] ++ [MVariable MAppend "OBJS" [MFragment "$(EXTERN_OBJ)"] | hasExtern],
+        ] ++ [MVariable MAppend "OBJS" [MFragment ("$(OBJ_DIR_NAME)" </> groupObject g)] | g <- externs],
         MakeBlock [
             MVariable MSimple "DEPS" [MFunction "patsubst" [MFragment "%.o", MFragment "%.d",
-                MFragment (if hasExtern then "$(OBJS) $(EXTERN_OBJS)" else "$(OBJS)")]]
+                MFragment (unwords ("$(OBJS)" : [ "$(" ++ groupObjects g ++ ")" | g <- externs ]))]]
         ],
         MakeBlock $ [
             MRule "all" ["$(TARGET)"] [],
@@ -392,33 +392,28 @@ genDeliverableMakefile config info osalSources sources externSrcs externLibs tes
             then "$(CROSS)" ++ drop (length cross) tool
             else unwords (map (relocate substitutions) (words tool))
 
-    hasExtern = not (null externSrcs && null externLibs)
-
     hasAssembly = any ((== ".s") . takeExtension) osalSources
 
+    -- | As in the build, a block for each group of C
     externVariables =
-        [ MakeBlock $
-            map (\src -> MVariable MAppend "EXTERN_SRCS" [MFragment src]) externSrcs
-            ++ map (\lib -> MVariable MAppend "EXTERN_LIBS" [MFragment lib]) externLibs
-            ++ [
-                MVariable MSimple "EXTERN_SYMBOLS" [MFragment (value "EXTERN_SYMBOLS")],
-                MVariable MSimple "TERMINA_EXTERN_LIBC" [MFragment (value "TERMINA_EXTERN_LIBC")],
-                MVariable MSimple "EXTERN_OBJS" [MFunction "patsubst" [MFragment "%.c", MFragment "$(OBJ_DIR_NAME)/%.o", MFragment "$(EXTERN_SRCS)"]],
-                MVariable MSimple "EXTERN_OBJ" [MFragment "$(OBJ_DIR_NAME)/$(PROJECT_NAME).ext.o"]
-            ]
-        | hasExtern ]
+        [ MakeBlock [MVariable MSimple "TERMINA_EXTERN_LIBC" [MFragment (value "TERMINA_EXTERN_LIBC")]] | not (null externs) ]
+        ++ [ MakeBlock [MVariable MSimple (groupObjects g)
+                [MFragment (unwords [ "$(OBJ_DIR_NAME)" </> groupFolder g </> replaceExtension src "o" | src <- groupSources g ])]]
+           | g <- externs ]
 
     externRule = concat
-        [ [ MRule "$(EXTERN_OBJS)" ["TERMINA_EXTERN_CPPFLAGS:=-iquote " ++ externFolder </> externHeaderFolder] [],
-          MRule "$(EXTERN_OBJ)" ["$(EXTERN_OBJS)", "$(EXTERN_LIBS)"] [
+        [ [ MRule ("$(" ++ groupObjects g ++ ")") ["TERMINA_EXTERN_CPPFLAGS:=-iquote " ++ groupFolder g </> externHeaderFolder] []
+          | not (null (groupSources g)) ] ++ [
+          MRule ("$(OBJ_DIR_NAME)" </> groupObject g) (("$(" ++ groupObjects g ++ ")") : libraries) [
             MakeCommand False [MFragment "@echo Linking $@"],
             MakeCommand False [MFragment "@mkdir -p $(@D)"],
             MakeCommand False [MFragment $ unwords [
                 "@CC='$(CC)' CFLAGS='$(CFLAGS)' LD='$(LD)' OBJCOPY='$(OBJCOPY)' NM='$(NM)' OBJDUMP='$(OBJDUMP)'",
                 "LIBC='$(TERMINA_EXTERN_LIBC)'",
-                "sh osal/tools/extern/link.sh '$@' '$(EXTERN_OBJS)' '$(EXTERN_LIBS)' '$(EXTERN_SYMBOLS)'"]]
+                "sh osal/tools/extern/link.sh '$@' '$(" ++ groupObjects g ++ ")' '" ++ unwords libraries ++ "' '" ++ unwords (groupSymbols g) ++ "'"]]
           ] ]
-        | hasExtern ]
+        | g <- externs
+        , let libraries = [ groupFolder g </> lib | lib <- groupLibraries g ] ]
 
     -- | As in the build of the project, the modules of the test itself keep
     -- each call as a call
