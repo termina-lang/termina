@@ -24,8 +24,12 @@ file path = FetchedFile path "100644" ""
 link :: String -> FetchedFile
 link path = FetchedFile path "120000" "../elsewhere"
 
+-- | The module whose extern function the C of the package defines.
+crcModule :: FetchedFile
+crcModule = FetchedFile "src/pus/crc.fin" "100644" "extern function pus_crc16() -> u16;\n"
+
 package :: [FetchedFile]
-package = [manifest library, file "src/pus/service1.fin", file "extern/src/crc.c", file "extern/lib/posix-gcc/libcrc.a",
+package = [manifest library, file "src/pus/service1.fin", crcModule, file "extern/src/crc.c", file "extern/lib/posix-gcc/libcrc.a",
     file "extern/notes.txt", file "README.md"]
 
 errorsOf :: [FetchedFile] -> [String]
@@ -53,12 +57,22 @@ spec = do
   describe "extern" $ do
 
     it "rejects a missing file and a pattern that matches none" $
-      errorsOf (manifest "exports: [pus]\nextern:\n  pus.crc:\n    sources: [crc.c, \"spi/*.c\"]\n" : file "src/pus/service1.fin" : [])
-        `shouldBe` [ "extern/src/crc.c: the extern section lists a file that the package does not have"
-                   , "extern/src/spi/*.c: the extern section lists a pattern that matches no file of the package" ]
+      errorsOf [manifest "exports: [pus]\nextern:\n  pus.crc:\n    sources: [crc.c, \"spi/*.c\"]\n", file "src/pus/service1.fin", crcModule]
+        `shouldBe` [ "The extern section of the package lists extern/src/crc.c under pus.crc, and the file does not exist"
+                   , "The extern section of the package lists extern/src/spi/*.c under pus.crc, and the pattern matches no file" ]
 
     it "accepts a pattern that matches some file" $
-      validatePackage [manifest "exports: [pus]\nextern:\n  pus.crc:\n    sources: [\"spi/*.c\"]\n", file "src/pus/service1.fin", file "extern/src/spi/a.c"]
+      validatePackage [manifest "exports: [pus]\nextern:\n  pus.crc:\n    sources: [\"spi/*.c\"]\n", file "src/pus/service1.fin", crcModule,
+                       file "extern/src/spi/a.c"]
+        `shouldSatisfy` isRight
+
+    it "rejects an exported module with an extern function and no entry" $
+      errorsOf (package ++ [FetchedFile "src/pus/tm.fin" "100644" "extern function pus_tm_raw() -> u32;\n"])
+        `shouldBe` ["The module pus.tm declares the extern function pus_tm_raw and is not listed in the extern section of the package"]
+
+    it "ignores the C of a module that it does not export" $
+      validatePackage (manifest (library ++ "  test_support.fake:\n    sources: [fake.c]\n")
+                       : tail package ++ [FetchedFile "src/test_support/fake.fin" "100644" "extern function fake() -> u32;\n", file "extern/src/fake.c"])
         `shouldSatisfy` isRight
 
   describe "links and submodules" $ do

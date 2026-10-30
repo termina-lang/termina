@@ -9,15 +9,20 @@ module Configuration.Validate (
 ) where
 
 import Data.Char (toLower)
-import Data.List (find, isPrefixOf, sortOn, groupBy)
+import Data.List (find, isPrefixOf, sortOn, groupBy, stripPrefix)
 import Data.Function (on)
 import qualified Data.Map.Strict as M
+import Data.Maybe (mapMaybe)
+import qualified Data.Text as T
+import System.FilePath
 
 import Configuration.Configuration
+import Configuration.ExternCheck (ExternSection(..), sectionErrors, moduleErrors, sourceExterns)
 import Configuration.Fetch (FetchedFile(..))
 import Configuration.Manifest
+import Configuration.Namespace (SourceModule(..), parseModule)
 import Configuration.Prefix
-import Configuration.Vendor (isVendored)
+import Configuration.Vendor (isVendored, exportedExtern)
 
 -- | Check the files of the commit of a package, and give its manifest or
 -- every problem found.
@@ -45,8 +50,6 @@ validateFiles local files =
 
   where
 
-    modes = M.fromList [(fetchedPath f, fetchedMode f) | f <- files]
-
     externPaths = externFiles . manifestExtern
 
     -- | A path dependency only exists on the machine of the author.
@@ -54,16 +57,33 @@ validateFiles local files =
         [ "the package declares the path dependency " ++ p ++ ", which only exists on the machine of its author"
         | not local, DepPath p <- manifestDependencies manifest ]
 
-    -- | Each file of the extern section is in the commit, and each pattern
-    -- matches some file; a link in its place is reported with the others.
-    externErrors manifest = concatMap check (externPaths manifest)
+    -- | The checks of the C of the project, over what the consumer receives:
+    -- the entries of the exported modules, the files that go to "vendor/" and
+    -- the exported modules. An exported module that does not parse is left to
+    -- the build of the consumer, which reports the error of the parser.
+    externErrors manifest =
+        sectionErrors [section] ++ moduleErrors owner "src" config Nothing (mapMaybe sourceExterns exported)
 
       where
 
-        check p
-            | any (listedMatches ("extern/" ++ p)) (M.keys modes) = []
-            | '*' `elem` p = ["extern/" ++ p ++ ": the extern section lists a pattern that matches no file of the package"]
-            | otherwise = ["extern/" ++ p ++ ": the extern section lists a file that the package does not have"]
+        owner = "the package"
+
+        config = exportedExtern manifest
+
+        vendored = [ f | f <- files, isVendored manifest (fetchedPath f) ]
+
+        exported =
+            [ SourceModule segments path (parseModule (joinPath segments) path bytes)
+            | FetchedFile path _ bytes <- vendored, Just rel <- [stripPrefix "src/" path], takeExtension rel == ".fin"
+            , let segments = splitDirectories (dropExtension rel) ]
+
+        keys = [ map T.unpack (T.splitOn "." key) | key <- M.keys (externModules config) ]
+
+        section = ExternSection owner externFolder "src" config
+            [ rel | FetchedFile path _ _ <- vendored, Just rel <- [stripPrefix (externFolder ++ "/") path] ]
+            (map moduleSegments exported)
+            [ (moduleSegments m, moduleFile m) | m <- exported ]
+            (mapMaybe sourceExterns [ m | m <- exported, moduleSegments m `elem` keys ])
 
     -- | A symbolic link or a submodule where the build reads: in an exported
     -- subtree, on the way to one, or in place of a file that is copied.
