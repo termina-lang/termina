@@ -7,15 +7,19 @@ module Command.Extern (
     ExternBuild(..),
     externFolder,
     prepareExtern,
+    checkExternModules,
     externSymbols
 ) where
 
 import Configuration.Configuration
 import Configuration.Platform
+import Command.Common (parseTerminaFile)
 import Command.Types
 import Command.Utils
+import Configuration.Namespace (locationLine)
 import Core.AST
 import Modules.Modules
+import Modules.Utils (qualifiedToModuleName)
 
 import Control.Monad
 import qualified Data.ByteString as BS
@@ -83,7 +87,7 @@ checkExtern config externFolderPath (ExternConfig moduleEntries) = do
   -- a package carries every header and library
   forM_ present $ \file ->
     unless (file `elem` listed) $
-      dieWithError $ "The file \"" ++ externFolderPath </> file ++ "\" is not listed under any module in its \"extern\" section of \"termina.yaml\""
+      dieWithError $ "The file \"" ++ externFolderPath </> file ++ "\" is not listed under any module in " ++ sectionOf externFolderPath
   -- | The libraries of a module are tied to the platforms they were compiled
   -- for, so a module that has some has to have them for the selected one
   forM_ (M.toList moduleEntries) $ \(modName, entry) ->
@@ -107,6 +111,69 @@ checkExtern config externFolderPath (ExternConfig moduleEntries) = do
         (folder : _ : _) | folder == externHeaderFolder -> takeExtension file == ".h"
         (folder : plt : _ : _) | folder == externLibraryFolder -> checkPlatform plt /= Nothing && takeExtension file == ".a"
         _ -> False
+
+-- | Check each "extern" section against the modules of its source folder:
+-- each entry names a module of the folder that declares some extern function,
+-- and each module of the folder that the build loads with an extern function
+-- has its entry. A module that the build does not load is only parsed. The
+-- main module has no entry, so it declares no extern function.
+checkExternModules :: ParsedModule -> ParsedProject -> [(FilePath, ExternConfig)] -> IO ()
+checkExternModules mainModule project sections = do
+  -- | The section of the main module is the last one
+  let mainSection = fst (last sections)
+  forM_ (externFunctions (parsedAST (metadata mainModule))) $ \(ident, ann) ->
+    dieWithError $ fullPath mainModule ++ ":" ++ show (locationLine ann) ++ ": " ++ takeFileName (fullPath mainModule)
+      ++ " cannot declare the extern function " ++ ident ++ ". Declare it in a module of " ++ sourceFolderOf mainSection
+      ++ "/ and list that module in " ++ sectionOf mainSection
+  -- | An entry may be in the section of another folder, also of a test that this build leaves out
+  hasTests <- doesDirectoryExist "tests"
+  tests <- if hasTests then listDirectory "tests" else return []
+  let folders = nub (map fst sections ++ [ "tests" </> t </> externFolder | t <- tests ])
+  forM_ sections $ \(folder, ExternConfig moduleEntries) -> do
+    let srcFolder = sourceFolderOf folder
+    forM_ (M.keys moduleEntries) $ \modName -> do
+      let qname = joinPath (map T.unpack (T.splitOn (T.pack ".") modName))
+          path = srcFolder </> qname <.> "fin"
+          listsOf = "The extern section of " ++ ownerOf folder ++ " lists " ++ T.unpack modName
+      isModule <- doesFileExist path
+      unless isModule $ do
+        isFolder <- doesDirectoryExist (srcFolder </> qname)
+        when isFolder $
+          dieWithError $ listsOf ++ ", which is a folder (" ++ srcFolder </> qname ++ ") and not a module"
+        others <- filterM (\other -> doesFileExist (sourceFolderOf other </> qname <.> "fin")) (folders \\ [folder])
+        forM_ others $ \other ->
+          dieWithError $ listsOf ++ ", which is a module of " ++ ownerOf other ++ " (" ++ sourceFolderOf other </> qname <.> "fin"
+            ++ "). Move its entry to " ++ sectionOf other
+        dieWithError $ listsOf ++ ", which is not a module (" ++ path ++ " does not exist)"
+      elements <- case M.lookup qname project of
+        Just loaded | fullPath loaded == path -> return (parsedAST (metadata loaded))
+        _ -> frags . snd <$> parseTerminaFile qname path
+      when (null (externFunctions elements)) $
+        dieWithError $ listsOf ++ ", which declares no extern function (" ++ path ++ ")"
+    forM_ (M.elems project) $ \loaded ->
+      case externFunctions (parsedAST (metadata loaded)) of
+        (ident, _) : _ | fullPath loaded == srcFolder </> qualifiedName loaded <.> "fin"
+                  , not (M.member (T.pack (qualifiedToModuleName (qualifiedName loaded))) moduleEntries) ->
+          dieWithError $ "The module " ++ qualifiedToModuleName (qualifiedName loaded) ++ " declares the extern function "
+            ++ ident ++ " and is not listed in " ++ sectionOf folder
+        _ -> return ()
+
+  where
+
+    -- | The source folder next to an "extern" folder.
+    sourceFolderOf folder = normalise (takeDirectory folder </> "src")
+
+    externFunctions elements = [ (ident, ann) | ExternFunction ident _ _ _ _ ann <- elements ]
+
+-- | Who an "extern" folder belongs to, as the messages name it.
+ownerOf :: FilePath -> String
+ownerOf folder =
+  case splitDirectories folder of
+    ["tests", testName, _] -> "the test " ++ testName
+    _ -> "the project"
+
+sectionOf :: FilePath -> String
+sectionOf folder = "the extern section of " ++ ownerOf folder
 
 -- | The files under a folder, as paths relative to it.
 listFiles :: FilePath -> IO [FilePath]

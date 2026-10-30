@@ -52,7 +52,7 @@ import Data.Aeson.Encode.Pretty (Config(..), defConfig, encodePretty', keyOrder)
 import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
 import EFP.Schedulability.WCEPath.Printer
 import Command.Common
-import Command.Extern (prepareExtern)
+import Command.Extern (prepareExtern, checkExternModules)
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.PlantUML
 import Extras.PlantUML.Printer
@@ -523,6 +523,8 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
     when chatty (putStrLn . debugMessage $ "Loading project modules")
     parsedModules <- loadModules sources mainFolder (importedModules appModule)
     let parsedProject = M.insert (qualifiedName appModule) appModule parsedModules
+    -- | Check the extern sections of the manifest against the modules
+    checkExternModules appModule parsedProject (deploymentExterns deployment)
     -- | Detect any possible loops in the project
     when chatty (putStrLn . debugMessage $ "Ordering project modules")
     let projectDependencies = M.map importedModules parsedProject

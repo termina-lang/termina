@@ -11,7 +11,9 @@ import qualified Data.Text as T
 
 import System.FilePath
 import System.Directory
+import Parser.AST (TerminaModule)
 import Parser.Parsing (terminaModuleParser)
+import Parser.Types (ParserAnn)
 import Parser.Errors
 import Text.Parsec (runParser)
 import qualified Data.Map.Strict as M
@@ -49,19 +51,10 @@ loadTerminaModule ::
   -> IO ParsedModule
 loadTerminaModule sources root filePath = do
   let fullP = root </> filePath <.> "fin"
-  -- read it
-  src_code <- either (const (dieWithError $ fullP ++ ": the file is not valid UTF-8")) return . TE.decodeUtf8' =<< BS.readFile fullP
+  (src_code, term) <- parseTerminaFile filePath fullP
   mod_time <- getModificationTime fullP
-  -- parse it
-  case runParser terminaModuleParser filePath fullP (T.unpack src_code) of
-    Left err ->
-      let pErr = annotateError (Position filePath (errorPos err) (errorPos err)) (EParseError err)
-          fileMap = M.singleton fullP src_code
-      in
-      dieWithReport (toText pErr fileMap)
-    Right term -> do
-      imports <- mapM (importOf (M.singleton fullP src_code) fullP) (modules term)
-      return $ TerminaModuleData filePath fullP mod_time imports [] src_code (ParsingData . frags $ term)
+  imports <- mapM (importOf (M.singleton fullP src_code) fullP) (modules term)
+  return $ TerminaModuleData filePath fullP mod_time imports [] src_code (ParsingData . frags $ term)
 
   where
 
@@ -81,6 +74,23 @@ loadTerminaModule sources root filePath = do
             NotExported folder -> dieWithError $ fullP ++ ":" ++ show (locationLine ann) ++ ": "
               ++ notExportedMessage folder (qualifiedToModuleName qname)
             Missing -> dieWithReport (toText (annotateError ann (EImportedFileNotFound (root </> qname <.> "fin"))) fileMap)
+
+-- | Read and parse a Termina file, without its imports.
+parseTerminaFile ::
+  -- | Qualified name of the module
+  FilePath
+  -- | Path of the file
+  -> FilePath
+  -> IO (T.Text, TerminaModule ParserAnn)
+parseTerminaFile filePath fullP = do
+  src_code <- either (const (dieWithError $ fullP ++ ": the file is not valid UTF-8")) return . TE.decodeUtf8' =<< BS.readFile fullP
+  case runParser terminaModuleParser filePath fullP (T.unpack src_code) of
+    Left err ->
+      let pErr = annotateError (Position filePath (errorPos err) (errorPos err)) (EParseError err)
+          fileMap = M.singleton fullP src_code
+      in
+      dieWithReport (toText pErr fileMap)
+    Right term -> return (src_code, term)
 
 -- | Load the modules that the modules of a folder import, and everything they
 -- import in turn, each one from the folder where the importer finds it. One
