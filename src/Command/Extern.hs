@@ -52,7 +52,11 @@ prepareExtern config project folders = do
   let files = concat checked
       relFiles = map snd files
   forM_ (relFiles \\ nub relFiles) $ \file ->
-    dieWithError $ "The extern file \"" ++ file ++ "\" is in more than one extern folder of the deployment"
+    case [ folder | (folder, rel) <- files, rel == file ] of
+      first : second : _ ->
+        dieWithError $ "Both " ++ addTrailingPathSeparator first ++ " and " ++ addTrailingPathSeparator second ++ " have the file "
+          ++ file ++ ", and the two would go to the same place in the output folder"
+      _ -> return ()
   copyExtern (outputFolder config </> externFolder) files
   let srcs = filter ((== ".c") . takeExtension) relFiles
       libs = filter ((== ".a") . takeExtension) relFiles
@@ -68,31 +72,32 @@ checkExtern config loaded externFolderPath (ExternConfig moduleEntries) = do
   present <- if folderExists then listFiles externFolderPath else return []
   -- | The sources, the headers and the libraries of each platform have a folder each
   forM_ present $ \file ->
-    unless (inItsFolder file) $
-      dieWithError $ "The file \"" ++ externFolderPath </> file ++ "\" is not in its folder: "
-        ++ "\"extern\" holds the C sources in \"src\", their headers in \"include\" and the libraries of each platform in \"lib/<platform>\""
+    forM_ (misplaced file) $ \problem ->
+      dieWithError $ "The file " ++ externFolderPath </> file ++ problem
   -- | Each listed path names a file, and no file twice in the same list
   listed <- fmap concat . forM (M.toList moduleEntries) $ \(modName, ExternEntry srcs hdrs libs) ->
     fmap concat . forM (listsOf srcs hdrs libs) $ \entries -> do
       let named = [ (entry, listedFiles present entry) | entry <- entries ]
+          listing path = "The extern section of " ++ ownerOf externFolderPath ++ " lists " ++ externFolderPath </> path
       forM_ named $ \(entry, files) ->
         when (null files) $
-          dieWithError $ "The extern entry of " ++ T.unpack modName ++ " lists \"" ++ externFolderPath </> entry ++ "\", which "
-            ++ (if '*' `elem` entry then "matches no file" else "does not exist")
+          dieWithError $ listing entry ++ " under " ++ T.unpack modName ++ ", and "
+            ++ (if '*' `elem` entry then "the pattern matches no file" else "the file does not exist")
       let files = concatMap snd named
       forM_ (nub (files \\ nub files)) $ \file ->
-        dieWithError $ "The extern entry of " ++ T.unpack modName ++ " names \"" ++ externFolderPath </> file ++ "\" twice"
+        dieWithError $ listing file ++ " twice under " ++ T.unpack modName
       return files
   -- | Every file of the folder is listed, so that no C is left uncompiled and
   -- a package carries every header and library
   forM_ present $ \file ->
     unless (file `elem` listed) $
-      dieWithError $ "The file \"" ++ externFolderPath </> file ++ "\" is not listed under any module in " ++ sectionOf externFolderPath
+      dieWithError $ "The file " ++ externFolderPath </> file ++ " is not listed under any module in " ++ sectionOf externFolderPath
   -- | The libraries of a module are tied to the platforms they were compiled
   -- for, so a loaded module that has some has to have them for the selected one
   forM_ (M.toList loadedEntries) $ \(modName, entry) ->
     unless (M.null (entryLibraries entry) || M.member (platform config) (entryLibraries entry)) $
-      dieWithError $ "The extern entry of " ++ T.unpack modName ++ " has no libraries for the platform \"" ++ T.unpack (platform config) ++ "\""
+      dieWithError $ "The extern section of " ++ ownerOf externFolderPath ++ " lists libraries of " ++ T.unpack modName
+        ++ " for other platforms, and none for " ++ T.unpack (platform config)
   return . nub $ concat
     [ concatMap (listedFiles present . (externSourceFolder </>)) srcs
       ++ concatMap (listedFiles present . (externHeaderFolder </>)) hdrs
@@ -107,12 +112,26 @@ checkExtern config loaded externFolderPath (ExternConfig moduleEntries) = do
       [map (externSourceFolder </>) srcs, map (externHeaderFolder </>) hdrs]
       ++ [ map ((externLibraryFolder </> T.unpack plt) </>) pltLibs | (plt, pltLibs) <- M.toList libs ]
 
-    inItsFolder file =
+    -- | What is wrong with the place of a file of the folder, if anything
+    misplaced file =
       case splitDirectories file of
-        (folder : _ : _) | folder == externSourceFolder -> takeExtension file == ".c"
-        (folder : _ : _) | folder == externHeaderFolder -> takeExtension file == ".h"
-        (folder : plt : _ : _) | folder == externLibraryFolder -> checkPlatform plt /= Nothing && takeExtension file == ".a"
-        _ -> False
+        (folder : _ : _) | folder == externSourceFolder -> holds folder ".c" "C sources"
+        (folder : _ : _) | folder == externHeaderFolder -> holds folder ".h" "headers"
+        (folder : plt : _ : _) | folder == externLibraryFolder ->
+          if checkPlatform plt == Nothing
+            then Just $ " is in " ++ inFolder (folder </> plt) ++ ", and " ++ plt ++ " is not a platform"
+            else holds (folder </> plt) ".a" "libraries"
+        _ -> Just $ " cannot be in " ++ inFolder "" ++ ". The C sources go in " ++ inFolder externSourceFolder
+          ++ ", their headers in " ++ inFolder externHeaderFolder ++ " and the libraries of each platform in "
+          ++ inFolder (externLibraryFolder </> "<platform>")
+
+      where
+
+        holds folder extension what
+          | takeExtension file == extension = Nothing
+          | otherwise = Just $ " is in " ++ inFolder folder ++ ", which only holds " ++ what ++ " (" ++ extension ++ ")"
+
+    inFolder folder = addTrailingPathSeparator (externFolderPath </> folder)
 
 -- | Check each "extern" section against the modules of its source folder:
 -- each entry names a module of the folder that declares some extern function,
