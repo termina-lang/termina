@@ -74,6 +74,19 @@ checkExtern config loaded externFolderPath (ExternConfig moduleEntries) = do
   forM_ present $ \file ->
     forM_ (misplaced file) $ \problem ->
       dieWithError $ "The file " ++ externFolderPath </> file ++ problem
+  -- | The headers of the folder go before the generated ones, so none can
+  -- have the path of a generated one, and the C would not see it
+  forM_ present $ \file ->
+    case splitDirectories file of
+      folder : rest | folder == externHeaderFolder -> do
+        let header = joinPath rest
+        when (header `elem` generatedHeaders) $
+          dieWithError $ "The file " ++ externFolderPath </> file ++ " has the path of a header that the transpiler generates"
+        owners <- filterM (\src -> doesFileExist (src </> replaceExtension header "fin")) seenFolders
+        forM_ owners $ \src ->
+          dieWithError $ "The file " ++ externFolderPath </> file ++ " has the path of the header that the transpiler generates for "
+            ++ qualifiedToModuleName (dropExtension header) ++ " (" ++ src </> replaceExtension header "fin" ++ ")"
+      _ -> return ()
   -- | Each listed path names a file, and no file twice in the same list
   listed <- fmap concat . forM (M.toList moduleEntries) $ \(modName, ExternEntry srcs hdrs libs) ->
     fmap concat . forM (listsOf srcs hdrs libs) $ \entries -> do
@@ -107,6 +120,12 @@ checkExtern config loaded externFolderPath (ExternConfig moduleEntries) = do
   where
 
     loadedEntries = M.filterWithKey (\modName _ -> S.member modName loaded) moduleEntries
+
+    -- | The source folders whose modules the C of the folder sees
+    seenFolders = nub [sourceFolderOf externFolderPath, sourceFolderOf externFolder]
+
+    -- | The headers that the transpiler generates besides those of the modules
+    generatedHeaders = ["config.h", "option.h", "status.h", "result.h", "app.h", "test.h"]
 
     listsOf srcs hdrs libs =
       [map (externSourceFolder </>) srcs, map (externHeaderFolder </>) hdrs]
