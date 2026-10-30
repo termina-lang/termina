@@ -43,12 +43,12 @@ externFolder = "extern"
 
 -- | Check each "extern" section of the manifest against its folder, the one
 -- of the project and, in a test, the one of the test, and copy the files that
--- the selected platform needs to the output folder. A file that both folders
--- have would overwrite the other in the output folder, so it is an error. A
--- deployment with no C returns Nothing.
-prepareExtern :: TerminaConfig -> [(FilePath, ExternConfig)] -> IO (Maybe ExternBuild)
-prepareExtern config folders = do
-  checked <- mapM (\(folder, extern) -> map (folder,) <$> checkExtern config folder extern) folders
+-- the modules of the build need on the selected platform to the output
+-- folder. A file that both folders have would overwrite the other in the
+-- output folder, so it is an error. A deployment with no C returns Nothing.
+prepareExtern :: TerminaConfig -> ParsedProject -> [(FilePath, ExternConfig)] -> IO (Maybe ExternBuild)
+prepareExtern config project folders = do
+  checked <- mapM (\(folder, extern) -> map (folder,) <$> checkExtern config (loadedFrom project folder) folder extern) folders
   let files = concat checked
       relFiles = map snd files
   forM_ (relFiles \\ nub relFiles) $ \file ->
@@ -61,9 +61,9 @@ prepareExtern config folders = do
     else return . Just $ ExternBuild srcs libs
 
 -- | Check the "extern" section against its folder, and give the files that
--- the selected platform needs, relative to the folder.
-checkExtern :: TerminaConfig -> FilePath -> ExternConfig -> IO [FilePath]
-checkExtern config externFolderPath (ExternConfig moduleEntries) = do
+-- the loaded modules need on the selected platform, relative to the folder.
+checkExtern :: TerminaConfig -> S.Set T.Text -> FilePath -> ExternConfig -> IO [FilePath]
+checkExtern config loaded externFolderPath (ExternConfig moduleEntries) = do
   folderExists <- doesDirectoryExist externFolderPath
   present <- if folderExists then listFiles externFolderPath else return []
   -- | The sources, the headers and the libraries of each platform have a folder each
@@ -89,17 +89,19 @@ checkExtern config externFolderPath (ExternConfig moduleEntries) = do
     unless (file `elem` listed) $
       dieWithError $ "The file \"" ++ externFolderPath </> file ++ "\" is not listed under any module in " ++ sectionOf externFolderPath
   -- | The libraries of a module are tied to the platforms they were compiled
-  -- for, so a module that has some has to have them for the selected one
-  forM_ (M.toList moduleEntries) $ \(modName, entry) ->
+  -- for, so a loaded module that has some has to have them for the selected one
+  forM_ (M.toList loadedEntries) $ \(modName, entry) ->
     unless (M.null (entryLibraries entry) || M.member (platform config) (entryLibraries entry)) $
       dieWithError $ "The extern entry of " ++ T.unpack modName ++ " has no libraries for the platform \"" ++ T.unpack (platform config) ++ "\""
   return . nub $ concat
     [ concatMap (listedFiles present . (externSourceFolder </>)) srcs
       ++ concatMap (listedFiles present . (externHeaderFolder </>)) hdrs
       ++ [ externLibraryFolder </> T.unpack (platform config) </> lib | lib <- M.findWithDefault [] (platform config) libs ]
-    | ExternEntry srcs hdrs libs <- M.elems moduleEntries ]
+    | ExternEntry srcs hdrs libs <- M.elems loadedEntries ]
 
   where
+
+    loadedEntries = M.filterWithKey (\modName _ -> S.member modName loaded) moduleEntries
 
     listsOf srcs hdrs libs =
       [map (externSourceFolder </>) srcs, map (externHeaderFolder </>) hdrs]
@@ -117,10 +119,8 @@ checkExtern config externFolderPath (ExternConfig moduleEntries) = do
 -- and each module of the folder that the build loads with an extern function
 -- has its entry. A module that the build does not load is only parsed. The
 -- main module has no entry, so it declares no extern function.
-checkExternModules :: ParsedModule -> ParsedProject -> [(FilePath, ExternConfig)] -> IO ()
-checkExternModules mainModule project sections = do
-  -- | The section of the main module is the last one
-  let mainSection = fst (last sections)
+checkExternModules :: ParsedModule -> FilePath -> ParsedProject -> [(FilePath, ExternConfig)] -> IO ()
+checkExternModules mainModule mainSection project sections = do
   forM_ (externFunctions (parsedAST (metadata mainModule))) $ \(ident, ann) ->
     dieWithError $ fullPath mainModule ++ ":" ++ show (locationLine ann) ++ ": " ++ takeFileName (fullPath mainModule)
       ++ " cannot declare the extern function " ++ ident ++ ". Declare it in a module of " ++ sourceFolderOf mainSection
@@ -134,36 +134,47 @@ checkExternModules mainModule project sections = do
     forM_ (M.keys moduleEntries) $ \modName -> do
       let qname = joinPath (map T.unpack (T.splitOn (T.pack ".") modName))
           path = srcFolder </> qname <.> "fin"
-          listsOf = "The extern section of " ++ ownerOf folder ++ " lists " ++ T.unpack modName
+          listing = "The extern section of " ++ ownerOf folder ++ " lists " ++ T.unpack modName
       isModule <- doesFileExist path
       unless isModule $ do
         isFolder <- doesDirectoryExist (srcFolder </> qname)
         when isFolder $
-          dieWithError $ listsOf ++ ", which is a folder (" ++ srcFolder </> qname ++ ") and not a module"
+          dieWithError $ listing ++ ", which is a folder (" ++ srcFolder </> qname ++ ") and not a module"
         others <- filterM (\other -> doesFileExist (sourceFolderOf other </> qname <.> "fin")) (folders \\ [folder])
         forM_ others $ \other ->
-          dieWithError $ listsOf ++ ", which is a module of " ++ ownerOf other ++ " (" ++ sourceFolderOf other </> qname <.> "fin"
+          dieWithError $ listing ++ ", which is a module of " ++ ownerOf other ++ " (" ++ sourceFolderOf other </> qname <.> "fin"
             ++ "). Move its entry to " ++ sectionOf other
-        dieWithError $ listsOf ++ ", which is not a module (" ++ path ++ " does not exist)"
+        dieWithError $ listing ++ ", which is not a module (" ++ path ++ " does not exist)"
       elements <- case M.lookup qname project of
         Just loaded | fullPath loaded == path -> return (parsedAST (metadata loaded))
         _ -> frags . snd <$> parseTerminaFile qname path
       when (null (externFunctions elements)) $
-        dieWithError $ listsOf ++ ", which declares no extern function (" ++ path ++ ")"
-    forM_ (M.elems project) $ \loaded ->
+        dieWithError $ listing ++ ", which declares no extern function (" ++ path ++ ")"
+    forM_ (filter (isFrom folder) (M.elems project)) $ \loaded ->
       case externFunctions (parsedAST (metadata loaded)) of
-        (ident, _) : _ | fullPath loaded == srcFolder </> qualifiedName loaded <.> "fin"
-                  , not (M.member (T.pack (qualifiedToModuleName (qualifiedName loaded))) moduleEntries) ->
+        (ident, _) : _ | not (M.member (T.pack (qualifiedToModuleName (qualifiedName loaded))) moduleEntries) ->
           dieWithError $ "The module " ++ qualifiedToModuleName (qualifiedName loaded) ++ " declares the extern function "
             ++ ident ++ " and is not listed in " ++ sectionOf folder
         _ -> return ()
 
   where
 
-    -- | The source folder next to an "extern" folder.
-    sourceFolderOf folder = normalise (takeDirectory folder </> "src")
-
     externFunctions elements = [ (ident, ann) | ExternFunction ident _ _ _ _ ann <- elements ]
+
+-- | The source folder next to an "extern" folder.
+sourceFolderOf :: FilePath -> FilePath
+sourceFolderOf folder = normalise (takeDirectory folder </> "src")
+
+-- | Whether a module of the build is loaded from the source folder next to an
+-- "extern" folder.
+isFrom :: FilePath -> ParsedModule -> Bool
+isFrom folder m = fullPath m == sourceFolderOf folder </> qualifiedName m <.> "fin"
+
+-- | The modules of the build loaded from the source folder next to an
+-- "extern" folder, as its section names them.
+loadedFrom :: ParsedProject -> FilePath -> S.Set T.Text
+loadedFrom project folder = S.fromList
+  [ T.pack (qualifiedToModuleName (qualifiedName m)) | m <- M.elems project, isFrom folder m ]
 
 -- | Who an "extern" folder belongs to, as the messages name it.
 ownerOf :: FilePath -> String
