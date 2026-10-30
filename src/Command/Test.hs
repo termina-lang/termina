@@ -8,7 +8,7 @@ module Command.Test (
     TestCase(..), testCases
 ) where
 
-import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, loadBuildProject, selectDeployments)
+import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, loadProject, selectDeployments)
 import Command.Common (loadTerminaModule, loadModules)
 import Command.Deliver (deliverableInfo)
 import Command.Sources (loadSources)
@@ -219,7 +219,7 @@ runTests mName mPlatform mProfile mExecutor mServer mXsdb offline mode = do
     hSetBuffering stdout LineBuffering
     loaded <- try (case mode of
         Recorded _ -> loadManifest >>= either dieWithFirstError return
-        _ -> loadBuildProject False offline) :: IO (Either ExitCode Manifest)
+        _ -> loadProject False offline) :: IO (Either ExitCode Manifest)
     manifest <- either (const (exitWith (ExitFailure 2))) return loaded
     let selection = maybe SelectTests SelectTest mName
         buildArgs = BuildCmdArgs False False Nothing selection mPlatform mProfile offline

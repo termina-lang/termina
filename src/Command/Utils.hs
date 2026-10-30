@@ -20,7 +20,6 @@ import ControlFlow.ExitPaths
 import Configuration.Configuration
 import Configuration.Lock (Lock, decodeLockFile)
 import Configuration.Manifest
-import Configuration.Namespace (checkExports)
 import System.Directory
 import Utils.Annotations
 import ControlFlow.ExitPaths.Errors (PathsCheckError)
@@ -324,18 +323,6 @@ loadManifest = liftIO $ do
 -- | Load the "termina.lock" of a project, which is empty when there is none.
 loadLock :: FilePath -> IO (Either [String] Lock)
 loadLock root = either (Left . pure . ("termina.lock: " ++)) Right <$> decodeLockFile (root </> "termina.lock")
-
--- | Load "termina.yaml" as "loadManifest" does and check also the prefixes
--- that a library exports, for the commands that build: a new library has no
--- module yet, and "termina new --test" has to work on it.
-loadProject :: (MonadIO m) => m (Either [String] Manifest)
-loadProject = do
-    result <- loadManifest
-    case result of
-        Left errs -> return (Left errs)
-        Right manifest -> do
-            exportErrors <- liftIO $ checkExports "." manifest
-            return $ if null exportErrors then Right manifest else Left exportErrors
 
 -- | Print an error, which may take several lines, and stop.
 dieWithError :: String -> IO a

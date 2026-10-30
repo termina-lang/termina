@@ -2,12 +2,12 @@
 
 module Command.Build (
     buildCmdArgsParser, buildCommand, generateCommand, BuildCmdArgs(..),
-    Selection(..), selectDeployments, buildDeployment, announce, runMake, loadBuildProject
+    Selection(..), selectDeployments, buildDeployment, announce, runMake, loadProject
 ) where
 
 import Configuration.Configuration
 import Configuration.Manifest
-import Configuration.Namespace (exportedModules)
+import Configuration.Namespace (checkExports, exportedModules)
 import Command.Dependencies (Fetching(..), Sync(..), syncDependencies, describeChange)
 import Command.Sources (loadSources, localFolders)
 import Configuration.Local (LocalPackage(..), readLocalPackages)
@@ -319,17 +319,20 @@ genMonadicHeaderFiles params plt monadicTypes = do
 selectedDeployments :: BuildCmdArgs -> IO [Deployment]
 selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile offline) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
-    manifest <- loadBuildProject chatty offline
+    manifest <- loadProject chatty offline
     either dieWithError return $ selectDeployments manifest selection mPlatform mProfile
 
 -- | Load the project for a command that builds: the manifest, the folders, the
 -- prefixes of a library, the lock and vendor/ brought in line with the
 -- manifest (each copy that does not change checked against its hash; offline,
 -- without fetching anything) and, in a library, the types of its exported
--- modules.
-loadBuildProject :: Bool -> Bool -> IO Manifest
-loadBuildProject chatty offline = do
-    manifest <- loadProject >>= either dieWithFirstError return
+-- modules. A new library has no module yet, so "termina new --test" reads only
+-- the manifest and the folders.
+loadProject :: Bool -> Bool -> IO Manifest
+loadProject chatty offline = do
+    manifest <- loadManifest >>= either dieWithFirstError return
+    exportErrors <- checkExports "." manifest
+    unless (null exportErrors) $ dieWithFirstError exportErrors
     lock <- loadLock "." >>= either dieWithFirstError return
     place <- currentPlace
     Sync changes warnings <- syncDependencies place "termina build" (if offline then Offline else Reuse) True "." manifest lock

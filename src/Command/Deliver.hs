@@ -71,7 +71,7 @@ deliverCommand (DeliverCmdArgs chatty withTests archive withTrace) = do
     -- A deliverable is built from the state in git, which verify checks without writing.
     place <- currentPlace
     verifyProject place "." >>= either dieWithFirstError return
-    manifest <- loadBuildProject chatty True
+    manifest <- loadProject chatty True
     let hasApp = isJust (appDeployment manifest)
         selection = case (withTests, hasApp) of
             (False, _) -> SelectApp
