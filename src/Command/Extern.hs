@@ -1,10 +1,11 @@
--- | The C of the project: the sources, their headers and the precompiled
--- libraries that the manifest lists in its "extern" section, under the
--- "extern" folder of the project. The files that the build uses are copied
--- to the output folder and linked into a single relocatable object in which
--- only the extern functions stay global. The sections are checked when the
--- project is loaded (Configuration.ExternCheck); what is left here depends on
--- the build.
+-- | The C of a deployment: the sources, their headers and the precompiled
+-- libraries that the manifest of the project and those of its dependencies
+-- list in their "extern" sections. The files that the build uses are copied
+-- to the output folder, and the C of each manifest is linked into a
+-- relocatable object of its own in which only its extern functions stay
+-- global. The sections are checked when the project is loaded and when a
+-- dependency is admitted (Configuration.ExternCheck); what is left here
+-- depends on the build.
 module Command.Extern (
     ExternGroup(..),
     groupObject,
@@ -16,6 +17,9 @@ module Command.Extern (
 
 import Configuration.Configuration
 import Configuration.ExternCheck (ModuleExterns(..), moduleErrors, ownerOfFolder, listFiles)
+import Configuration.Manifest (Manifest(..), ProjectInfo(..), decodeManifestFile)
+import Configuration.Vendor (exportedExtern)
+import Command.Sources (Owner(..), SourceFolder(..), Sources)
 import Command.Types
 import Command.Utils
 import Core.AST
@@ -24,7 +28,9 @@ import Modules.Utils (qualifiedToModuleName)
 
 import Control.Monad
 import qualified Data.ByteString as BS
-import Data.List (nub, (\\))
+import Data.Char (toUpper)
+import Data.Function (on)
+import Data.List (groupBy, isPrefixOf, nub, sortOn, (\\))
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -57,14 +63,16 @@ groupObject g = normalise (takeDirectory (groupFolder g) </> groupName g <.> "ex
 groupObjects :: ExternGroup -> String
 groupObjects g = if null (groupVariable g) then "EXTERN_OBJS" else groupVariable g ++ "_EXTERN_OBJS"
 
--- | Copy the files of each "extern" section, the one of the project and, in
--- a test, the one of the test, that the modules of the build need on the
--- selected platform to the output folder, and give the group of the project,
--- if it has C. A file that both folders have would overwrite the other in the
--- output folder, so it is an error.
-prepareExtern :: TerminaConfig -> ParsedProject -> [(FilePath, ExternConfig)] -> IO [ExternGroup]
-prepareExtern config project folders = do
-  checked <- mapM (\(folder, extern) -> map (folder,) <$> usedFiles config (loadedFrom project folder) folder extern) folders
+-- | Copy the C that the modules of the build need on the selected platform
+-- to the output folder, and give its groups: the one of the project, with the
+-- section of the project and, in a test, the one of the test, and one for each
+-- dependency with C in the modules that the build loads from it. A file that
+-- both sections of the project have would overwrite the other in the output
+-- folder, so it is an error, and so are two dependencies whose C would go to
+-- the same place.
+prepareExtern :: TerminaConfig -> ParsedProject -> Sources -> [(FilePath, ExternConfig)] -> IO [ExternGroup]
+prepareExtern config project sources folders = do
+  checked <- mapM (\(folder, extern) -> map (folder,) <$> usedFiles config (ownerOfFolder folder) (loadedFrom project folder) folder extern) folders
   let files = concat checked
       relFiles = map snd files
   forM_ (relFiles \\ nub relFiles) $ \file ->
@@ -73,24 +81,77 @@ prepareExtern config project folders = do
         dieWithError $ "Both " ++ addTrailingPathSeparator first ++ " and " ++ addTrailingPathSeparator second ++ " have the file "
           ++ file ++ ", and the two would go to the same place in the output folder"
       _ -> return ()
+  let projectGroups = [ groupOf (T.unpack (name config)) "" externFolder relFiles (map fst folders) | not (null relFiles) ]
+  -- | The C of each dependency, from the section of its manifest, with only what it exports
+  dependencies <- fmap concat . forM [ f | f <- sources, isDependency (folderOwner f) ] $ \f -> do
+    let root = takeDirectory (folderPath f)
+        extern = root </> externFolder
+    manifest <- decodeManifestFile (root </> "termina.yaml") >>= either (\err -> dieWithError (root </> "termina.yaml: " ++ err)) return
+    let library = T.unpack (projectName (manifestProject manifest))
+    used <- usedFiles config ("the dependency " ++ library) (loadedFrom project extern) extern (exportedExtern manifest)
+    return [ (f, extern, used, groupOf library (variableOf f) (destinationOf f) used [extern]) | not (null used) ]
+  -- | Two dependencies whose objects would have one variable, or whose C would go to one folder
+  forM_ (groupBy ((==) `on` (\(_, _, _, g) -> groupVariable g)) (sortOn (\(_, _, _, g) -> groupVariable g) dependencies)) $ \case
+    (f, _, _, g) : (other, _, _, _) : _ -> dieWithError $ case (folderOwner f, folderOwner other) of
+      (Local library _, Local _ _) -> "The local folders " ++ takeDirectory (folderPath f) ++ " and " ++ takeDirectory (folderPath other)
+        ++ " are both the library " ++ library ++ ", and their C would go to the same place in the output folder"
+      _ -> takeDirectory (makeRelative "vendor" (folderPath f)) ++ " and " ++ takeDirectory (makeRelative "vendor" (folderPath other))
+        ++ " give the same name, " ++ groupObjects g ++ ", to the objects of their C in the Makefile"
+    _ -> return ()
   copyExtern (outputFolder config </> externFolder) files
-  let symbols = S.toList (S.fromList [ ident | (folder, _) <- folders, m <- M.elems project, isFrom folder m
-                                             , (ident, _) <- externDeclared (parsedExterns m) ])
-  return [ ExternGroup (T.unpack (name config)) "" externFolder
-             (filter ((== ".c") . takeExtension) relFiles) (filter ((== ".a") . takeExtension) relFiles) symbols
-         | not (null relFiles) ]
+  forM_ dependencies $ \(_, extern, used, g) -> copyExtern (outputFolder config </> groupFolder g) [ (extern, file) | file <- used ]
+  removeStaleGroups (outputFolder config) (map (\(_, _, _, g) -> groupFolder g) dependencies)
+  return (projectGroups ++ [ g | (_, _, _, g) <- dependencies ])
+
+  where
+
+    -- | A group with its files and the extern functions of the modules
+    -- loaded from the source folders next to its extern folders
+    groupOf groupName' variable folder used externs = ExternGroup groupName' variable folder
+      (filter ((== ".c") . takeExtension) used) (filter ((== ".a") . takeExtension) used)
+      (S.toList (S.fromList [ ident | extern <- externs, m <- M.elems project, isFrom extern m
+                                    , (ident, _) <- externDeclared (parsedExterns m) ]))
+
+    isDependency owner = case owner of
+      Package {} -> True
+      Local {} -> True
+      _ -> False
+
+    -- | A package goes under its normalized URL, as in vendor/, and a local
+    -- folder under the name of its library
+    destinationOf f = case folderOwner f of
+      Local library _ -> "local" </> library </> externFolder
+      _ -> takeDirectory (folderPath f) </> externFolder
+
+    variableOf f = case folderOwner f of
+      Local library _ -> "LOCAL_" ++ map variableChar library
+      _ -> map variableChar (takeDirectory (makeRelative "vendor" (folderPath f)))
+
+    variableChar c = if c `elem` ("./" :: String) then '_' else toUpper c
+
+-- | Remove from the output folder the C of the dependencies that the build no
+-- longer has, given the folders of those that it has.
+removeStaleGroups :: FilePath -> [FilePath] -> IO ()
+removeStaleGroups out kept =
+  forM_ ["vendor", "local"] $ \top -> do
+    exists <- doesDirectoryExist (out </> top)
+    when exists $ do
+      present <- listFiles (out </> top)
+      forM_ present $ \file ->
+        unless (any (\folder -> addTrailingPathSeparator folder `isPrefixOf` (top </> file)) kept) $
+          removeFile (out </> top </> file)
 
 -- | The files of an "extern" section that the loaded modules need on the
 -- selected platform, relative to its folder. A loaded module that has
 -- libraries has to have them for the selected platform, since they are tied to
 -- the platforms they were compiled for.
-usedFiles :: TerminaConfig -> S.Set T.Text -> FilePath -> ExternConfig -> IO [FilePath]
-usedFiles config loaded externFolderPath (ExternConfig moduleEntries) = do
+usedFiles :: TerminaConfig -> String -> S.Set T.Text -> FilePath -> ExternConfig -> IO [FilePath]
+usedFiles config owner loaded externFolderPath (ExternConfig moduleEntries) = do
   folderExists <- doesDirectoryExist externFolderPath
   present <- if folderExists then listFiles externFolderPath else return []
   forM_ (M.toList loadedEntries) $ \(modName, entry) ->
     unless (M.null (entryLibraries entry) || M.member (platform config) (entryLibraries entry)) $
-      dieWithError $ "The extern section of " ++ ownerOfFolder externFolderPath ++ " lists libraries of " ++ T.unpack modName
+      dieWithError $ "The extern section of " ++ owner ++ " lists libraries of " ++ T.unpack modName
         ++ " for other platforms, and none for " ++ T.unpack (platform config)
   return . nub $ concat
     [ concatMap (listedFiles present . (externSourceFolder </>)) srcs

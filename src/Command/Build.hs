@@ -10,9 +10,6 @@ import Configuration.Manifest
 import Configuration.Namespace (checkExports, exportedModules)
 import Command.Dependencies (Fetching(..), Sync(..), syncDependencies, describeChange)
 import Command.Sources (loadSources, localFolders)
-import Configuration.Local (LocalPackage(..), readLocalPackages)
-import Configuration.Lock (Lock(..), LockedPackage(..))
-import Configuration.Vendor (packageDir, exportedExtern)
 import Command.Utils
 import Control.Exception (IOException, try)
 import Data.Maybe (fromMaybe, isJust)
@@ -345,16 +342,6 @@ loadProject chatty offline = do
         >>= either dieWithFirstError return
     mapM_ (putStrLn . warnMessage) warnings
     mapM_ (putStrLn . infoMessage . ("termina.lock: " ++) . describeChange) changes
-    -- The C of each package will be linked into its own object; until then a package with C cannot be built.
-    lockAfter <- loadLock "." >>= either dieWithFirstError return
-    locals <- readLocalPackages [(".", p) | DepPath p <- manifestDependencies manifest ++ concatMap testDependencies (M.elems (manifestTests manifest))]
-        >>= either dieWithFirstError return
-    vendored <- forM (lockPackages lockAfter) $ \locked ->
-        (,) (T.unpack (lockedUrl locked)) <$> decodeManifestFile (packageDir "." (lockedUrl locked) </> "termina.yaml")
-    forM_ ([(origin, m) | (origin, Right m) <- vendored] ++ [(folder, localManifest l) | (folder, l) <- M.toList locals]) $ \(origin, m) ->
-        unless (null (externFiles (exportedExtern m))) $
-            dieWithError $ T.unpack (projectName (manifestProject m)) ++ " (" ++ origin
-                ++ ") has C in its extern section, and termina cannot build the C of a dependency yet."
     checkLibrary chatty manifest
     return manifest
 
@@ -593,7 +580,7 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
     externsOf <- forM [deploymentConfig deployment, deploymentPlainConfig deployment] $ \outConfig -> do
       when chatty (putStrLn . debugMessage $ "Generating code into \"" ++ outputFolder outConfig ++ "\"")
       -- | Copy the C of the deployment to the output folder
-      externs <- prepareExtern outConfig parsedProject (deploymentExterns deployment)
+      externs <- prepareExtern outConfig parsedProject sources (deploymentExterns deployment)
       genModules outConfig plt monadicTypes elaboratedProject
       genInitFile outConfig plt elaboratedProject
       genPlatformCode outConfig plt loweredProject programArchitecture externs
