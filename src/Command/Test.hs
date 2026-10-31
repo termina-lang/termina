@@ -541,10 +541,13 @@ debuggerVersion gdb = do
 -- | Lists the tests, their platforms and their cases
 listTests :: Bool -> IO ()
 listTests json = do
-    manifest <- loadManifest >>= either dieWithFirstError return
-    listed <- forM (M.toList (manifestTests manifest)) $ \(testName, entry) -> do
-      cases <- loadTestCases manifest (T.unpack testName)
-      return (testName, entry, cases)
+    -- | A test that cannot be read exits with 2, as in a run
+    loaded <- try (do
+        manifest <- loadManifest >>= either dieWithFirstError return
+        forM (M.toList (manifestTests manifest)) $ \(testName, entry) -> do
+          cases <- loadTestCases manifest (T.unpack testName)
+          return (testName, entry, cases)) :: IO (Either ExitCode [(T.Text, TestEntry, [TestCase])])
+    listed <- either (const (exitWith (ExitFailure 2))) return loaded
     if json
       then BLC.putStrLn $ encodePretty' defConfig { confCompare = keyOrder keys } (object [
           "tests" .= [ object [
