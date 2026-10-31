@@ -89,23 +89,23 @@ spec = describe "Manifest" $ do
 
     it "rejects a rev that YAML reads as a number" $
       (project ++ app ++ "dependencies:\n  - git: https://github.com/a/b\n    rev: 1.10\n")
-        `failsWith` "the rev of https://github.com/a/b is read as a number. Write the tag in quotes, as in rev: \"1.10\""
+        `failsWith` "dependencies[0].rev: is read as a number. Write the tag in quotes, as in rev: \"1.10\""
 
     it "rejects a dependency that is not https" $
       (project ++ app ++ "dependencies:\n  - git: http://example.com/a/b\n    rev: v1\n")
-        `failsWith` "http://example.com/a/b is not an https:// URL, and dependencies are fetched with https://"
+        `failsWith` "dependencies[0].git: http://example.com/a/b is not an https:// URL, and dependencies are fetched with https://"
 
     it "rejects a tick that does not divide 1000000" $
       (project ++ "app:\n  platform: posix-gcc\n  profile: release\n  microseconds-per-tick: 7\n")
-        `failsWith` "must divide 1000000"
+        `failsWith` "app.microseconds-per-tick: must divide 1000000 exactly"
 
     it "rejects a test without platforms" $
       (project ++ app ++ "tests:\n  hk:\n    platforms: []\n    timeout: 10\n")
-        `failsWith` "has no platforms"
+        `failsWith` "tests.hk.platforms: lists no platform"
 
     it "rejects a test name that is not snake_case" $
       (project ++ app ++ "tests:\n  HkTask:\n    platforms: [posix-gcc]\n    timeout: 10\n")
-        `failsWith` "not lowercase snake_case"
+        `failsWith` "tests.HkTask: the name of a test is lowercase snake_case"
 
     it "reads the entry of a test" $
       fmap (M.toList . manifestTests)
@@ -147,7 +147,7 @@ spec = describe "Manifest" $ do
 
     it "rejects a harness stack size that is not positive" $
       failsWith (project ++ app ++ "tests:\n  hk:\n    platforms: [posix-gcc]\n    timeout: 10\n    harness-stack-size: 0\n")
-        "harness-stack-size must be positive"
+        "tests.hk.harness-stack-size: must be positive"
 
     it "builds each test on each platform into its own folder" $
       case parsed withTick of
@@ -266,4 +266,4 @@ spec = describe "Manifest" $ do
 
     it "rejects the overrides of a test, which apply to the whole project" $
       (nexys ++ hk ++ "    overrides:\n      - git: https://github.com/acme/pus\n        rev: v1\n")
-        `failsWith` "they go at the top level of the manifest"
+        `failsWith` "tests.hk: overrides go at the top level of the manifest"

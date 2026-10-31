@@ -58,17 +58,17 @@ spec = describe "Manifest: extern section" $ do
     "extern:\n  sources:\n    - crc.c\n" `failsWith` "under the module that declares their extern functions"
 
   it "rejects a key that is not the name of a module" $
-    "extern:\n  Drivers.uart:\n    sources: [uart.c]\n" `failsWith` "which is not the name of a module"
+    "extern:\n  Drivers.uart:\n    sources: [uart.c]\n" `failsWith` "extern.Drivers.uart: is not the name of a module"
 
   it "rejects an entry with neither sources nor libraries" $
     "extern:\n  drivers.uart:\n    headers: [regs.h]\n" `failsWith` "has neither sources nor libraries"
 
   it "rejects a file of the wrong kind in a list" $
-    "extern:\n  drivers.uart:\n    sources: [uart.c]\n    headers: [regs.c]\n" `failsWith` "which is not a .h file"
+    "extern:\n  drivers.uart:\n    sources: [uart.c]\n    headers: [regs.c]\n" `failsWith` "extern.drivers.uart.headers[0]: regs.c is not a .h file"
 
   it "takes patterns in the file name of sources and headers only" $ do
-    "extern:\n  drivers.uart:\n    sources: [\"*/uart.c\"]\n" `failsWith` "whose * is in a folder"
-    "extern:\n  math.mcs:\n    libraries:\n      posix-gcc: [\"*.a\"]\n" `failsWith` "the libraries take no patterns"
+    "extern:\n  drivers.uart:\n    sources: [\"*/uart.c\"]\n" `failsWith` "extern.drivers.uart.sources[0]: */uart.c has its * in a folder"
+    "extern:\n  math.mcs:\n    libraries:\n      posix-gcc: [\"*.a\"]\n" `failsWith` "extern.math.mcs.libraries.posix-gcc[0]: *.a is a pattern, and the libraries take no patterns"
 
   it "matches a pattern against the files of one folder" $
     map (listedMatches "src/spi/*.c") ["src/spi/a.c", "src/spi/b.c", "src/spi/sub/c.c", "src/a.c", "src/spi/a.h"]

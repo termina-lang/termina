@@ -38,6 +38,7 @@ module Configuration.Manifest (
 import Control.Monad
 import qualified Data.Aeson.Key as K
 import qualified Data.Aeson.KeyMap as KM
+import Data.Aeson.Types (JSONPath, JSONPathElement(..), iparseEither, explicitParseField, explicitParseFieldMaybe, (<?>))
 import qualified Data.ByteString as BS
 import Data.Char (isAsciiLower, isDigit)
 import Data.List (intercalate, isPrefixOf, nub, sort, stripPrefix, (\\))
@@ -119,13 +120,19 @@ data TestEntry = TestEntry {
 -- first field this transpiler does not know.
 parseManifest :: Value -> Either String Manifest
 parseManifest v = do
-    ver <- parseEither manifestVersion v
+    ver <- parseWithPath manifestVersion v
     unless (ver `elem` knownManifestVersions) $
         Left $ "manifest-version " ++ show ver ++ " is not supported by this version of termina (supported: "
             ++ unwords (map show knownManifestVersions) ++ ")"
-    parseEither manifestParser v
+    parseWithPath manifestParser v
 
   where
+
+    -- | The field at fault goes before the message, as in tests.hk.timeout
+    parseWithPath p = either (\(path, msg) -> Left (withPath path msg)) Right . iparseEither p
+
+    withPath [] msg = msg
+    withPath path msg = showPath path ++ ": " ++ msg
 
     manifestVersion :: Value -> Parser Int
     manifestVersion = withObject "manifest" $ \o -> do
@@ -144,13 +151,29 @@ decodeManifestFile path = fromYaml <$> decodeFileEither path
 fromYaml :: Either ParseException Value -> Either String Manifest
 fromYaml = either (Left . prettyPrintParseException) parseManifest
 
+-- | A path of the manifest as it is written in it: project.name,
+-- dependencies[0].
+showPath :: JSONPath -> String
+showPath = foldl step ""
+
+  where
+
+    step "" (Key k) = K.toString k
+    step acc (Key k) = acc ++ "." ++ K.toString k
+    step acc (Index i) = acc ++ "[" ++ show i ++ "]"
+
+-- | A list whose elements are read with a parser, each under its index in
+-- the path.
+listOf :: (Value -> Parser a) -> Value -> Parser [a]
+listOf p v = parseJSON v >>= zipWithM (\i x -> p x <?> Index i) [0 ..]
+
 -- | Fail on a field that the object does not admit, suggesting the admitted
 -- one closest to it.
-onlyFields :: String -> [K.Key] -> Object -> Parser ()
-onlyFields what allowed o =
+onlyFields :: [K.Key] -> Object -> Parser ()
+onlyFields allowed o =
     case filter (`notElem` allowed) (KM.keys o) of
         [] -> return ()
-        (k : _) -> fail $ "unknown field \"" ++ K.toString k ++ "\" in " ++ what ++ suggestion (K.toString k)
+        (k : _) -> fail $ "unknown field \"" ++ K.toString k ++ "\"" ++ suggestion (K.toString k)
 
   where
 
@@ -175,44 +198,48 @@ isSnakeCase [] = False
 
 manifestParser :: Value -> Parser Manifest
 manifestParser = withObject "manifest" $ \o -> do
-    onlyFields "the manifest" ["project", "exports", "dependencies", "overrides",
+    onlyFields ["project", "exports", "dependencies", "overrides",
         "sys-print-output-buffer-size", "sys-read-input-buffer-size", "extern", "app", "tests"] o
-    project <- o .: "project" >>= projectParser
-    mExports <- o .:? "exports"
-    mApp <- o .:? "app"
+    project <- explicitParseField projectParser o "project"
+    mExports <- o .:? "exports" :: Parser (Maybe Value)
+    mApp <- o .:? "app" :: Parser (Maybe Value)
     nature <- case (mExports, mApp) of
         (Just _, Just _) -> fail "a project has either exports (a library) or app (an application), not both"
         (Nothing, Nothing) -> fail "a project needs either exports (a library) or app (an application)"
-        (Just exports, Nothing) -> Library <$> mapM prefixParser exports
-        (Nothing, Just app) -> Application <$> appParser app
+        (Just _, Nothing) -> Library <$> explicitParseField (listOf (parseJSON >=> prefixParser)) o "exports"
+        (Nothing, Just _) -> Application <$> explicitParseField appParser o "app"
     Manifest project nature
-        <$> (o .:? "dependencies" .!= [] >>= mapM dependencyParser)
-        <*> (o .:? "overrides" .!= [] >>= mapM gitDependencyParser)
-        <*> (o .:? "sys-print-output-buffer-size" .!= defaultSysPrintOutputBufferSize >>= positive "sys-print-output-buffer-size")
-        <*> (o .:? "sys-read-input-buffer-size" .!= defaultSysReadInputBufferSize >>= positive "sys-read-input-buffer-size")
-        <*> (o .:? "extern" >>= maybe (return emptyExternConfig) externParser)
-        <*> (o .:? "tests" .!= M.empty >>= M.traverseWithKey testParser)
+        <$> (explicitParseFieldMaybe (listOf dependencyParser) o "dependencies" .!= [])
+        <*> (explicitParseFieldMaybe (listOf gitDependencyParser) o "overrides" .!= [])
+        <*> (explicitParseFieldMaybe positive o "sys-print-output-buffer-size" .!= defaultSysPrintOutputBufferSize)
+        <*> (explicitParseFieldMaybe positive o "sys-read-input-buffer-size" .!= defaultSysReadInputBufferSize)
+        <*> (explicitParseFieldMaybe externParser o "extern" .!= emptyExternConfig)
+        <*> (explicitParseFieldMaybe testsParser o "tests" .!= M.empty)
+
+  where
+
+    testsParser v = parseJSON v >>= M.traverseWithKey (\t tv -> testParser t tv <?> Key (K.fromText t))
 
 projectParser :: Value -> Parser ProjectInfo
 projectParser = withObject "project" $ \o -> do
-    onlyFields "project" ["name", "version", "manifest-version", "assurance"] o
+    onlyFields ["name", "version", "manifest-version", "assurance"] o
     ProjectInfo
         <$> o .: "name"
         <*> o .: "version"
         <*> o .: "manifest-version"
-        <*> (o .:? "assurance" .!= [] >>= mapM assuranceParser >>= noRepeatedStandard)
+        <*> (explicitParseFieldMaybe (listOf assuranceParser >=> noRepeatedStandard) o "assurance" .!= [])
 
   where
 
     noRepeatedStandard assurances = do
         let standards = map assuranceStandard assurances
         when (length (nub standards) /= length standards) $
-            fail "a standard appears twice in project.assurance"
+            fail "a standard appears twice"
         return assurances
 
 assuranceParser :: Value -> Parser Assurance
 assuranceParser = withObject "assurance" $ \o -> do
-    onlyFields "an assurance entry" ["standard", "level"] o
+    onlyFields ["standard", "level"] o
     standard <- o .: "standard"
     level <- o .: "level"
     case (standard :: T.Text, T.unpack level) of
@@ -227,27 +254,35 @@ prefixParser txt =
     let segments = T.splitOn "." txt in
     if all (isSnakeCase . T.unpack) segments
         then return (Prefix segments)
-        else fail $ "the export \"" ++ T.unpack txt ++ "\" is not a module prefix (lowercase snake_case segments separated by dots)"
+        else fail $ "\"" ++ T.unpack txt ++ "\" is not a module prefix (lowercase snake_case segments separated by dots)"
 
 dependencyParser :: Value -> Parser Dependency
 dependencyParser = withObject "dependency" $ \o ->
     if KM.member "path" o
         then do
-            onlyFields "a path dependency" ["path"] o
+            onlyFields ["path"] o
             DepPath <$> o .: "path"
         else DepGit <$> gitDependencyParser (Object o)
 
 gitDependencyParser :: Value -> Parser GitDependency
 gitDependencyParser = withObject "dependency" $ \o -> do
-    onlyFields "a git dependency" ["git", "rev"] o
-    url <- o .: "git"
-    either fail return (checkGitUrl url)
-    rev <- o .: "rev"
-    GitDependency url <$> case rev of
+    onlyFields ["git", "rev"] o
+    GitDependency
+        <$> explicitParseField urlParser o "git"
+        <*> explicitParseField revParser o "rev"
+
+  where
+
+    urlParser v = do
+        url <- parseJSON v
+        either fail return (checkGitUrl url)
+        return url
+
+    revParser rev = case rev of
         String tag -> return tag
         -- YAML reads 1.0 or 1.10 as a number, and 1.10 becomes 1.1, so the tag is lost.
-        Number _ -> fail $ "the rev of " ++ T.unpack url ++ " is read as a number. Write the tag in quotes, as in rev: \"1.10\""
-        _ -> fail $ "the rev of " ++ T.unpack url ++ " is not a tag"
+        Number _ -> fail "is read as a number. Write the tag in quotes, as in rev: \"1.10\""
+        _ -> fail "is not a tag"
 
 -- | A dependency is written with https://. An SSH address gets its https://
 -- form and the rule that makes git use SSH for it on this machine.
@@ -291,23 +326,25 @@ profileParser other = fail $ "unknown profile \"" ++ T.unpack other ++ "\" (know
 
 -- | The length of the tick, which has to divide 1000000 exactly because the
 -- runtime derives the ticks per second from it.
-tickParser :: Maybe Integer -> Parser (Maybe Integer)
-tickParser Nothing = return Nothing
-tickParser (Just ticks) =
+tickParser :: Value -> Parser Integer
+tickParser v = do
+    ticks <- parseJSON v
     if ticks > 0 && 1000000 `mod` ticks == 0
-        then return (Just ticks)
-        else fail "microseconds-per-tick must divide 1000000 exactly"
+        then return ticks
+        else fail "must divide 1000000 exactly"
 
-positive :: String -> Integer -> Parser Integer
-positive what n = if n > 0 then return n else fail $ what ++ " must be positive"
+positive :: Value -> Parser Integer
+positive v = do
+    n <- parseJSON v
+    if n > 0 then return n else fail "must be positive"
 
 -- | The extern section: the C of each module, under its name with dots.
 externParser :: Value -> Parser ExternConfig
 externParser = withObject "extern" $ \o -> do
     -- | Until 0.7.0 the section listed its files without their module
     when (oldForm o) $
-        fail "the extern section lists the files under the module that declares their extern functions, as in crc.crc: {sources: [crc.c]}"
-    ExternConfig . M.fromList <$> mapM entryParser (KM.toList o)
+        fail "lists the files without their module. List them under the module that declares their extern functions, as in crc.crc: {sources: [crc.c]}"
+    ExternConfig . M.fromList <$> mapM (\(key, v) -> entryParser key v <?> Key key) (KM.toList o)
 
   where
 
@@ -316,63 +353,69 @@ externParser = withObject "extern" $ \o -> do
         (_, Just (Object libs)) -> any ((/= Nothing) . checkPlatform . K.toString) (KM.keys libs)
         _ -> False
 
-    entryParser (key, v) = do
+    entryParser key v = do
         let modName = K.toText key
-            what = "the extern entry of " ++ T.unpack modName
         unless (all (isSnakeCase . T.unpack) (T.splitOn "." modName)) $
-            fail $ "the extern section names " ++ T.unpack modName ++ ", which is not the name of a module"
-        entry <- withObject what (\eo -> do
-            onlyFields what ["sources", "headers", "libraries"] eo
-            srcs <- eo .:? "sources" .!= [] >>= mapM (listedPath what ".c" True)
-            hdrs <- eo .:? "headers" .!= [] >>= mapM (listedPath what ".h" True)
-            libs <- eo .:? "libraries" .!= M.empty
-            forM_ (M.toList libs) $ \(plt, pltLibs) ->
-                platformParser plt >> mapM_ (listedPath what ".a" False) pltLibs
+            fail "is not the name of a module"
+        entry <- withObject "extern entry" (\eo -> do
+            onlyFields ["sources", "headers", "libraries"] eo
+            srcs <- explicitParseFieldMaybe (listOf (listedPath ".c" True)) eo "sources" .!= []
+            hdrs <- explicitParseFieldMaybe (listOf (listedPath ".h" True)) eo "headers" .!= []
+            libs <- explicitParseFieldMaybe librariesParser eo "libraries" .!= M.empty
             when (null srcs && M.null libs) $
-                fail $ what ++ " has neither sources nor libraries"
+                fail "has neither sources nor libraries"
             return (ExternEntry srcs hdrs libs)) v
         return (modName, entry)
 
+    librariesParser v = parseJSON v >>= M.traverseWithKey (\plt pltLibs ->
+        (platformParser plt >> listOf (listedPath ".a" False) pltLibs) <?> Key (K.fromText plt))
+
     -- | A path inside its folder and with its extension; a source or a header
     -- may have a * in its file name, which matches the files of one folder.
-    listedPath what ext patterns path
-        | not (insideFolder path) = fail $ what ++ " lists " ++ path ++ ", which is outside its folder"
-        | takeExtension path /= ext = fail $ what ++ " lists " ++ path ++ ", which is not a " ++ ext ++ " file"
-        | '*' `elem` takeDirectory path = fail $ what ++ " lists " ++ path ++ ", whose * is in a folder: a pattern matches the files of one folder"
-        | not patterns && '*' `elem` path = fail $ what ++ " lists " ++ path ++ ", and the libraries take no patterns"
+    listedPath ext patterns v = parseJSON v >>= checkPath ext patterns
+
+    checkPath ext patterns path
+        | not (insideFolder path) = fail $ path ++ " is outside its folder"
+        | takeExtension path /= ext = fail $ path ++ " is not a " ++ ext ++ " file"
+        | '*' `elem` takeDirectory path = fail $ path ++ " has its * in a folder: a pattern matches the files of one folder"
+        | not patterns && '*' `elem` path = fail $ path ++ " is a pattern, and the libraries take no patterns"
         | otherwise = return path
 
 appParser :: Value -> Parser AppDeployment
 appParser = withObject "app" $ \o -> do
-    onlyFields "app" ["platform", "profile", "microseconds-per-tick"] o
+    onlyFields ["platform", "profile", "microseconds-per-tick"] o
     AppDeployment
-        <$> (o .: "platform" >>= platformParser)
-        <*> (o .: "profile" >>= profileParser)
-        <*> (o .:? "microseconds-per-tick" >>= tickParser)
+        <$> explicitParseField (parseJSON >=> platformParser) o "platform"
+        <*> explicitParseField (parseJSON >=> profileParser) o "profile"
+        <*> explicitParseFieldMaybe tickParser o "microseconds-per-tick"
 
 testParser :: T.Text -> Value -> Parser TestEntry
 testParser testName v = do
-    let what = "test " ++ T.unpack testName
     unless (isSnakeCase (T.unpack testName)) $
-        fail $ "the test name \"" ++ T.unpack testName ++ "\" is not lowercase snake_case"
-    withObject what (\o -> do
+        fail "the name of a test is lowercase snake_case"
+    withObject "test" (\o -> do
         -- One resolution serves the whole project, so an override is forced in every build.
         when (KM.member "overrides" o) $
-            fail $ what ++ " has overrides: they go at the top level of the manifest and apply to the whole project"
-        onlyFields what ["platforms", "timeout", "test-log-size", "harness-stack-size",
+            fail "overrides go at the top level of the manifest and apply to the whole project"
+        onlyFields ["platforms", "timeout", "test-log-size", "harness-stack-size",
             "microseconds-per-tick", "extern", "dependencies"] o
-        platformNames <- o .: "platforms"
-        when (null platformNames) $ fail $ what ++ " has no platforms"
-        when (length (nub platformNames) /= length platformNames) $
-            fail $ what ++ " lists a platform twice"
         TestEntry
-            <$> mapM platformParser platformNames
-            <*> (o .: "timeout" >>= positive "timeout")
-            <*> (o .:? "test-log-size" .!= defaultTestLogSize >>= positive "test-log-size")
-            <*> (o .:? "harness-stack-size" >>= traverse (positive "harness-stack-size"))
-            <*> (o .:? "microseconds-per-tick" >>= tickParser)
-            <*> (o .:? "extern" >>= maybe (return emptyExternConfig) externParser)
-            <*> (o .:? "dependencies" .!= [] >>= mapM dependencyParser)) v
+            <$> explicitParseField platformsParser o "platforms"
+            <*> explicitParseField positive o "timeout"
+            <*> (explicitParseFieldMaybe positive o "test-log-size" .!= defaultTestLogSize)
+            <*> explicitParseFieldMaybe positive o "harness-stack-size"
+            <*> explicitParseFieldMaybe tickParser o "microseconds-per-tick"
+            <*> (explicitParseFieldMaybe externParser o "extern" .!= emptyExternConfig)
+            <*> (explicitParseFieldMaybe (listOf dependencyParser) o "dependencies" .!= [])) v
+
+  where
+
+    platformsParser pv = do
+        platformNames <- parseJSON pv :: Parser [T.Text]
+        when (null platformNames) $ fail "lists no platform"
+        when (length (nub platformNames) /= length platformNames) $
+            fail "lists a platform twice"
+        listOf (parseJSON >=> platformParser) pv
 
 -- | Check the folders of the project against the manifest, and give every
 -- mismatch found.
