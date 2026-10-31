@@ -80,6 +80,7 @@ deliverCommand (DeliverCmdArgs chatty withTests archive withTrace) = do
     unless (hasApp || withTests) $
       dieWithError $ "the project is a library and has no application: deliver its tests with --tests"
     deployments <- either dieWithError return $ selectDeployments manifest selection Nothing Nothing
+    when (null deployments) (putStrLn . infoMessage $ nothingSelected manifest selection Nothing)
     forM_ deployments $ \deployment -> do
       announce deployments ("Delivering " ++ deploymentLabel deployment)
       deliverDeployment chatty manifest archive withTrace deployment

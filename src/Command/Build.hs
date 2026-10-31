@@ -2,7 +2,7 @@
 
 module Command.Build (
     buildCmdArgsParser, buildCommand, generateCommand, BuildCmdArgs(..),
-    Selection(..), selectDeployments, buildDeployment, announce, runMake, loadProject
+    Selection(..), selectDeployments, nothingSelected, buildDeployment, announce, runMake, loadProject
 ) where
 
 import Configuration.Configuration
@@ -318,7 +318,9 @@ selectedDeployments :: BuildCmdArgs -> IO [Deployment]
 selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile offline) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
     manifest <- loadProject chatty offline
-    either dieWithError return $ selectDeployments manifest selection mPlatform mProfile
+    deployments <- either dieWithError return $ selectDeployments manifest selection mPlatform mProfile
+    when (null deployments) (putStrLn . infoMessage $ nothingSelected manifest selection mPlatform)
+    return deployments
 
 -- | Load the project for a command that builds: the manifest, the folders, the
 -- prefixes of a library, the lock and vendor/ brought in line with the
@@ -384,21 +386,24 @@ checkLibrary chatty manifest =
             [] -> [TestPlatform]
             plts -> plts
 
+-- | The deployments of a selection. The application of a library gives none,
+-- and so do the tests of a project without tests or of a platform on which no
+-- test runs.
 selectDeployments :: Manifest -> Selection -> Maybe Platform -> Maybe ProjectProfile -> Either String [Deployment]
 selectDeployments manifest selection mPlatform mProfile =
     case selection of
         SelectApp
             | isJust mPlatform || isJust mProfile ->
                 Left "--platform and --profile select the platforms and the profile of tests: use them with --test, --tests or --all"
-            | otherwise -> maybe (Left noApp) (Right . pure) (appDeployment manifest)
+            | otherwise -> Right (maybe [] pure (appDeployment manifest))
         SelectTest testName ->
             case M.lookup (T.pack testName) tests of
                 Nothing -> Left $ "the manifest declares no test " ++ testName
                 Just entry -> case testOn (T.pack testName, entry) of
                     [] -> Left $ "the test " ++ testName ++ " does not run on " ++ maybe "" show mPlatform
                     ds -> Right ds
-        SelectTests -> nonEmpty (concatMap testOn (M.toList tests))
-        SelectAll -> nonEmpty (maybe [] pure (appDeployment manifest) ++ concatMap testOn (M.toList tests))
+        SelectTests -> Right (concatMap testOn (M.toList tests))
+        SelectAll -> Right (maybe [] pure (appDeployment manifest) ++ concatMap testOn (M.toList tests))
 
   where
 
@@ -410,10 +415,13 @@ selectDeployments manifest selection mPlatform mProfile =
         [ testDeployment manifest testName entry plt prf
         | plt <- testPlatforms entry, maybe True (== plt) mPlatform ]
 
-    noApp = "the project is a library and has no application: build its tests with --test, --tests or --all"
-
-    nonEmpty [] = Left "no deployment to build"
-    nonEmpty ds = Right ds
+-- | The message for a selection that gives no deployment.
+nothingSelected :: Manifest -> Selection -> Maybe Platform -> String
+nothingSelected manifest selection mPlatform =
+    case selection of
+        SelectApp -> "the library has no application. Its exported modules have been checked; build its tests with --test, --tests or --all"
+        _ | M.null (manifestTests manifest) -> "the project has no tests"
+          | otherwise -> "no test runs on " ++ maybe "" show mPlatform
 
 -- | Command handler for the "generate" command
 generateCommand :: BuildCmdArgs -> IO ()
