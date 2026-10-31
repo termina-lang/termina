@@ -319,7 +319,7 @@ typeStatement rTy (ReturnStmt retExpression anns) =
   case (rTy, retExpression) of
     (Nothing, Nothing) -> return $ SAST.ReturnStmt Nothing (buildExpAnn anns TUnit)
     (Just ts, Just e) -> do
-      typed_e <- typeExpression (Just ts) typeRHSObject e
+      typed_e <- catchMismatch (getAnnotation e) (EReturnValueTypeMismatch ts) (typeExpression (Just ts) typeRHSObject e)
       -- ReturnStmt (Just ety) . buildExpAnn anns <$> getExprType ety
       return $ SAST.ReturnStmt (Just typed_e) (buildExpAnn anns ts)
     (Just ty, Nothing) -> throwError $ annotateError anns $ EReturnValueExpected ty

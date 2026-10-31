@@ -1,0 +1,7 @@
+function foo() -> u32 {
+
+    let small : u16 = 3;
+
+    return small;
+
+}

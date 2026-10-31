@@ -128,6 +128,7 @@ data Error
   | EArrayExprListInitializerExprTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ List of initializing expressions type mismatch
   | EReturnValueExpected (TerminaType SemanticAnn) -- ^ Expected return value
   | EReturnValueNotUnit -- ^ Return value not expected
+  | EReturnValueTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Return value of another type (SE-238)
   | EInvalidArrayType (TerminaType SemanticAnn) -- ^ Invalid array type
   | EInvalidBoxType (TerminaType SemanticAnn) -- ^ Invalid box type
   | ENoTypeFound Identifier -- ^ Type not found
@@ -1096,6 +1097,9 @@ instance Diagnosable Error where
         relatedTo clsPos "the class is defined here" $
         diagnostic "SE-237" "test access outside a test class"
             ("Class \x1b[31m" <> T.pack classId <> "\x1b[0m declares the access port \x1b[31m" <> T.pack ident <> "\x1b[0m of type \x1b[31m" <> showText ty <> "\x1b[0m.\n" <> "Only a test class may declare an access port of this type.")
+    describe (EReturnValueTypeMismatch expectedTy actualTy) =
+        diagnostic "SE-238" "return value type mismatch"
+            ("The function is expected to return a value of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
 
     -- | The two clauses below pick their detail with a case, which the script
     -- that moved the rest of this table does not read, so they were moved by
