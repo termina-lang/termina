@@ -37,7 +37,7 @@ import System.Directory (createDirectoryIfMissing, doesFileExist, findExecutable
 import System.Environment (lookupEnv)
 import System.Info (os)
 import System.Process (readProcessWithExitCode)
-import System.IO (BufferMode(LineBuffering), hPutStrLn, hSetBuffering, stderr, stdout)
+import System.IO (hPutStrLn, stderr)
 import Command.Types
 import Command.Utils
 import Configuration.Manifest
@@ -215,8 +215,6 @@ modeOf mName mCase isolated mRecord offline =
 -- without bringing the lock and vendor/ in line.
 runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Maybe Executor -> Maybe Server -> Maybe Server -> Bool -> Mode -> IO ()
 runTests mName mPlatform mProfile mExecutor mServer mXsdb offline mode = do
-    -- | The report goes in order with the output of make
-    hSetBuffering stdout LineBuffering
     loaded <- try (case mode of
         Recorded _ -> loadManifest >>= either dieWithFirstError return
         _ -> loadProject False offline) :: IO (Either ExitCode Manifest)

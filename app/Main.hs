@@ -14,6 +14,7 @@ import Command.Test
 import Command.Try
 import Command.LSP
 import Command.Sched
+import System.IO (BufferMode(LineBuffering), hSetBuffering, stdout)
 
 data Command =
     New NewCmdArgs
@@ -101,6 +102,8 @@ publicVersion = intercalate "." (map show (take 3 (versionBranch version)))
 
 main :: IO ()
 main = do
+    -- | The messages go in order with the errors and the output of make
+    hSetBuffering stdout LineBuffering
     cmd <- customExecParser (prefs showHelpOnEmpty) $ info (commandParser <**> simpleVersioner ("termina " ++ publicVersion) <**> helper)
         (fullDesc
             <> header "termina: a domain-specific language for real-time critical systems" )
