@@ -39,7 +39,7 @@ import Paths_termina (version)
 import System.Directory
 import System.Exit
 import System.FilePath
-import System.Process (proc, readCreateProcessWithExitCode)
+import System.Process (readProcessWithExitCode)
 
 -- | Data type for the "deliver" command arguments
 data DeliverCmdArgs =
@@ -208,7 +208,7 @@ deliverDeployment chatty manifest archive withTrace deployment = do
 -- variables of the OSAL and of the toolchain.
 deliverableInfo :: String -> FilePath -> IO (M.Map String String)
 deliverableInfo label folder = do
-    (code, out, err) <- readCreateProcessWithExitCode (proc "make" ["-s", "--no-print-directory", "-C", folder, "deliverable-info"]) ""
+    (code, out, err) <- readProcessWithExitCode "make" ["-s", "--no-print-directory", "-C", folder, "deliverable-info"] ""
     case code of
         ExitSuccess -> return . M.fromList . map (fmap (drop 1) . break (== '=')) . filter ('=' `elem`) . lines $ out
         ExitFailure _ -> dieWithError $ "make failed to give the values of the build of " ++ label ++ ":\n" ++ err
