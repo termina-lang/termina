@@ -9,7 +9,6 @@ import ControlFlow.Architecture.Utils (isUnitTest)
 import Semantic.Types
 
 import System.FilePath
-import System.Exit
 import Command.Utils
 import Generator.LanguageC.Printer
 import Command.Types
@@ -28,18 +27,18 @@ genPlatformCode _ TestPlatform _ _ _ = return ()
 genPlatformCode params plt loweredProject progArchitecture externs = do
   stamp <- if isTestBuild params
     then case genTestDescriptor params loweredProject progArchitecture of
-      Left err -> die . errorMessage $ err
+      Left err -> dieWithError err
       Right (descriptor, stamp) -> do
         writeIfChanged (destinationPath </> "test" <.> "json") (TE.decodeUtf8 (BL.toStrict descriptor))
         return stamp
     else return 0
 
   case runGenMainFile params plt mainFile stamp progArchitecture of
-    Left err -> die . errorMessage $ show err
+    Left err -> dieWithError $ show err
     Right cMainFile -> writeIfChanged mainFile $ runCPrinter (lineDirectives params) cMainFile
 
   case runGenConfigFile params plt configFile progArchitecture of
-    Left err -> die . errorMessage $ show err
+    Left err -> dieWithError $ show err
     Right cConfigFile -> writeIfChanged configFile $ runCPrinter (lineDirectives params) cConfigFile
 
   writeIfChanged (destinationPath </> "Makefile") $
