@@ -42,7 +42,8 @@ import System.Exit (ExitCode(..), die, exitFailure)
 import System.IO (stderr)
 import System.Environment (getEnvironment)
 import Control.Exception (IOException, try)
-import System.Process (readProcessWithExitCode)
+import System.Process (readCreateProcessWithExitCode)
+import Configuration.Fetch (gitProcess)
 import qualified Crypto.Hash.SHA256 as SHA256
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
@@ -359,10 +360,12 @@ sortProjectDepsOrLoop = topErrorInternal . M.toList
         )
         Right $ topSortFromDepList projectDependencies
 
--- | Runs git with the given arguments, or reports why it could not.
+-- | Runs git with the given arguments, in the C locale, or reports why it
+-- could not.
 runGit :: [String] -> IO (Either String String)
 runGit args = do
-    result <- try (readProcessWithExitCode "git" args "")
+    p <- gitProcess args
+    result <- try (readCreateProcessWithExitCode p "")
     return $ case result of
         Left e -> Left (show (e :: IOException))
         Right (ExitSuccess, out, _) -> Right out

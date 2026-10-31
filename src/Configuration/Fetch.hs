@@ -11,7 +11,8 @@ module Configuration.Fetch (
     resolveTag,
     fetchTag,
     fetchPackage,
-    fetchLocked
+    fetchLocked,
+    gitProcess
 ) where
 
 import Control.Concurrent.Async (withAsync, wait)
