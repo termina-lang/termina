@@ -447,13 +447,13 @@ checkLayout root manifest = do
         hasApp <- doesDirectoryExist (root </> appFolder)
         case manifestNature manifest of
             Library _ ->
-                return ["a library, with exports, cannot have an app/ folder" | hasApp]
+                return ["app/: a library, with exports, cannot have an app/ folder" | hasApp]
             Application _ | not hasApp ->
-                return ["the manifest has an app section but there is no app/ folder"]
+                return ["termina.yaml: the manifest has an app section but there is no app/ folder"]
             Application _ -> do
                 entries <- visible <$> listDirectory (root </> appFolder)
                 let appFile = appFilename <.> "fin"
-                return $ ["app/ has no " ++ appFile | appFile `notElem` entries]
+                return $ ["app/: has no " ++ appFile | appFile `notElem` entries]
                     ++ ["app/" ++ e ++ ": app/ may only contain " ++ appFile | e <- entries, e /= appFile]
 
     checkTests = do
@@ -464,11 +464,11 @@ checkLayout root manifest = do
             isDir <- doesDirectoryExist (root </> "tests" </> e)
             hasTestFile <- doesFileExist (root </> "tests" </> e </> "test.fin")
             return $ if not isDir
-                then ["tests/" ++ e ++ " is not a folder"]
-                else ["tests/" ++ e ++ " has no test.fin" | not hasTestFile]
-                    ++ ["tests/" ++ e ++ " is not declared in the tests section of the manifest" | e `notElem` declared]
+                then ["tests/" ++ e ++ ": is not a folder"]
+                else ["tests/" ++ e ++ ": has no test.fin" | not hasTestFile]
+                    ++ ["tests/" ++ e ++ ": is not declared in the tests section of the manifest" | e `notElem` declared]
         return $ concat entryErrors
-            ++ ["the test " ++ t ++ " has no folder tests/" ++ t | t <- declared \\ entries]
+            ++ ["termina.yaml: the test " ++ t ++ " has no folder tests/" ++ t | t <- declared \\ entries]
 
     -- | No module directly under the folder, and every segment of a module
     -- name in lowercase snake_case.

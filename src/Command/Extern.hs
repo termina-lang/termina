@@ -73,13 +73,13 @@ groupObjects g = if null (groupVariable g) then "EXTERN_OBJS" else groupVariable
 -- the same place.
 prepareExtern :: TerminaConfig -> ParsedProject -> Sources -> [(FilePath, ExternConfig)] -> IO [ExternGroup]
 prepareExtern config project sources folders = do
-  checked <- mapM (\(folder, extern) -> map (folder,) <$> usedFiles config (ownerOfFolder folder) (loadedFrom project folder) folder extern) folders
+  checked <- mapM (\(folder, extern) -> map (folder,) <$> usedFiles config "termina.yaml" (ownerOfFolder folder) (loadedFrom project folder) folder extern) folders
   let files = concat checked
       relFiles = map snd files
   forM_ (relFiles \\ nub relFiles) $ \file ->
     case [ folder | (folder, rel) <- files, rel == file ] of
       first : second : _ ->
-        dieWithError $ "Both " ++ addTrailingPathSeparator first ++ " and " ++ addTrailingPathSeparator second ++ " have the file "
+        dieWithError $ "both " ++ addTrailingPathSeparator first ++ " and " ++ addTrailingPathSeparator second ++ " have the file "
           ++ file ++ ", and the two would go to the same place in the output folder"
       _ -> return ()
   let projectGroups = [ groupOf (T.unpack (name config)) "" externFolder relFiles (map fst folders) | not (null relFiles) ]
@@ -89,12 +89,12 @@ prepareExtern config project sources folders = do
         extern = root </> externFolder
     manifest <- decodeManifestFile (root </> "termina.yaml") >>= either (\err -> dieWithError (root </> "termina.yaml: " ++ err)) return
     let library = T.unpack (projectName (manifestProject manifest))
-    used <- usedFiles config ("the dependency " ++ library) (loadedFrom project extern) extern (exportedExtern manifest)
+    used <- usedFiles config (root </> "termina.yaml") ("the dependency " ++ library) (loadedFrom project extern) extern (exportedExtern manifest)
     return [ (f, extern, used, groupOf library (variableOf f) (destinationOf f) used [extern]) | not (null used) ]
   -- | Two dependencies whose objects would have one variable, or whose C would go to one folder
   forM_ (groupBy ((==) `on` (\(_, _, _, g) -> groupVariable g)) (sortOn (\(_, _, _, g) -> groupVariable g) dependencies)) $ \case
     (f, _, _, g) : (other, _, _, _) : _ -> dieWithError $ case (folderOwner f, folderOwner other) of
-      (Local library _, Local _ _) -> "The local folders " ++ takeDirectory (folderPath f) ++ " and " ++ takeDirectory (folderPath other)
+      (Local library _, Local _ _) -> "the local folders " ++ takeDirectory (folderPath f) ++ " and " ++ takeDirectory (folderPath other)
         ++ " are both the library " ++ library ++ ", and their C would go to the same place in the output folder"
       _ -> takeDirectory (makeRelative "vendor" (folderPath f)) ++ " and " ++ takeDirectory (makeRelative "vendor" (folderPath other))
         ++ " give the same name, " ++ groupObjects g ++ ", to the objects of their C in the Makefile"
@@ -141,15 +141,16 @@ removeStaleGroups out kept =
         removeFile (out </> top </> file)
 
 -- | The files of an "extern" section that the loaded modules need on the
--- selected platform, relative to its folder. A loaded module that has
--- libraries has to have them for the selected platform, since they are tied to
--- the platforms they were compiled for.
-usedFiles :: TerminaConfig -> String -> S.Set T.Text -> FilePath -> ExternConfig -> IO [FilePath]
-usedFiles config owner loaded externFolderPath (ExternConfig moduleEntries) = do
+-- selected platform, relative to its folder, given the manifest that declares
+-- the section and its owner. A loaded module that has libraries has to have
+-- them for the selected platform, since they are tied to the platforms they
+-- were compiled for.
+usedFiles :: TerminaConfig -> FilePath -> String -> S.Set T.Text -> FilePath -> ExternConfig -> IO [FilePath]
+usedFiles config manifestPath owner loaded externFolderPath (ExternConfig moduleEntries) = do
   present <- filesUnder externFolderPath
   forM_ (M.toList loadedEntries) $ \(modName, entry) ->
     unless (M.null (entryLibraries entry) || M.member (platform config) (entryLibraries entry)) $
-      dieWithError $ "The extern section of " ++ owner ++ " lists libraries of " ++ T.unpack modName
+      dieWithError $ manifestPath ++ ": the extern section of " ++ owner ++ " lists libraries of " ++ T.unpack modName
         ++ " for other platforms, and none for " ++ T.unpack (platform config)
   return . nub $ concat
     [ concatMap (listedFiles present . (externSourceFolder </>)) srcs

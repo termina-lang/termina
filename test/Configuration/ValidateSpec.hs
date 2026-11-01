@@ -58,8 +58,8 @@ spec = do
 
     it "rejects a missing file and a pattern that matches none" $
       errorsOf [manifest "exports: [pus]\nextern:\n  pus.crc:\n    sources: [crc.c, \"spi/*.c\"]\n", file "src/pus/service1.fin", crcModule]
-        `shouldBe` [ "The extern section of the package lists extern/src/crc.c under pus.crc, and the file does not exist"
-                   , "The extern section of the package lists extern/src/spi/*.c under pus.crc, and the pattern matches no file" ]
+        `shouldBe` [ "termina.yaml: the extern section of the package lists extern/src/crc.c under pus.crc, and the file does not exist"
+                   , "termina.yaml: the extern section of the package lists extern/src/spi/*.c under pus.crc, and the pattern matches no file" ]
 
     it "accepts a pattern that matches some file" $
       validatePackage [manifest "exports: [pus]\nextern:\n  pus.crc:\n    sources: [\"spi/*.c\"]\n", file "src/pus/service1.fin", crcModule,
@@ -68,7 +68,7 @@ spec = do
 
     it "rejects an exported module with an extern function and no entry" $
       errorsOf (package ++ [FetchedFile "src/pus/tm.fin" "100644" "extern function pus_tm_raw() -> u32;\n"])
-        `shouldBe` ["The module pus.tm declares the extern function pus_tm_raw and is not listed in the extern section of the package"]
+        `shouldBe` ["src/pus/tm.fin:1: the module pus.tm declares the extern function pus_tm_raw and is not listed in the extern section of the package"]
 
     it "ignores the C of a module that it does not export" $
       validatePackage (manifest (library ++ "  test_support.fake:\n    sources: [fake.c]\n")

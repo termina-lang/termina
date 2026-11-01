@@ -83,14 +83,14 @@ sectionErrors sections = concatMap errorsOf sections
 
     -- | The sources, the headers and the libraries of each platform have a folder each
     misplacedErrors s =
-        [ "The file " ++ sectionFolder s </> file ++ problem | file <- sectionFiles s, Just problem <- [misplaced s file] ]
+        [ sectionFolder s </> file ++ ":" ++ problem | file <- sectionFiles s, Just problem <- [misplaced s file] ]
 
     -- | The headers of the folder go before the generated ones, so none can
     -- have the path of a generated one, and the C would not see it
     hidingErrors s = concat
-        [ [ "The file " ++ sectionFolder s </> file ++ " has the path of a header that the transpiler generates"
+        [ [ sectionFolder s </> file ++ ": has the path of a header that the transpiler generates"
           | header `elem` generatedHeaders ]
-          ++ [ "The file " ++ sectionFolder s </> file ++ " has the path of the header that the transpiler generates for "
+          ++ [ sectionFolder s </> file ++ ": has the path of the header that the transpiler generates for "
                 ++ dottedName segments ++ " (" ++ file' ++ ")"
              | (segments, file') <- sectionSeen s, joinPath segments <.> "h" == header ]
         | file <- sectionFiles s
@@ -111,7 +111,7 @@ sectionErrors sections = concatMap errorsOf sections
     -- | Every file of the folder is listed, so that no C is left uncompiled and
     -- a package carries every header and library
     unlistedErrors s =
-        [ "The file " ++ sectionFolder s </> file ++ " is not listed under any module in " ++ sectionOf (sectionOwner s)
+        [ sectionFolder s </> file ++ ": is not listed under any module in " ++ sectionOf (sectionOwner s)
         | file <- sectionFiles s, file `notElem` listed ]
 
       where
@@ -139,11 +139,11 @@ sectionErrors sections = concatMap errorsOf sections
 
         segments = map T.unpack (T.splitOn "." modName)
 
-        listing' = "The extern section of " ++ sectionOwner s ++ " lists " ++ T.unpack modName
+        listing' = manifestFile ++ ": " ++ sectionOf (sectionOwner s) ++ " lists " ++ T.unpack modName
 
         moduleOf o = sectionSourceFolder o </> joinPath segments <.> "fin"
 
-    listing s path = "The extern section of " ++ sectionOwner s ++ " lists " ++ sectionFolder s </> path
+    listing s path = manifestFile ++ ": " ++ sectionOf (sectionOwner s) ++ " lists " ++ sectionFolder s </> path
 
     listsOf (ExternEntry srcs hdrs libs) =
         [map (externSourceFolder </>) srcs, map (externHeaderFolder </>) hdrs]
@@ -183,14 +183,19 @@ moduleErrors owner srcFolder config mainModule externs =
         ++ " cannot declare the extern function " ++ ident ++ ". Declare it in a module of "
         ++ srcFolder ++ "/ and list that module in " ++ sectionOf owner
     | Just m <- [mainModule], (ident, ann) <- externDeclared m ]
-    ++ [ "The module " ++ dottedName (externSegments m) ++ " declares the extern function " ++ ident
-            ++ " and is not listed in " ++ sectionOf owner
+    ++ [ externFile m ++ ":" ++ show (locationLine ann) ++ ": the module " ++ dottedName (externSegments m)
+            ++ " declares the extern function " ++ ident ++ " and is not listed in " ++ sectionOf owner
        | m <- externs
-       , (ident, _) : _ <- [externDeclared m]
+       , (ident, ann) : _ <- [externDeclared m]
        , not (M.member (T.pack (dottedName (externSegments m))) (externModules config)) ]
 
 sectionOf :: String -> String
 sectionOf owner = "the extern section of " ++ owner
+
+-- | The file of the manifest, which the errors of the entries of a section
+-- name.
+manifestFile :: FilePath
+manifestFile = "termina.yaml"
 
 -- | The sections of a project, read from its folders: the one of "src" and
 -- the one of each test. In a test, the C of the project and the one of the
