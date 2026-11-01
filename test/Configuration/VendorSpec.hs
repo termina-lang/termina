@@ -40,12 +40,13 @@ spec = do
 
   describe "files that go to vendor" $
 
-    it "keeps the manifest, the modules of the exported prefixes and the extern files listed under them" $
+    it "keeps the manifest, the modules of the exported prefixes and the extern files listed under them, none of them hidden" $
       filter (isVendored library) [
           "termina.yaml", "src/pus/service1.fin", "src/pus/service1/tm.fin", "src/ccsds/tc/frame.fin",
           "src/pus/service2.fin", "src/test_support/fake.fin", "src/ccsds/README.md", "extern/src/crc.c",
           "extern/src/spi/a.c", "extern/src/spi/sub/b.c", "extern/include/crc.h", "extern/lib/posix-gcc/libcrc.a",
-          "extern/src/notes.c", "extern/src/fake.c", "tests/t1/test.fin", "README.md"
+          "extern/src/notes.c", "extern/src/fake.c", "tests/t1/test.fin", "README.md",
+          "src/ccsds/.draft.fin", "src/ccsds/.cache/frame.fin", "extern/src/spi/.a.c", "extern/src/.DS_Store"
         ] `shouldBe` ["termina.yaml", "src/pus/service1.fin", "src/pus/service1/tm.fin", "src/ccsds/tc/frame.fin",
           "extern/src/crc.c", "extern/src/spi/a.c", "extern/include/crc.h", "extern/lib/posix-gcc/libcrc.a"]
 

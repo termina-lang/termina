@@ -45,12 +45,13 @@ packageDir root url = vendorDir root </> normalizedFolder url
 
 -- | Whether a file of a package goes to "vendor/": its "termina.yaml", the
 -- modules of its exported prefixes and the files that its "extern" section
--- lists under those modules.
+-- lists under those modules, none of them hidden.
 isVendored :: Manifest -> String -> Bool
 isVendored manifest path =
-    path == "termina.yaml"
-        || (".fin" `isSuffixOf` path && any (`ownsPath` path) (manifestPrefixes manifest))
-        || any (\listed -> listedMatches ("extern/" ++ listed) path) (externFiles (exportedExtern manifest))
+    not (isHidden path)
+        && (path == "termina.yaml"
+            || (".fin" `isSuffixOf` path && any (`ownsPath` path) (manifestPrefixes manifest))
+            || any (\listed -> listedMatches ("extern/" ++ listed) path) (externFiles (exportedExtern manifest)))
 
 -- | The entries of the "extern" section of a package whose module is in one
 -- of its exported prefixes, the only ones that a consumer gets.
@@ -110,7 +111,7 @@ readPackage root url = do
   where
 
     listFiles dir rel = do
-        entries <- listDirectory (dir </> rel)
+        entries <- filter (not . isHidden) <$> listDirectory (dir </> rel)
         concat <$> forM entries (\e -> do
             let relPath = if null rel then e else rel ++ "/" ++ e
             isDir <- doesDirectoryExist (dir </> relPath)

@@ -228,14 +228,15 @@ ownerOfFolder folder =
         ["tests", testName, _] -> "the test " ++ testName
         _ -> "the project"
 
--- | The files under a folder, as paths relative to it.
+-- | The files under a folder, as paths relative to it, without the hidden
+-- ones.
 listFiles :: FilePath -> IO [FilePath]
 listFiles root = go ""
 
   where
 
     go rel = do
-      entries <- listDirectory (root </> rel)
+      entries <- filter (not . isHidden) <$> listDirectory (root </> rel)
       concat <$> forM entries (\entry -> do
         let relEntry = if null rel then entry else rel </> entry
         isDir <- doesDirectoryExist (root </> relEntry)

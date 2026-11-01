@@ -66,6 +66,10 @@ spec = describe "Manifest: extern section" $ do
   it "rejects a file of the wrong kind in a list" $
     "extern:\n  drivers.uart:\n    sources: [uart.c]\n    headers: [regs.c]\n" `failsWith` "extern.drivers.uart.headers[0]: regs.c is not a .h file"
 
+  it "rejects a hidden file" $ do
+    "extern:\n  drivers.uart:\n    sources: [uart.c, .uart.c]\n" `failsWith` "extern.drivers.uart.sources[1]: .uart.c is a hidden file, and the build leaves hidden files out"
+    "extern:\n  drivers.uart:\n    sources: [.spi/uart.c]\n" `failsWith` "extern.drivers.uart.sources[0]: .spi/uart.c is a hidden file"
+
   it "takes patterns in the file name of sources and headers only" $ do
     "extern:\n  drivers.uart:\n    sources: [\"*/uart.c\"]\n" `failsWith` "extern.drivers.uart.sources[0]: */uart.c has its * in a folder"
     "extern:\n  math.mcs:\n    libraries:\n      posix-gcc: [\"*.a\"]\n" `failsWith` "extern.math.mcs.libraries.posix-gcc[0]: *.a is a pattern, and the libraries take no patterns"

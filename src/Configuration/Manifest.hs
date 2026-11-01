@@ -370,12 +370,14 @@ externParser = withObject "extern" $ \o -> do
     librariesParser v = parseJSON v >>= M.traverseWithKey (\plt pltLibs ->
         (platformParser plt >> listOf (listedPath ".a" False) pltLibs) <?> Key (K.fromText plt))
 
-    -- | A path inside its folder and with its extension; a source or a header
-    -- may have a * in its file name, which matches the files of one folder.
+    -- | A path inside its folder, not hidden and with its extension; a source
+    -- or a header may have a * in its file name, which matches the files of
+    -- one folder.
     listedPath ext patterns v = parseJSON v >>= checkPath ext patterns
 
     checkPath ext patterns path
         | not (insideFolder path) = fail $ path ++ " is outside its folder"
+        | isHidden path = fail $ path ++ " is a hidden file, and the build leaves hidden files out"
         | takeExtension path /= ext = fail $ path ++ " is not a " ++ ext ++ " file"
         | '*' `elem` takeDirectory path = fail $ path ++ " has its * in a folder: a pattern matches the files of one folder"
         | not patterns && '*' `elem` path = fail $ path ++ " is a pattern, and the libraries take no patterns"
