@@ -12,8 +12,7 @@ module Configuration.ExternCheck (
     moduleErrors,
     sourceExterns,
     projectSections,
-    ownerOfFolder,
-    listFiles
+    ownerOfFolder
 ) where
 
 import Control.Monad
@@ -21,7 +20,6 @@ import Data.List (find, isPrefixOf, nub, (\\))
 import qualified Data.Map.Strict as M
 import Data.Maybe (isNothing, mapMaybe)
 import qualified Data.Text as T
-import System.Directory
 import System.FilePath
 
 import Configuration.Configuration
@@ -34,6 +32,7 @@ import Generator.CodeGen.Application.Option (genOptionPathName)
 import Generator.CodeGen.Application.Status (genStatusPathName)
 import Generator.CodeGen.Application.Result (genResultPathName)
 import Utils.Annotations (Location)
+import Utils.Files (filesUnder)
 
 -- | A section of "extern" with what its checks read.
 data ExternSection = ExternSection {
@@ -213,8 +212,7 @@ projectSections root manifest = do
   where
 
     section folder src config names seen = do
-        exists <- doesDirectoryExist (root </> folder)
-        files <- if exists then listFiles (root </> folder) else return []
+        files <- filesUnder (root </> folder)
         listed <- mapM (readModule root src)
             [ segments | key <- M.keys (externModules config), let segments = map T.unpack (T.splitOn "." key), segments `elem` names ]
         return ( ExternSection (ownerOfFolder folder) folder src config files names seen (mapMaybe sourceExterns listed)
@@ -227,17 +225,3 @@ ownerOfFolder folder =
     case splitDirectories folder of
         ["tests", testName, _] -> "the test " ++ testName
         _ -> "the project"
-
--- | The files under a folder, as paths relative to it, without the hidden
--- ones.
-listFiles :: FilePath -> IO [FilePath]
-listFiles root = go ""
-
-  where
-
-    go rel = do
-      entries <- filter (not . isHidden) <$> listDirectory (root </> rel)
-      concat <$> forM entries (\entry -> do
-        let relEntry = if null rel then entry else rel </> entry
-        isDir <- doesDirectoryExist (root </> relEntry)
-        if isDir then go relEntry else return [relEntry])

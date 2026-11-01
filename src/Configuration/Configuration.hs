@@ -13,7 +13,6 @@ module Configuration.Configuration (
     listedMatches,
     listedFiles,
     insideFolder,
-    isHidden,
     ProjectProfile(..),
     defaultConfig,
     DeploymentKind(..),
@@ -32,7 +31,7 @@ module Configuration.Configuration (
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
 import Data.Yaml
-import Data.List (isPrefixOf, nub, tails)
+import Data.List (nub, tails)
 import System.FilePath (isRelative, splitDirectories, takeDirectory, takeFileName, (</>))
 
 import Configuration.Platform
@@ -101,11 +100,6 @@ listedFiles present listed = filter (listedMatches listed) present
 -- is relative and does not go up with "..".
 insideFolder :: FilePath -> Bool
 insideFolder path = isRelative path && ".." `notElem` splitDirectories path
-
--- | Whether a path is hidden: its name, or the name of one of its folders,
--- starts with a dot. The build leaves hidden files out.
-isHidden :: FilePath -> Bool
-isHidden = any (\part -> "." `isPrefixOf` part && part `notElem` [".", ".."]) . splitDirectories
 
 defaultSysPrintOutputBufferSize, defaultSysReadInputBufferSize :: Integer
 defaultSysPrintOutputBufferSize = 256

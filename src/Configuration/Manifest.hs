@@ -51,6 +51,7 @@ import System.FilePath
 
 import Configuration.Configuration
 import Configuration.Platform
+import Utils.Files (filesUnder, isHidden)
 
 -- | The versions of the format of the manifest that this transpiler reads.
 knownManifestVersions :: [Int]
@@ -436,23 +437,11 @@ checkLayout root manifest = do
     -- leave one of the two out of the build.
     checkShadowing t = do
         let testSrc = "tests" </> t </> "src"
-        modules <- finFiles testSrc
+        modules <- filter ((== ".fin") . takeExtension) <$> filesUnder (root </> testSrc)
         clashes <- filterM (\m -> doesFileExist (root </> "src" </> m)) modules
         return [testSrc </> m ++ ": the project has a module with the same name in src/" | m <- clashes]
 
-    finFiles dir = do
-        exists <- doesDirectoryExist (root </> dir)
-        if not exists then return [] else go dir ""
-      where
-        go base rel = do
-            entries <- visible <$> listDirectory (root </> base </> rel)
-            concat <$> forM entries (\e -> do
-                let relEntry = if null rel then e else rel </> e
-                isDir <- doesDirectoryExist (root </> base </> relEntry)
-                if isDir then go base relEntry
-                    else return [relEntry | takeExtension e == ".fin"])
-
-    visible = filter (not . ("." `isPrefixOf`))
+    visible = filter (not . isHidden)
 
     checkApp = do
         hasApp <- doesDirectoryExist (root </> appFolder)

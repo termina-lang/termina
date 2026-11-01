@@ -16,7 +16,7 @@ module Command.Extern (
 ) where
 
 import Configuration.Configuration
-import Configuration.ExternCheck (ModuleExterns(..), moduleErrors, ownerOfFolder, listFiles)
+import Configuration.ExternCheck (ModuleExterns(..), moduleErrors, ownerOfFolder)
 import Configuration.Manifest (Manifest(..), ProjectInfo(..), decodeManifestFile)
 import Configuration.Vendor (exportedExtern)
 import Command.Sources (Owner(..), SourceFolder(..), Sources)
@@ -25,6 +25,7 @@ import Command.Utils
 import Core.AST
 import Modules.Modules
 import Modules.Utils (qualifiedToModuleName)
+import Utils.Files (filesUnder)
 
 import Control.Monad
 import qualified Data.ByteString as BS
@@ -134,12 +135,10 @@ prepareExtern config project sources folders = do
 removeStaleGroups :: FilePath -> [FilePath] -> IO ()
 removeStaleGroups out kept =
   forM_ ["vendor", "local"] $ \top -> do
-    exists <- doesDirectoryExist (out </> top)
-    when exists $ do
-      present <- listFiles (out </> top)
-      forM_ present $ \file ->
-        unless (any (\folder -> addTrailingPathSeparator folder `isPrefixOf` (top </> file)) kept) $
-          removeFile (out </> top </> file)
+    present <- filesUnder (out </> top)
+    forM_ present $ \file ->
+      unless (any (\folder -> addTrailingPathSeparator folder `isPrefixOf` (top </> file)) kept) $
+        removeFile (out </> top </> file)
 
 -- | The files of an "extern" section that the loaded modules need on the
 -- selected platform, relative to its folder. A loaded module that has
@@ -147,8 +146,7 @@ removeStaleGroups out kept =
 -- the platforms they were compiled for.
 usedFiles :: TerminaConfig -> String -> S.Set T.Text -> FilePath -> ExternConfig -> IO [FilePath]
 usedFiles config owner loaded externFolderPath (ExternConfig moduleEntries) = do
-  folderExists <- doesDirectoryExist externFolderPath
-  present <- if folderExists then listFiles externFolderPath else return []
+  present <- filesUnder externFolderPath
   forM_ (M.toList loadedEntries) $ \(modName, entry) ->
     unless (M.null (entryLibraries entry) || M.member (platform config) (entryLibraries entry)) $
       dieWithError $ "The extern section of " ++ owner ++ " lists libraries of " ++ T.unpack modName
@@ -211,9 +209,7 @@ copyExtern destination folderFiles = do
     unless same $ do
       createDirectoryIfMissing True (takeDirectory target)
       BS.writeFile target content
-  destinationExists <- doesDirectoryExist destination
-  when destinationExists $ do
-    present <- listFiles destination
-    let listed = S.fromList files
-    forM_ present $ \file ->
-      unless (file `S.member` listed) $ removeFile (destination </> file)
+  present <- filesUnder destination
+  let listed = S.fromList files
+  forM_ present $ \file ->
+    unless (file `S.member` listed) $ removeFile (destination </> file)

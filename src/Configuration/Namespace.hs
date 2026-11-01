@@ -11,15 +11,13 @@ module Configuration.Namespace (
     dottedName
 ) where
 
-import Control.Monad
 import Data.Char (isUpper, toLower, toUpper)
-import Data.List (find, intercalate, isPrefixOf, nub, sort, tails, (\\))
+import Data.List (find, intercalate, isPrefixOf, nub, tails, (\\))
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.ByteString as BS
 import qualified Data.Text.Encoding as TE
-import System.Directory
 import System.FilePath
 import Text.Parsec (runParser)
 import Text.Parsec.Pos (sourceLine)
@@ -32,6 +30,7 @@ import Parser.Parsing (terminaModuleParser)
 import Parser.Types (ParserAnn)
 import Semantic.Environment (declaredNames)
 import Utils.Annotations
+import Utils.Files (filesUnder)
 
 -- | A module of a source folder, by the segments of its name, with its file
 -- and its tree, if it parses.
@@ -170,16 +169,5 @@ readModule root folder segments = do
 -- | The modules under a source folder of the project, such as "src" or
 -- "tests/hk/src", by the segments of their names, without reading them.
 moduleNames :: FilePath -> FilePath -> IO [[String]]
-moduleNames root folder = map (splitDirectories . dropExtension) . sort <$> finFiles (root </> folder) ""
-
-  where
-
-    finFiles dir rel = do
-        exists <- doesDirectoryExist (dir </> rel)
-        if not exists then return [] else do
-            entries <- filter (not . ("." `isPrefixOf`)) <$> listDirectory (dir </> rel)
-            concat <$> forM entries (\e -> do
-                let relEntry = if null rel then e else rel </> e
-                isDir <- doesDirectoryExist (dir </> relEntry)
-                if isDir then finFiles dir relEntry
-                    else return [relEntry | takeExtension e == ".fin"])
+moduleNames root folder =
+    map (splitDirectories . dropExtension) . filter ((== ".fin") . takeExtension) <$> filesUnder (root </> folder)

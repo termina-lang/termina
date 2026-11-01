@@ -19,7 +19,7 @@ import Control.Monad
 import qualified Crypto.Hash.SHA256 as SHA256
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BC
-import Data.List (isSuffixOf, sortOn)
+import Data.List (intercalate, isSuffixOf, sortOn)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -30,6 +30,7 @@ import Configuration.Configuration
 import Configuration.Lock
 import Configuration.Manifest
 import Configuration.Prefix
+import Utils.Files (filesUnder, isHidden)
 
 -- | A file of a package: its path from the root of the package, with "/"
 -- separators, and its bytes.
@@ -101,21 +102,13 @@ writePackage root url files = do
 
     gitAttributes = "* -text\n"
 
--- | The files of a package in "vendor/", to hash them again.
+-- | The files of a package in "vendor/", to hash them again, with "/"
+-- between folders on every system.
 readPackage :: FilePath -> T.Text -> IO [VendoredFile]
 readPackage root url = do
     let dir = packageDir root url
-    paths <- listFiles dir ""
-    forM paths $ \path -> (,) path <$> BS.readFile (dir </> path)
-
-  where
-
-    listFiles dir rel = do
-        entries <- filter (not . isHidden) <$> listDirectory (dir </> rel)
-        concat <$> forM entries (\e -> do
-            let relPath = if null rel then e else rel ++ "/" ++ e
-            isDir <- doesDirectoryExist (dir </> relPath)
-            if isDir then listFiles dir relPath else return [relPath])
+    paths <- filesUnder dir
+    forM paths $ \path -> (,) (intercalate "/" (splitDirectories path)) <$> BS.readFile (dir </> path)
 
 -- | The files of a locked package in "vendor/", or why they are not the ones
 -- the lock records: the folder is missing or its content-hash differs. The

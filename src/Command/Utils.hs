@@ -44,6 +44,7 @@ import System.Environment (getEnvironment)
 import Control.Exception (IOException, try)
 import System.Process (readCreateProcessWithExitCode)
 import Configuration.Fetch (gitProcess)
+import Utils.Files (filesUnder)
 import qualified Crypto.Hash.SHA256 as SHA256
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
@@ -115,19 +116,9 @@ writeIfChanged path content = do
 -- generates, such as the C of a module that has been deleted.
 removeStaleFiles :: FilePath -> [String] -> [FilePath] -> IO ()
 removeStaleFiles folder extensions expected = do
-  exists <- doesDirectoryExist folder
-  when exists $ do
-    files <- listFilesRecursive folder
-    forM_ files $ \f ->
-      when (takeExtension f `elem` extensions && f `notElem` expected) (removeFile f)
-
-  where
-
-    listFilesRecursive dir = do
-      entries <- map (dir </>) <$> listDirectory dir
-      concat <$> mapM (\e -> do
-        isDir <- doesDirectoryExist e
-        if isDir then listFilesRecursive e else return [e]) entries
+  files <- map (folder </>) <$> filesUnder folder
+  forM_ files $ \f ->
+    when (takeExtension f `elem` extensions && f `notElem` expected) (removeFile f)
 
 boxUsageCheckModules :: LoweredProject -> Maybe BoxUsageError
 boxUsageCheckModules = check . M.elems
