@@ -8,7 +8,8 @@ module Command.Test (
     TestCase(..), testCases
 ) where
 
-import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, loadProject, nothingSelected, selectDeployments)
+import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, nothingSelected, selectDeployments)
+import Command.Project (loadProject)
 import Command.Common (loadTerminaModule, loadModules)
 import Command.Deliver (deliverableInfo)
 import Command.Sources (loadSources)

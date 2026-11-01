@@ -2,13 +2,12 @@
 
 module Command.Build (
     buildCmdArgsParser, buildCommand, generateCommand, BuildCmdArgs(..),
-    Selection(..), selectDeployments, nothingSelected, buildDeployment, announce, runMake, loadProject
+    Selection(..), selectDeployments, nothingSelected, buildDeployment, announce, runMake
 ) where
 
 import Configuration.Configuration
 import Configuration.Manifest
-import Configuration.Namespace (checkExports, exportedModules)
-import Command.Dependencies (Fetching(..), Sync(..), syncDependencies, describeChange)
+import Command.Project (loadProject)
 import Command.Sources (loadSources, localFolders)
 import Command.Utils
 import Control.Exception (IOException, try)
@@ -50,8 +49,7 @@ import Data.Aeson.Encode.Pretty (Config(..), defConfig, encodePretty', keyOrder)
 import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
 import EFP.Schedulability.WCEPath.Printer
 import Command.Common
-import Command.Extern (ExternGroup, prepareExtern, checkLoadedExterns, parsedExterns)
-import Configuration.ExternCheck (projectSections, sectionErrors, moduleErrors)
+import Command.Extern (ExternGroup, prepareExtern, checkLoadedExterns)
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.PlantUML
 import Extras.PlantUML.Printer
@@ -321,70 +319,6 @@ selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile offlin
     deployments <- either dieWithError return $ selectDeployments manifest selection mPlatform mProfile
     when (null deployments) (putStrLn . infoMessage $ nothingSelected manifest selection mPlatform)
     return deployments
-
--- | Load the project for a command that builds: the manifest, the folders, the
--- prefixes of a library, the lock and vendor/ brought in line with the
--- manifest (each copy that does not change checked against its hash; offline,
--- without fetching anything) and, in a library, the types of its exported
--- modules. A new library has no module yet, so "termina new --test" reads only
--- the manifest and the folders.
-loadProject :: Bool -> Bool -> IO Manifest
-loadProject chatty offline = do
-    manifest <- loadManifest >>= either dieWithFirstError return
-    -- | The extern sections, reading only the modules that their entries
-    -- name; one of them that does not parse stops with the report of the parser
-    (sections, unparsed) <- projectSections "." manifest
-    forM_ unparsed $ uncurry parseTerminaFile
-    unless (null (sectionErrors sections)) $ dieWithFirstError (sectionErrors sections)
-    exportErrors <- checkExports "." manifest
-    unless (null exportErrors) $ dieWithFirstError exportErrors
-    lock <- loadLock "." >>= either dieWithFirstError return
-    place <- currentPlace
-    Sync changes warnings <- syncDependencies place "termina build" (if offline then Offline else Reuse) True "." manifest lock
-        >>= either dieWithFirstError return
-    mapM_ (putStrLn . warnMessage) warnings
-    mapM_ (putStrLn . infoMessage . ("termina.lock: " ++) . describeChange) changes
-    checkLibrary chatty manifest
-    return manifest
-
--- | Type check the exported modules of a library together, with what they
--- import, on each platform of its tests, or on the platform of the test suite
--- when it has none. A library has no app.fin that says what is loaded, and a
--- consumer may load any exported module, so an exported module that no test
--- imports is checked too, and the names of all of them meet (SE-081, SE-133).
--- It is checked as a test, so that a module that is not exported may hold a
--- test class that several tests share.
-checkLibrary :: Bool -> Manifest -> IO ()
-checkLibrary chatty manifest =
-    case manifestNature manifest of
-        Application _ -> return ()
-        Library _ -> do
-            roots <- exportedModules "." manifest
-            sources <- loadSources manifest Nothing "src"
-            parsedModules <- loadModules sources "src" [ModuleDependency root Internal | root <- roots]
-            -- | Whoever imports the library may load any exported module, so each one with extern functions has its entry
-            case moduleErrors "the project" "src" (manifestExtern manifest) Nothing (map parsedExterns (M.elems parsedModules)) of
-                [] -> return ()
-                errs -> dieWithFirstError errs
-            orderedModules <- either
-                (\files -> dieWithError $ "Detected cycle between the exported modules of the library: " ++ show files)
-                return
-                (sortProjectDepsOrLoop (M.map importedModules parsedModules))
-            forM_ libraryPlatforms $ \plt -> do
-                when chatty (putStrLn . debugMessage $ "Type checking the exported modules on " ++ show plt)
-                let config = (defaultConfig (T.unpack (projectName (manifestProject manifest))) plt) {
-                        sysPrintOutputBufferSize = manifestPrintBufSize manifest,
-                        sysReadInputBufferSize = manifestReadBufSize manifest,
-                        deploymentKind = TestBuild "library"
-                      }
-                void (typeModules parsedModules (makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)) orderedModules)
-
-  where
-
-    libraryPlatforms =
-        case foldr (\plt acc -> if plt `elem` acc then acc else plt : acc) [] (concatMap testPlatforms (M.elems (manifestTests manifest))) of
-            [] -> [TestPlatform]
-            plts -> plts
 
 -- | The deployments of a selection. The application of a library gives none,
 -- and so do the tests of a project without tests or of a platform on which no

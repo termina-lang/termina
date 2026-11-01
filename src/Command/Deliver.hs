@@ -12,6 +12,7 @@ module Command.Deliver (
 
 import Command.Build
 import Command.Extern (ExternGroup(..), groupObject, groupObjects)
+import Command.Project (loadProject)
 import Command.Update (verifyProject)
 import Command.Utils
 import Configuration.Configuration
