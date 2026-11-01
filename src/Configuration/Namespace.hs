@@ -1,19 +1,18 @@
--- | The namespaces of a project: the prefixes that a library exports.
+-- | The prefixes that a library exports, which share out the module paths
+-- among the libraries, and the reading of the modules of a source folder
+-- without loading them.
 module Configuration.Namespace (
     SourceModule(..),
     readModule,
     moduleNames,
     checkExports,
     exportedModules,
-    hasLibraryPrefix,
     parseModule,
     locationLine,
     dottedName
 ) where
 
-import Data.Char (isUpper, toLower, toUpper)
-import Data.List (find, intercalate, isPrefixOf, nub, tails, (\\))
-import qualified Data.Map.Strict as M
+import Data.List (find, intercalate, nub, tails, (\\))
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.ByteString as BS
@@ -28,7 +27,6 @@ import Core.AST
 import Parser.AST (TerminaModule)
 import Parser.Parsing (terminaModuleParser)
 import Parser.Types (ParserAnn)
-import Semantic.Environment (declaredNames)
 import Utils.Annotations
 import Utils.Files (filesUnder)
 
@@ -40,10 +38,10 @@ data SourceModule = SourceModule {
     moduleParsed :: !(Maybe (TerminaModule ParserAnn))
   }
 
--- | Check the prefixes of the exports of a library against each other and
--- against the names of its modules, and the exported modules against the
--- prefixes, and give every problem found. Only the exported modules are read.
--- An application exports nothing and has nothing to check.
+-- | Check the exports of a library, and give every problem found: a prefix
+-- listed twice, two prefixes that overlap, a prefix without modules, and an
+-- exported module that imports a module that is not exported or declares a
+-- test class. Only the exported modules are read, and an application has none.
 checkExports :: FilePath -> Manifest -> IO [String]
 checkExports root manifest =
     case manifestNature manifest of
@@ -72,17 +70,15 @@ checkExports root manifest =
             ++ prefixFolder p ++ ".fin and no .fin under " ++ prefixFolder p ++ "/"
         | not (any (ownsModule p) names)]
 
-    -- | An exported module has to import only exported modules of the
-    -- library, and give every name the prefix of the library. One that does
-    -- not parse is left to the type check of the library, which loads it and
-    -- reports the error of the parser.
+    -- | An exported module imports only exported modules of the library. A
+    -- module that does not parse gives no error here; the type check of the
+    -- library reports it.
     exportedErrors prefixes names m =
         case find (`ownsModule` moduleSegments m) prefixes of
             Nothing -> []
-            Just p -> case moduleParsed m of
+            Just _ -> case moduleParsed m of
                 Nothing -> []
-                Just ast -> importErrors prefixes names m ast ++ nameErrors (last (prefixSegments p)) m ast
-                    ++ testClassErrors m ast
+                Just ast -> importErrors prefixes names m ast ++ testClassErrors m ast
 
     importErrors prefixes names m ast =
         [ at m (locationLine ann) ++ "the exported module " ++ dottedName (moduleSegments m) ++ " imports "
@@ -91,30 +87,13 @@ checkExports root manifest =
         , imported `S.member` S.fromList names
         , not (any (`ownsModule` imported) prefixes) ]
 
-    nameErrors segment m ast =
-        [ at m (locationLine loc) ++ "the name " ++ name ++ " of the exported module " ++ dottedName (moduleSegments m)
-            ++ " does not start with the prefix " ++ segment ++ " (" ++ segment ++ "_..., "
-            ++ map toUpper segment ++ "_..., " ++ pascal segment ++ "...)"
-        | (name, loc) <- M.toList (declaredNames (frags ast))
-        , not (hasLibraryPrefix segment name) ]
-
-    -- | A test class holds the cases of one test, so a library does not
-    -- publish it: what tests reuse is ordinary code.
+    -- | An exported module declares no test class.
     testClassErrors m ast =
         [ at m (locationLine loc) ++ "the exported module " ++ dottedName (moduleSegments m) ++ " declares the test class "
             ++ ident ++ ", which only a test or a module that is not exported may hold"
         | TypeDefinition (Class TestClass ident _ _ _) loc <- frags ast ]
 
     at m line = moduleFile m ++ ":" ++ show line ++ ": "
-
-    pascal = concatMap capitalize . splitOn '_'
-
-    capitalize (c : cs) = toUpper c : cs
-    capitalize [] = []
-
-    splitOn sep s = case break (== sep) s of
-        (part, []) -> [part]
-        (part, _ : rest) -> part : splitOn sep rest
 
 -- | The exported modules of a library, by their qualified name
 -- ("pus/service1"), without reading them, and none in an application.
@@ -134,22 +113,6 @@ locationLine _ = 0
 -- | A module name with dots, such as "pus.service1".
 dottedName :: [String] -> String
 dottedName = intercalate "."
-
--- | Whether a name starts with the last segment of the prefix of its library:
--- in snake case or upper case, the segment and "_" ("char_dev_send",
--- "CHAR_DEV_MAX"); in Pascal case, the segment without "_" and an upper-case
--- letter ("CharDevSend").
-hasLibraryPrefix :: String -> String -> Bool
-hasLibraryPrefix segment name =
-    (segment ++ "_") `isPrefixOf` map toLower name
-        || (map toLower (take (length joined) name) == joined
-            && case drop (length joined) name of
-                (c : _) -> isUpper c
-                [] -> False)
-
-  where
-
-    joined = filter (/= '_') segment
 
 -- | Parse the bytes of a module, given its qualified name and its file;
 -- nothing when they are not UTF-8 or do not parse.

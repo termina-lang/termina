@@ -95,21 +95,12 @@ spec = describe "exports" $ do
       exportErrorsWith "parse" [("src/pus/service1.fin", "function {\n"), ("src/pus/latin1.fin", "// versi\243n\n")]
         (library ["pus"]) `shouldReturn` []
 
-    it "rejects a name of an exported module without the prefix of the library" $
-      exportErrorsWith "names" [("src/drivers/gaisler/crc.fin", "function crc16(x : u16) -> u16 {\n    return x;\n}\n")]
-        (library ["drivers.gaisler"])
-        `shouldReturn` ["src/drivers/gaisler/crc.fin:1: the name crc16 of the exported module drivers.gaisler.crc does not start with the prefix gaisler (gaisler_..., GAISLER_..., Gaisler...)"]
-
     it "rejects a test class in an exported module, and lets one that is not exported hold it" $
       exportErrorsWith "test-class"
         [ ("src/pus/cases.fin", "test class PusCases {\n    case hk(&priv self) {\n        return;\n    }\n};\n")
         , ("src/test_support/cases.fin", "test class SupportCases {\n    case hk(&priv self) {\n        return;\n    }\n};\n") ]
         (library ["pus"])
         `shouldReturn` ["src/pus/cases.fin:1: the exported module pus.cases declares the test class PusCases, which only a test or a module that is not exported may hold"]
-
-    it "does not ask for the prefix in a module that is not exported" $
-      exportErrorsWith "names-free" [("src/pus/util/crc.fin", crc), ("src/test_support/fake.fin", "function fake(x : u16) -> u16 {\n    return x;\n}\n")]
-        (library ["pus"]) `shouldReturn` []
 
   describe "exported modules to type check" $
 
@@ -123,16 +114,3 @@ spec = describe "exports" $ do
       case either (Left . show) parseManifest (decodeEither' (BS.pack (library ["pus"]))) of
         Left err -> expectationFailure err
         Right manifest -> exportedModules root manifest `shouldReturn` ["pus" </> "broken", "pus" </> "service1", "pus" </> "util" </> "crc"]
-
-  describe "prefix of a name" $ do
-
-    it "accepts the segment in snake case, upper case and Pascal case" $
-      map (hasLibraryPrefix "gaisler") ["gaisler_uart_init", "GAISLER_MAX_FRAME", "GaislerAPBUARTDriver", "GaislerCharDev"]
-        `shouldBe` [True, True, True, True]
-
-    it "accepts a segment with underscores in Pascal case without them" $
-      map (hasLibraryPrefix "char_dev") ["char_dev_send", "CHAR_DEV_MAX", "CharDevSend"] `shouldBe` [True, True, True]
-
-    it "rejects a name glued to the segment, the segment alone, and a C or an I before it" $
-      map (hasLibraryPrefix "gaisler") ["Gaislerdriver", "gaislerx", "Gaisler", "gaisler", "CGaislerUart", "IGaislerCharDev", "crc16"]
-        `shouldBe` replicate 7 False

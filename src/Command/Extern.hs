@@ -4,8 +4,8 @@
 -- to the output folder, and the C of each manifest is linked into a
 -- relocatable object of its own in which only its extern functions stay
 -- global. The sections are checked when the project is loaded and when a
--- dependency is admitted (Configuration.ExternCheck); what is left here
--- depends on the build.
+-- dependency is admitted (Configuration.ExternCheck); this module does the
+-- part that depends on the deployment.
 module Command.Extern (
     ExternGroup(..),
     groupObject,
@@ -65,9 +65,9 @@ groupObjects :: ExternGroup -> String
 groupObjects g = if null (groupVariable g) then "EXTERN_OBJS" else groupVariable g ++ "_EXTERN_OBJS"
 
 -- | Copy the C that the modules of the build need on the selected platform
--- to the output folder, and give its groups: the one of the project, with the
--- section of the project and, in a test, the one of the test, and one for each
--- dependency with C in the modules that the build loads from it. A file that
+-- to the output folder, and give its groups: one for the project, with its C
+-- and, in a test, the C of the test, and one for each dependency whose loaded
+-- modules have C. A file that
 -- both sections of the project have would overwrite the other in the output
 -- folder, so it is an error, and so are two dependencies whose C would go to
 -- the same place.
@@ -142,9 +142,8 @@ removeStaleGroups out kept =
 
 -- | The files of an "extern" section that the loaded modules need on the
 -- selected platform, relative to its folder, given the manifest that declares
--- the section and its owner. A loaded module that has libraries has to have
--- them for the selected platform, since they are tied to the platforms they
--- were compiled for.
+-- the section and its owner. A loaded module with libraries has them for the
+-- selected platform.
 usedFiles :: TerminaConfig -> FilePath -> String -> S.Set T.Text -> FilePath -> ExternConfig -> IO [FilePath]
 usedFiles config manifestPath owner loaded externFolderPath (ExternConfig moduleEntries) = do
   present <- filesUnder externFolderPath
@@ -195,9 +194,8 @@ loadedFrom project folder = S.fromList
   [ T.pack (qualifiedToModuleName (qualifiedName m)) | m <- M.elems project, isFrom folder m ]
 
 -- | Copy the files, each one given by its folder and its path relative to it,
--- to the output folder. A file is written only when its content changed, so
--- that its date only moves when it has to, and the files of the output folder
--- that are no longer listed are removed.
+-- to the output folder. A file is written only when its content changes, and
+-- the files of the output folder that are no longer listed are removed.
 copyExtern :: FilePath -> [(FilePath, FilePath)] -> IO ()
 copyExtern destination folderFiles = do
   let files = map snd folderFiles

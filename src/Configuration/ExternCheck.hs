@@ -47,7 +47,7 @@ data ExternSection = ExternSection {
     sectionFiles :: ![FilePath],
     -- | The modules of its source folder, by the segments of their names
     sectionModules :: ![[String]],
-    -- | The modules whose generated headers may reach its C, with their
+    -- | The modules whose generated headers its C can include, with their
     -- files: those of every source folder of the project
     sectionSeen :: ![([String], FilePath)],
     -- | The modules that its entries name and that parse
@@ -72,8 +72,8 @@ sourceExterns m = ModuleExterns (moduleSegments m) (moduleFile m) . externsOf <$
 
 -- | Every problem of the sections of a manifest that follows from the manifest
 -- itself: the "extern" folder, the lists and the modules that the entries
--- name. The sections go together, since an entry may name a module of the
--- source folder of another one.
+-- name. An entry that names a module of the source folder of another section
+-- is reported with that section.
 sectionErrors :: [ExternSection] -> [String]
 sectionErrors sections = concatMap errorsOf sections
 
@@ -85,8 +85,8 @@ sectionErrors sections = concatMap errorsOf sections
     misplacedErrors s =
         [ sectionFolder s </> file ++ ":" ++ problem | file <- sectionFiles s, Just problem <- [misplaced s file] ]
 
-    -- | The headers of the folder go before the generated ones, so none can
-    -- have the path of a generated one, and the C would not see it
+    -- | The C sees the headers of the folder before the generated ones, so no
+    -- header of the folder has the path of a generated one
     hidingErrors s = concat
         [ [ sectionFolder s </> file ++ ": has the path of a header that the transpiler generates"
           | header `elem` generatedHeaders ]
@@ -108,8 +108,7 @@ sectionErrors sections = concatMap errorsOf sections
         , let named = [ (path, listedFiles (sectionFiles s) path) | path <- paths ]
               files = concatMap snd named ]
 
-    -- | Every file of the folder is listed, so that no C is left uncompiled and
-    -- a package carries every header and library
+    -- | Every file of the folder is listed under some module
     unlistedErrors s =
         [ sectionFolder s </> file ++ ": is not listed under any module in " ++ sectionOf (sectionOwner s)
         | file <- sectionFiles s, file `notElem` listed ]
