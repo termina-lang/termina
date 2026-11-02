@@ -4,6 +4,8 @@ import Command.Utils
 import Command.Sources
 import Command.Types
 import Configuration.Namespace (locationLine)
+import Configuration.Parsed
+import qualified Data.Map.Lazy as ML
 import Data.List (find)
 import Modules.Utils (buildModuleName, qualifiedToModuleName)
 
@@ -12,10 +14,8 @@ import qualified Data.Text as T
 import System.FilePath
 import System.Directory
 import Parser.AST (TerminaModule)
-import Parser.Parsing (terminaModuleParser)
 import Parser.Types (ParserAnn)
 import Parser.Errors
-import Text.Parsec (runParser)
 import qualified Data.Map.Strict as M
 import Semantic.Types (SemanticAnn)
 import Modules.Modules
@@ -38,20 +38,21 @@ import ControlFlow.ValueAnalysis (runValueAnalysisCheck)
 import qualified Data.Set as S
 import Control.Monad (forM_)
 import qualified Data.ByteString as BS
-import qualified Data.Text.Encoding as TE
 
 
--- | Load Termina file 
+-- | Load a Termina module, taken from the parsed files or, when they do not
+-- have it, read and parsed from its file.
 loadTerminaModule ::
-  Sources
+  ParsedFiles
+  -> Sources
   -- | Source folder of the module
   -> FilePath
   -- | Path of the file to load
   -> FilePath
   -> IO ParsedModule
-loadTerminaModule sources root filePath = do
+loadTerminaModule parsed sources root filePath = do
   let fullP = root </> filePath <.> "fin"
-  (src_code, term) <- parseTerminaFile filePath fullP
+  (src_code, term) <- maybe (parseTerminaFile filePath fullP) (parsedOrDie filePath fullP) (ML.lookup (normalise fullP) parsed)
   mod_time <- getModificationTime fullP
   imports <- mapM (importOf (M.singleton fullP src_code) fullP) (modules term)
   return $ TerminaModuleData filePath fullP mod_time imports [] src_code (ParsingData . frags $ term)
@@ -82,25 +83,31 @@ parseTerminaFile ::
   -- | Path of the file
   -> FilePath
   -> IO (T.Text, TerminaModule ParserAnn)
-parseTerminaFile filePath fullP = do
-  src_code <- either (const (dieWithError $ fullP ++ ": the file is not valid UTF-8")) return . TE.decodeUtf8' =<< BS.readFile fullP
-  case runParser terminaModuleParser filePath fullP (T.unpack src_code) of
-    Left err ->
+parseTerminaFile filePath fullP = BS.readFile fullP >>= parsedOrDie filePath fullP . parseFile filePath fullP
+
+-- | The text and the tree of a parsed module file, given its qualified name
+-- and its path, or stop with the error of the parser.
+parsedOrDie :: QualifiedName -> FilePath -> ParsedFile -> IO (T.Text, TerminaModule ParserAnn)
+parsedOrDie filePath fullP parsedFile =
+  case parsedFile of
+    Left NotUtf8 -> dieWithError $ fullP ++ ": the file is not valid UTF-8"
+    Left (InvalidSyntax src_code err) ->
       let pErr = annotateError (Position filePath (errorPos err) (errorPos err)) (EParseError err)
           fileMap = M.singleton fullP src_code
       in
       dieWithReport (toText pErr fileMap)
-    Right term -> return (src_code, term)
+    Right parsedModule -> return parsedModule
 
 -- | Load the modules that the modules of a folder import, and everything they
 -- import in turn, each one from the folder where the importer finds it. One
 -- name found in two folders of the build is an error.
 loadModules
-  :: Sources
+  :: ParsedFiles
+  -> Sources
   -> FilePath
   -> [ModuleDependency]
   -> IO ParsedProject
-loadModules sources importer imported = loadModules' M.empty [(dep, importer) | dep <- imported]
+loadModules parsed sources importer imported = loadModules' M.empty [(dep, importer) | dep <- imported]
 
   where
 
@@ -117,7 +124,7 @@ loadModules sources importer imported = loadModules' M.empty [(dep, importer) | 
         | fullPath loaded == folder </> qname <.> "fin" -> loadModules' fsLoaded fss
         | otherwise -> dieWithError (collisionMessage sources qname (moduleFolder qname (fullPath loaded)) folder)
       Nothing -> do
-        loadedModule <- loadTerminaModule sources folder qname
+        loadedModule <- loadTerminaModule parsed sources folder qname
         loadModules' (M.insert qname loadedModule fsLoaded)
           (fss ++ [(dep, folder) | dep <- importedModules loadedModule])
 

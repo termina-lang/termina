@@ -14,7 +14,9 @@ import Configuration.Platform
 import Command.Common
 import Command.Dependencies (Fetching(..), Sync(..), syncDependencies, describeChange)
 import Command.Extern (parsedExterns)
-import Command.Sources (LoadedProject(..), buildSources)
+import Command.Sources (LoadedProject(..), buildSources, readProjectModules)
+import qualified Data.Map.Lazy as ML
+import System.FilePath (normalise)
 import Command.Utils
 import Generator.Environment
 import Modules.Modules
@@ -33,20 +35,22 @@ import qualified Data.Text as T
 loadProject :: Bool -> Bool -> IO LoadedProject
 loadProject chatty offline = do
     manifest <- loadManifest >>= either dieWithFirstError return
+    own <- readProjectModules manifest
     -- | The extern sections, reading only the modules that their entries
     -- name; one of them that does not parse stops with the report of the parser
-    (sections, unparsed) <- readExternSections "." manifest
-    forM_ unparsed $ uncurry parseTerminaFile
+    (sections, unparsed) <- readExternSections "." own manifest
+    forM_ unparsed $ \(qname, file) ->
+        maybe (parseTerminaFile qname file) (parsedOrDie qname file) (ML.lookup (normalise file) own)
     unless (null (checkExternSections sections)) $ dieWithFirstError (checkExternSections sections)
-    exportErrors <- checkExports "." manifest
+    exportErrors <- checkExports "." own manifest
     unless (null exportErrors) $ dieWithFirstError exportErrors
     lock <- loadLock "." >>= either dieWithFirstError return
     place <- currentPlace
-    Sync changes warnings packages locals <- syncDependencies place "termina build" (if offline then Offline else Reuse) True "." manifest lock
+    Sync changes warnings packages locals parsed <- syncDependencies place "termina build" (if offline then Offline else Reuse) True "." manifest lock
         >>= either dieWithFirstError return
     mapM_ (putStrLn . warnMessage) warnings
     mapM_ (putStrLn . infoMessage . ("termina.lock: " ++) . describeChange) changes
-    let project = LoadedProject manifest packages locals
+    let project = LoadedProject manifest packages locals (ML.union own parsed)
     verifyLibrary chatty project
     return project
 
@@ -61,7 +65,7 @@ verifyLibrary chatty project =
         Application _ -> return ()
         Library _ -> do
             roots <- exportedModules "." manifest
-            parsedModules <- loadModules (buildSources project Nothing "src") "src" [ModuleDependency root Internal | root <- roots]
+            parsedModules <- loadModules (loadedParsed project) (buildSources project Nothing "src") "src" [ModuleDependency root Internal | root <- roots]
             -- | Each exported module with extern functions has its entry
             case checkExternModules "the project" "src" (manifestExtern manifest) Nothing (map parsedExterns (M.elems parsedModules)) of
                 [] -> return ()

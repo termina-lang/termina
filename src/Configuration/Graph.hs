@@ -7,30 +7,34 @@ module Configuration.Graph (
 ) where
 
 import Data.List (isSuffixOf, tails)
+import qualified Data.Map.Lazy as ML
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
-import System.FilePath (joinPath, dropExtension, splitDirectories)
+import System.FilePath (dropExtension, normalise, splitDirectories, (</>))
 
 import Configuration.Fetch (FetchedFile(..))
 import Configuration.Local
 import Configuration.Lock (normalizeUrl)
 import Configuration.Manifest
-import Configuration.Namespace (parseModule, locationLine, dottedName)
+import Configuration.Namespace (locationLine, dottedName)
+import Configuration.Parsed (ParsedFile, parsedTree)
 import Configuration.Prefix
 import Configuration.Resolve
 import Core.AST
 
 -- | A package of the graph as the checks see it: where its files are shown,
--- its manifest and files, and the folder of a local one, which its path
--- dependencies are relative to.
-data Unit = Unit String Manifest [FetchedFile] (Maybe FilePath)
+-- its manifest and files, the folder of a local one, which its path
+-- dependencies are relative to, and its parsed modules by their path in it.
+data Unit = Unit String Manifest [FetchedFile] (Maybe FilePath) (FilePath -> Maybe ParsedFile)
 
 -- | Every problem of the graph of the root: prefixes that overlap between two
 -- packages, or between a package and the root when it is a library, and
 -- imports of exported modules that leave their package and its dependencies.
-checkGraph :: Manifest -> Resolution -> M.Map FilePath LocalPackage -> [String]
-checkGraph root resolution locals = overlapErrors ++ concatMap importErrors units
+-- The modules of a package of the resolution are taken from the parsed files,
+-- by the key of the package and their path in it.
+checkGraph :: Manifest -> Resolution -> (T.Text -> FilePath -> Maybe ParsedFile) -> M.Map FilePath LocalPackage -> [String]
+checkGraph root resolution parsedAt locals = overlapErrors ++ concatMap importErrors units
 
   where
 
@@ -41,27 +45,29 @@ checkGraph root resolution locals = overlapErrors ++ concatMap importErrors unit
     nameOf = T.unpack . projectName . manifestProject
 
     units = [ Unit ("vendor/" ++ T.unpack key) (manifestOf pkg) (obtainedFiles (resolvedObtained pkg)) Nothing
+                (parsedAt key)
             | (key, pkg) <- M.toList packages ]
-        ++ [ Unit folder (localManifest l) (localFiles l) (Just folder) | (folder, l) <- M.toList locals ]
+        ++ [ Unit folder (localManifest l) (localFiles l) (Just folder) (\path -> ML.lookup (normalise (folder </> path)) (localParsed l))
+           | (folder, l) <- M.toList locals ]
 
     -- | The prefixes with their owner, and whether the owner is the root,
     -- whose own overlaps are reported by its build.
     owned = [(nameOf root, True, p) | p <- manifestPrefixes root]
-        ++ [(nameOf m, False, p) | Unit _ m _ _ <- units, p <- manifestPrefixes m]
+        ++ [(nameOf m, False, p) | Unit _ m _ _ _ <- units, p <- manifestPrefixes m]
 
     overlapErrors =
         [ "the prefix " ++ prefixText p1 ++ " of " ++ o1 ++ " overlaps " ++ prefixText p2 ++ " of " ++ o2
         | ((o1, r1, p1) : rest) <- tails owned, (o2, r2, p2) <- rest
         , not (r1 && r2), overlaps p1 p2 ]
 
-    importErrors (Unit shown m files folder) =
+    importErrors (Unit shown m files folder parsedIn) =
         [ shown ++ "/" ++ path ++ ":" ++ show (locationLine ann) ++ ": the exported module "
             ++ dottedName segments ++ " imports " ++ dottedName imported ++ ", which is neither exported by "
             ++ nameOf m ++ " nor by a dependency it declares"
-        | FetchedFile path _ bytes <- files
+        | FetchedFile path _ _ <- files
         , ".fin" `isSuffixOf` path, any (`ownsPath` path) (manifestPrefixes m)
         , let segments = splitDirectories (dropExtension (drop (length ("src/" :: String)) path))
-        , Just ast <- [parseModule (joinPath segments) path bytes]
+        , Just ast <- [parsedIn path >>= parsedTree]
         , ModuleImport imported ann <- modules ast
         , not (any (`ownsModule` imported) allowed) ]
 

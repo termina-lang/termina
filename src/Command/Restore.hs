@@ -17,6 +17,7 @@ import Command.Dependencies (PackageError(..), describeObtainErrors)
 import Command.Utils (Place, currentPlace, dieWithFirstError, infoMessage, loadLock)
 import Configuration.Fetch
 import Configuration.Lock
+import Configuration.Parsed (packageLookup)
 import Configuration.Resolve (ResolveError(..))
 import Configuration.Validate
 import Configuration.Vendor
@@ -68,7 +69,7 @@ restoreVendor place root = do
         fetched <- fetchLocked root url tag (lockedCommit locked)
         return $ case fetched of
             Left err -> failed (FetchFailed err)
-            Right (Fetched _ files fromPrefetch) -> case validatePackage files of
+            Right (Fetched _ files fromPrefetch) -> case validatePackage (packageLookup (packageDir root url) [(p, b) | FetchedFile p _ b <- files]) files of
                 Left errs -> failed (InvalidPackage errs)
                 Right manifest ->
                     let vendored = [(p, b) | FetchedFile p _ b <- files, isVendored manifest p]

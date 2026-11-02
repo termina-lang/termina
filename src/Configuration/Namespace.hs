@@ -1,31 +1,27 @@
 -- | The prefixes that a library exports, which share out the module paths
--- among the libraries, and the reading of the modules of a source folder
--- without loading them.
+-- among the libraries, and the modules of a source folder without loading
+-- them.
 module Configuration.Namespace (
     SourceModule(..),
-    readModule,
+    sourceModule,
     moduleNames,
     checkExports,
     exportedModules,
-    parseModule,
     locationLine,
     dottedName
 ) where
 
 import Data.List (find, intercalate, nub, tails, (\\))
+import qualified Data.Map.Lazy as ML
 import qualified Data.Set as S
-import qualified Data.Text as T
-import qualified Data.ByteString as BS
-import qualified Data.Text.Encoding as TE
 import System.FilePath
-import Text.Parsec (runParser)
 import Text.Parsec.Pos (sourceLine)
 
 import Configuration.Manifest
+import Configuration.Parsed
 import Configuration.Prefix
 import Core.AST
 import Parser.AST (TerminaModule)
-import Parser.Parsing (terminaModuleParser)
 import Parser.Types (ParserAnn)
 import Utils.Annotations
 import Utils.Files (filesUnder)
@@ -42,14 +38,14 @@ data SourceModule = SourceModule {
 -- listed twice, two prefixes that overlap, a prefix without modules, and an
 -- exported module that imports a module that is not exported or declares a
 -- test class. Only the exported modules are read, and an application has none.
-checkExports :: FilePath -> Manifest -> IO [String]
-checkExports root manifest =
+checkExports :: FilePath -> ParsedFiles -> Manifest -> IO [String]
+checkExports root parsed manifest =
     case manifestNature manifest of
         Application _ -> return []
         Library [] -> return ["a library exports at least one prefix"]
         Library prefixes -> do
             names <- moduleNames root "src"
-            exported <- mapM (readModule root "src") [ segments | segments <- names, any (`ownsModule` segments) prefixes ]
+            let exported = map (sourceModule parsed "src") [ segments | segments <- names, any (`ownsModule` segments) prefixes ]
             return $ repeatedErrors prefixes ++ overlapErrors (nub prefixes)
                 ++ concatMap (emptyErrors names) (nub prefixes)
                 ++ concatMap (exportedErrors (nub prefixes) names) exported
@@ -114,20 +110,15 @@ locationLine _ = 0
 dottedName :: [String] -> String
 dottedName = intercalate "."
 
--- | Parse the bytes of a module, given its qualified name and its file;
--- nothing when they are not UTF-8 or do not parse.
-parseModule :: QualifiedName -> FilePath -> BS.ByteString -> Maybe (TerminaModule ParserAnn)
-parseModule qname file bytes =
-    case TE.decodeUtf8' bytes of
-        Left _ -> Nothing
-        Right text -> either (const Nothing) Just (runParser terminaModuleParser qname file (T.unpack text))
+-- | The module of a source folder with the given segments, taken from the
+-- parsed files.
+sourceModule :: ParsedFiles -> FilePath -> [String] -> SourceModule
+sourceModule parsed folder segments =
+    SourceModule segments file (ML.lookup (normalise file) parsed >>= parsedTree)
 
--- | Read and parse the module of a source folder with the given segments.
-readModule :: FilePath -> FilePath -> [String] -> IO SourceModule
-readModule root folder segments = do
-    let qname = joinPath segments
-        file = folder </> qname <.> "fin"
-    SourceModule segments file . parseModule qname file <$> BS.readFile (root </> file)
+  where
+
+    file = folder </> joinPath segments <.> "fin"
 
 -- | The modules under a source folder of the project, such as "src" or
 -- "tests/hk/src", by the segments of their names, without reading them.

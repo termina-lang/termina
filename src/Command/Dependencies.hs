@@ -18,6 +18,7 @@ module Command.Dependencies (
 import Control.Monad
 import Data.IORef
 import Data.List (intercalate)
+import qualified Data.Map.Lazy as ML
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import System.Directory
@@ -29,6 +30,7 @@ import Configuration.Graph
 import Configuration.Local
 import Configuration.Lock
 import Configuration.Manifest
+import Configuration.Parsed
 import Configuration.Resolve
 import Configuration.Validate
 import Configuration.Vendor
@@ -72,8 +74,11 @@ data Sync = Sync {
     -- | The packages of the lock by normalized URL, each with its URL and its manifest
     syncPackages :: !(M.Map T.Text (T.Text, Manifest)),
     -- | The libraries of local folders by folder
-    syncLocals :: !(M.Map FilePath LocalPackage)
-  } deriving (Eq, Show)
+    syncLocals :: !(M.Map FilePath LocalPackage),
+    -- | The modules of the packages and of the local folders by their path
+    -- from the project folder
+    syncParsed :: !ParsedFiles
+  } deriving Show
 
 -- | Update the lock and vendor/ from a manifest. It reads and validates the
 -- libraries of local folders, resolves the manifest, takes from vendor/ every
@@ -93,11 +98,20 @@ syncDependencies place commandName fetching write root manifest lock = do
             resolution <- resolveWith (obtain used) manifest extra
             case resolution of
                 Left errs -> return (Left (describeObtainErrors place commandName errs))
-                Right res -> case checkGraph manifest res locals of
-                    [] -> Right <$> commit res locals used
-                    errs -> return (Left errs)
+                Right res ->
+                    let parsed = ML.map (\p -> parsePackage (packageDir root (resolvedUrl p)) (filesOf p)) (resolvedPackages res)
+                        parsedAt key path = do
+                            files <- ML.lookup key parsed
+                            p <- M.lookup key (resolvedPackages res)
+                            ML.lookup (normalise (packageDir root (resolvedUrl p) </> path)) files
+                    in case checkGraph manifest res parsedAt locals of
+                        [] -> Right <$> commit res locals
+                            (ML.unions (ML.elems parsed ++ map localParsed (M.elems locals))) used
+                        errs -> return (Left errs)
 
   where
+
+    filesOf p = [ (path, bytes) | FetchedFile path _ bytes <- obtainedFiles (resolvedObtained p) ]
 
     rootName = T.unpack (projectName (manifestProject manifest))
 
@@ -125,13 +139,13 @@ syncDependencies place commandName fetching write root manifest lock = do
         fetched <- fetchTag root u t
         case fetched of
             Left err -> return (Left (FetchFailed err))
-            Right (Fetched sha files fromPrefetch) -> case validatePackage files of
+            Right (Fetched sha files fromPrefetch) -> case validatePackage (packageLookup (packageDir root u) [(p, b) | FetchedFile p _ b <- files]) files of
                 Left errs -> return (Left (InvalidPackage errs))
                 Right m -> do
                     when fromPrefetch (modifyIORef used (prefetchDir root u :))
                     return (Right (Obtained sha m files))
 
-    commit res locals used = do
+    commit res locals parsed used = do
         let packages = M.elems (resolvedPackages res)
             vendored p = [ (path, bytes) | FetchedFile path _ bytes <- obtainedFiles (resolvedObtained p)
                          , isVendored (obtainedManifest (resolvedObtained p)) path ]
@@ -150,7 +164,7 @@ syncDependencies place commandName fetching write root manifest lock = do
             writeLockFile (root </> "termina.lock") (Lock (lockVersion emptyLock) (map entry packages))
         when write (readIORef used >>= mapM_ removePathForcibly)
         return (Sync changes (overrideWarnings res)
-            (M.map (\p -> (resolvedUrl p, obtainedManifest (resolvedObtained p))) (resolvedPackages res)) locals)
+            (M.map (\p -> (resolvedUrl p, obtainedManifest (resolvedObtained p))) (resolvedPackages res)) locals parsed)
 
     -- | The folder of a package that left the lock, and the folders above it
     -- that it leaves empty.

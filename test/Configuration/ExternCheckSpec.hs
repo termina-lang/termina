@@ -5,7 +5,8 @@ module Configuration.ExternCheckSpec (spec) where
 
 import Configuration.Configuration
 import Configuration.ExternCheck
-import Configuration.Namespace (SourceModule(..), parseModule)
+import Configuration.Namespace (SourceModule(..))
+import Configuration.Parsed (parseFile, parsedTree)
 
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.Map.Strict as M
@@ -20,7 +21,7 @@ externs :: FilePath -> FilePath -> String -> ModuleExterns
 externs folder file text =
     let qname = dropExtension file
     in head (mapMaybe sourceExterns [SourceModule (splitDirectories qname) (folder </> file)
-                                         (parseModule qname (folder </> file) (BS.pack text))])
+                                         (parsedTree (parseFile qname (folder </> file) (BS.pack text)))])
 
 uart, util, clock :: ModuleExterns
 uart = externs "src" "drivers/uart.fin" "extern function uart_write(c : u8);\n"

@@ -7,6 +7,7 @@ import Configuration.Fetch
 import Configuration.Graph
 import Configuration.Lock (normalizeUrl)
 import Configuration.Manifest
+import Configuration.Parsed (packageLookup)
 import Configuration.Resolve
 
 import qualified Data.ByteString.Char8 as BS
@@ -33,7 +34,13 @@ package name exports deps modules = ResolvedPackage (T.pack (url name)) "v1" (Ob
 
 -- | The problems of a graph without local packages.
 graphErrors :: Manifest -> Resolution -> [String]
-graphErrors root res = checkGraph root res M.empty
+graphErrors root res = checkGraph root res parsedAt M.empty
+
+  where
+
+    parsedAt key path = do
+        p <- M.lookup key (resolvedPackages res)
+        packageLookup "" [(f, bytes) | FetchedFile f _ bytes <- obtainedFiles (resolvedObtained p)] path
 
 resolution :: [ResolvedPackage] -> Resolution
 resolution pkgs = Resolution (M.fromList [(normalizeUrl (resolvedUrl p), p) | p <- pkgs]) [] []

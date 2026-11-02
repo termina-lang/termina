@@ -10,6 +10,7 @@ module Command.Sources (
     Lookup(..),
     LoadedProject(..),
     readProject,
+    readProjectModules,
     buildSources,
     plainSources,
     lookupModule,
@@ -20,7 +21,9 @@ module Command.Sources (
 ) where
 
 import Control.Monad
+import qualified Data.ByteString as BS
 import Data.List (find)
+import qualified Data.Map.Lazy as ML
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -31,8 +34,10 @@ import Command.Utils (dieWithFirstError, loadLock)
 import Configuration.Local
 import Configuration.Lock
 import Configuration.Manifest
+import Configuration.Parsed
 import Configuration.Prefix (manifestPrefixes, ownsModule)
 import Configuration.Vendor (packageDir)
+import Utils.Files (filesUnder)
 import Modules.Utils (qualifiedToModuleName)
 import Utils.Annotations (QualifiedName)
 
@@ -69,8 +74,11 @@ data LoadedProject = LoadedProject {
     -- | The packages of vendor/ by normalized URL, each with its URL and its manifest
     loadedPackages :: !(M.Map T.Text (T.Text, Manifest)),
     -- | The libraries of local folders by folder
-    loadedLocals :: !(M.Map FilePath LocalPackage)
-  } deriving (Eq, Show)
+    loadedLocals :: !(M.Map FilePath LocalPackage),
+    -- | The modules of the project and of its dependencies by their path from
+    -- the project folder
+    loadedParsed :: !ParsedFiles
+  } deriving Show
 
 -- | Read a project and its dependencies from disk, without updating the lock
 -- or vendor/. It stops at the first error.
@@ -81,17 +89,44 @@ readProject manifest = do
     vendored <- forM (lockPackages lock) $ \l -> do
         m <- decodeManifestFile (packageDir "." (lockedUrl l) </> "termina.yaml")
         either (\err -> dieWithFirstError ["vendor/: " ++ err]) (\m' -> return (normalizeUrl (lockedUrl l), (lockedUrl l, m'))) m
-    return (LoadedProject manifest (M.fromList vendored) locals)
+    own <- readProjectModules manifest
+    packages <- mapM (\l -> readSourceFolder (normalise (packageDir "." (lockedUrl l) </> "src"))) (lockPackages lock)
+    return (LoadedProject manifest (M.fromList vendored) locals
+        (ML.unions (own : packages ++ map localParsed (M.elems locals))))
 
   where
 
     allDependencies = manifestDependencies manifest ++ concatMap testDependencies (M.elems (manifestTests manifest))
 
+-- | The modules of a project: those of src/ and of the src/ of each test, and
+-- the main modules of app/ and of each test, read from disk.
+readProjectModules :: Manifest -> IO ParsedFiles
+readProjectModules manifest = do
+    sources <- mapM readSourceFolder ("src" : map (</> "src") tests)
+    mains <- mapM readMainFolder ("app" : tests)
+    return (ML.unions (sources ++ mains))
+
+  where
+
+    tests = ["tests" </> T.unpack t | t <- M.keys (manifestTests manifest)]
+
+    readMainFolder folder = do
+        exists <- doesDirectoryExist folder
+        names <- if exists then listDirectory folder else return []
+        files <- filterM (doesFileExist . (folder </>)) [n | n <- names, takeExtension n == ".fin"]
+        parseFolder folder <$> mapM (\f -> (,) f <$> BS.readFile (folder </> f)) files
+
+-- | The modules under a source folder, read from disk.
+readSourceFolder :: FilePath -> IO ParsedFiles
+readSourceFolder folder = do
+    files <- filter ((== ".fin") . takeExtension) <$> filesUnder folder
+    parseFolder folder <$> mapM (\f -> (,) f <$> BS.readFile (folder </> f)) files
+
 -- | The folders of the build of the application, or of a test, with the
 -- folder of its main module. Only the local folders that the dependencies of
 -- the project and of the test reach are included.
 buildSources :: LoadedProject -> Maybe String -> FilePath -> Sources
-buildSources (LoadedProject manifest vendored admitted) mTest mainFolder =
+buildSources (LoadedProject manifest vendored admitted _) mTest mainFolder =
     sources vendored (reachedLocals admitted [(".", p) | DepPath p <- manifestDependencies manifest])
         (reachedLocals admitted [(".", p) | DepPath p <- testDeps])
 

@@ -20,22 +20,24 @@ import Configuration.Configuration
 import Configuration.ExternCheck (ExternSection(..), checkExternSections, checkExternModules, sourceExterns)
 import Configuration.Fetch (FetchedFile(..))
 import Configuration.Manifest
-import Configuration.Namespace (SourceModule(..), parseModule)
+import Configuration.Namespace (SourceModule(..))
+import Configuration.Parsed (ParsedFile, parsedTree)
 import Configuration.Prefix
 import Configuration.Vendor (isVendored, exportedExtern)
 
 -- | Check the files of the commit of a package, and give its manifest or
--- every problem found.
-validatePackage :: [FetchedFile] -> Either [String] Manifest
+-- every problem found. The modules are taken from the parsed files, by their
+-- path in the package.
+validatePackage :: (FilePath -> Maybe ParsedFile) -> [FetchedFile] -> Either [String] Manifest
 validatePackage = validateFiles False
 
 -- | Check the files of a library in a local folder as those of a fetched
 -- package, except that it may itself depend on other local folders.
-validateLocalPackage :: [FetchedFile] -> Either [String] Manifest
+validateLocalPackage :: (FilePath -> Maybe ParsedFile) -> [FetchedFile] -> Either [String] Manifest
 validateLocalPackage = validateFiles True
 
-validateFiles :: Bool -> [FetchedFile] -> Either [String] Manifest
-validateFiles local files =
+validateFiles :: Bool -> (FilePath -> Maybe ParsedFile) -> [FetchedFile] -> Either [String] Manifest
+validateFiles local parsedAt files =
     case find ((== "termina.yaml") . fetchedPath) files of
         Nothing -> Left ["the package has no termina.yaml"]
         Just yaml -> case decodeManifest (fetchedBytes yaml) of
@@ -73,8 +75,8 @@ validateFiles local files =
         vendored = [ f | f <- files, isVendored manifest (fetchedPath f) ]
 
         exported =
-            [ SourceModule segments path (parseModule (joinPath segments) path bytes)
-            | FetchedFile path _ bytes <- vendored, Just rel <- [stripPrefix "src/" path], takeExtension rel == ".fin"
+            [ SourceModule segments path (parsedAt path >>= parsedTree)
+            | FetchedFile path _ _ <- vendored, Just rel <- [stripPrefix "src/" path], takeExtension rel == ".fin"
             , let segments = splitDirectories (dropExtension rel) ]
 
         keys = [ map T.unpack (T.splitOn "." key) | key <- M.keys (externModules config) ]

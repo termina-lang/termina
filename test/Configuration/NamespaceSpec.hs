@@ -2,6 +2,7 @@
 -- against its sources.
 module Configuration.NamespaceSpec (spec) where
 
+import Command.Sources (readProjectModules)
 import Configuration.Manifest
 import Configuration.Namespace
 
@@ -35,7 +36,9 @@ exportErrorsWith label files yaml = do
     BS.writeFile (root </> f) (BS.pack content)
   case either (Left . show) parseManifest (decodeEither' (BS.pack yaml)) of
     Left err -> expectationFailure err >> return []
-    Right manifest -> checkExports root manifest
+    Right manifest -> do
+      parsed <- withCurrentDirectory root (readProjectModules manifest)
+      checkExports root parsed manifest
 
 spec :: Spec
 spec = describe "exports" $ do

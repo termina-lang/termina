@@ -478,10 +478,10 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
     -- | Load the module that wires the deployment
     let mainModulePath = mainFolder </> deploymentMainModule deployment <.> "fin"
     when chatty (putStrLn . debugMessage $ "Loading the main module: \"" ++ mainModulePath ++ "\"")
-    appModule <- loadTerminaModule sources mainFolder (deploymentMainModule deployment)
+    appModule <- loadTerminaModule (loadedParsed project) sources mainFolder (deploymentMainModule deployment)
     -- | Load the project
     when chatty (putStrLn . debugMessage $ "Loading project modules")
-    parsedModules <- loadModules sources mainFolder (importedModules appModule)
+    parsedModules <- loadModules (loadedParsed project) sources mainFolder (importedModules appModule)
     let parsedProject = M.insert (qualifiedName appModule) appModule parsedModules
     -- | The modules of the deployment with extern functions have their entries
     verifyLoadedExterns appModule (maybe externFolder (\t -> "tests" </> t </> externFolder) mTest)

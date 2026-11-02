@@ -24,7 +24,8 @@ import System.FilePath
 
 import Configuration.Configuration
 import Configuration.Manifest
-import Configuration.Namespace (SourceModule(..), readModule, moduleNames, locationLine, dottedName)
+import Configuration.Namespace (SourceModule(..), sourceModule, moduleNames, locationLine, dottedName)
+import Configuration.Parsed (ParsedFiles)
 import Configuration.Platform (checkPlatform)
 import Core.AST
 import Generator.CodeGen.Application.Config (genConfigPathName)
@@ -200,11 +201,11 @@ manifestFile = "termina.yaml"
 -- the one of each test. In a test, the C of the project and the one of the
 -- test go to one folder of the output, so the headers of every section are
 -- checked against the modules of every source folder. Of the modules, only
--- those that the entries name are read. It also gives the named modules that
--- do not parse, by their qualified name and their file, for the caller to
--- report.
-readExternSections :: FilePath -> Manifest -> IO ([ExternSection], [(FilePath, FilePath)])
-readExternSections root manifest = do
+-- those that the entries name are read, from the parsed files. It also gives
+-- the named modules that do not parse, by their qualified name and their file,
+-- for the caller to report.
+readExternSections :: FilePath -> ParsedFiles -> Manifest -> IO ([ExternSection], [(FilePath, FilePath)])
+readExternSections root parsed manifest = do
     let folders = (externFolder, "src", manifestExtern manifest)
             : [ (folder </> externFolder, folder </> "src", testExtern entry)
               | (testName, entry) <- M.toList (manifestTests manifest), let folder = "tests" </> T.unpack testName ]
@@ -217,8 +218,8 @@ readExternSections root manifest = do
 
     section folder src config names seen = do
         files <- filesUnder (root </> folder)
-        listed <- mapM (readModule root src)
-            [ segments | key <- M.keys (externModules config), let segments = map T.unpack (T.splitOn "." key), segments `elem` names ]
+        let listed = map (sourceModule parsed src)
+                [ segments | key <- M.keys (externModules config), let segments = map T.unpack (T.splitOn "." key), segments `elem` names ]
         return ( ExternSection (ownerOfFolder folder) folder src config files names seen (mapMaybe sourceExterns listed)
                , [ (joinPath (moduleSegments m), moduleFile m) | m <- listed, isNothing (moduleParsed m) ] )
 

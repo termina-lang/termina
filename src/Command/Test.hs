@@ -217,7 +217,7 @@ modeOf mName mCase isolated mRecord offline =
 runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Maybe Executor -> Maybe Server -> Maybe Server -> Bool -> Mode -> IO ()
 runTests mName mPlatform mProfile mExecutor mServer mXsdb offline mode = do
     loaded <- try (case mode of
-        Recorded _ -> (\m -> LoadedProject m M.empty M.empty) <$> (loadManifest >>= either dieWithFirstError return)
+        Recorded _ -> (\m -> LoadedProject m M.empty M.empty M.empty) <$> (loadManifest >>= either dieWithFirstError return)
         _ -> loadProject False offline) :: IO (Either ExitCode LoadedProject)
     project <- either (const (exitWith (ExitFailure 2))) return loaded
     let manifest = loadedManifest project
@@ -592,8 +592,8 @@ loadTestCases :: LoadedProject -> String -> IO [TestCase]
 loadTestCases project testName = do
     let testFolder = "tests" </> testName
         sources = buildSources project (Just testName) testFolder
-    testModule <- loadTerminaModule sources testFolder "test"
-    parsedModules <- loadModules sources testFolder (importedModules testModule)
+    testModule <- loadTerminaModule (loadedParsed project) sources testFolder "test"
+    parsedModules <- loadModules (loadedParsed project) sources testFolder (importedModules testModule)
     let parsedProject = M.insert (qualifiedName testModule) testModule parsedModules
     orderedModules <- either
         (\cycleFiles -> dieWithError $ "Detected cycle between the source files of the test " ++ testName ++ ": " ++ show cycleFiles)
