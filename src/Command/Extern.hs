@@ -17,7 +17,9 @@ module Command.Extern (
 
 import Configuration.Configuration
 import Configuration.ExternCheck (ModuleExterns(..), checkExternModules, ownerOfFolder)
-import Configuration.Manifest (Manifest(..), ProjectInfo(..), decodeManifestFile)
+import Configuration.Fetch (FetchedFile(..))
+import Configuration.Manifest (Manifest(..), ProjectInfo(..))
+import Configuration.Package (packageFiles, packageManifest)
 import Configuration.Vendor (exportedExtern)
 import Command.Sources (Owner(..), SourceFolder(..), Sources)
 import Command.Types
@@ -31,7 +33,7 @@ import Control.Monad
 import qualified Data.ByteString as BS
 import Data.Char (toUpper)
 import Data.Function (on)
-import Data.List (groupBy, isPrefixOf, nub, sortOn, (\\))
+import Data.List (groupBy, isPrefixOf, nub, sortOn, stripPrefix, (\\))
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -73,7 +75,9 @@ groupObjects g = if null (groupVariable g) then "EXTERN_OBJS" else groupVariable
 -- the same place.
 prepareExtern :: TerminaConfig -> ParsedProject -> Sources -> [(FilePath, ExternConfig)] -> IO [ExternGroup]
 prepareExtern config project sources folders = do
-  checked <- mapM (\(folder, extern) -> map (folder,) <$> usedFiles config "termina.yaml" (ownerOfFolder folder) (loadedFrom project folder) folder extern) folders
+  checked <- forM folders $ \(folder, extern) -> do
+    present <- filesUnder folder
+    map (folder,) <$> usedFiles config "termina.yaml" (ownerOfFolder folder) (loadedFrom project folder) present extern
   let files = concat checked
       relFiles = map snd files
   forM_ (relFiles \\ nub relFiles) $ \file ->
@@ -84,13 +88,14 @@ prepareExtern config project sources folders = do
       _ -> return ()
   let projectGroups = [ groupOf (T.unpack (name config)) "" externFolder relFiles (map fst folders) | not (null relFiles) ]
   -- | The C of each dependency, from the section of its manifest, with only what it exports
-  dependencies <- fmap concat . forM [ f | f <- sources, isDependency (folderOwner f) ] $ \f -> do
+  dependencies <- fmap concat . forM [ (f, p) | f <- sources, isDependency (folderOwner f), Just p <- [folderPackage f] ] $ \(f, p) -> do
     let root = takeDirectory (folderPath f)
         extern = root </> externFolder
-    manifest <- decodeManifestFile (root </> "termina.yaml") >>= either (\err -> dieWithError (root </> "termina.yaml: " ++ err)) return
-    let library = T.unpack (projectName (manifestProject manifest))
-    used <- usedFiles config (root </> "termina.yaml") ("the dependency " ++ library) (loadedFrom project extern) extern (exportedExtern manifest)
-    return [ (f, extern, used, groupOf library (variableOf f) (destinationOf f) used [extern]) | not (null used) ]
+        manifest = packageManifest p
+        library = T.unpack (projectName (manifestProject manifest))
+        present = [ rel | FetchedFile path _ _ <- packageFiles p, Just rel <- [stripPrefix (externFolder ++ "/") path] ]
+    used <- usedFiles config (root </> "termina.yaml") ("the dependency " ++ library) (loadedFrom project extern) present (exportedExtern manifest)
+    return [ (f, p, used, groupOf library (variableOf f) (destinationOf f) used [extern]) | not (null used) ]
   -- | Two dependencies whose objects would have one variable, or whose C would go to one folder
   forM_ (groupBy ((==) `on` (\(_, _, _, g) -> groupVariable g)) (sortOn (\(_, _, _, g) -> groupVariable g) dependencies)) $ \case
     (f, _, _, g) : (other, _, _, _) : _ -> dieWithError $ case (folderOwner f, folderOwner other) of
@@ -99,8 +104,11 @@ prepareExtern config project sources folders = do
       _ -> takeDirectory (makeRelative "vendor" (folderPath f)) ++ " and " ++ takeDirectory (makeRelative "vendor" (folderPath other))
         ++ " give the same name, " ++ groupObjects g ++ ", to the objects of their C in the Makefile"
     _ -> return ()
-  copyExtern (outputFolder config </> externFolder) files
-  forM_ dependencies $ \(_, extern, used, g) -> copyExtern (outputFolder config </> groupFolder g) [ (extern, file) | file <- used ]
+  copyExtern (outputFolder config </> externFolder) =<< mapM (\(folder, rel) -> (rel,) <$> BS.readFile (folder </> rel)) files
+  forM_ dependencies $ \(_, p, used, g) ->
+    let contents = M.fromList [ (path, bytes) | FetchedFile path _ bytes <- packageFiles p ]
+    in copyExtern (outputFolder config </> groupFolder g)
+         [ (file, bytes) | file <- used, Just bytes <- [M.lookup (externFolder ++ "/" ++ file) contents] ]
   removeStaleGroups (outputFolder config) (map (\(_, _, _, g) -> groupFolder g) dependencies)
   return (projectGroups ++ [ g | (_, _, _, g) <- dependencies ])
 
@@ -142,11 +150,10 @@ removeStaleGroups out kept =
 
 -- | The files of an "extern" section that the loaded modules need on the
 -- selected platform, relative to its folder, given the manifest that declares
--- the section and its owner. A loaded module with libraries has them for the
--- selected platform.
-usedFiles :: TerminaConfig -> FilePath -> String -> S.Set T.Text -> FilePath -> ExternConfig -> IO [FilePath]
-usedFiles config manifestPath owner loaded externFolderPath (ExternConfig moduleEntries) = do
-  present <- filesUnder externFolderPath
+-- the section, its owner and the files of the folder. A loaded module with
+-- libraries has them for the selected platform.
+usedFiles :: TerminaConfig -> FilePath -> String -> S.Set T.Text -> [FilePath] -> ExternConfig -> IO [FilePath]
+usedFiles config manifestPath owner loaded present (ExternConfig moduleEntries) = do
   forM_ (M.toList loadedEntries) $ \(modName, entry) ->
     unless (M.null (entryLibraries entry) || M.member (platform config) (entryLibraries entry)) $
       dieWithError $ manifestPath ++ ": the extern section of " ++ owner ++ " lists libraries of " ++ T.unpack modName
@@ -193,16 +200,15 @@ loadedFrom :: ParsedProject -> FilePath -> S.Set T.Text
 loadedFrom project folder = S.fromList
   [ T.pack (qualifiedToModuleName (qualifiedName m)) | m <- M.elems project, isFrom folder m ]
 
--- | Copy the files, each one given by its folder and its path relative to it,
--- to the output folder. A file is written only when its content changes, and
--- the files of the output folder that are no longer listed are removed.
-copyExtern :: FilePath -> [(FilePath, FilePath)] -> IO ()
-copyExtern destination folderFiles = do
-  let files = map snd folderFiles
-  forM_ folderFiles $ \(folder, file) -> do
-    let source = folder </> file
-        target = destination </> file
-    content <- BS.readFile source
+-- | Write the files, each one given by its path relative to the output folder
+-- and its content, to the output folder. A file is written only when its
+-- content changes, and the files of the output folder that are no longer
+-- listed are removed.
+copyExtern :: FilePath -> [(FilePath, BS.ByteString)] -> IO ()
+copyExtern destination contents = do
+  let files = map fst contents
+  forM_ contents $ \(file, content) -> do
+    let target = destination </> file
     targetExists <- doesFileExist target
     same <- if targetExists then (== content) <$> BS.readFile target else return False
     unless same $ do

@@ -67,7 +67,9 @@ data SourceFolder = SourceFolder {
     -- folder, which holds the whole library
     folderPrefixes :: !(Maybe [Prefix]),
     -- | Its modules, by their path from the project folder
-    folderModules :: !ParsedFiles
+    folderModules :: !ParsedFiles,
+    -- | The package it belongs to, for a dependency
+    folderPackage :: !(Maybe P.Package)
   } deriving Show
 
 type Sources = [SourceFolder]
@@ -176,13 +178,13 @@ buildSources (LoadedProject manifest vendored admitted own) mTest mainFolder =
             mainOwner = maybe Project TestOf mTest
             vendoredFolder k p via = SourceFolder (folderOf k)
                 (Package (nameOf (P.packageManifest p)) via (if M.member k rootGraph then Nothing else mTest))
-                (folderOf k : map folderOf (declared k)) Nothing (P.packageModules p)
+                (folderOf k : map folderOf (declared k)) Nothing (P.packageModules p) (Just p)
             localFolder' l = SourceFolder (localSrc (P.packageFolder l))
                 (Local (nameOf (P.packageManifest l)) (if M.member (P.packageFolder l) rootLocals then Nothing else mTest))
                 (localSrc (P.packageFolder l) : map folderOf (localKeys l) ++ map localSrc (localPaths l))
-                (Just (manifestPrefixes (P.packageManifest l))) (P.packageModules l)
-        in [SourceFolder mainFolder mainOwner mainSees Nothing own, SourceFolder "src" Project projectSees Nothing own]
-            ++ [SourceFolder f (TestOf t) testSees Nothing own | Just t <- [mTest], f <- testSrc]
+                (Just (manifestPrefixes (P.packageManifest l))) (P.packageModules l) (Just l)
+        in [SourceFolder mainFolder mainOwner mainSees Nothing own Nothing, SourceFolder "src" Project projectSees Nothing own Nothing]
+            ++ [SourceFolder f (TestOf t) testSees Nothing own Nothing | Just t <- [mTest], f <- testSrc]
             ++ [vendoredFolder k p via | (k, via) <- M.toList graph, Just p <- [M.lookup k packages]]
             ++ map localFolder' (M.elems locals)
 
@@ -192,7 +194,7 @@ plainSources :: FilePath -> [FilePath] -> IO Sources
 plainSources mainFolder folders = do
     mainModules <- readMainFolder mainFolder
     modules <- ML.unions . (mainModules :) <$> mapM readSourceFolder folders
-    return [SourceFolder f Project folders Nothing modules | f <- mainFolder : folders]
+    return [SourceFolder f Project folders Nothing modules Nothing | f <- mainFolder : folders]
 
 data Lookup =
     Found FilePath
