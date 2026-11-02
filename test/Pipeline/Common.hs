@@ -31,21 +31,18 @@ import qualified Data.Text.Encoding as TE
 import Data.Text (Text, pack)
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
-import qualified Data.Set as S
 import Data.Time (UTCTime(..), fromGregorian, secondsToDiffTime)
 
 import Parser.Parsing (terminaModuleParser)
 import Text.Parsec (runParser)
 import Core.AST (TerminaModule'(..), ModuleImport'(..))
 
-import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
-import Semantic.Environment (makeInitialGlobalEnv, Environment, addDeclaredNames)
+import Semantic.Environment (makeInitialGlobalEnv, Environment)
 import Semantic.Types (SemanticAnn)
 
 import Configuration.Configuration (defaultConfig, TerminaConfig (..), DeploymentKind (..))
 import Configuration.Platform (Platform(..))
-import Generator.Environment
-    (getPlatformInitialGlobalEnv, getPlatformInitialProgram)
+import Generator.Environment (getPlatformInitialGlobalEnv)
 import Generator.CodeGen.Module (runGenSourceFile)
 import Generator.CodeGen.Application.Glue (runGenMainFile)
 import Generator.TestDescriptor (genTestDescriptor)
@@ -57,21 +54,14 @@ import Lowering.AST (AnnotatedProgram)
 import qualified Semantic.AST as SAST
 
 import Command.Types
-import Command.Utils
-    (lowerProject, loweredChecks, runCheck, CheckFailure(..),
-     elaborateProject, sideEffectCheckModules,
-     getVisibleModules, sortProjectDepsOrLoop, projectDeclaredNames)
+import Command.Utils (CheckFailure(..), sortProjectDepsOrLoop)
 import Modules.Modules (TerminaModuleData(..), ModuleDependency(..))
 import Modules.Utils (buildModuleName)
 import Parser.Errors (Error(..), ParsingErrors)
 import Utils.Annotations (QualifiedName, annotateError, Location(Internal))
 
-import ControlFlow.Architecture (runGenArchitecture, pruneUnconnectedSystemElements)
+import Command.Pipeline (CheckedModules(..), checkModules, typeProject)
 import ControlFlow.Architecture.Types (TerminaProgArch)
-import ControlFlow.Architecture.Checks (runArchitectureChecks)
-import ControlFlow.ConstFolding (runConstFolding, constFoldModule)
-import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
-import ControlFlow.ValueAnalysis (runValueAnalysisCheck)
 import Utils.Errors (ErrorMessage(errorIdent, toText))
 
 -- | Drives a set of in-memory modules through the *full* transpiler pipeline,
@@ -153,23 +143,9 @@ runProjectPipeline cfg sources = do
   let files = M.fromList [ (qname, pack src) | (qname, src) <- sources ]
   parsedProject <- M.fromList <$> mapM parseModule sources
   ordered <- orderModules parsedProject
-  typedProject <- typeProject cfg files parsedProject ordered
-  loweredProject <- stage files (lowerProject typedProject)
-  mapM_ (\check -> noCheckError files (runCheck check TestPlatform loweredProject)) loweredChecks
-  -- | Constant folding runs before architecture so the architecture pass and
-  -- the code generator see every type (array sizes) already folded to literals.
-  (foldedProject, constEnvs) <- foldProject files loweredProject ordered
-  -- | The constant propagation check follows the folding, which is what gives
-  -- it the constants of each module.
-  evidence <- analyseValues files foldedProject constEnvs ordered
-  -- | The side-effect check reads the elaborated AST, which says what the
-  -- generated code checks while it runs.
-  let (elaborated, reports) = elaborateProject evidence foldedProject
-  maybe (Right ()) (Left . failure files)
-    (sideEffectCheckModules TestPlatform elaborated)
-  progArch <- genProjectArchitecture cfg files foldedProject ordered
-  stage files (runArchitectureChecks ordered progArch)
-  pure (PipelineResult foldedProject ordered progArch elaborated reports)
+  checked <- checkedOrFailure files (checkModules cfg TestPlatform parsedProject ordered)
+  pure (PipelineResult (checkedLowered checked) ordered (checkedArchitecture checked)
+    (checkedElaborated checked) (checkedReports checked))
 
 -- | The typed AST of one module of a project, which is the stage the language
 -- server keeps and the one its index is built from. The stages after it, basic
@@ -180,7 +156,7 @@ runTypedModule target sources = do
   let files = M.fromList [ (qname, pack src) | (qname, src) <- sources ]
   parsedProject <- M.fromList <$> mapM parseModule sources
   ordered <- orderModules parsedProject
-  typedProject <- typeProject configParams files parsedProject ordered
+  typedProject <- checkedOrFailure files (typeProject (initialEnv configParams) parsedProject ordered)
   pure (typedAST . metadata $ typedProject M.! target)
 
 -- | Render the generated @main@ file (task/emitter installation, the app init
@@ -226,38 +202,6 @@ renderInitFile prjprogs =
   case runGenInitFile configParams TestPlatform "init" (fmap (fst . elaborateProgram provers) <$> prjprogs) of
     Left err -> Left . T.pack $ show err
     Right cFile -> Right $ runCPrinter False cFile
-
--- | Constant-fold every module in dependency order, threading the constant
--- environment so a module resolves the constants defined by the modules it
--- imports. Mirrors @Command.Common.constFolding@ but stays in 'Either'.
-foldProject :: M.Map FilePath Text -> LoweredProject -> [QualifiedName]
-  -> Either Failure (LoweredProject, ProjectConstEnvs)
-foldProject files loweredProject = go (ConstFoldEnv M.empty TestPlatform (microsecondsPerTick configParams)) M.empty M.empty
-  where
-    go _ folded constEnvs [] = Right (folded, constEnvs)
-    go env folded constEnvs (m:ms) =
-      case runConstFolding env (constFoldModule (loweredProject M.! m)) of
-        Left err -> Left (failure files err)
-        Right (foldedModule, env') ->
-          go env' (M.insert m foldedModule folded) (M.insert m (constEnv env') constEnvs) ms
-
--- | Report a condition that always has the same value, which is what the value
--- analysis check looks for. Mirrors @Command.Common.valueAnalysisCheck@ but
--- stays in 'Either'.
-analyseValues :: M.Map FilePath Text -> LoweredProject -> ProjectConstEnvs
-  -> [QualifiedName] -> Either Failure ProjectValueEvidence
-analyseValues files loweredProject constEnvs = go M.empty M.empty
-
-  where
-
-    go _ evidence [] = Right evidence
-    go returned evidence (m:ms) =
-      case runValueAnalysisCheck TestPlatform
-             (M.findWithDefault M.empty m constEnvs)
-             returned
-             (loweredAST . metadata $ loweredProject M.! m) of
-        (Just err, _, _) -> Left (failure files err)
-        (Nothing, returned', proven) -> go returned' (M.insert m proven evidence) ms
 
 -- | The error code (@errorIdent@: \"SE-042\", \"BE-001\", \"AE-007\",
 -- \"CF-…\") raised by the first failing pipeline stage for a single-module
@@ -371,39 +315,6 @@ orderModules parsedProject =
       (annotateError Internal (EImportedFilesLoop loop) :: ParsingErrors))
     Right ordered -> Right ordered
 
-typeProject :: TerminaConfig -> M.Map FilePath Text -> ParsedProject -> [QualifiedName]
-  -> Either Failure TypedProject
-typeProject cfg files parsedProject =
-  go M.empty (addDeclaredNames (projectDeclaredNames parsedProject) (initialEnv cfg))
-
-  where
-
-    go typed _ [] = Right typed
-    go typed prevState (m:ms) =
-      let parsedModule = parsedProject M.! m
-          prevModsMap = M.map visibleModules typed
-          vmods = S.fromList $ getVisibleModules prevModsMap (importedModules parsedModule)
-      in case runTypeChecking prevState
-                (typeTerminaModule (S.insert m vmods) (parsedAST . metadata $ parsedModule)) of
-           Left err -> Left (failure files err)
-           Right (typedProgram, newState) ->
-             let typedModule = TerminaModuleData m m dummyTime
-                   (importedModules parsedModule) (S.toList vmods)
-                   (sourcecode parsedModule) (SemanticData typedProgram)
-             in go (M.insert m typedModule typed) newState ms
-
-genProjectArchitecture :: TerminaConfig -> M.Map FilePath Text -> LoweredProject
-  -> [QualifiedName] -> Either Failure (TerminaProgArch SemanticAnn)
-genProjectArchitecture cfg files loweredProject = go (initialProg cfg)
-
-  where
-
-    go tp [] = Right (pruneUnconnectedSystemElements tp)
-    go tp (m:ms) =
-      case runGenArchitecture tp m (loweredAST . metadata $ loweredProject M.! m) of
-        Left err -> Left (failure files err)
-        Right tp' -> go tp' ms
-
 renderModule :: TerminaConfig -> ElaboratedModule -> Either Failure Text
 renderModule cfg eModule =
   case runGenSourceFile cfg TestPlatform (qualifiedName eModule)
@@ -419,9 +330,6 @@ configParams = defaultConfig "test" TestPlatform
 initialEnv :: TerminaConfig -> Environment
 initialEnv cfg = makeInitialGlobalEnv (Just cfg) TestPlatform
                (getPlatformInitialGlobalEnv cfg TestPlatform)
-
-initialProg :: TerminaConfig -> TerminaProgArch SemanticAnn
-initialProg cfg = getPlatformInitialProgram cfg TestPlatform
 
 -- | A placeholder modification time: only the IO file-caching logic in
 -- Command.Build reads it; the pure pipeline never inspects it.
@@ -454,16 +362,10 @@ errCode err =
     then code <> pack ": " <> pack (take 240 (show err))
     else code
 
--- | Collapse a stage that yields @Either error@ into the error's code on the
--- @Left@.
-stage :: (ErrorMessage e, Show e) => M.Map FilePath Text -> Either e a -> Either Failure a
-stage files = either (Left . failure files) Right
-
--- | The same, for a check of the basic-block AST, which reports the answers its
--- callers need instead of the error itself.
-noCheckError :: M.Map FilePath Text -> Maybe CheckFailure -> Either Failure ()
-noCheckError files =
-  maybe (Right ()) (\f -> Left (Failure (code f) (failureMessage f files)))
+-- | The result of a stage of the transpiler, or what its failure reports.
+checkedOrFailure :: M.Map FilePath Text -> Either CheckFailure a -> Either Failure a
+checkedOrFailure files =
+  either (\f -> Left (Failure (code f) (failureMessage f files))) Right
 
   where
 

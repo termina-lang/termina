@@ -28,6 +28,7 @@ import Text.Parsec.Error
 import qualified Data.ByteString as BS
 import qualified Data.Text.Encoding as TE
 import Command.Build (CheckedDeployment(..), checkDeployment)
+import Command.Pipeline (CheckedModules(..))
 import Command.Project (loadProject)
 import Command.Sources (LoadedProject(..))
 import Configuration.Manifest (Deployment(..), appDeployment)
@@ -660,8 +661,8 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
     when chatty (putStrLn . debugMessage $ "Creating output include folder (if missing): \"" ++ outputIncludeFolder ++ "\"")
     createDirectoryIfMissing True outputIncludeFolder
     checked <- checkDeployment chatty project deployment
-    let loweredProject = checkedLowered checked
-        programArchitecture = checkedArchitecture checked
+    let loweredProject = checkedLowered (checkedResult checked)
+        programArchitecture = checkedArchitecture (checkedResult checked)
     -- | Load the transactional worst-case execution paths
     when chatty (putStrLn . debugMessage $ "Loading transactional worst-case execution paths")
     pathProject <- loadWCEPathModules loweredProject (efpFolder config)

@@ -28,7 +28,7 @@ import System.Directory
 import qualified Data.Map.Strict as M
 import Modules.Modules
 import Generator.Monadic
-import Data.List (foldl', nub)
+import Data.List (nub)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Generator.LanguageC.Printer (runCPrinter)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
@@ -36,12 +36,9 @@ import Generator.CodeGen.Application.Option (runGenOptionHeaderFile, genOptionPa
 import Generator.CodeGen.Application.Config (genConfigPathName)
 import Core.AST
     ( TerminaType'(TEnum, TStruct) )
-import Generator.Environment
 import Generator.CodeGen.Platform
 import Configuration.Platform
-import Utils.Errors
 import Utils.Annotations
-import Semantic.Environment
 import qualified Data.Set as S
 import Generator.CodeGen.Application.Status (runGenStatusHeaderFile, genStatusPathName)
 import Generator.CodeGen.Application.Result (runGenResultHeaderFile, genResultPathName)
@@ -50,6 +47,7 @@ import Data.Aeson.Encode.Pretty (Config(..), defConfig, encodePretty', keyOrder)
 import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
 import EFP.Schedulability.WCEPath.Printer
 import Command.Common
+import Command.Pipeline (CheckedModules(..), checkModules)
 import Command.Extern (ExternGroup, prepareExtern, verifyLoadedExterns)
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.PlantUML
@@ -58,7 +56,6 @@ import Text.Read
 import Data.Char
 import qualified Data.ByteString.Lazy as BL
 import Elaboration (ElaborationReport)
-import Semantic.Types (SemanticAnn)
 import Elaboration.Report (checksReport)
 
 
@@ -185,13 +182,6 @@ buildCmdArgsParser = BuildCmdArgs
     trim :: String -> String
     trim = f . f
       where f = reverse . dropWhile isSpace
-
-monadicTypesMapModules :: TypedProject -> MonadicTypes
-monadicTypesMapModules = foldl' monadicTypesMapModule emptyMonadicTypes  . M.elems
-
-  where
-    monadicTypesMapModule :: MonadicTypes -> TypedModule -> MonadicTypes
-    monadicTypesMapModule prevMap typedModule = runMapMonadicTypesAnnotatedProgram prevMap (typedAST . metadata $ typedModule)
 
 genTWCEPFiles ::
   TerminaConfig
@@ -474,12 +464,7 @@ data CheckedDeployment = CheckedDeployment {
     checkedModules :: !ParsedProject,
     -- | The modules in the order in which they are type checked
     checkedOrder :: ![QualifiedName],
-    checkedMonadicTypes :: !MonadicTypes,
-    checkedLowered :: !LoweredProject,
-    checkedElaborated :: !ElaboratedProject,
-    -- | The run-time checks that each module keeps
-    checkedReports :: !(M.Map QualifiedName ElaborationReport),
-    checkedArchitecture :: !(TerminaProgArch SemanticAnn)
+    checkedResult :: !CheckedModules
   }
 
 -- | Load the modules of a deployment of a project and check them up to its
@@ -512,43 +497,16 @@ checkDeployment chatty project deployment = do
           dieWithError . T.unpack $ "Detected cycle between project source files: " <> T.intercalate " -> " (map (T.pack . show) files))
         return
         $ sortProjectDepsOrLoop projectDependencies
-    when chatty (putStrLn. debugMessage $ "Type checking project modules")
-    -- | Create the initial global environment
-    let initialGlobalEnv = makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)
-    (typedProject, _finalGlobalEnv) <- typeModules parsedProject initialGlobalEnv orderedDependencies
-    -- | Obtain the set of option types
-    when chatty (putStrLn . debugMessage $ "Searching for option types")
-    let monadicTypes = monadicTypesMapModules typedProject
-    -- | Obtain the basic blocks AST of the program
-    when chatty (putStrLn . debugMessage $ "Lowering the project modules")
-    rawLoweredProject <-
-      either
-        (\err ->
-          dieWithReport (toText err M.empty))
-        return
-        $ lowerProject typedProject
-    runLoweredChecks chatty plt rawLoweredProject
-    when chatty (putStrLn . debugMessage $ "Performing constant folding")
-    (loweredProject, constEnvs) <- constFolding config plt rawLoweredProject
-    when chatty (putStrLn . debugMessage $ "Analysing the values of the project modules")
-    valueEvidence <- valueAnalysisCheck plt constEnvs loweredProject
-    -- | Decide the run-time checks
-    when chatty (putStrLn . debugMessage $ "Elaborating the run-time checks")
-    let (elaboratedProject, checksReports) = elaborateProject valueEvidence loweredProject
-    when chatty (putStrLn . debugMessage $ "Side-effect checking project modules")
-    sideEffectCheck plt elaboratedProject
-    -- | Obtain the architectural description of the program
-    when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
-    programArchitecture <- genArchitecture loweredProject (getPlatformInitialProgram config plt) orderedDependencies
-    architectureCheck loweredProject orderedDependencies programArchitecture
-    return (CheckedDeployment sources parsedProject orderedDependencies monadicTypes loweredProject
-        elaboratedProject checksReports programArchitecture)
+    when chatty (putStrLn . debugMessage $ "Checking project modules")
+    checked <- orDieWithFailure (projectSourceFiles parsedProject)
+      (checkModules config plt parsedProject orderedDependencies)
+    return (CheckedDeployment sources parsedProject orderedDependencies checked)
 
 -- | Generate the C and the Makefile of a deployment of a project. It gives the
 -- modules of the deployment with their source files, and its groups of C.
 generateDeployment :: BuildCmdArgs -> LoadedProject -> Deployment -> IO ([(QualifiedName, FilePath)], [ExternGroup])
 generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _) project deployment = do
-    CheckedDeployment sources parsedProject _ monadicTypes loweredProject elaboratedProject checksReports programArchitecture
+    CheckedDeployment sources parsedProject _ (CheckedModules monadicTypes loweredProject elaboratedProject checksReports programArchitecture)
         <- checkDeployment chatty project deployment
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment

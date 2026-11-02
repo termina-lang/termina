@@ -250,56 +250,16 @@ data CheckFailure = CheckFailure
 checkFailure :: (ErrorMessage e, Show e) => e -> CheckFailure
 checkFailure err = CheckFailure (errorIdent err) (show err) (toText err)
 
--- | A check over the basic-block AST of a whole project, with the message that
--- announces it while it runs.
-data Check = Check
-  {
-    checkMessage :: String
-  , runCheck :: Platform -> LoweredProject -> Maybe CheckFailure
-  }
-
--- | The checks the basic-block AST goes through, in the order they run. Reading
--- an object that no path has assigned is a more basic mistake than assigning a
--- value that nobody reads, so the usage check goes before the linearity one.
-loweredChecks :: [Check]
-loweredChecks =
-  [
-    Check "Checking basic block paths"
-      (const (fmap checkFailure . basicBlockPathsCheckModules))
-  , Check "Definite assignment checking project modules"
-      (const (fmap checkFailure . varUsageCheckModules))
-  , Check "Usage checking project modules"
-      (const (fmap checkFailure . boxUsageCheckModules))
-    -- | The deque check relies on the boxes it sees moved being well formed.
-  , Check "Deque checking project modules"
-      (const (fmap checkFailure . dequeUsageCheckModules))
-    -- | The scope check relies on definite assignment having passed, and a
-    -- declaration in too wide a block is the least of the mistakes, so it goes
-    -- last.
-  , Check "Scope checking project modules"
-      (const (fmap checkFailure . varScopeCheckModules))
-  ]
-
 -- | The source of each module of a project, which is what the error printer
 -- quotes from.
 projectSourceFiles :: M.Map QualifiedName (TerminaModuleData a) -> M.Map FilePath T.Text
 projectSourceFiles =
   M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) M.empty
 
--- | Runs every check over the basic-block AST, stopping at the first error.
-runLoweredChecks :: Bool -> Platform -> LoweredProject -> IO ()
-runLoweredChecks chatty plt loweredProject = mapM_ runOne loweredChecks
-
-  where
-
-    sourceFilesMap = projectSourceFiles loweredProject
-
-    runOne :: Check -> IO ()
-    runOne check = do
-      when chatty (putStrLn . debugMessage $ checkMessage check)
-      case runCheck check plt loweredProject of
-        Nothing -> return ()
-        Just failure -> dieWithReport (failureMessage failure sourceFilesMap)
+-- | The result of a check, or its error printed with the source of the
+-- modules of the project, and stop.
+orDieWithFailure :: M.Map FilePath T.Text -> Either CheckFailure a -> IO a
+orDieWithFailure files = either (\failure -> dieWithReport (failureMessage failure files)) return
 
 -- | Load "termina.yaml" and check the folders of the project against it,
 -- giving every problem found.

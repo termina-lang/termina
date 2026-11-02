@@ -16,7 +16,7 @@ import Text.Parsec (runParser)
 import Generator.LanguageC.Printer (runCPrinter)
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
-import Command.Common (constFolding, valueAnalysisCheck, sideEffectCheck)
+import Command.Pipeline (foldProject, analyseValues)
 import Core.AST
 import Configuration.Configuration 
 import Configuration.Platform
@@ -91,12 +91,14 @@ typeSingleModule parsedModule = do
 elaborateSingleModule :: BasicBlocksModule -> IO ElaboratedModule
 elaborateSingleModule bbModule = do
     let config = defaultConfig "test" TestPlatform
-        project = M.singleton (qualifiedName bbModule) bbModule
-    (foldedProject, constEnvs) <- constFolding config TestPlatform project
-    evidence <- valueAnalysisCheck TestPlatform constEnvs foldedProject
+        qname = qualifiedName bbModule
+        project = M.singleton qname bbModule
+        files = projectSourceFiles project
+    (foldedProject, constEnvs) <- orDieWithFailure files (foldProject config TestPlatform project [qname])
+    evidence <- orDieWithFailure files (analyseValues TestPlatform constEnvs foldedProject [qname])
     let (elaboratedProject, _) = elaborateProject evidence foldedProject
-    sideEffectCheck TestPlatform elaboratedProject
-    return $ elaboratedProject M.! qualifiedName bbModule
+    orDieWithFailure files (maybe (Right ()) (Left . checkFailure) (sideEffectCheckModules TestPlatform elaboratedProject))
+    return $ elaboratedProject M.! qname
 
 printSourceModule :: Bool -> ElaboratedModule -> IO ()
 printSourceModule debugBuild eModule = do

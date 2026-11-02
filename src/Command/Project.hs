@@ -14,6 +14,7 @@ import Configuration.Platform
 import Command.Common
 import Command.Dependencies (Fetching(..), Sync(..), syncDependencies, describeChange)
 import Command.Extern (parsedExterns)
+import Command.Pipeline (typeProject)
 import Command.Sources (LoadedProject(..), buildSources, readProjectModules)
 import qualified Data.Map.Lazy as ML
 import System.FilePath (normalise)
@@ -81,7 +82,8 @@ verifyLibrary chatty project =
                         sysReadInputBufferSize = manifestReadBufSize manifest,
                         deploymentKind = TestBuild "library"
                       }
-                void (typeModules parsedModules (makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)) orderedModules)
+                void (orDieWithFailure (projectSourceFiles parsedModules)
+                  (typeProject (makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)) parsedModules orderedModules))
 
   where
 
