@@ -7,7 +7,7 @@ module Command.Project (
 ) where
 
 import Configuration.Configuration
-import Configuration.ExternCheck (projectSections, sectionErrors, moduleErrors)
+import Configuration.ExternCheck (readExternSections, checkExternSections, checkExternModules)
 import Configuration.Manifest
 import Configuration.Namespace (checkExports, exportedModules)
 import Configuration.Platform
@@ -35,9 +35,9 @@ loadProject chatty offline = do
     manifest <- loadManifest >>= either dieWithFirstError return
     -- | The extern sections, reading only the modules that their entries
     -- name; one of them that does not parse stops with the report of the parser
-    (sections, unparsed) <- projectSections "." manifest
+    (sections, unparsed) <- readExternSections "." manifest
     forM_ unparsed $ uncurry parseTerminaFile
-    unless (null (sectionErrors sections)) $ dieWithFirstError (sectionErrors sections)
+    unless (null (checkExternSections sections)) $ dieWithFirstError (checkExternSections sections)
     exportErrors <- checkExports "." manifest
     unless (null exportErrors) $ dieWithFirstError exportErrors
     lock <- loadLock "." >>= either dieWithFirstError return
@@ -46,7 +46,7 @@ loadProject chatty offline = do
         >>= either dieWithFirstError return
     mapM_ (putStrLn . warnMessage) warnings
     mapM_ (putStrLn . infoMessage . ("termina.lock: " ++) . describeChange) changes
-    checkLibrary chatty manifest
+    verifyLibrary chatty manifest
     return manifest
 
 -- | Type check the exported modules of a library together, with the modules
@@ -54,8 +54,8 @@ loadProject chatty offline = do
 -- has none. Every exported module is checked, whether a test imports it or
 -- not, and their names must not clash. The modules are checked as those of a
 -- test, so a module that is not exported may hold a test class.
-checkLibrary :: Bool -> Manifest -> IO ()
-checkLibrary chatty manifest =
+verifyLibrary :: Bool -> Manifest -> IO ()
+verifyLibrary chatty manifest =
     case manifestNature manifest of
         Application _ -> return ()
         Library _ -> do
@@ -63,7 +63,7 @@ checkLibrary chatty manifest =
             sources <- loadSources manifest Nothing "src"
             parsedModules <- loadModules sources "src" [ModuleDependency root Internal | root <- roots]
             -- | Each exported module with extern functions has its entry
-            case moduleErrors "the project" "src" (manifestExtern manifest) Nothing (map parsedExterns (M.elems parsedModules)) of
+            case checkExternModules "the project" "src" (manifestExtern manifest) Nothing (map parsedExterns (M.elems parsedModules)) of
                 [] -> return ()
                 errs -> dieWithFirstError errs
             orderedModules <- either

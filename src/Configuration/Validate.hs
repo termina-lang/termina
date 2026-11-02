@@ -17,7 +17,7 @@ import qualified Data.Text as T
 import System.FilePath
 
 import Configuration.Configuration
-import Configuration.ExternCheck (ExternSection(..), sectionErrors, moduleErrors, sourceExterns)
+import Configuration.ExternCheck (ExternSection(..), checkExternSections, checkExternModules, sourceExterns)
 import Configuration.Fetch (FetchedFile(..))
 import Configuration.Manifest
 import Configuration.Namespace (SourceModule(..), parseModule)
@@ -62,7 +62,7 @@ validateFiles local files =
     -- the exported modules. An exported module that does not parse is left to
     -- the build of the consumer, which reports the error of the parser.
     externErrors manifest =
-        sectionErrors [section] ++ moduleErrors owner "src" config Nothing (mapMaybe sourceExterns exported)
+        checkExternSections [section] ++ checkExternModules owner "src" config Nothing (mapMaybe sourceExterns exported)
 
       where
 

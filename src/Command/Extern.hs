@@ -11,12 +11,12 @@ module Command.Extern (
     groupObject,
     groupObjects,
     prepareExtern,
-    checkLoadedExterns,
+    verifyLoadedExterns,
     parsedExterns
 ) where
 
 import Configuration.Configuration
-import Configuration.ExternCheck (ModuleExterns(..), moduleErrors, ownerOfFolder)
+import Configuration.ExternCheck (ModuleExterns(..), checkExternModules, ownerOfFolder)
 import Configuration.Manifest (Manifest(..), ProjectInfo(..), decodeManifestFile)
 import Configuration.Vendor (exportedExtern)
 import Command.Sources (Owner(..), SourceFolder(..), Sources)
@@ -164,9 +164,9 @@ usedFiles config manifestPath owner loaded externFolderPath (ExternConfig module
 -- | Check that each module that the deployment loads from the source folder
 -- of a section, and that declares an extern function, has its entry, and that
 -- the module that wires the deployment, whose section is given, declares none.
-checkLoadedExterns :: ParsedModule -> FilePath -> ParsedProject -> [(FilePath, ExternConfig)] -> IO ()
-checkLoadedExterns mainModule mainSection project sections =
-  case concat [ moduleErrors (ownerOfFolder folder) (sourceFolderOf folder) config
+verifyLoadedExterns :: ParsedModule -> FilePath -> ParsedProject -> [(FilePath, ExternConfig)] -> IO ()
+verifyLoadedExterns mainModule mainSection project sections =
+  case concat [ checkExternModules (ownerOfFolder folder) (sourceFolderOf folder) config
                   (if folder == mainSection then Just (parsedExterns mainModule) else Nothing)
                   (map parsedExterns (filter (isFrom folder) (M.elems project)))
               | (folder, config) <- sections ] of

@@ -8,10 +8,10 @@
 module Configuration.ExternCheck (
     ExternSection(..),
     ModuleExterns(..),
-    sectionErrors,
-    moduleErrors,
+    checkExternSections,
+    checkExternModules,
     sourceExterns,
-    projectSections,
+    readExternSections,
     ownerOfFolder
 ) where
 
@@ -74,8 +74,8 @@ sourceExterns m = ModuleExterns (moduleSegments m) (moduleFile m) . externsOf <$
 -- itself: the "extern" folder, the lists and the modules that the entries
 -- name. An entry that names a module of the source folder of another section
 -- is reported with that section.
-sectionErrors :: [ExternSection] -> [String]
-sectionErrors sections = concatMap errorsOf sections
+checkExternSections :: [ExternSection] -> [String]
+checkExternSections sections = concatMap errorsOf sections
 
   where
 
@@ -176,8 +176,8 @@ sectionErrors sections = concatMap errorsOf sections
 -- source folder, given by its owner, its source folder and its entries. The
 -- module that wires a deployment has no entry, so it declares no extern
 -- function.
-moduleErrors :: String -> FilePath -> ExternConfig -> Maybe ModuleExterns -> [ModuleExterns] -> [String]
-moduleErrors owner srcFolder config mainModule externs =
+checkExternModules :: String -> FilePath -> ExternConfig -> Maybe ModuleExterns -> [ModuleExterns] -> [String]
+checkExternModules owner srcFolder config mainModule externs =
     [ externFile m ++ ":" ++ show (locationLine ann) ++ ": " ++ takeFileName (externFile m)
         ++ " cannot declare the extern function " ++ ident ++ ". Declare it in a module of "
         ++ srcFolder ++ "/ and list that module in " ++ sectionOf owner
@@ -203,8 +203,8 @@ manifestFile = "termina.yaml"
 -- those that the entries name are read. It also gives the named modules that
 -- do not parse, by their qualified name and their file, for the caller to
 -- report.
-projectSections :: FilePath -> Manifest -> IO ([ExternSection], [(FilePath, FilePath)])
-projectSections root manifest = do
+readExternSections :: FilePath -> Manifest -> IO ([ExternSection], [(FilePath, FilePath)])
+readExternSections root manifest = do
     let folders = (externFolder, "src", manifestExtern manifest)
             : [ (folder </> externFolder, folder </> "src", testExtern entry)
               | (testName, entry) <- M.toList (manifestTests manifest), let folder = "tests" </> T.unpack testName ]

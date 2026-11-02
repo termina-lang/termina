@@ -53,12 +53,12 @@ spec = do
   describe "a section without problems" $
 
     it "gives no error" $
-      sectionErrors [good, test [("fake.clock", entry ["clock.c"] [])] ["src/clock.c"]] `shouldBe` []
+      checkExternSections [good, test [("fake.clock", entry ["clock.c"] [])] ["src/clock.c"]] `shouldBe` []
 
   describe "the folder" $ do
 
     it "rejects a file out of its folder, and lists each one" $
-      sectionErrors [good { sectionFiles = sectionFiles good ++ ["notes.txt", "src/regs.h", "lib/leon3/libx.a"] }]
+      checkExternSections [good { sectionFiles = sectionFiles good ++ ["notes.txt", "src/regs.h", "lib/leon3/libx.a"] }]
         `shouldBe` [ "extern/notes.txt: cannot be in extern/. The C sources go in extern/src/, their headers in "
                        ++ "extern/include/ and the libraries of each platform in extern/lib/<platform>/"
                    , "extern/src/regs.h: is in extern/src/, which only holds C sources (.c)"
@@ -68,35 +68,35 @@ spec = do
                    , "extern/lib/leon3/libx.a: is not listed under any module in the extern section of the project" ]
 
     it "rejects a header with the path of a generated one" $
-      sectionErrors [project [("drivers.uart", entry ["uart.c"] ["drivers/uart.h", "config.h"])]
+      checkExternSections [project [("drivers.uart", entry ["uart.c"] ["drivers/uart.h", "config.h"])]
                       ["src/uart.c", "include/drivers/uart.h", "include/config.h"]]
         `shouldBe` [ "extern/include/drivers/uart.h: has the path of the header that the transpiler generates for "
                        ++ "drivers.uart (src/drivers/uart.fin)"
                    , "extern/include/config.h: has the path of a header that the transpiler generates" ]
 
     it "rejects a header of the project with the path of the one of a module of a test" $
-      sectionErrors [project [("drivers.uart", entry ["uart.c"] ["fake/clock.h"])] ["src/uart.c", "include/fake/clock.h"]]
+      checkExternSections [project [("drivers.uart", entry ["uart.c"] ["fake/clock.h"])] ["src/uart.c", "include/fake/clock.h"]]
         `shouldBe` [ "extern/include/fake/clock.h: has the path of the header that the transpiler generates for "
                        ++ "fake.clock (tests/hk/src/fake/clock.fin)" ]
 
   describe "the lists" $
 
     it "rejects a missing file, a pattern that matches none and a file named twice" $
-      sectionErrors [project [("drivers.uart", entry ["uart.c", "spi/*.c", "uart.c"] [])] ["src/uart.c"]]
+      checkExternSections [project [("drivers.uart", entry ["uart.c", "spi/*.c", "uart.c"] [])] ["src/uart.c"]]
         `shouldBe` [ "termina.yaml: the extern section of the project lists extern/src/spi/*.c under drivers.uart, and the pattern matches no file"
                    , "termina.yaml: the extern section of the project lists extern/src/uart.c twice under drivers.uart" ]
 
   describe "the entries" $ do
 
     it "rejects an entry that is not a module, a folder or a module without extern functions" $
-      sectionErrors [project [ ("drivers.uart", entry ["uart.c"] []), ("drivers.spi", entry ["uart.c"] [])
+      checkExternSections [project [ ("drivers.uart", entry ["uart.c"] []), ("drivers.spi", entry ["uart.c"] [])
                              , ("drivers", entry ["uart.c"] []), ("drivers.util", entry ["uart.c"] []) ] ["src/uart.c"]]
         `shouldBe` [ "termina.yaml: the extern section of the project lists drivers, which is a folder (src/drivers) and not a module"
                    , "termina.yaml: the extern section of the project lists drivers.spi, which is not a module (src/drivers/spi.fin does not exist)"
                    , "termina.yaml: the extern section of the project lists drivers.util, which declares no extern function (src/drivers/util.fin)" ]
 
     it "names the section of a module of another folder" $
-      sectionErrors [good { sectionConfig = ExternConfig (M.insert "fake.clock" (entry ["uart.c"] []) (externModules (sectionConfig good))) },
+      checkExternSections [good { sectionConfig = ExternConfig (M.insert "fake.clock" (entry ["uart.c"] []) (externModules (sectionConfig good))) },
                      test [("fake.clock", entry ["clock.c"] [])] ["src/clock.c"]]
         `shouldBe` [ "termina.yaml: the extern section of the project lists fake.clock, which is a module of the test hk "
                        ++ "(tests/hk/src/fake/clock.fin). Move its entry to the extern section of the test hk" ]
@@ -104,13 +104,13 @@ spec = do
   describe "the modules" $ do
 
     it "rejects a module with an extern function and no entry" $
-      moduleErrors "the test hk" "tests/hk/src" (ExternConfig M.empty) Nothing [clock, util]
+      checkExternModules "the test hk" "tests/hk/src" (ExternConfig M.empty) Nothing [clock, util]
         `shouldBe` [ "tests/hk/src/fake/clock.fin:1: the module fake.clock declares the extern function now and is not listed in the extern section of the test hk" ]
 
     it "accepts a module with its entry" $
-      moduleErrors "the project" "src" (sectionConfig good) Nothing [uart, util] `shouldBe` []
+      checkExternModules "the project" "src" (sectionConfig good) Nothing [uart, util] `shouldBe` []
 
     it "rejects an extern function in the module that wires the deployment" $
-      moduleErrors "the project" "src" (sectionConfig good) (Just (externs "app" "app.fin" "\nextern function seven() -> u32;\n")) []
+      checkExternModules "the project" "src" (sectionConfig good) (Just (externs "app" "app.fin" "\nextern function seven() -> u32;\n")) []
         `shouldBe` [ "app/app.fin:2: app.fin cannot declare the extern function seven. Declare it in a module of src/ "
                        ++ "and list that module in the extern section of the project" ]
