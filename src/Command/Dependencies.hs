@@ -76,7 +76,7 @@ data Sync = Sync {
     -- | The packages of the lock by normalized URL, each with its URL and its manifest
     syncPackages :: !(M.Map T.Text (T.Text, Manifest)),
     -- | The libraries of local folders by folder
-    syncLocals :: !(M.Map FilePath LocalPackage),
+    syncLocals :: !(M.Map FilePath Package),
     -- | The modules of the packages and of the local folders by their path
     -- from the project folder
     syncParsed :: !ParsedFiles
@@ -95,17 +95,15 @@ syncDependencies place commandName fetching write root manifest lock = do
     case localResult of
         Left errs -> return (Left errs)
         Right locals -> do
-            let extra = [ (g, [rootName, T.unpack (projectName (manifestProject (localManifest l)))])
-                        | l <- M.elems locals, DepGit g <- manifestDependencies (localManifest l) ]
+            let extra = [ (g, [rootName, T.unpack (projectName (manifestProject (packageManifest l)))])
+                        | l <- M.elems locals, DepGit g <- manifestDependencies (packageManifest l) ]
             resolution <- resolveWith (obtain used) manifest extra
             case resolution of
                 Left errs -> return (Left (describeObtainErrors place commandName errs))
                 Right res ->
-                    let parsedAt key path = M.lookup key (resolvedPackages res) >>= \p -> packageModule (resolvedObtained p) path
-                    in case checkGraph manifest res parsedAt locals of
-                        [] -> Right <$> commit res locals
-                            (ML.unions (map (packageModules . resolvedObtained) (M.elems (resolvedPackages res))
-                                ++ map localParsed (M.elems locals))) used
+                    let packages = map resolvedObtained (M.elems (resolvedPackages res)) ++ M.elems locals
+                    in case checkGraph manifest packages of
+                        [] -> Right <$> commit res locals (ML.unions (map packageModules packages)) used
                         errs -> return (Left errs)
 
   where

@@ -34,6 +34,7 @@ import Command.Utils (dieWithFirstError, loadLock)
 import Configuration.Local
 import Configuration.Lock
 import Configuration.Manifest
+import qualified Configuration.Package as P
 import Configuration.Parsed
 import Configuration.Prefix (manifestPrefixes, ownsModule)
 import Configuration.Vendor (packageDir)
@@ -74,7 +75,7 @@ data LoadedProject = LoadedProject {
     -- | The packages of vendor/ by normalized URL, each with its URL and its manifest
     loadedPackages :: !(M.Map T.Text (T.Text, Manifest)),
     -- | The libraries of local folders by folder
-    loadedLocals :: !(M.Map FilePath LocalPackage),
+    loadedLocals :: !(M.Map FilePath P.Package),
     -- | The modules of the project and of its dependencies by their path from
     -- the project folder
     loadedParsed :: !ParsedFiles
@@ -92,7 +93,7 @@ readProject manifest = do
     own <- readProjectModules manifest
     packages <- mapM (\l -> readSourceFolder (normalise (packageDir "." (lockedUrl l) </> "src"))) (lockPackages lock)
     return (LoadedProject manifest (M.fromList vendored) locals
-        (ML.unions (own : packages ++ map localParsed (M.elems locals))))
+        (ML.unions (own : packages ++ map P.packageModules (M.elems locals))))
 
   where
 
@@ -154,10 +155,10 @@ buildSources (LoadedProject manifest vendored admitted _) mTest mainFolder =
                         name = maybe "" (nameOf . snd) (M.lookup k packages)
                     in go (foldr (\d -> M.insert d (Just name)) seen new) (rest ++ new)
             localSrc folder = normalise (folder </> "src")
-            localKeys l = keysOf (manifestDependencies (localManifest l))
-            localPaths l = [localFolderOf (localFolder l) p | DepPath p <- manifestDependencies (localManifest l)]
+            localKeys l = keysOf (manifestDependencies (P.packageManifest l))
+            localPaths l = [localFolderOf (P.packageFolder l) p | DepPath p <- manifestDependencies (P.packageManifest l)]
             startsOf deps = [localFolderOf "." p | DepPath p <- deps]
-            gitStartsOf keys ls = [(k, Nothing) | k <- keys] ++ [(k, Just (nameOf (localManifest l))) | l <- M.elems ls, k <- localKeys l]
+            gitStartsOf keys ls = [(k, Nothing) | k <- keys] ++ [(k, Just (nameOf (P.packageManifest l))) | l <- M.elems ls, k <- localKeys l]
             rootStarts = gitStartsOf rootKeys rootLocals
             rootGraph = closure rootStarts
             graph = closure (rootStarts ++ gitStartsOf testKeys testLocals)
@@ -171,10 +172,10 @@ buildSources (LoadedProject manifest vendored admitted _) mTest mainFolder =
             packageFolder k via = SourceFolder (folderOf k)
                 (Package (maybe "" (nameOf . snd) (M.lookup k packages)) via (if M.member k rootGraph then Nothing else mTest))
                 (folderOf k : map folderOf (declared k)) Nothing
-            localFolder' l = SourceFolder (localSrc (localFolder l))
-                (Local (nameOf (localManifest l)) (if M.member (localFolder l) rootLocals then Nothing else mTest))
-                (localSrc (localFolder l) : map folderOf (localKeys l) ++ map localSrc (localPaths l))
-                (Just (manifestPrefixes (localManifest l)))
+            localFolder' l = SourceFolder (localSrc (P.packageFolder l))
+                (Local (nameOf (P.packageManifest l)) (if M.member (P.packageFolder l) rootLocals then Nothing else mTest))
+                (localSrc (P.packageFolder l) : map folderOf (localKeys l) ++ map localSrc (localPaths l))
+                (Just (manifestPrefixes (P.packageManifest l)))
         in [SourceFolder mainFolder mainOwner mainSees Nothing, SourceFolder "src" Project projectSees Nothing]
             ++ [SourceFolder f (TestOf t) testSees Nothing | Just t <- [mTest], f <- testSrc]
             ++ [packageFolder k via | (k, via) <- M.toList graph, M.member k packages]

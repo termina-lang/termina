@@ -7,78 +7,75 @@ module Configuration.Graph (
 ) where
 
 import Data.List (isSuffixOf, tails)
-import qualified Data.Map.Lazy as ML
 import qualified Data.Map.Strict as M
-import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
-import System.FilePath (dropExtension, normalise, splitDirectories, (</>))
+import System.FilePath (dropExtension, splitDirectories)
 
 import Configuration.Fetch (FetchedFile(..))
-import Configuration.Local
+import Configuration.Local (localFolderOf)
 import Configuration.Lock (normalizeUrl)
 import Configuration.Manifest
 import Configuration.Namespace (locationLine, dottedName)
-import Configuration.Package (Package(..))
-import Configuration.Parsed (ParsedFile, parsedTree)
+import Configuration.Package
+import Configuration.Parsed (parsedTree)
 import Configuration.Prefix
-import Configuration.Resolve
 import Core.AST
 
--- | A package of the graph as the checks see it: where its files are shown,
--- its manifest and files, the folder of a local one, which its path
--- dependencies are relative to, and its parsed modules by their path in it.
-data Unit = Unit String Manifest [FetchedFile] (Maybe FilePath) (FilePath -> Maybe ParsedFile)
-
--- | Every problem of the graph of the root: prefixes that overlap between two
+-- | Every problem of the graph of the root, given its packages, those of
+-- repositories and those of local folders: prefixes that overlap between two
 -- packages, or between a package and the root when it is a library, and
 -- imports of exported modules that leave their package and its dependencies.
--- The modules of a package of the resolution are taken from the parsed files,
--- by the key of the package and their path in it.
-checkGraph :: Manifest -> Resolution -> (T.Text -> FilePath -> Maybe ParsedFile) -> M.Map FilePath LocalPackage -> [String]
-checkGraph root resolution parsedAt locals = overlapErrors ++ concatMap importErrors units
+checkGraph :: Manifest -> [Package] -> [String]
+checkGraph root packages = overlapErrors ++ concatMap importErrors packages
 
   where
 
-    packages = resolvedPackages resolution
+    fromGit = M.fromList [ (normalizeUrl url, p) | p@Package { packageOrigin = FromGit url _ _ } <- packages ]
 
-    manifestOf = packageManifest . resolvedObtained
+    fromFolder = M.fromList [ (folder, p) | p@Package { packageOrigin = FromFolder folder } <- packages ]
 
     nameOf = T.unpack . projectName . manifestProject
 
-    units = [ Unit ("vendor/" ++ T.unpack key) (manifestOf pkg) (packageFiles (resolvedObtained pkg)) Nothing
-                (parsedAt key)
-            | (key, pkg) <- M.toList packages ]
-        ++ [ Unit folder (localManifest l) (localFiles l) (Just folder) (\path -> ML.lookup (normalise (folder </> path)) (localParsed l))
-           | (folder, l) <- M.toList locals ]
+    -- | Where the files of a package are shown in the messages.
+    shownAs p = case packageOrigin p of
+        FromGit url _ _ -> "vendor/" ++ T.unpack (normalizeUrl url)
+        FromFolder folder -> folder
 
     -- | The prefixes with their owner, and whether the owner is the root,
     -- whose own overlaps are reported by its build.
     owned = [(nameOf root, True, p) | p <- manifestPrefixes root]
-        ++ [(nameOf m, False, p) | Unit _ m _ _ _ <- units, p <- manifestPrefixes m]
+        ++ [(nameOf (packageManifest pkg), False, p) | pkg <- packages, p <- manifestPrefixes (packageManifest pkg)]
 
     overlapErrors =
         [ "the prefix " ++ prefixText p1 ++ " of " ++ o1 ++ " overlaps " ++ prefixText p2 ++ " of " ++ o2
         | ((o1, r1, p1) : rest) <- tails owned, (o2, r2, p2) <- rest
         , not (r1 && r2), overlaps p1 p2 ]
 
-    importErrors (Unit shown m files folder parsedIn) =
-        [ shown ++ "/" ++ path ++ ":" ++ show (locationLine ann) ++ ": the exported module "
+    importErrors pkg =
+        [ shownAs pkg ++ "/" ++ path ++ ":" ++ show (locationLine ann) ++ ": the exported module "
             ++ dottedName segments ++ " imports " ++ dottedName imported ++ ", which is neither exported by "
             ++ nameOf m ++ " nor by a dependency it declares"
-        | FetchedFile path _ _ <- files
+        | FetchedFile path _ _ <- packageFiles pkg
         , ".fin" `isSuffixOf` path, any (`ownsPath` path) (manifestPrefixes m)
         , let segments = splitDirectories (dropExtension (drop (length ("src/" :: String)) path))
-        , Just ast <- [parsedIn path >>= parsedTree]
+        , Just ast <- [packageModule pkg path >>= parsedTree]
         , ModuleImport imported ann <- modules ast
         , not (any (`ownsModule` imported) allowed) ]
 
       where
 
+        m = packageManifest pkg
+
+        -- | Path dependencies are relative to the folder of a local package.
+        base = case packageOrigin pkg of
+            FromFolder folder -> folder
+            FromGit {} -> "."
+
         allowed = manifestPrefixes m ++ concat
-            [ manifestPrefixes (manifestOf dep)
+            [ manifestPrefixes (packageManifest dep)
             | DepGit g <- manifestDependencies m
-            , Just dep <- [M.lookup (normalizeUrl (gitUrl g)) packages] ]
+            , Just dep <- [M.lookup (normalizeUrl (gitUrl g)) fromGit] ]
             ++ concat
-            [ manifestPrefixes (localManifest l)
+            [ manifestPrefixes (packageManifest dep)
             | DepPath p <- manifestDependencies m
-            , Just l <- [M.lookup (localFolderOf (fromMaybe "." folder) p) locals] ]
+            , Just dep <- [M.lookup (localFolderOf base p) fromFolder] ]

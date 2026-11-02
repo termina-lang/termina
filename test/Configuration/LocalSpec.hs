@@ -4,6 +4,7 @@ module Configuration.LocalSpec (spec) where
 
 import Configuration.Local
 import Configuration.Manifest
+import Configuration.Package (packageManifest)
 
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
@@ -39,7 +40,7 @@ spec = describe "local libraries" $ do
       [ ("drivers/termina.yaml", library "drivers" "dependencies:\n  - path: ../hal\n"), ("drivers/src/drivers/uart.fin", "")
       , ("hal/termina.yaml", library "hal" ""), ("hal/src/hal/gpio.fin", "") ] $ do
         found <- readLocalPackages [(".", "../drivers")]
-        fmap (M.map (T.unpack . projectName . manifestProject . localManifest)) found
+        fmap (M.map (T.unpack . projectName . manifestProject . packageManifest)) found
           `shouldBe` Right (M.fromList [("../drivers", "drivers"), ("../hal", "hal")])
 
   it "refuses a folder that does not exist, and one that is not a library" $

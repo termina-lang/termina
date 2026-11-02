@@ -2,7 +2,6 @@
 -- dependencies: read from disk and checked as a fetched package would be,
 -- following their own path dependencies.
 module Configuration.Local (
-    LocalPackage(..),
     localFolderOf,
     readLocalPackages,
     reachedLocals
@@ -18,18 +17,7 @@ import System.FilePath
 import Configuration.Fetch (FetchedFile(..))
 import Configuration.Manifest
 import Configuration.Package
-import Configuration.Parsed (ParsedFiles)
 import Configuration.Validate (checkPackage)
-
-data LocalPackage = LocalPackage {
-    -- | The folder, as the project reaches it
-    localFolder :: !FilePath,
-    localManifest :: !Manifest,
-    -- | Its manifest, src/ and extern/, as a fetched package gives them
-    localFiles :: ![FetchedFile],
-    -- | The modules of its src/ by their path from the project folder
-    localParsed :: !ParsedFiles
-  } deriving Show
 
 -- | The folder that a path dependency names, written in the manifest of a
 -- folder: relative to that folder, without the steps that go down and up.
@@ -45,12 +33,12 @@ localFolderOf parent path = tidy (splitDirectories (normalise (parent </> path))
     step acc segment = segment : acc
 
 -- | The folders of the path dependencies of a local package.
-pathFolders :: LocalPackage -> [FilePath]
-pathFolders local = [localFolderOf (localFolder local) path | DepPath path <- manifestDependencies (localManifest local)]
+pathFolders :: Package -> [FilePath]
+pathFolders local = [localFolderOf (packageFolder local) path | DepPath path <- manifestDependencies (packageManifest local)]
 
 -- | The packages of a map that the path dependencies of some folders reach,
 -- directly or through other packages of the map.
-reachedLocals :: M.Map FilePath LocalPackage -> [(FilePath, FilePath)] -> M.Map FilePath LocalPackage
+reachedLocals :: M.Map FilePath Package -> [(FilePath, FilePath)] -> M.Map FilePath Package
 reachedLocals locals starts = go M.empty [localFolderOf parent path | (parent, path) <- starts]
 
   where
@@ -64,7 +52,7 @@ reachedLocals locals starts = go M.empty [localFolderOf parent path | (parent, p
 
 -- | The local packages that the path dependencies of some folders reach,
 -- each one with the dependencies by path of its own manifest, by folder.
-readLocalPackages :: [(FilePath, FilePath)] -> IO (Either [String] (M.Map FilePath LocalPackage))
+readLocalPackages :: [(FilePath, FilePath)] -> IO (Either [String] (M.Map FilePath Package))
 readLocalPackages starts = go M.empty [localFolderOf parent path | (parent, path) <- starts]
 
   where
@@ -89,7 +77,7 @@ readLocalPackages starts = go M.empty [localFolderOf parent path | (parent, path
                 return $ case packageFromFiles (FromFolder folder) folder (manifest ++ files) of
                     Left err -> Left (inFolder [err])
                     Right package -> case checkPackage package of
-                        [] -> Right (LocalPackage folder (packageManifest package) (packageFiles package) (packageModules package))
+                        [] -> Right package
                         errs -> Left (inFolder errs)
 
     readManifest folder = do

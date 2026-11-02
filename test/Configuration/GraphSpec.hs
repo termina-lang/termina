@@ -7,7 +7,7 @@ import Configuration.Fetch
 import Configuration.Graph
 import Configuration.Lock (normalizeUrl)
 import Configuration.Manifest
-import Configuration.Package (Origin(..), Package(..), packageModule)
+import Configuration.Package (Origin(..), Package(..))
 import Configuration.Parsed (parsePackage)
 import Configuration.Resolve
 
@@ -39,11 +39,7 @@ package name exports deps modules =
 
 -- | The problems of a graph without local packages.
 graphErrors :: Manifest -> Resolution -> [String]
-graphErrors root res = checkGraph root res parsedAt M.empty
-
-  where
-
-    parsedAt key path = M.lookup key (resolvedPackages res) >>= \p -> packageModule (resolvedObtained p) path
+graphErrors root res = checkGraph root (map resolvedObtained (M.elems (resolvedPackages res)))
 
 resolution :: [ResolvedPackage] -> Resolution
 resolution pkgs = Resolution (M.fromList [(normalizeUrl (resolvedUrl p), p) | p <- pkgs]) [] []
