@@ -61,8 +61,8 @@ data Fetching =
 -- | How the lock changes: a package that enters it, one that moves to
 -- another tag or commit, and one that leaves it.
 data LockChange =
-    Added ResolvedPackage
-    | Changed LockedPackage ResolvedPackage
+    Added ResolvedDependency
+    | Changed LockedPackage ResolvedDependency
     | Removed LockedPackage
   deriving (Eq, Show)
 
@@ -72,7 +72,7 @@ data Sync = Sync {
     -- | What the user has to know about the resolution
     syncWarnings :: ![String],
     -- | The packages of the lock by normalized URL
-    syncPackages :: !(M.Map T.Text Package),
+    syncRemotes :: !(M.Map T.Text Package),
     -- | The libraries of local folders by folder
     syncLocals :: !(M.Map FilePath Package)
   } deriving Show
@@ -96,7 +96,7 @@ syncDependencies place commandName fetching write root manifest lock = do
             case resolution of
                 Left errs -> return (Left (describeObtainErrors place commandName errs))
                 Right res ->
-                    case checkGraph manifest (map resolvedObtained (M.elems (resolvedPackages res)) ++ M.elems locals) of
+                    case checkGraph manifest (map resolvedPackage (M.elems (resolvedDependencies res)) ++ M.elems locals) of
                         [] -> Right <$> commit res locals used
                         errs -> return (Left errs)
 
@@ -139,16 +139,16 @@ syncDependencies place commandName fetching write root manifest lock = do
                         errs -> return (Left (InvalidPackage errs))
 
     commit res locals used = do
-        let packages = M.elems (resolvedPackages res)
-            vendored p = [ (path, bytes) | FetchedFile path _ bytes <- packageFiles (resolvedObtained p)
-                         , isVendored (packageManifest (resolvedObtained p)) path ]
+        let packages = M.elems (resolvedDependencies res)
+            vendored p = [ (path, bytes) | FetchedFile path _ bytes <- packageFiles (resolvedPackage p)
+                         , isVendored (packageManifest (resolvedPackage p)) path ]
             entry p = LockedPackage (resolvedUrl p) (resolvedTag p) (commitOf p) (contentHash (vendored p))
             changes = [ change | p <- packages, let old = M.lookup (normalizeUrl (resolvedUrl p)) oldPackages
                       , Just change <- [case old of
                             Nothing -> Just (Added p)
                             Just l | l /= entry p -> Just (Changed l p)
                             _ -> Nothing] ]
-                ++ [Removed l | (k, l) <- M.toList oldPackages, not (M.member k (resolvedPackages res))]
+                ++ [Removed l | (k, l) <- M.toList oldPackages, not (M.member k (resolvedDependencies res))]
         when (write && not (null changes)) $ do
             forM_ changes $ \change -> case change of
                 Added p -> writePackage root (resolvedUrl p) (vendored p)
@@ -157,7 +157,7 @@ syncDependencies place commandName fetching write root manifest lock = do
             writeLockFile (root </> "termina.lock") (Lock (lockVersion emptyLock) (map entry packages))
         when write (readIORef used >>= mapM_ removePathForcibly)
         return (Sync changes (overrideWarnings res)
-            (M.map resolvedObtained (resolvedPackages res)) locals)
+            (M.map resolvedPackage (resolvedDependencies res)) locals)
 
     -- | The folder of a package that left the lock, and the folders above it
     -- that it leaves empty.
@@ -171,8 +171,8 @@ syncDependencies place commandName fetching write root manifest lock = do
 
 -- | The commit of a package of the resolution, which always comes from a
 -- repository.
-commitOf :: ResolvedPackage -> T.Text
-commitOf = fromMaybe "" . packageCommit . resolvedObtained
+commitOf :: ResolvedDependency -> T.Text
+commitOf = fromMaybe "" . packageCommit . resolvedPackage
 
 -- | A change of the lock as the user reads it.
 describeChange :: LockChange -> String

@@ -23,9 +23,9 @@ url name = "https://github.com/acme/" ++ name
 
 -- | A package with its exports, the names of the packages it depends on and
 -- its modules.
-package :: String -> String -> [String] -> [(String, String)] -> ResolvedPackage
+package :: String -> String -> [String] -> [(String, String)] -> ResolvedDependency
 package name exports deps modules =
-    ResolvedPackage (T.pack (url name)) "v1"
+    ResolvedDependency (T.pack (url name)) "v1"
         (Package (FromGit (T.pack (url name)) "v1" (T.pack (replicate 40 'a'))) "" m files
             (parsePackage "" [(p, BS.pack body) | (p, body) <- modules]))
         ["app"]
@@ -39,9 +39,9 @@ package name exports deps modules =
 
 -- | The problems of a graph without local packages.
 graphErrors :: Manifest -> Resolution -> [String]
-graphErrors root res = checkGraph root (map resolvedObtained (M.elems (resolvedPackages res)))
+graphErrors root res = checkGraph root (map resolvedPackage (M.elems (resolvedDependencies res)))
 
-resolution :: [ResolvedPackage] -> Resolution
+resolution :: [ResolvedDependency] -> Resolution
 resolution pkgs = Resolution (M.fromList [(normalizeUrl (resolvedUrl p), p) | p <- pkgs]) [] []
 
 app :: Manifest
@@ -50,10 +50,10 @@ app = manifestOf $ header "app" ++ "app:\n  platform: posix-gcc\n  profile: rele
 module' :: [String] -> String
 module' imports = concat ["import " ++ i ++ ";\n" | i <- imports] ++ "function f() {\n    return;\n}\n"
 
-ccsds :: ResolvedPackage
+ccsds :: ResolvedDependency
 ccsds = package "ccsds" "ccsds" [] [("src/ccsds/tc.fin", module' [])]
 
-hal :: ResolvedPackage
+hal :: ResolvedDependency
 hal = package "hal" "hal" [] [("src/hal/gpio.fin", module' [])]
 
 spec :: Spec

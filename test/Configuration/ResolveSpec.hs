@@ -60,7 +60,7 @@ run reg m = runState (resolve fetch m) 0
         return $ maybe (Left "needs credentials") Right (M.lookup (normalizeUrl u, t) reg)
 
 names :: Either [ResolveError String] Resolution -> Either [ResolveError String] [T.Text]
-names = fmap (M.keys . resolvedPackages)
+names = fmap (M.keys . resolvedDependencies)
 
 spec :: Spec
 spec = do
@@ -70,7 +70,7 @@ spec = do
     it "brings the dependencies of the dependencies, with the path to each" $ do
       let reg = registry [("pus", "v1", library "pus" [(url "ccsds", "v2")] []), ("ccsds", "v2", library "ccsds" [] [])]
           (result, _) = run reg (root [(url "pus", "v1")] [] [])
-      fmap (map resolvedPath . M.elems . resolvedPackages) result `shouldBe` Right [["obdh", "pus"], ["obdh"]]
+      fmap (map resolvedPath . M.elems . resolvedDependencies) result `shouldBe` Right [["obdh", "pus"], ["obdh"]]
 
     it "brings once a package that two packages require with the same tag" $ do
       let reg = registry [ ("pus", "v1", library "pus" [(url "hal", "v1")] [])
@@ -86,7 +86,7 @@ spec = do
     it "keeps the URL written closest to the root" $ do
       let reg = registry [("pus", "v1", library "pus" [(url "hal.git", "v1")] []), ("hal", "v1", library "hal" [] [])]
           (result, _) = run reg (root [(url "pus", "v1"), ("https://github.com/Acme/HAL", "v1")] [] [])
-      fmap (map resolvedUrl . M.elems . resolvedPackages) result `shouldBe` Right ["https://github.com/Acme/HAL", T.pack (url "pus")]
+      fmap (map resolvedUrl . M.elems . resolvedDependencies) result `shouldBe` Right ["https://github.com/Acme/HAL", T.pack (url "pus")]
 
   describe "versions" $ do
 
@@ -108,7 +108,7 @@ spec = do
       let (result, _) = run reg (project [(url "embedded-hal", "v0.4.0")])
       fmap appliedOverrides result `shouldBe`
         Right [AppliedOverride "github.com/acme/embedded-hal" "v0.4.0" "v0.3.1" ["obdh", "gaisler-drivers"]]
-      fmap (map resolvedTag . M.elems . resolvedPackages) result `shouldBe` Right ["v0.4.0", "v0.2.0", "v0.1.0"]
+      fmap (map resolvedTag . M.elems . resolvedDependencies) result `shouldBe` Right ["v0.4.0", "v0.2.0", "v0.1.0"]
 
     it "ignores the overrides of a dependency, and names them" $ do
       let reg' = registry [ ("pus", "v1", library "pus" [] [(url "hal", "v9")]) ]

@@ -20,7 +20,7 @@ import Command.Dependencies
 import Command.Utils (Place(..), currentPlace, dieWithFirstError, warnMessage, infoMessage, loadLock)
 import Configuration.Lock
 import Configuration.Manifest
-import Configuration.Resolve (ResolvedPackage(..))
+import Configuration.Resolve (ResolvedDependency(..))
 
 data AddCmdArgs = AddCmdArgs String String (Maybe String)
   deriving Show

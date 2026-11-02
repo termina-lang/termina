@@ -35,7 +35,7 @@ import Configuration.Fetch (FetchedFile(..))
 import Configuration.Local
 import Configuration.Lock
 import Configuration.Manifest
-import qualified Configuration.Package as P
+import Configuration.Package
 import Configuration.Parsed
 import Configuration.Prefix (manifestPrefixes, ownsModule)
 import Configuration.Vendor (packageDir, readPackage)
@@ -52,10 +52,10 @@ data Owner =
     -- | A package of vendor/: its name, the package that first brought it
     -- (none when the project or a test declares it), and the test that
     -- declares it when only a test does
-    | Package !String !(Maybe String) !(Maybe String)
+    | RemotePackage !String !(Maybe String) !(Maybe String)
     -- | A library of a local folder: its name, and the test that declares it
     -- when only a test does
-    | Local !String !(Maybe String)
+    | LocalPackage !String !(Maybe String)
   deriving (Eq, Show)
 
 data SourceFolder = SourceFolder {
@@ -69,7 +69,7 @@ data SourceFolder = SourceFolder {
     -- | Its modules, by their path from the project folder
     folderModules :: !ParsedFiles,
     -- | The package it belongs to, for a dependency
-    folderPackage :: !(Maybe P.Package)
+    folderPackage :: !(Maybe Package)
   } deriving Show
 
 type Sources = [SourceFolder]
@@ -78,11 +78,11 @@ type Sources = [SourceFolder]
 data LoadedProject = LoadedProject {
     loadedManifest :: !Manifest,
     -- | The packages of vendor/ by normalized URL
-    loadedPackages :: !(M.Map T.Text P.Package),
+    loadedRemotes :: !(M.Map T.Text Package),
     -- | The libraries of local folders by folder
-    loadedLocals :: !(M.Map FilePath P.Package),
+    loadedLocals :: !(M.Map FilePath Package),
     -- | The modules of the project, by their path from the project folder
-    loadedModules :: !ParsedFiles
+    loadedProjectModules :: !ParsedFiles
   } deriving Show
 
 -- | Read a project and its dependencies from disk, without updating the lock
@@ -95,7 +95,7 @@ readProject manifest = do
         let url = lockedUrl l
         files <- readPackage "." url
         either (\err -> dieWithFirstError ["vendor/" ++ T.unpack (normalizeUrl url) ++ ": " ++ err]) (return . (,) (normalizeUrl url)) $
-            P.packageFromFiles (P.FromGit url (lockedRev l) (lockedCommit l)) (packageDir "." url) [FetchedFile p "100644" b | (p, b) <- files]
+            packageFromFiles (FromGit url (lockedRev l) (lockedCommit l)) (packageDir "." url) [FetchedFile p "100644" b | (p, b) <- files]
     own <- readProjectModules manifest
     return (LoadedProject manifest (M.fromList vendored) locals own)
 
@@ -151,21 +151,21 @@ buildSources (LoadedProject manifest vendored admitted own) mTest mainFolder =
     testKeys = keysOf testDeps
 
     sources packages rootLocals testLocals =
-        let folderOf k = maybe "" (localSrc . P.packageFolder) (M.lookup k packages)
-            declared k = maybe [] (keysOf . manifestDependencies . P.packageManifest) (M.lookup k packages)
+        let folderOf k = maybe "" (localSrc . packageFolder) (M.lookup k packages)
+            declared k = maybe [] (keysOf . manifestDependencies . packageManifest) (M.lookup k packages)
             -- The packages reached from some keys, each with the package that first brought it.
             closure starts = go (M.fromList starts) (map fst starts)
               where
                 go seen [] = seen
                 go seen (k : rest) =
                     let new = [d | d <- declared k, not (M.member d seen)]
-                        name = maybe "" (nameOf . P.packageManifest) (M.lookup k packages)
+                        name = maybe "" (nameOf . packageManifest) (M.lookup k packages)
                     in go (foldr (\d -> M.insert d (Just name)) seen new) (rest ++ new)
             localSrc folder = normalise (folder </> "src")
-            localKeys l = keysOf (manifestDependencies (P.packageManifest l))
-            localPaths l = [localFolderOf (P.packageFolder l) p | DepPath p <- manifestDependencies (P.packageManifest l)]
+            localKeys l = keysOf (manifestDependencies (packageManifest l))
+            localPaths l = [localFolderOf (packageFolder l) p | DepPath p <- manifestDependencies (packageManifest l)]
             startsOf deps = [localFolderOf "." p | DepPath p <- deps]
-            gitStartsOf keys ls = [(k, Nothing) | k <- keys] ++ [(k, Just (nameOf (P.packageManifest l))) | l <- M.elems ls, k <- localKeys l]
+            gitStartsOf keys ls = [(k, Nothing) | k <- keys] ++ [(k, Just (nameOf (packageManifest l))) | l <- M.elems ls, k <- localKeys l]
             rootStarts = gitStartsOf rootKeys rootLocals
             rootGraph = closure rootStarts
             graph = closure (rootStarts ++ gitStartsOf testKeys testLocals)
@@ -177,12 +177,12 @@ buildSources (LoadedProject manifest vendored admitted own) mTest mainFolder =
             mainSees = maybe projectSees (const testSees) mTest
             mainOwner = maybe Project TestOf mTest
             vendoredFolder k p via = SourceFolder (folderOf k)
-                (Package (nameOf (P.packageManifest p)) via (if M.member k rootGraph then Nothing else mTest))
-                (folderOf k : map folderOf (declared k)) Nothing (P.packageModules p) (Just p)
-            localFolder' l = SourceFolder (localSrc (P.packageFolder l))
-                (Local (nameOf (P.packageManifest l)) (if M.member (P.packageFolder l) rootLocals then Nothing else mTest))
-                (localSrc (P.packageFolder l) : map folderOf (localKeys l) ++ map localSrc (localPaths l))
-                (Just (manifestPrefixes (P.packageManifest l))) (P.packageModules l) (Just l)
+                (RemotePackage (nameOf (packageManifest p)) via (if M.member k rootGraph then Nothing else mTest))
+                (folderOf k : map folderOf (declared k)) Nothing (packageModules p) (Just p)
+            localFolder' l = SourceFolder (localSrc (packageFolder l))
+                (LocalPackage (nameOf (packageManifest l)) (if M.member (packageFolder l) rootLocals then Nothing else mTest))
+                (localSrc (packageFolder l) : map folderOf (localKeys l) ++ map localSrc (localPaths l))
+                (Just (manifestPrefixes (packageManifest l))) (packageModules l) (Just l)
         in [SourceFolder mainFolder mainOwner mainSees Nothing own Nothing, SourceFolder "src" Project projectSees Nothing own Nothing]
             ++ [SourceFolder f (TestOf t) testSees Nothing own Nothing | Just t <- [mTest], f <- testSrc]
             ++ [vendoredFolder k p via | (k, via) <- M.toList graph, Just p <- [M.lookup k packages]]
@@ -267,7 +267,7 @@ hiddenMessage folder importerOwner dotted =
 -- | The local folders that a build takes libraries from, as the project
 -- names them.
 localFolders :: Sources -> [FilePath]
-localFolders sources = [takeDirectory (folderPath f) | f <- sources, Local {} <- [folderOwner f]]
+localFolders sources = [takeDirectory (folderPath f) | f <- sources, LocalPackage {} <- [folderOwner f]]
 
 -- | Why a module of a local library outside its exports cannot be imported.
 notExportedMessage :: SourceFolder -> String -> String
@@ -278,8 +278,8 @@ notExportedMessage folder dotted =
 -- | The name of a dependency, the package that brought it and the test
 -- that declares it when only a test does.
 dependency :: Owner -> Maybe (String, Maybe String, Maybe String)
-dependency (Package name via test) = Just (name, via, test)
-dependency (Local name test) = Just (name, Nothing, test)
+dependency (RemotePackage name via test) = Just (name, via, test)
+dependency (LocalPackage name test) = Just (name, Nothing, test)
 dependency _ = Nothing
 
 -- | Two modules of a build with one name, the one of the project first.

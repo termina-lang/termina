@@ -4,7 +4,7 @@
 -- of each package for the application and all its tests, with the overrides
 -- of the root, and the path that brought in each requirement.
 module Configuration.Resolve (
-    ResolvedPackage(..),
+    ResolvedDependency(..),
     AppliedOverride(..),
     Resolution(..),
     ResolveError(..),
@@ -21,12 +21,13 @@ import Configuration.Lock (normalizeUrl)
 import Configuration.Manifest
 import Configuration.Package
 
--- | A package of the resolution: the URL as the first manifest that names it
--- writes it, the tag, the package, and the path that first required it.
-data ResolvedPackage = ResolvedPackage {
+-- | A dependency of the resolution: the URL as the first manifest that names
+-- it writes it, the tag, the package it resolves to, and the path that first
+-- required it.
+data ResolvedDependency = ResolvedDependency {
     resolvedUrl :: !T.Text,
     resolvedTag :: !T.Text,
-    resolvedObtained :: !Package,
+    resolvedPackage :: !Package,
     resolvedPath :: ![String]
   } deriving (Eq, Show)
 
@@ -40,8 +41,8 @@ data AppliedOverride = AppliedOverride {
   } deriving (Eq, Show)
 
 data Resolution = Resolution {
-    -- | The packages, by normalized URL
-    resolvedPackages :: !(M.Map T.Text ResolvedPackage),
+    -- | The dependencies, by normalized URL
+    resolvedDependencies :: !(M.Map T.Text ResolvedDependency),
     appliedOverrides :: ![AppliedOverride],
     -- | The overrides in the manifest of a dependency, which do not count:
     -- the name of the package and the URL of each override.
@@ -60,7 +61,7 @@ data Requirement = Requirement !T.Text !T.Text ![String]
 data State e = State {
     -- | The tag and the path of each normalized URL already met
     seen :: !(M.Map T.Text (T.Text, [String])),
-    packages :: !(M.Map T.Text ResolvedPackage),
+    packages :: !(M.Map T.Text ResolvedDependency),
     applied :: ![AppliedOverride],
     ignored :: ![(T.Text, T.Text)],
     errors :: ![ResolveError e]
@@ -113,7 +114,7 @@ resolveWith obtain root extra = do
                             name = projectName (manifestProject manifest)
                             deps = [Requirement (gitUrl g) (gitRev g) (path ++ [T.unpack name]) | DepGit g <- manifestDependencies manifest]
                         go (rest ++ deps) st' {
-                            packages = M.insert key (ResolvedPackage url tag got path) (packages st'),
+                            packages = M.insert key (ResolvedDependency url tag got path) (packages st'),
                             ignored = reverse [(name, gitUrl o) | o <- manifestOverrides manifest] ++ ignored st' }
 
 -- | The message of an error, with the path of each requirement ending in the

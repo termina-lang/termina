@@ -99,7 +99,7 @@ prepareExtern config project sources folders = do
   -- | Two dependencies whose objects would have one variable, or whose C would go to one folder
   forM_ (groupBy ((==) `on` (\(_, _, _, g) -> groupVariable g)) (sortOn (\(_, _, _, g) -> groupVariable g) dependencies)) $ \case
     (f, _, _, g) : (other, _, _, _) : _ -> dieWithError $ case (folderOwner f, folderOwner other) of
-      (Local library _, Local _ _) -> "the local folders " ++ takeDirectory (folderPath f) ++ " and " ++ takeDirectory (folderPath other)
+      (LocalPackage library _, LocalPackage _ _) -> "the local folders " ++ takeDirectory (folderPath f) ++ " and " ++ takeDirectory (folderPath other)
         ++ " are both the library " ++ library ++ ", and their C would go to the same place in the output folder"
       _ -> takeDirectory (makeRelative "vendor" (folderPath f)) ++ " and " ++ takeDirectory (makeRelative "vendor" (folderPath other))
         ++ " give the same name, " ++ groupObjects g ++ ", to the objects of their C in the Makefile"
@@ -122,18 +122,18 @@ prepareExtern config project sources folders = do
                                     , (ident, _) <- externDeclared (parsedExterns m) ]))
 
     isDependency owner = case owner of
-      Package {} -> True
-      Local {} -> True
+      RemotePackage {} -> True
+      LocalPackage {} -> True
       _ -> False
 
     -- | A package goes under its normalized URL, as in vendor/, and a local
     -- folder under the name of its library
     destinationOf f = case folderOwner f of
-      Local library _ -> "local" </> library </> externFolder
+      LocalPackage library _ -> "local" </> library </> externFolder
       _ -> takeDirectory (folderPath f) </> externFolder
 
     variableOf f = case folderOwner f of
-      Local library _ -> "LOCAL_" ++ map variableChar library
+      LocalPackage library _ -> "LOCAL_" ++ map variableChar library
       _ -> map variableChar (takeDirectory (makeRelative "vendor" (folderPath f)))
 
     variableChar c = if c `elem` ("./" :: String) then '_' else toUpper c
