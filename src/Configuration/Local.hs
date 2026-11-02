@@ -11,15 +11,15 @@ module Configuration.Local (
 import Control.Monad
 import qualified Data.ByteString as BS
 import Data.List (intercalate)
-import qualified Data.Map.Lazy as ML
 import qualified Data.Map.Strict as M
 import System.Directory
 import System.FilePath
 
 import Configuration.Fetch (FetchedFile(..))
 import Configuration.Manifest
-import Configuration.Parsed
-import Configuration.Validate (validateLocalPackage)
+import Configuration.Package
+import Configuration.Parsed (ParsedFiles)
+import Configuration.Validate (checkPackage)
 
 data LocalPackage = LocalPackage {
     -- | The folder, as the project reaches it
@@ -85,11 +85,12 @@ readLocalPackages starts = go M.empty [localFolderOf parent path | (parent, path
             else do
                 manifest <- readManifest folder
                 files <- concat <$> mapM (tree folder) ["src", "extern"]
-                let all' = manifest ++ files
-                    parsed = parsePackage folder [(path, bytes) | FetchedFile path _ bytes <- files]
-                    parsedAt path = ML.lookup (normalise (folder </> path)) parsed
-                return $ either (Left . map ((folder ++ ": ") ++)) (\m -> Right (LocalPackage folder m all' parsed))
-                    (validateLocalPackage parsedAt all')
+                let inFolder = map ((folder ++ ": ") ++)
+                return $ case packageFromFiles (FromFolder folder) folder (manifest ++ files) of
+                    Left err -> Left (inFolder [err])
+                    Right package -> case checkPackage package of
+                        [] -> Right (LocalPackage folder (packageManifest package) (packageFiles package) (packageModules package))
+                        errs -> Left (inFolder errs)
 
     readManifest folder = do
         exists <- doesFileExist (folder </> "termina.yaml")

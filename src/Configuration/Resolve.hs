@@ -4,7 +4,6 @@
 -- of each package for the application and all its tests, with the overrides
 -- of the root, and the path that brought in each requirement.
 module Configuration.Resolve (
-    Obtained(..),
     ResolvedPackage(..),
     AppliedOverride(..),
     Resolution(..),
@@ -18,24 +17,16 @@ import Data.List (intercalate)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 
-import Configuration.Fetch (FetchedFile)
 import Configuration.Lock (normalizeUrl)
 import Configuration.Manifest
-
--- | A package as the function that brings it gives it: the commit of its
--- tag, its validated manifest and its files.
-data Obtained = Obtained {
-    obtainedSha :: !T.Text,
-    obtainedManifest :: !Manifest,
-    obtainedFiles :: ![FetchedFile]
-  } deriving (Eq, Show)
+import Configuration.Package
 
 -- | A package of the resolution: the URL as the first manifest that names it
--- writes it, the tag, what was obtained, and the path that first required it.
+-- writes it, the tag, the package, and the path that first required it.
 data ResolvedPackage = ResolvedPackage {
     resolvedUrl :: !T.Text,
     resolvedTag :: !T.Text,
-    resolvedObtained :: !Obtained,
+    resolvedObtained :: !Package,
     resolvedPath :: ![String]
   } deriving (Eq, Show)
 
@@ -79,13 +70,13 @@ data State e = State {
 -- that the URL of a package is the one written closest to the root. A package
 -- already met with the same tag is not brought again, which also ends the
 -- cycles; every error is collected before giving up.
-resolve :: Monad m => (T.Text -> T.Text -> m (Either e Obtained)) -> Manifest -> m (Either [ResolveError e] Resolution)
+resolve :: Monad m => (T.Text -> T.Text -> m (Either e Package)) -> Manifest -> m (Either [ResolveError e] Resolution)
 resolve obtain root = resolveWith obtain root []
 
 -- | Resolve as "resolve" does, with more requirements after those of the
 -- root and its tests, each with the path that brings it: the dependencies
 -- of the libraries that the project takes from local folders.
-resolveWith :: Monad m => (T.Text -> T.Text -> m (Either e Obtained)) -> Manifest -> [(GitDependency, [String])]
+resolveWith :: Monad m => (T.Text -> T.Text -> m (Either e Package)) -> Manifest -> [(GitDependency, [String])]
     -> m (Either [ResolveError e] Resolution)
 resolveWith obtain root extra = do
     final <- go (initial ++ [Requirement (gitUrl g) (gitRev g) path | (g, path) <- extra]) (State M.empty M.empty [] [] [])
@@ -118,7 +109,7 @@ resolveWith obtain root extra = do
                 case result of
                     Left err -> go rest st' { errors = ObtainFailed url tag path err : errors st' }
                     Right got -> do
-                        let manifest = obtainedManifest got
+                        let manifest = packageManifest got
                             name = projectName (manifestProject manifest)
                             deps = [Requirement (gitUrl g) (gitRev g) (path ++ [T.unpack name]) | DepGit g <- manifestDependencies manifest]
                         go (rest ++ deps) st' {

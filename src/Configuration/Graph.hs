@@ -18,6 +18,7 @@ import Configuration.Local
 import Configuration.Lock (normalizeUrl)
 import Configuration.Manifest
 import Configuration.Namespace (locationLine, dottedName)
+import Configuration.Package (Package(..))
 import Configuration.Parsed (ParsedFile, parsedTree)
 import Configuration.Prefix
 import Configuration.Resolve
@@ -40,11 +41,11 @@ checkGraph root resolution parsedAt locals = overlapErrors ++ concatMap importEr
 
     packages = resolvedPackages resolution
 
-    manifestOf = obtainedManifest . resolvedObtained
+    manifestOf = packageManifest . resolvedObtained
 
     nameOf = T.unpack . projectName . manifestProject
 
-    units = [ Unit ("vendor/" ++ T.unpack key) (manifestOf pkg) (obtainedFiles (resolvedObtained pkg)) Nothing
+    units = [ Unit ("vendor/" ++ T.unpack key) (manifestOf pkg) (packageFiles (resolvedObtained pkg)) Nothing
                 (parsedAt key)
             | (key, pkg) <- M.toList packages ]
         ++ [ Unit folder (localManifest l) (localFiles l) (Just folder) (\path -> ML.lookup (normalise (folder </> path)) (localParsed l))

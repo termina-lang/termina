@@ -17,7 +17,7 @@ import Command.Dependencies (PackageError(..), describeObtainErrors)
 import Command.Utils (Place, currentPlace, dieWithFirstError, infoMessage, loadLock)
 import Configuration.Fetch
 import Configuration.Lock
-import Configuration.Parsed (packageLookup)
+import Configuration.Package
 import Configuration.Resolve (ResolveError(..))
 import Configuration.Validate
 import Configuration.Vendor
@@ -69,10 +69,12 @@ restoreVendor place root = do
         fetched <- fetchLocked root url tag (lockedCommit locked)
         return $ case fetched of
             Left err -> failed (FetchFailed err)
-            Right (Fetched _ files fromPrefetch) -> case validatePackage (packageLookup (packageDir root url) [(p, b) | FetchedFile p _ b <- files]) files of
-                Left errs -> failed (InvalidPackage errs)
-                Right manifest ->
-                    let vendored = [(p, b) | FetchedFile p _ b <- files, isVendored manifest p]
-                    in if contentHash vendored == lockedContentHash locked
-                        then Right (locked, vendored, fromPrefetch)
-                        else failed (VendorMismatch "the files that termina copies from this commit do not match the content-hash of termina.lock")
+            Right (Fetched sha files fromPrefetch) -> case packageFromFiles (FromGit url tag sha) (packageDir root url) files of
+                Left err -> failed (InvalidPackage [err])
+                Right package -> case checkPackage package of
+                    [] ->
+                        let vendored = [(p, b) | FetchedFile p _ b <- files, isVendored (packageManifest package) p]
+                        in if contentHash vendored == lockedContentHash locked
+                            then Right (locked, vendored, fromPrefetch)
+                            else failed (VendorMismatch "the files that termina copies from this commit do not match the content-hash of termina.lock")
+                    errs -> failed (InvalidPackage errs)

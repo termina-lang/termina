@@ -7,7 +7,8 @@ import Configuration.Fetch
 import Configuration.Graph
 import Configuration.Lock (normalizeUrl)
 import Configuration.Manifest
-import Configuration.Parsed (packageLookup)
+import Configuration.Package (Origin(..), Package(..), packageModule)
+import Configuration.Parsed (parsePackage)
 import Configuration.Resolve
 
 import qualified Data.ByteString.Char8 as BS
@@ -23,7 +24,11 @@ url name = "https://github.com/acme/" ++ name
 -- | A package with its exports, the names of the packages it depends on and
 -- its modules.
 package :: String -> String -> [String] -> [(String, String)] -> ResolvedPackage
-package name exports deps modules = ResolvedPackage (T.pack (url name)) "v1" (Obtained (T.pack (replicate 40 'a')) m files) ["app"]
+package name exports deps modules =
+    ResolvedPackage (T.pack (url name)) "v1"
+        (Package (FromGit (T.pack (url name)) "v1" (T.pack (replicate 40 'a'))) "" m files
+            (parsePackage "" [(p, BS.pack body) | (p, body) <- modules]))
+        ["app"]
 
   where
 
@@ -38,9 +43,7 @@ graphErrors root res = checkGraph root res parsedAt M.empty
 
   where
 
-    parsedAt key path = do
-        p <- M.lookup key (resolvedPackages res)
-        packageLookup "" [(f, bytes) | FetchedFile f _ bytes <- obtainedFiles (resolvedObtained p)] path
+    parsedAt key path = M.lookup key (resolvedPackages res) >>= \p -> packageModule (resolvedObtained p) path
 
 resolution :: [ResolvedPackage] -> Resolution
 resolution pkgs = Resolution (M.fromList [(normalizeUrl (resolvedUrl p), p) | p <- pkgs]) [] []

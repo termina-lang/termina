@@ -6,6 +6,7 @@ module Configuration.ResolveSpec (spec) where
 
 import Configuration.Lock (normalizeUrl)
 import Configuration.Manifest
+import Configuration.Package (Origin(..), Package(..))
 import Configuration.Resolve
 
 import Control.Monad.State
@@ -41,11 +42,11 @@ url :: String -> String
 url name = "https://github.com/acme/" ++ name
 
 -- | The packages that the fake fetch knows, by URL and tag.
-type Registry = M.Map (T.Text, T.Text) Obtained
+type Registry = M.Map (T.Text, T.Text) Package
 
 registry :: [(String, String, Manifest)] -> Registry
 registry entries = M.fromList
-    [ ((normalizeUrl (T.pack (url name)), T.pack tag), Obtained (T.pack (replicate 40 'a')) m [])
+    [ ((normalizeUrl (T.pack (url name)), T.pack tag), Package (FromGit (T.pack (url name)) (T.pack tag) (T.pack (replicate 40 'a'))) "" m [] M.empty)
     | (name, tag, m) <- entries ]
 
 -- | Resolve against a registry, counting the packages brought.

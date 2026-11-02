@@ -8,7 +8,6 @@ module Configuration.Parsed (
     parseFile,
     parseFolder,
     parsePackage,
-    packageLookup,
     parsedTree
 ) where
 
@@ -60,15 +59,6 @@ parseFolder folder files = ML.fromList
 parsePackage :: FilePath -> [(FilePath, BS.ByteString)] -> ParsedFiles
 parsePackage folder files =
     parseFolder (folder </> "src") [ (rel, bytes) | (path, bytes) <- files, Just rel <- [stripPrefix "src/" path] ]
-
--- | The modules of a package by their path in it, given the files of the
--- package by their path in it and the folder where the package is.
-packageLookup :: FilePath -> [(FilePath, BS.ByteString)] -> FilePath -> Maybe ParsedFile
-packageLookup folder files = \path -> ML.lookup (normalise (folder </> path)) parsed
-
-  where
-
-    parsed = parsePackage folder files
 
 -- | The tree of a parsed module file, or nothing when it does not parse.
 parsedTree :: ParsedFile -> Maybe (TerminaModule ParserAnn)

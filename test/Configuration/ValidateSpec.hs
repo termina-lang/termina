@@ -4,12 +4,10 @@
 module Configuration.ValidateSpec (spec) where
 
 import Configuration.Fetch
-import Configuration.Manifest (Manifest)
-import Configuration.Parsed (packageLookup)
+import Configuration.Package (Origin(..), packageFromFiles)
 import Configuration.Validate
 
 import qualified Data.ByteString.Char8 as BS
-import Data.Either (isRight)
 import Test.Hspec
 
 import Configuration.Helpers (header)
@@ -34,12 +32,9 @@ package :: [FetchedFile]
 package = [manifest library, file "src/pus/service1.fin", crcModule, file "extern/src/crc.c", file "extern/lib/posix-gcc/libcrc.a",
     file "extern/notes.txt", file "README.md"]
 
--- | Validate the files of a package, with its modules parsed from them.
-validate :: [FetchedFile] -> Either [String] Manifest
-validate files = validatePackage (packageLookup "" [(p, bytes) | FetchedFile p _ bytes <- files]) files
-
+-- | The problems of a package of a repository made of the files.
 errorsOf :: [FetchedFile] -> [String]
-errorsOf files = either id (const []) (validate files)
+errorsOf files = either pure checkPackage (packageFromFiles (FromGit "" "" "") "" files)
 
 spec :: Spec
 spec = do
@@ -47,7 +42,7 @@ spec = do
   describe "manifest" $ do
 
     it "accepts a library and gives its manifest" $
-      validate package `shouldSatisfy` isRight
+      errorsOf package `shouldBe` []
 
     it "rejects a package without termina.yaml" $
       errorsOf (tail package) `shouldBe` ["the package has no termina.yaml"]
@@ -68,18 +63,18 @@ spec = do
                    , "termina.yaml: the extern section of the package lists extern/src/spi/*.c under pus.crc, and the pattern matches no file" ]
 
     it "accepts a pattern that matches some file" $
-      validate [manifest "exports: [pus]\nextern:\n  pus.crc:\n    sources: [\"spi/*.c\"]\n", file "src/pus/service1.fin", crcModule,
-                       file "extern/src/spi/a.c"]
-        `shouldSatisfy` isRight
+      errorsOf [manifest "exports: [pus]\nextern:\n  pus.crc:\n    sources: [\"spi/*.c\"]\n", file "src/pus/service1.fin", crcModule,
+                file "extern/src/spi/a.c"]
+        `shouldBe` []
 
     it "rejects an exported module with an extern function and no entry" $
       errorsOf (package ++ [FetchedFile "src/pus/tm.fin" "100644" "extern function pus_tm_raw() -> u32;\n"])
         `shouldBe` ["src/pus/tm.fin:1: the module pus.tm declares the extern function pus_tm_raw and is not listed in the extern section of the package"]
 
     it "ignores the C of a module that it does not export" $
-      validate (manifest (library ++ "  test_support.fake:\n    sources: [fake.c]\n")
-                       : tail package ++ [FetchedFile "src/test_support/fake.fin" "100644" "extern function fake() -> u32;\n", file "extern/src/fake.c"])
-        `shouldSatisfy` isRight
+      errorsOf (manifest (library ++ "  test_support.fake:\n    sources: [fake.c]\n")
+                : tail package ++ [FetchedFile "src/test_support/fake.fin" "100644" "extern function fake() -> u32;\n", file "extern/src/fake.c"])
+        `shouldBe` []
 
   describe "links and submodules" $ do
 
@@ -90,8 +85,8 @@ spec = do
                    , "extern/lib/posix-gcc: a symbolic link, which a package cannot hold where its files are copied" ]
 
     it "ignores them where nothing is copied" $
-      validate (package ++ [link "docs/latest", link "src/util/crc.fin", link "extern/old.c"])
-        `shouldSatisfy` isRight
+      errorsOf (package ++ [link "docs/latest", link "src/util/crc.fin", link "extern/old.c"])
+        `shouldBe` []
 
   describe "case" $
 

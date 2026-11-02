@@ -18,6 +18,7 @@ module Command.Dependencies (
 import Control.Monad
 import Data.IORef
 import Data.List (intercalate)
+import Data.Maybe (fromMaybe)
 import qualified Data.Map.Lazy as ML
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
@@ -30,7 +31,8 @@ import Configuration.Graph
 import Configuration.Local
 import Configuration.Lock
 import Configuration.Manifest
-import Configuration.Parsed
+import Configuration.Package
+import Configuration.Parsed (ParsedFiles)
 import Configuration.Resolve
 import Configuration.Validate
 import Configuration.Vendor
@@ -99,19 +101,14 @@ syncDependencies place commandName fetching write root manifest lock = do
             case resolution of
                 Left errs -> return (Left (describeObtainErrors place commandName errs))
                 Right res ->
-                    let parsed = ML.map (\p -> parsePackage (packageDir root (resolvedUrl p)) (filesOf p)) (resolvedPackages res)
-                        parsedAt key path = do
-                            files <- ML.lookup key parsed
-                            p <- M.lookup key (resolvedPackages res)
-                            ML.lookup (normalise (packageDir root (resolvedUrl p) </> path)) files
+                    let parsedAt key path = M.lookup key (resolvedPackages res) >>= \p -> packageModule (resolvedObtained p) path
                     in case checkGraph manifest res parsedAt locals of
                         [] -> Right <$> commit res locals
-                            (ML.unions (ML.elems parsed ++ map localParsed (M.elems locals))) used
+                            (ML.unions (map (packageModules . resolvedObtained) (M.elems (resolvedPackages res))
+                                ++ map localParsed (M.elems locals))) used
                         errs -> return (Left errs)
 
   where
-
-    filesOf p = [ (path, bytes) | FetchedFile path _ bytes <- obtainedFiles (resolvedObtained p) ]
 
     rootName = T.unpack (projectName (manifestProject manifest))
 
@@ -131,25 +128,29 @@ syncDependencies place commandName fetching write root manifest lock = do
         copy <- lockedPackage root locked
         return $ case copy of
             Left err -> Left (VendorMismatch err)
-            Right files -> case maybe (Left "vendor/ has no termina.yaml") decodeManifest (lookup "termina.yaml" files) of
-                Left err -> Left (InvalidPackage ["termina.yaml: " ++ err])
-                Right m -> Right (Obtained (lockedCommit locked) m [FetchedFile p "100644" b | (p, b) <- files])
+            Right files ->
+                either (Left . InvalidPackage . pure) Right $
+                    packageFromFiles (FromGit (lockedUrl locked) (lockedRev locked) (lockedCommit locked)) (packageDir root (lockedUrl locked))
+                        [FetchedFile p "100644" b | (p, b) <- files]
 
     fromGit used u t = do
         fetched <- fetchTag root u t
         case fetched of
             Left err -> return (Left (FetchFailed err))
-            Right (Fetched sha files fromPrefetch) -> case validatePackage (packageLookup (packageDir root u) [(p, b) | FetchedFile p _ b <- files]) files of
-                Left errs -> return (Left (InvalidPackage errs))
-                Right m -> do
-                    when fromPrefetch (modifyIORef used (prefetchDir root u :))
-                    return (Right (Obtained sha m files))
+            Right (Fetched sha files fromPrefetch) ->
+                case packageFromFiles (FromGit u t sha) (packageDir root u) files of
+                    Left err -> return (Left (InvalidPackage [err]))
+                    Right package -> case checkPackage package of
+                        [] -> do
+                            when fromPrefetch (modifyIORef used (prefetchDir root u :))
+                            return (Right package)
+                        errs -> return (Left (InvalidPackage errs))
 
     commit res locals parsed used = do
         let packages = M.elems (resolvedPackages res)
-            vendored p = [ (path, bytes) | FetchedFile path _ bytes <- obtainedFiles (resolvedObtained p)
-                         , isVendored (obtainedManifest (resolvedObtained p)) path ]
-            entry p = LockedPackage (resolvedUrl p) (resolvedTag p) (obtainedSha (resolvedObtained p)) (contentHash (vendored p))
+            vendored p = [ (path, bytes) | FetchedFile path _ bytes <- packageFiles (resolvedObtained p)
+                         , isVendored (packageManifest (resolvedObtained p)) path ]
+            entry p = LockedPackage (resolvedUrl p) (resolvedTag p) (commitOf p) (contentHash (vendored p))
             changes = [ change | p <- packages, let old = M.lookup (normalizeUrl (resolvedUrl p)) oldPackages
                       , Just change <- [case old of
                             Nothing -> Just (Added p)
@@ -164,7 +165,7 @@ syncDependencies place commandName fetching write root manifest lock = do
             writeLockFile (root </> "termina.lock") (Lock (lockVersion emptyLock) (map entry packages))
         when write (readIORef used >>= mapM_ removePathForcibly)
         return (Sync changes (overrideWarnings res)
-            (M.map (\p -> (resolvedUrl p, obtainedManifest (resolvedObtained p))) (resolvedPackages res)) locals parsed)
+            (M.map (\p -> (resolvedUrl p, packageManifest (resolvedObtained p))) (resolvedPackages res)) locals parsed)
 
     -- | The folder of a package that left the lock, and the folders above it
     -- that it leaves empty.
@@ -176,12 +177,17 @@ syncDependencies place commandName fetching write root manifest lock = do
             empty <- if exists then null <$> listDirectory dir else return False
             when empty (removeDirectory dir)
 
+-- | The commit of a package of the resolution, which always comes from a
+-- repository.
+commitOf :: ResolvedPackage -> T.Text
+commitOf = fromMaybe "" . packageCommit . resolvedObtained
+
 -- | A change of the lock as the user reads it.
 describeChange :: LockChange -> String
 describeChange (Added p) = "added " ++ T.unpack (resolvedUrl p) ++ " " ++ T.unpack (resolvedTag p)
 describeChange (Changed l p)
     | lockedRev l == resolvedTag p =
-        T.unpack (resolvedUrl p) ++ " " ++ T.unpack (resolvedTag p) ++ " now at " ++ T.unpack (obtainedSha (resolvedObtained p))
+        T.unpack (resolvedUrl p) ++ " " ++ T.unpack (resolvedTag p) ++ " now at " ++ T.unpack (commitOf p)
     | otherwise = T.unpack (resolvedUrl p) ++ " " ++ T.unpack (lockedRev l) ++ " -> " ++ T.unpack (resolvedTag p)
 describeChange (Removed l) = "removed " ++ T.unpack (lockedUrl l) ++ " " ++ T.unpack (lockedRev l)
 
