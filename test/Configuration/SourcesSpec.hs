@@ -54,10 +54,9 @@ vendored :: String -> FilePath
 vendored name = normalise (packageDir "." (url name) </> "src")
 
 -- | Where an import of a folder lands, as text that a test can compare.
-lookupIn :: Sources -> FilePath -> String -> IO String
-lookupIn sources importer qname = do
-    found <- lookupModule sources importer qname
-    return $ case found of
+lookupIn :: Sources -> FilePath -> String -> String
+lookupIn sources importer qname =
+    case lookupModule sources importer qname of
         Found folder -> "found in " ++ folder
         Ambiguous a b -> collisionMessage sources qname a b
         Hidden folder -> hiddenMessage folder (maybe Project folderOwner (lookup importer [(folderPath f, f) | f <- sources])) (dotted qname)
@@ -73,31 +72,31 @@ spec = describe "source folders of a build" $ do
 
   it "finds a module of a declared dependency, and one of the dependencies of a package" $
     withProject $ \app _ -> do
-      lookupIn app "src" "obdh/tm" `shouldReturn` "found in src"
-      lookupIn app (vendored "pus") "ccsds/m" `shouldReturn` ("found in " ++ vendored "ccsds")
+      lookupIn app "src" "obdh/tm" `shouldBe` "found in src"
+      lookupIn app (vendored "pus") "ccsds/m" `shouldBe` ("found in " ++ vendored "ccsds")
 
   it "refuses a package that only reaches the build through another" $
     withProject $ \app _ ->
-      lookupIn app "src" "ccsds/m" `shouldReturn`
+      lookupIn app "src" "ccsds/m" `shouldBe`
         "ccsds reaches this build through drivers, but termina.yaml does not declare it, so this project cannot import ccsds.m. Add ccsds to the dependencies to use it."
 
   it "lets the test see its dependencies and its modules, and keeps them from the code of src/" $
     withProject $ \_ test -> do
-      lookupIn test ("tests" </> "hk") "fixtures/m" `shouldReturn` ("found in " ++ vendored "fixtures")
-      lookupIn test ("tests" </> "hk" </> "src") "hk/h" `shouldReturn` ("found in " ++ "tests" </> "hk" </> "src")
-      lookupIn test "src" "fixtures/m" `shouldReturn` "fixtures is a dependency of the test hk only, so the code of src/ cannot import fixtures.m."
-      lookupIn test "src" "hk/h" `shouldReturn` "hk.h is a module of the test hk, so the code of src/ cannot import it."
+      lookupIn test ("tests" </> "hk") "fixtures/m" `shouldBe` ("found in " ++ vendored "fixtures")
+      lookupIn test ("tests" </> "hk" </> "src") "hk/h" `shouldBe` ("found in " ++ "tests" </> "hk" </> "src")
+      lookupIn test "src" "fixtures/m" `shouldBe` "fixtures is a dependency of the test hk only, so the code of src/ cannot import fixtures.m."
+      lookupIn test "src" "hk/h" `shouldBe` "hk.h is a module of the test hk, so the code of src/ cannot import it."
 
   it "takes the exported modules of a library in a local folder, which sees its own dependencies" $
     withProject $ \app _ -> do
       let drivers = "libs" </> "drivers" </> "src"
-      lookupIn app "src" "drivers/uart" `shouldReturn` ("found in " ++ drivers)
-      lookupIn app "src" "support/fake" `shouldReturn`
+      lookupIn app "src" "drivers/uart" `shouldBe` ("found in " ++ drivers)
+      lookupIn app "src" "support/fake" `shouldBe`
         ("support.fake is in " ++ drivers ++ ", outside the exports of drivers, so it cannot be imported from it.")
-      lookupIn app drivers "ccsds/m" `shouldReturn` ("found in " ++ vendored "ccsds")
+      lookupIn app drivers "ccsds/m" `shouldBe` ("found in " ++ vendored "ccsds")
 
   it "refuses a module of the project with the name of one of a dependency" $
     withProject $ \app _ ->
-      lookupIn app "src" "pus/m" `shouldReturn`
+      lookupIn app "src" "pus/m" `shouldBe`
         ("src/pus/m.fin has the same name as the module pus.m of the dependency pus, in " ++ vendored "pus"
           ++ "/. Two modules of a build cannot have the same name.")

@@ -40,19 +40,19 @@ import Control.Monad (forM_)
 import qualified Data.ByteString as BS
 
 
--- | Load a Termina module, taken from the parsed files or, when they do not
--- have it, read and parsed from its file.
+-- | Load a Termina module, taken from the modules of its source folder or,
+-- when the folder does not have it, read and parsed from its file.
 loadTerminaModule ::
-  ParsedFiles
-  -> Sources
+  Sources
   -- | Source folder of the module
   -> FilePath
   -- | Path of the file to load
   -> FilePath
   -> IO ParsedModule
-loadTerminaModule parsed sources root filePath = do
+loadTerminaModule sources root filePath = do
   let fullP = root </> filePath <.> "fin"
-  (src_code, term) <- maybe (parseTerminaFile filePath fullP) (parsedOrDie filePath fullP) (ML.lookup (normalise fullP) parsed)
+      inFolder = find ((== root) . folderPath) sources >>= ML.lookup (normalise fullP) . folderModules
+  (src_code, term) <- maybe (parseTerminaFile filePath fullP) (parsedOrDie filePath fullP) inFolder
   mod_time <- getModificationTime fullP
   imports <- mapM (importOf (M.singleton fullP src_code) fullP) (modules term)
   return $ TerminaModuleData filePath fullP mod_time imports [] src_code (ParsingData . frags $ term)
@@ -65,9 +65,8 @@ loadTerminaModule parsed sources root filePath = do
     importOf fileMap fullP (ModuleImport modName ann) =
       case buildModuleName ann modName of
         Left err -> dieWithReport (toText err fileMap)
-        Right qname -> do
-          found <- lookupModule sources root qname
-          case found of
+        Right qname ->
+          case lookupModule sources root qname of
             Found _ -> return (ModuleDependency qname ann)
             Ambiguous a b -> dieWithError (collisionMessage sources qname a b)
             Hidden folder -> dieWithError $ fullP ++ ":" ++ show (locationLine ann) ++ ": "
@@ -102,20 +101,18 @@ parsedOrDie filePath fullP parsedFile =
 -- import in turn, each one from the folder where the importer finds it. One
 -- name found in two folders of the build is an error.
 loadModules
-  :: ParsedFiles
-  -> Sources
+  :: Sources
   -> FilePath
   -> [ModuleDependency]
   -> IO ParsedProject
-loadModules parsed sources importer imported = loadModules' M.empty [(dep, importer) | dep <- imported]
+loadModules sources importer imported = loadModules' M.empty [(dep, importer) | dep <- imported]
 
   where
 
   loadModules' :: ParsedProject -> [(ModuleDependency, FilePath)] -> IO ParsedProject
   loadModules' fsLoaded [] = pure fsLoaded
   loadModules' fsLoaded ((ModuleDependency qname _, from) : fss) = do
-    found <- lookupModule sources from qname
-    folder <- case found of
+    folder <- case lookupModule sources from qname of
       Found folder -> return folder
       Ambiguous a b -> dieWithError (collisionMessage sources qname a b)
       _ -> dieWithError $ "Module " ++ qname ++ " not found"
@@ -124,7 +121,7 @@ loadModules parsed sources importer imported = loadModules' M.empty [(dep, impor
         | fullPath loaded == folder </> qname <.> "fin" -> loadModules' fsLoaded fss
         | otherwise -> dieWithError (collisionMessage sources qname (moduleFolder qname (fullPath loaded)) folder)
       Nothing -> do
-        loadedModule <- loadTerminaModule parsed sources folder qname
+        loadedModule <- loadTerminaModule sources folder qname
         loadModules' (M.insert qname loadedModule fsLoaded)
           (fss ++ [(dep, folder) | dep <- importedModules loadedModule])
 

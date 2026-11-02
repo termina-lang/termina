@@ -46,11 +46,11 @@ loadProject chatty offline = do
     unless (null exportErrors) $ dieWithFirstError exportErrors
     lock <- loadLock "." >>= either dieWithFirstError return
     place <- currentPlace
-    Sync changes warnings packages locals parsed <- syncDependencies place "termina build" (if offline then Offline else Reuse) True "." manifest lock
+    Sync changes warnings packages locals <- syncDependencies place "termina build" (if offline then Offline else Reuse) True "." manifest lock
         >>= either dieWithFirstError return
     mapM_ (putStrLn . warnMessage) warnings
     mapM_ (putStrLn . infoMessage . ("termina.lock: " ++) . describeChange) changes
-    let project = LoadedProject manifest packages locals (ML.union own parsed)
+    let project = LoadedProject manifest packages locals own
     verifyLibrary chatty project
     return project
 
@@ -65,7 +65,7 @@ verifyLibrary chatty project =
         Application _ -> return ()
         Library _ -> do
             roots <- exportedModules "." manifest
-            parsedModules <- loadModules (loadedParsed project) (buildSources project Nothing "src") "src" [ModuleDependency root Internal | root <- roots]
+            parsedModules <- loadModules (buildSources project Nothing "src") "src" [ModuleDependency root Internal | root <- roots]
             -- | Each exported module with extern functions has its entry
             case checkExternModules "the project" "src" (manifestExtern manifest) Nothing (map parsedExterns (M.elems parsedModules)) of
                 [] -> return ()

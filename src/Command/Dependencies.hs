@@ -19,7 +19,6 @@ import Control.Monad
 import Data.IORef
 import Data.List (intercalate)
 import Data.Maybe (fromMaybe)
-import qualified Data.Map.Lazy as ML
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import System.Directory
@@ -32,7 +31,6 @@ import Configuration.Local
 import Configuration.Lock
 import Configuration.Manifest
 import Configuration.Package
-import Configuration.Parsed (ParsedFiles)
 import Configuration.Resolve
 import Configuration.Validate
 import Configuration.Vendor
@@ -73,13 +71,10 @@ data Sync = Sync {
     syncChanges :: ![LockChange],
     -- | What the user has to know about the resolution
     syncWarnings :: ![String],
-    -- | The packages of the lock by normalized URL, each with its URL and its manifest
-    syncPackages :: !(M.Map T.Text (T.Text, Manifest)),
+    -- | The packages of the lock by normalized URL
+    syncPackages :: !(M.Map T.Text Package),
     -- | The libraries of local folders by folder
-    syncLocals :: !(M.Map FilePath Package),
-    -- | The modules of the packages and of the local folders by their path
-    -- from the project folder
-    syncParsed :: !ParsedFiles
+    syncLocals :: !(M.Map FilePath Package)
   } deriving Show
 
 -- | Update the lock and vendor/ from a manifest. It reads and validates the
@@ -101,9 +96,8 @@ syncDependencies place commandName fetching write root manifest lock = do
             case resolution of
                 Left errs -> return (Left (describeObtainErrors place commandName errs))
                 Right res ->
-                    let packages = map resolvedObtained (M.elems (resolvedPackages res)) ++ M.elems locals
-                    in case checkGraph manifest packages of
-                        [] -> Right <$> commit res locals (ML.unions (map packageModules packages)) used
+                    case checkGraph manifest (map resolvedObtained (M.elems (resolvedPackages res)) ++ M.elems locals) of
+                        [] -> Right <$> commit res locals used
                         errs -> return (Left errs)
 
   where
@@ -144,7 +138,7 @@ syncDependencies place commandName fetching write root manifest lock = do
                             return (Right package)
                         errs -> return (Left (InvalidPackage errs))
 
-    commit res locals parsed used = do
+    commit res locals used = do
         let packages = M.elems (resolvedPackages res)
             vendored p = [ (path, bytes) | FetchedFile path _ bytes <- packageFiles (resolvedObtained p)
                          , isVendored (packageManifest (resolvedObtained p)) path ]
@@ -163,7 +157,7 @@ syncDependencies place commandName fetching write root manifest lock = do
             writeLockFile (root </> "termina.lock") (Lock (lockVersion emptyLock) (map entry packages))
         when write (readIORef used >>= mapM_ removePathForcibly)
         return (Sync changes (overrideWarnings res)
-            (M.map (\p -> (resolvedUrl p, packageManifest (resolvedObtained p))) (resolvedPackages res)) locals parsed)
+            (M.map resolvedObtained (resolvedPackages res)) locals)
 
     -- | The folder of a package that left the lock, and the folders above it
     -- that it leaves empty.

@@ -61,7 +61,7 @@ addDependency place root url tag mTest = do
             synced <- syncDependencies place "termina add" Reuse True root manifest lock
             case synced of
                 Left errs -> return (Left errs)
-                Right (Sync changes warnings _ _ _) -> do
+                Right (Sync changes warnings _ _) -> do
                     BS.writeFile (root </> "termina.yaml") (utf8 newText)
                     let (added, others) = partition isThis changes
                     return (Right (AddReport (map describe (added ++ others)) warnings))

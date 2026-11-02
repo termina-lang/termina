@@ -90,7 +90,7 @@ updateDependencies place root mDep = do
                     return (Left [dep ++ " is not a dependency of this project."])
                 _ -> do
                     synced <- syncDependencies place "termina update" (Refresh (maybe (const True) matches mDep)) True root manifest lock
-                    return $ flip fmap synced $ \(Sync changes warnings _ _ _) ->
+                    return $ flip fmap synced $ \(Sync changes warnings _ _) ->
                         (warnings, if null changes then ["termina.lock is up to date"] else map (("termina.lock: " ++) . describeChange) changes)
 
 -- | What "termina update" would change, without writing: the tags of the
@@ -139,7 +139,7 @@ verifyProject place root = do
                 (p : _) -> return (Left ["termina.yaml takes " ++ p ++ " from a local folder, which termina.lock cannot pin."])
                 [] -> do
                     synced <- syncDependencies place "termina verify" Offline False root manifest lock
-                    return $ synced >>= \(Sync changes _ _ _ _) -> case changes of
+                    return $ synced >>= \(Sync changes _ _ _) -> case changes of
                         [] -> Right ()
                         _ -> Left (map describe changes)
 

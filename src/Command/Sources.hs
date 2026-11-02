@@ -31,13 +31,14 @@ import System.Directory
 import System.FilePath
 
 import Command.Utils (dieWithFirstError, loadLock)
+import Configuration.Fetch (FetchedFile(..))
 import Configuration.Local
 import Configuration.Lock
 import Configuration.Manifest
 import qualified Configuration.Package as P
 import Configuration.Parsed
 import Configuration.Prefix (manifestPrefixes, ownsModule)
-import Configuration.Vendor (packageDir)
+import Configuration.Vendor (packageDir, readPackage)
 import Utils.Files (filesUnder)
 import Modules.Utils (qualifiedToModuleName)
 import Utils.Annotations (QualifiedName)
@@ -64,21 +65,22 @@ data SourceFolder = SourceFolder {
     folderSees :: ![FilePath],
     -- | The prefixes whose modules can be imported from it, in a local
     -- folder, which holds the whole library
-    folderPrefixes :: !(Maybe [Prefix])
-  } deriving (Eq, Show)
+    folderPrefixes :: !(Maybe [Prefix]),
+    -- | Its modules, by their path from the project folder
+    folderModules :: !ParsedFiles
+  } deriving Show
 
 type Sources = [SourceFolder]
 
 -- | A project and its dependencies.
 data LoadedProject = LoadedProject {
     loadedManifest :: !Manifest,
-    -- | The packages of vendor/ by normalized URL, each with its URL and its manifest
-    loadedPackages :: !(M.Map T.Text (T.Text, Manifest)),
+    -- | The packages of vendor/ by normalized URL
+    loadedPackages :: !(M.Map T.Text P.Package),
     -- | The libraries of local folders by folder
     loadedLocals :: !(M.Map FilePath P.Package),
-    -- | The modules of the project and of its dependencies by their path from
-    -- the project folder
-    loadedParsed :: !ParsedFiles
+    -- | The modules of the project, by their path from the project folder
+    loadedModules :: !ParsedFiles
   } deriving Show
 
 -- | Read a project and its dependencies from disk, without updating the lock
@@ -88,12 +90,12 @@ readProject manifest = do
     lock <- loadLock "." >>= either dieWithFirstError return
     locals <- readLocalPackages [(".", p) | DepPath p <- allDependencies] >>= either dieWithFirstError return
     vendored <- forM (lockPackages lock) $ \l -> do
-        m <- decodeManifestFile (packageDir "." (lockedUrl l) </> "termina.yaml")
-        either (\err -> dieWithFirstError ["vendor/: " ++ err]) (\m' -> return (normalizeUrl (lockedUrl l), (lockedUrl l, m'))) m
+        let url = lockedUrl l
+        files <- readPackage "." url
+        either (\err -> dieWithFirstError ["vendor/" ++ T.unpack (normalizeUrl url) ++ ": " ++ err]) (return . (,) (normalizeUrl url)) $
+            P.packageFromFiles (P.FromGit url (lockedRev l) (lockedCommit l)) (packageDir "." url) [FetchedFile p "100644" b | (p, b) <- files]
     own <- readProjectModules manifest
-    packages <- mapM (\l -> readSourceFolder (normalise (packageDir "." (lockedUrl l) </> "src"))) (lockPackages lock)
-    return (LoadedProject manifest (M.fromList vendored) locals
-        (ML.unions (own : packages ++ map P.packageModules (M.elems locals))))
+    return (LoadedProject manifest (M.fromList vendored) locals own)
 
   where
 
@@ -111,11 +113,14 @@ readProjectModules manifest = do
 
     tests = ["tests" </> T.unpack t | t <- M.keys (manifestTests manifest)]
 
-    readMainFolder folder = do
-        exists <- doesDirectoryExist folder
-        names <- if exists then listDirectory folder else return []
-        files <- filterM (doesFileExist . (folder </>)) [n | n <- names, takeExtension n == ".fin"]
-        parseFolder folder <$> mapM (\f -> (,) f <$> BS.readFile (folder </> f)) files
+-- | The modules of the folder of a main module, without its subfolders, read
+-- from disk.
+readMainFolder :: FilePath -> IO ParsedFiles
+readMainFolder folder = do
+    exists <- doesDirectoryExist folder
+    names <- if exists then listDirectory folder else return []
+    files <- filterM (doesFileExist . (folder </>)) [n | n <- names, takeExtension n == ".fin"]
+    parseFolder folder <$> mapM (\f -> (,) f <$> BS.readFile (folder </> f)) files
 
 -- | The modules under a source folder, read from disk.
 readSourceFolder :: FilePath -> IO ParsedFiles
@@ -127,7 +132,7 @@ readSourceFolder folder = do
 -- folder of its main module. Only the local folders that the dependencies of
 -- the project and of the test reach are included.
 buildSources :: LoadedProject -> Maybe String -> FilePath -> Sources
-buildSources (LoadedProject manifest vendored admitted _) mTest mainFolder =
+buildSources (LoadedProject manifest vendored admitted own) mTest mainFolder =
     sources vendored (reachedLocals admitted [(".", p) | DepPath p <- manifestDependencies manifest])
         (reachedLocals admitted [(".", p) | DepPath p <- testDeps])
 
@@ -144,15 +149,15 @@ buildSources (LoadedProject manifest vendored admitted _) mTest mainFolder =
     testKeys = keysOf testDeps
 
     sources packages rootLocals testLocals =
-        let folderOf k = maybe "" (\(u, _) -> normalise (packageDir "." u </> "src")) (M.lookup k packages)
-            declared k = maybe [] (keysOf . manifestDependencies . snd) (M.lookup k packages)
+        let folderOf k = maybe "" (localSrc . P.packageFolder) (M.lookup k packages)
+            declared k = maybe [] (keysOf . manifestDependencies . P.packageManifest) (M.lookup k packages)
             -- The packages reached from some keys, each with the package that first brought it.
             closure starts = go (M.fromList starts) (map fst starts)
               where
                 go seen [] = seen
                 go seen (k : rest) =
                     let new = [d | d <- declared k, not (M.member d seen)]
-                        name = maybe "" (nameOf . snd) (M.lookup k packages)
+                        name = maybe "" (nameOf . P.packageManifest) (M.lookup k packages)
                     in go (foldr (\d -> M.insert d (Just name)) seen new) (rest ++ new)
             localSrc folder = normalise (folder </> "src")
             localKeys l = keysOf (manifestDependencies (P.packageManifest l))
@@ -169,22 +174,25 @@ buildSources (LoadedProject manifest vendored admitted _) mTest mainFolder =
             testSrc = maybe [] (\t -> ["tests" </> t </> "src"]) mTest
             mainSees = maybe projectSees (const testSees) mTest
             mainOwner = maybe Project TestOf mTest
-            packageFolder k via = SourceFolder (folderOf k)
-                (Package (maybe "" (nameOf . snd) (M.lookup k packages)) via (if M.member k rootGraph then Nothing else mTest))
-                (folderOf k : map folderOf (declared k)) Nothing
+            vendoredFolder k p via = SourceFolder (folderOf k)
+                (Package (nameOf (P.packageManifest p)) via (if M.member k rootGraph then Nothing else mTest))
+                (folderOf k : map folderOf (declared k)) Nothing (P.packageModules p)
             localFolder' l = SourceFolder (localSrc (P.packageFolder l))
                 (Local (nameOf (P.packageManifest l)) (if M.member (P.packageFolder l) rootLocals then Nothing else mTest))
                 (localSrc (P.packageFolder l) : map folderOf (localKeys l) ++ map localSrc (localPaths l))
-                (Just (manifestPrefixes (P.packageManifest l)))
-        in [SourceFolder mainFolder mainOwner mainSees Nothing, SourceFolder "src" Project projectSees Nothing]
-            ++ [SourceFolder f (TestOf t) testSees Nothing | Just t <- [mTest], f <- testSrc]
-            ++ [packageFolder k via | (k, via) <- M.toList graph, M.member k packages]
+                (Just (manifestPrefixes (P.packageManifest l))) (P.packageModules l)
+        in [SourceFolder mainFolder mainOwner mainSees Nothing own, SourceFolder "src" Project projectSees Nothing own]
+            ++ [SourceFolder f (TestOf t) testSees Nothing own | Just t <- [mTest], f <- testSrc]
+            ++ [vendoredFolder k p via | (k, via) <- M.toList graph, Just p <- [M.lookup k packages]]
             ++ map localFolder' (M.elems locals)
 
--- | Folders that all see each other, as before packages, for the commands
--- that do not read them yet.
-plainSources :: FilePath -> [FilePath] -> Sources
-plainSources mainFolder folders = [SourceFolder f Project folders Nothing | f <- mainFolder : folders]
+-- | Folders that all see each other, as before packages, with their modules
+-- read from disk, for the commands that do not read packages yet.
+plainSources :: FilePath -> [FilePath] -> IO Sources
+plainSources mainFolder folders = do
+    mainModules <- readMainFolder mainFolder
+    modules <- ML.unions . (mainModules :) <$> mapM readSourceFolder folders
+    return [SourceFolder f Project folders Nothing modules | f <- mainFolder : folders]
 
 data Lookup =
     Found FilePath
@@ -197,23 +205,26 @@ data Lookup =
     | NotExported SourceFolder
     | Missing
 
--- | Where a module that a module of a folder imports is.
-lookupModule :: Sources -> FilePath -> QualifiedName -> IO Lookup
-lookupModule sources importer qname = do
-    let sees = maybe [importer] folderSees (folderAt importer)
-        has folder = doesFileExist (folder </> qname <.> "fin")
-        exported folder = maybe True (any (`ownsModule` splitDirectories qname)) (folderAt folder >>= folderPrefixes)
-    present <- filterM has (dedup sees)
+-- | Where a module that a module of a folder imports is, among the modules of
+-- the folders of the build.
+lookupModule :: Sources -> FilePath -> QualifiedName -> Lookup
+lookupModule sources importer qname =
     case filter exported present of
-        [folder] -> return (Found folder)
-        (a : b : _) -> return (Ambiguous a b)
+        [folder] -> Found folder
+        (a : b : _) -> Ambiguous a b
         [] -> case [f | folder <- present, Just f <- [folderAt folder]] of
-            (f : _) -> return (NotExported f)
-            [] -> do
-                others <- filterM (has . folderPath) [f | f <- sources, folderPath f `notElem` sees]
-                return (maybe Missing Hidden (safeHead others))
+            (f : _) -> NotExported f
+            [] -> maybe Missing Hidden (safeHead [f | f <- sources, folderPath f `notElem` sees, has (folderPath f)])
 
   where
+
+    sees = maybe [importer] folderSees (folderAt importer)
+
+    present = filter has (dedup sees)
+
+    has folder = maybe False (ML.member (normalise (folder </> qname <.> "fin")) . folderModules) (folderAt folder)
+
+    exported folder = maybe True (any (`ownsModule` splitDirectories qname)) (folderAt folder >>= folderPrefixes)
 
     folderAt folder = find ((== folder) . folderPath) sources
 

@@ -592,8 +592,8 @@ loadTestCases :: LoadedProject -> String -> IO [TestCase]
 loadTestCases project testName = do
     let testFolder = "tests" </> testName
         sources = buildSources project (Just testName) testFolder
-    testModule <- loadTerminaModule (loadedParsed project) sources testFolder "test"
-    parsedModules <- loadModules (loadedParsed project) sources testFolder (importedModules testModule)
+    testModule <- loadTerminaModule sources testFolder "test"
+    parsedModules <- loadModules sources testFolder (importedModules testModule)
     let parsedProject = M.insert (qualifiedName testModule) testModule parsedModules
     orderedModules <- either
         (\cycleFiles -> dieWithError $ "Detected cycle between the source files of the test " ++ testName ++ ": " ++ show cycleFiles)
