@@ -12,7 +12,7 @@ import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment
 import Command.Project (loadProject)
 import Command.Common (loadTerminaModule, loadModules)
 import Command.Deliver (deliverableInfo)
-import Command.Sources (loadSources)
+import Command.Sources (LoadedProject(..), buildSources, readProject)
 import Configuration.Configuration
 import Configuration.Platform (Platform(..), callSite, checkPlatform, gdbServerPort, xsdbServerPort)
 import Runner.Analysis (TestResult(TestResult), Run(..), RunEnd(..), AddressKind(..), analyse, addressesOf, renderReport, exitCodeOf)
@@ -212,15 +212,16 @@ modeOf mName mCase isolated mRecord offline =
 -- | Builds and runs each selected test on each of its platforms, and exits with
 -- the worst code of them: 0 when every case passes, 1 when one does not, 2 when
 -- a test cannot be built or read, also when the project cannot be loaded. A
--- record is decoded with the binary already built, so its project is read
--- without bringing the lock and vendor/ in line.
+-- record is decoded with the binary already built, and only the manifest is
+-- read.
 runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Maybe Executor -> Maybe Server -> Maybe Server -> Bool -> Mode -> IO ()
 runTests mName mPlatform mProfile mExecutor mServer mXsdb offline mode = do
     loaded <- try (case mode of
-        Recorded _ -> loadManifest >>= either dieWithFirstError return
-        _ -> loadProject False offline) :: IO (Either ExitCode Manifest)
-    manifest <- either (const (exitWith (ExitFailure 2))) return loaded
-    let selection = maybe SelectTests SelectTest mName
+        Recorded _ -> (\m -> LoadedProject m M.empty M.empty) <$> (loadManifest >>= either dieWithFirstError return)
+        _ -> loadProject False offline) :: IO (Either ExitCode LoadedProject)
+    project <- either (const (exitWith (ExitFailure 2))) return loaded
+    let manifest = loadedManifest project
+        selection = maybe SelectTests SelectTest mName
         buildArgs = BuildCmdArgs False False Nothing selection mPlatform mProfile offline
     deployments <- either cannotRun return (selectDeployments manifest selection mPlatform mProfile)
     when (null deployments) $
@@ -245,7 +246,7 @@ runTests mName mPlatform mProfile mExecutor mServer mXsdb offline mode = do
             ++ intercalate ", " (map (show . deploymentPlatform) deployments) ++ "; choose one with --platform")
         _ -> forM deployments $ \deployment -> do
             announce deployments ("Building " ++ deploymentLabel deployment)
-            built <- try (void (buildDeployment buildArgs deployment)) :: IO (Either ExitCode ())
+            built <- try (void (buildDeployment buildArgs project deployment)) :: IO (Either ExitCode ())
             case built of
                 Left _ -> do
                     let config = deploymentConfig deployment
@@ -545,8 +546,9 @@ listTests json = do
     -- | A test that cannot be read exits with 2, as in a run
     loaded <- try (do
         manifest <- loadManifest >>= either dieWithFirstError return
+        project <- readProject manifest
         forM (M.toList (manifestTests manifest)) $ \(testName, entry) -> do
-          cases <- loadTestCases manifest (T.unpack testName)
+          cases <- loadTestCases project (T.unpack testName)
           return (testName, entry, cases)) :: IO (Either ExitCode [(T.Text, TestEntry, [TestCase])])
     listed <- either (const (exitWith (ExitFailure 2))) return loaded
     if json
@@ -584,10 +586,10 @@ listTests json = do
     joinWith sep = foldr1 (\a b -> a ++ sep ++ b)
 
 -- | Parse the modules of a test and read its cases
-loadTestCases :: Manifest -> String -> IO [TestCase]
-loadTestCases manifest testName = do
+loadTestCases :: LoadedProject -> String -> IO [TestCase]
+loadTestCases project testName = do
     let testFolder = "tests" </> testName
-    sources <- loadSources manifest (Just testName) testFolder
+        sources = buildSources project (Just testName) testFolder
     testModule <- loadTerminaModule sources testFolder "test"
     parsedModules <- loadModules sources testFolder (importedModules testModule)
     let parsedProject = M.insert (qualifiedName testModule) testModule parsedModules

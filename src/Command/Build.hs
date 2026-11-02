@@ -8,7 +8,7 @@ module Command.Build (
 import Configuration.Configuration
 import Configuration.Manifest
 import Command.Project (loadProject)
-import Command.Sources (loadSources, localFolders)
+import Command.Sources (LoadedProject(..), buildSources, localFolders)
 import Command.Utils
 import Control.Exception (IOException, try)
 import Data.Maybe (fromMaybe, isJust)
@@ -311,14 +311,15 @@ genMonadicHeaderFiles params plt monadicTypes = do
     usesStatus = not . S.null . S.filter notStructOrEnum . statusTypes $ monadicTypes
     usesResults = not . S.null . S.unions . M.elems . M.filterWithKey (\k _ -> notStructOrEnum k) . resultTypes $ monadicTypes
 
--- | The deployments that the arguments select.
-selectedDeployments :: BuildCmdArgs -> IO [Deployment]
+-- | Load the project and give the deployments that the arguments select.
+selectedDeployments :: BuildCmdArgs -> IO (LoadedProject, [Deployment])
 selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile offline) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
-    manifest <- loadProject chatty offline
+    project <- loadProject chatty offline
+    let manifest = loadedManifest project
     deployments <- either dieWithError return $ selectDeployments manifest selection mPlatform mProfile
     when (null deployments) (putStrLn . infoMessage $ nothingSelected manifest selection mPlatform)
-    return deployments
+    return (project, deployments)
 
 -- | The deployments of a selection. The application of a library gives none,
 -- and so do the tests of a project without tests or of a platform on which no
@@ -360,26 +361,26 @@ nothingSelected manifest selection mPlatform =
 -- | Command handler for the "generate" command
 generateCommand :: BuildCmdArgs -> IO ()
 generateCommand args = do
-    deployments <- selectedDeployments args
+    (project, deployments) <- selectedDeployments args
     forM_ deployments $ \deployment -> do
       announce deployments ("Generating " ++ deploymentLabel deployment)
-      void (generateDeployment args deployment)
+      void (generateDeployment args project deployment)
 
 -- | Command handler for the "build" command: it generates each deployment
 -- and runs make on the folder of its C with the #line pragmas
 buildCommand :: BuildCmdArgs -> IO ()
 buildCommand args = do
-    deployments <- selectedDeployments args
+    (project, deployments) <- selectedDeployments args
     forM_ deployments $ \deployment -> do
       announce deployments ("Building " ++ deploymentLabel deployment)
-      void (buildDeployment args deployment)
+      void (buildDeployment args project deployment)
 
--- | Generate a deployment, run make on the folder of its C with the #line
--- pragmas and write its provenance.json. It gives the modules of the
+-- | Generate a deployment of a project, run make on the folder of its C with
+-- the #line pragmas and write its provenance.json. It gives the modules of the
 -- deployment with their source files, and its groups of C.
-buildDeployment :: BuildCmdArgs -> Deployment -> IO ([(QualifiedName, FilePath)], [ExternGroup])
-buildDeployment args deployment = do
-    built@(modules, _) <- generateDeployment args deployment
+buildDeployment :: BuildCmdArgs -> LoadedProject -> Deployment -> IO ([(QualifiedName, FilePath)], [ExternGroup])
+buildDeployment args project deployment = do
+    built@(modules, _) <- generateDeployment args project deployment
     let config = deploymentConfig deployment
     runMake (deploymentLabel deployment) (outputFolder config) []
     runMake (deploymentLabel deployment) (outputFolder config) ["-s", "stripped-hashes"]
@@ -439,10 +440,10 @@ writeProvenance config modules = do
     toPair [hash, path] = [(normalise path, hash)]
     toPair _ = []
 
--- | Generate the C and the Makefile of a deployment. It gives the modules of
--- the deployment with their source files, and its groups of C.
-generateDeployment :: BuildCmdArgs -> Deployment -> IO ([(QualifiedName, FilePath)], [ExternGroup])
-generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _) deployment = do
+-- | Generate the C and the Makefile of a deployment of a project. It gives the
+-- modules of the deployment with their source files, and its groups of C.
+generateDeployment :: BuildCmdArgs -> LoadedProject -> Deployment -> IO ([(QualifiedName, FilePath)], [ExternGroup])
+generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _) project deployment = do
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
         mainFolder = deploymentMainFolder deployment
@@ -451,8 +452,7 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
             ["tests", testName] -> Just testName
             _ -> Nothing
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
-    manifest <- decodeManifestFile "termina.yaml" >>= either (dieWithError . ("termina.yaml: " ++)) return
-    sources <- loadSources manifest mTest mainFolder
+    let sources = buildSources project mTest mainFolder
     -- A library of a local folder is not in the lock, so the build cannot be reproduced.
     forM_ (localFolders sources) $ \folder -> case profile config of
         Release -> dieWithError $ folder ++ " is a local folder, and a release is built only from tagged dependencies. "

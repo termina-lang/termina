@@ -47,9 +47,8 @@ withProject action = do
         let manifest = manifestOf $ header "obdh" ++ "app:\n  platform: posix-gcc\n  profile: release\n" ++ deps ["pus"]
                 ++ "  - path: libs/drivers\n"
                 ++ "tests:\n  hk:\n    platforms: [posix-gcc]\n    timeout: 10\n    dependencies:\n      - git: " ++ T.unpack (url "fixtures") ++ "\n        rev: \"v1\"\n"
-        app <- either (error . unlines) id <$> buildSources manifest Nothing "app"
-        test <- either (error . unlines) id <$> buildSources manifest (Just "hk") ("tests" </> "hk")
-        action app test
+        project <- readProject manifest
+        action (buildSources project Nothing "app") (buildSources project (Just "hk") ("tests" </> "hk"))
 
 vendored :: String -> FilePath
 vendored name = normalise (packageDir "." (url name) </> "src")

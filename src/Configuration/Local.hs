@@ -4,7 +4,8 @@
 module Configuration.Local (
     LocalPackage(..),
     localFolderOf,
-    readLocalPackages
+    readLocalPackages,
+    reachedLocals
 ) where
 
 import Control.Monad
@@ -39,6 +40,24 @@ localFolderOf parent path = tidy (splitDirectories (normalise (parent </> path))
     step acc "." = acc
     step acc segment = segment : acc
 
+-- | The folders of the path dependencies of a local package.
+pathFolders :: LocalPackage -> [FilePath]
+pathFolders local = [localFolderOf (localFolder local) path | DepPath path <- manifestDependencies (localManifest local)]
+
+-- | The packages of a map that the path dependencies of some folders reach,
+-- directly or through other packages of the map.
+reachedLocals :: M.Map FilePath LocalPackage -> [(FilePath, FilePath)] -> M.Map FilePath LocalPackage
+reachedLocals locals starts = go M.empty [localFolderOf parent path | (parent, path) <- starts]
+
+  where
+
+    go found [] = found
+    go found (folder : rest)
+        | M.member folder found = go found rest
+        | otherwise = case M.lookup folder locals of
+            Nothing -> go found rest
+            Just local -> go (M.insert folder local found) (rest ++ pathFolders local)
+
 -- | The local packages that the path dependencies of some folders reach,
 -- each one with the dependencies by path of its own manifest, by folder.
 readLocalPackages :: [(FilePath, FilePath)] -> IO (Either [String] (M.Map FilePath LocalPackage))
@@ -53,8 +72,7 @@ readLocalPackages starts = go M.empty [localFolderOf parent path | (parent, path
             read' <- readLocal folder
             case read' of
                 Left errs -> return (Left errs)
-                Right local -> go (M.insert folder local found)
-                    (rest ++ [localFolderOf folder path | DepPath path <- manifestDependencies (localManifest local)])
+                Right local -> go (M.insert folder local found) (rest ++ pathFolders local)
 
     readLocal folder = do
         exists <- doesDirectoryExist folder

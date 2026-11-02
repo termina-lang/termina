@@ -13,6 +13,7 @@ module Command.Deliver (
 import Command.Build
 import Command.Extern (ExternGroup(..), groupObject, groupObjects)
 import Command.Project (loadProject)
+import Command.Sources (LoadedProject(..))
 import Command.Update (verifyProject)
 import Command.Utils
 import Configuration.Configuration
@@ -72,8 +73,9 @@ deliverCommand (DeliverCmdArgs chatty withTests archive withTrace) = do
     -- A deliverable is built from the state in git, which verify checks without writing.
     place <- currentPlace
     verifyProject place "." >>= either dieWithFirstError return
-    manifest <- loadProject chatty True
-    let hasApp = isJust (appDeployment manifest)
+    loaded <- loadProject chatty True
+    let manifest = loadedManifest loaded
+        hasApp = isJust (appDeployment manifest)
         selection = case (withTests, hasApp) of
             (False, _) -> SelectApp
             (True, True) -> SelectAll
@@ -84,15 +86,15 @@ deliverCommand (DeliverCmdArgs chatty withTests archive withTrace) = do
     when (null deployments) (putStrLn . infoMessage $ nothingSelected manifest selection Nothing)
     forM_ deployments $ \deployment -> do
       announce deployments ("Delivering " ++ deploymentLabel deployment)
-      deliverDeployment chatty manifest archive withTrace deployment
+      deliverDeployment chatty loaded archive withTrace deployment
 
 -- | The folder of the deliverable of a deployment: "deliverable/app",
 -- "deliverable/tests/<name>/<platform>".
 deliverableFolder :: TerminaConfig -> FilePath
 deliverableFolder config = outputFolderName </> "deliverable" </> makeRelative outputFolderName (outputFolder config)
 
-deliverDeployment :: Bool -> Manifest -> Bool -> Bool -> Deployment -> IO ()
-deliverDeployment chatty manifest archive withTrace deployment = do
+deliverDeployment :: Bool -> LoadedProject -> Bool -> Bool -> Deployment -> IO ()
+deliverDeployment chatty loaded archive withTrace deployment = do
     let config = deploymentConfig deployment
         label = deploymentLabel deployment
         built = outputFolder config
@@ -101,7 +103,7 @@ deliverDeployment chatty manifest archive withTrace deployment = do
         binary = "bin" </> T.unpack (name config)
     -- | The build with the #line pragmas gives the values of the Makefile,
     -- the dependency files and the binary to compare with
-    (modules, externs) <- buildDeployment (BuildCmdArgs chatty False Nothing SelectApp Nothing Nothing True) deployment
+    (modules, externs) <- buildDeployment (BuildCmdArgs chatty False Nothing SelectApp Nothing Nothing True) loaded deployment
     info <- deliverableInfo label built
     let value key = M.findWithDefault "" key info
         list key = words (value key)
@@ -189,7 +191,7 @@ deliverDeployment chatty manifest archive withTrace deployment = do
     BL.writeFile (folder </> "provenance" <.> "json") $
       encodePretty' defConfig { confCompare = keyOrder ["name", "deployment", "platform", "profile", "termina", "osal", "compiler", "binary", "modules", "files", "path", "module", "object"] } provenance
     when archive $ do
-      let project = manifestProject manifest
+      let project = manifestProject (loadedManifest loaded)
           archiveName = intercalate "-" $
             [T.unpack (projectName project), T.unpack (projectVersion project)]
             ++ [T.unpack (name config) | isTestBuild config]

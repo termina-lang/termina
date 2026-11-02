@@ -1,14 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | The source folders of a build and what the modules of each one see: their
--- own folder and those of the dependencies that their manifest declares.
+-- | A project with its dependencies, and the source folders of a build with
+-- what the modules of each one see: their own folder and those of the
+-- dependencies that their manifest declares.
 module Command.Sources (
     Owner(..),
     SourceFolder(..),
     Sources,
     Lookup(..),
+    LoadedProject(..),
+    readProject,
     buildSources,
-    loadSources,
     plainSources,
     lookupModule,
     hiddenMessage,
@@ -61,24 +63,37 @@ data SourceFolder = SourceFolder {
 
 type Sources = [SourceFolder]
 
+-- | A project and its dependencies.
+data LoadedProject = LoadedProject {
+    loadedManifest :: !Manifest,
+    -- | The packages of vendor/ by normalized URL, each with its URL and its manifest
+    loadedPackages :: !(M.Map T.Text (T.Text, Manifest)),
+    -- | The libraries of local folders by folder
+    loadedLocals :: !(M.Map FilePath LocalPackage)
+  } deriving (Eq, Show)
+
+-- | Read a project and its dependencies from disk, without updating the lock
+-- or vendor/. It stops at the first error.
+readProject :: Manifest -> IO LoadedProject
+readProject manifest = do
+    lock <- loadLock "." >>= either dieWithFirstError return
+    locals <- readLocalPackages [(".", p) | DepPath p <- allDependencies] >>= either dieWithFirstError return
+    vendored <- forM (lockPackages lock) $ \l -> do
+        m <- decodeManifestFile (packageDir "." (lockedUrl l) </> "termina.yaml")
+        either (\err -> dieWithFirstError ["vendor/: " ++ err]) (\m' -> return (normalizeUrl (lockedUrl l), (lockedUrl l, m'))) m
+    return (LoadedProject manifest (M.fromList vendored) locals)
+
+  where
+
+    allDependencies = manifestDependencies manifest ++ concatMap testDependencies (M.elems (manifestTests manifest))
+
 -- | The folders of the build of the application, or of a test, with the
--- folder of its main module. The packages are those of the lock, read from
--- vendor/, which the build has already brought in line with the manifest,
--- and the libraries of local folders.
-buildSources :: Manifest -> Maybe String -> FilePath -> IO (Either [String] Sources)
-buildSources manifest mTest mainFolder = do
-    lockResult <- loadLock "."
-    rootLocals <- readLocalPackages [(".", p) | DepPath p <- manifestDependencies manifest]
-    testLocals <- readLocalPackages [(".", p) | DepPath p <- testDeps]
-    case (,,) <$> lockResult <*> rootLocals <*> testLocals of
-        Left errs -> return (Left errs)
-        Right (lock, rl, tl) -> do
-            vendored <- forM (lockPackages lock) $ \l -> do
-                m <- decodeManifestFile (packageDir "." (lockedUrl l) </> "termina.yaml")
-                return (normalizeUrl (lockedUrl l), (lockedUrl l, m))
-            case [err | (_, (_, Left err)) <- vendored] of
-                (err : _) -> return (Left ["vendor/: " ++ err])
-                [] -> return (Right (sources (M.fromList [(k, (u, m)) | (k, (u, Right m)) <- vendored]) rl tl))
+-- folder of its main module. Only the local folders that the dependencies of
+-- the project and of the test reach are included.
+buildSources :: LoadedProject -> Maybe String -> FilePath -> Sources
+buildSources (LoadedProject manifest vendored admitted) mTest mainFolder =
+    sources vendored (reachedLocals admitted [(".", p) | DepPath p <- manifestDependencies manifest])
+        (reachedLocals admitted [(".", p) | DepPath p <- testDeps])
 
   where
 
@@ -129,11 +144,6 @@ buildSources manifest mTest mainFolder = do
             ++ [SourceFolder f (TestOf t) testSees Nothing | Just t <- [mTest], f <- testSrc]
             ++ [packageFolder k via | (k, via) <- M.toList graph, M.member k packages]
             ++ map localFolder' (M.elems locals)
-
--- | The folders of a build, or the first error that keeps them from being
--- known, and stop.
-loadSources :: Manifest -> Maybe String -> FilePath -> IO Sources
-loadSources manifest mTest mainFolder = buildSources manifest mTest mainFolder >>= either dieWithFirstError return
 
 -- | Folders that all see each other, as before packages, for the commands
 -- that do not read them yet.

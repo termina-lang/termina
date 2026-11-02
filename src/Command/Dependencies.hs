@@ -64,18 +64,23 @@ data LockChange =
     | Removed LockedPackage
   deriving (Eq, Show)
 
--- | What a synchronization changed, and what the user has to know about the
--- resolution.
+-- | The result of a synchronization.
 data Sync = Sync {
     syncChanges :: ![LockChange],
-    syncWarnings :: ![String]
+    -- | What the user has to know about the resolution
+    syncWarnings :: ![String],
+    -- | The packages of the lock by normalized URL, each with its URL and its manifest
+    syncPackages :: !(M.Map T.Text (T.Text, Manifest)),
+    -- | The libraries of local folders by folder
+    syncLocals :: !(M.Map FilePath LocalPackage)
   } deriving (Eq, Show)
 
--- | Bring the lock and vendor/ in line with a manifest: resolve it, take from
--- vendor/ every package that the lock has with the same tag, fetch and
--- validate the rest, check the graph and, only then, write the copies that
--- change, remove those that left and write the lock. Nothing is written
--- when anything fails, nor when the caller only wants to know the changes.
+-- | Update the lock and vendor/ from a manifest. It reads and validates the
+-- libraries of local folders, resolves the manifest, takes from vendor/ every
+-- package that the lock has with the same tag, fetches and validates the rest
+-- and checks the graph. Then it writes the copies that change, removes those
+-- that left and writes the lock. Nothing is written when anything fails, nor
+-- when the caller only wants to know the changes.
 syncDependencies :: Place -> String -> Fetching -> Bool -> FilePath -> Manifest -> Lock -> IO (Either [String] Sync)
 syncDependencies place commandName fetching write root manifest lock = do
     used <- newIORef []
@@ -89,7 +94,7 @@ syncDependencies place commandName fetching write root manifest lock = do
             case resolution of
                 Left errs -> return (Left (describeObtainErrors place commandName errs))
                 Right res -> case checkGraph manifest res locals of
-                    [] -> Right <$> commit res used
+                    [] -> Right <$> commit res locals used
                     errs -> return (Left errs)
 
   where
@@ -126,7 +131,7 @@ syncDependencies place commandName fetching write root manifest lock = do
                     when fromPrefetch (modifyIORef used (prefetchDir root u :))
                     return (Right (Obtained sha m files))
 
-    commit res used = do
+    commit res locals used = do
         let packages = M.elems (resolvedPackages res)
             vendored p = [ (path, bytes) | FetchedFile path _ bytes <- obtainedFiles (resolvedObtained p)
                          , isVendored (obtainedManifest (resolvedObtained p)) path ]
@@ -144,7 +149,8 @@ syncDependencies place commandName fetching write root manifest lock = do
                 Removed l -> removePackage (lockedUrl l)
             writeLockFile (root </> "termina.lock") (Lock (lockVersion emptyLock) (map entry packages))
         when write (readIORef used >>= mapM_ removePathForcibly)
-        return (Sync changes (overrideWarnings res))
+        return (Sync changes (overrideWarnings res)
+            (M.map (\p -> (resolvedUrl p, obtainedManifest (resolvedObtained p))) (resolvedPackages res)) locals)
 
     -- | The folder of a package that left the lock, and the folders above it
     -- that it leaves empty.

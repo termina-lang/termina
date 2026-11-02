@@ -14,7 +14,7 @@ import Configuration.Platform
 import Command.Common
 import Command.Dependencies (Fetching(..), Sync(..), syncDependencies, describeChange)
 import Command.Extern (parsedExterns)
-import Command.Sources (loadSources)
+import Command.Sources (LoadedProject(..), buildSources)
 import Command.Utils
 import Generator.Environment
 import Modules.Modules
@@ -25,12 +25,12 @@ import Control.Monad
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 
--- | Load the project for a command that builds: the manifest, the folders, the
--- extern sections, the prefixes of a library, the lock and vendor/ brought in
--- line with the manifest (each copy that does not change checked against its
--- hash; offline, without fetching anything) and, in a library, the types of
--- its exported modules.
-loadProject :: Bool -> Bool -> IO Manifest
+-- | Load the project for a command that builds. It checks the manifest, the
+-- folders, the extern sections and the prefixes of a library, updates the lock
+-- and vendor/ from the manifest, validates the libraries of local folders and,
+-- in a library, type checks the exported modules. A copy of vendor/ that does
+-- not change is checked against its hash. Offline, nothing is fetched.
+loadProject :: Bool -> Bool -> IO LoadedProject
 loadProject chatty offline = do
     manifest <- loadManifest >>= either dieWithFirstError return
     -- | The extern sections, reading only the modules that their entries
@@ -42,26 +42,26 @@ loadProject chatty offline = do
     unless (null exportErrors) $ dieWithFirstError exportErrors
     lock <- loadLock "." >>= either dieWithFirstError return
     place <- currentPlace
-    Sync changes warnings <- syncDependencies place "termina build" (if offline then Offline else Reuse) True "." manifest lock
+    Sync changes warnings packages locals <- syncDependencies place "termina build" (if offline then Offline else Reuse) True "." manifest lock
         >>= either dieWithFirstError return
     mapM_ (putStrLn . warnMessage) warnings
     mapM_ (putStrLn . infoMessage . ("termina.lock: " ++) . describeChange) changes
-    verifyLibrary chatty manifest
-    return manifest
+    let project = LoadedProject manifest packages locals
+    verifyLibrary chatty project
+    return project
 
 -- | Type check the exported modules of a library together, with the modules
 -- they import, on each platform of its tests, or on the test platform when it
 -- has none. Every exported module is checked, whether a test imports it or
 -- not, and their names must not clash. The modules are checked as those of a
 -- test, so a module that is not exported may hold a test class.
-verifyLibrary :: Bool -> Manifest -> IO ()
-verifyLibrary chatty manifest =
+verifyLibrary :: Bool -> LoadedProject -> IO ()
+verifyLibrary chatty project =
     case manifestNature manifest of
         Application _ -> return ()
         Library _ -> do
             roots <- exportedModules "." manifest
-            sources <- loadSources manifest Nothing "src"
-            parsedModules <- loadModules sources "src" [ModuleDependency root Internal | root <- roots]
+            parsedModules <- loadModules (buildSources project Nothing "src") "src" [ModuleDependency root Internal | root <- roots]
             -- | Each exported module with extern functions has its entry
             case checkExternModules "the project" "src" (manifestExtern manifest) Nothing (map parsedExterns (M.elems parsedModules)) of
                 [] -> return ()
@@ -80,6 +80,8 @@ verifyLibrary chatty manifest =
                 void (typeModules parsedModules (makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)) orderedModules)
 
   where
+
+    manifest = loadedManifest project
 
     libraryPlatforms =
         case foldr (\plt acc -> if plt `elem` acc then acc else plt : acc) [] (concatMap testPlatforms (M.elems (manifestTests manifest))) of
