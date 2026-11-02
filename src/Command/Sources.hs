@@ -12,7 +12,6 @@ module Command.Sources (
     readProject,
     readProjectModules,
     buildSources,
-    plainSources,
     lookupModule,
     hiddenMessage,
     notExportedMessage,
@@ -187,14 +186,6 @@ buildSources (LoadedProject manifest vendored admitted own) mTest mainFolder =
             ++ [SourceFolder f (TestOf t) testSees Nothing own Nothing | Just t <- [mTest], f <- testSrc]
             ++ [vendoredFolder k p via | (k, via) <- M.toList graph, Just p <- [M.lookup k packages]]
             ++ map localFolder' (M.elems locals)
-
--- | Folders that all see each other, as before packages, with their modules
--- read from disk, for the commands that do not read packages yet.
-plainSources :: FilePath -> [FilePath] -> IO Sources
-plainSources mainFolder folders = do
-    mainModules <- readMainFolder mainFolder
-    modules <- ML.unions . (mainModules :) <$> mapM readSourceFolder folders
-    return [SourceFolder f Project folders Nothing modules Nothing | f <- mainFolder : folders]
 
 data Lookup =
     Found FilePath

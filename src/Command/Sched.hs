@@ -22,16 +22,15 @@ import Parser.Errors
 import Text.Parsec (runParser)
 import qualified Data.Map.Strict as M
 import Modules.Modules
-import Generator.Environment
-import Configuration.Platform
 import Utils.Errors
 import Utils.Annotations
 import Text.Parsec.Error
-import Semantic.Environment
 import qualified Data.ByteString as BS
 import qualified Data.Text.Encoding as TE
-import Command.Common
-import Command.Sources (plainSources)
+import Command.Build (CheckedDeployment(..), checkDeployment)
+import Command.Project (loadProject)
+import Command.Sources (LoadedProject(..))
+import Configuration.Manifest (Deployment(..), appDeployment)
 import EFP.Schedulability.WCEPath.Parsing
 import EFP.Schedulability.WCEPath.TypeChecking
 import Semantic.Types
@@ -649,16 +648,10 @@ genMASTModels reduction config arch sitMap trPathMap = do
 schedCommand :: SchedCmdArgs -> IO ()
 schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT writeMAST reduction) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
-    -- | Read the termina.yaml file
-    config <- loadConfig >>= either dieWithFirstError return
-    -- | Decode the selected platform field
-    plt <- maybe (dieWithError $ "Unsupported platform: \"" ++ show (platform config) ++ "\"") return $ checkPlatform (T.unpack $ platform config)
-    when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
-    -- | Check that the files are in place
-    existSourceFolder <- doesDirectoryExist (sourceModulesFolder config)
-    unless existSourceFolder (dieWithError $ "Source folder \"" ++ sourceModulesFolder config ++ "\" does not exist")
-    existAppFolder <- doesDirectoryExist appFolder
-    unless existAppFolder (dieWithError $ "Application folder \"" ++ appFolder ++ "\" does not exist")
+    project <- loadProject chatty False
+    deployment <- maybe (dieWithError "the project is a library and has no application") return
+        (appDeployment (loadedManifest project))
+    let config = deploymentConfig deployment
     -- | Create output header and source folder if it does not exist
     let outputSrcFolder = outputFolder config </> "src"
     let outputIncludeFolder = outputFolder config </> "include"
@@ -666,56 +659,9 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
     createDirectoryIfMissing True outputSrcFolder
     when chatty (putStrLn . debugMessage $ "Creating output include folder (if missing): \"" ++ outputIncludeFolder ++ "\"")
     createDirectoryIfMissing True outputIncludeFolder
-    -- | Load the main application module
-    when chatty (putStrLn . debugMessage $ "Loading application's main module: \"" ++ appFolder </> appFilename <.> "fin" ++ "\"")
-    sources <- plainSources appFolder [sourceModulesFolder config]
-    appModule <- loadTerminaModule sources appFolder appFilename
-    -- | Load the project
-    when chatty (putStrLn . debugMessage $ "Loading project modules")
-    parsedModules <- loadModules sources appFolder (importedModules appModule)
-    let parsedProject = M.insert (qualifiedName appModule) appModule parsedModules
-    -- | Detect any possible loops in the project
-    when chatty (putStrLn . debugMessage $ "Ordering project modules")
-    let projectDependencies = M.map importedModules parsedProject
-    orderedDependencies <-
-      either
-        (\files ->
-          dieWithError . T.unpack $ "Detected cycle between project source files: " <> T.intercalate " -> " (map (T.pack . show) files))
-        return
-        $ sortProjectDepsOrLoop projectDependencies
-    when chatty (putStrLn. debugMessage $ "Type checking project modules")
-    -- | Create the initial global environment
-    let initialGlobalEnv = makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)
-    (typedProject, _finalGlobalEnv) <- typeModules parsedProject initialGlobalEnv orderedDependencies
-    -- | Obtain the basic blocks AST of the program
-    when chatty (putStrLn . debugMessage $ "Lowering the project modules")
-    rawLoweredProject <-
-      either
-        (\err ->
-          dieWithReport (toText err M.empty))
-        return
-        $ lowerProject typedProject
-    runLoweredChecks chatty plt rawLoweredProject
-    when chatty (putStrLn . debugMessage $ "Performing constant folding")
-    (loweredProject, constEnvs) <- constFolding config plt rawLoweredProject
-    when chatty (putStrLn . debugMessage $ "Analysing the values of the project modules")
-    valueEvidence <- valueAnalysisCheck plt constEnvs loweredProject
-    when chatty (putStrLn . debugMessage $ "Side-effect checking project modules")
-    sideEffectCheck plt (fst (elaborateProject valueEvidence loweredProject))
-    -- | Obtain the architectural description of the program
-    when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
-    programArchitecture <- genArchitecture loweredProject (getPlatformInitialProgram config plt) orderedDependencies
-    checkInstanceModules loweredProject orderedDependencies programArchitecture
-    checkEmitterConnections loweredProject programArchitecture
-    checkChannelConnections loweredProject programArchitecture
-    checkResourceUsage loweredProject programArchitecture
-    checkPoolUsage loweredProject programArchitecture
-    checkDequeConnections loweredProject programArchitecture
-    checkTaskPriorities loweredProject programArchitecture
-    checkSystemExceptAction loweredProject programArchitecture
-    checkActivationCycles loweredProject programArchitecture
-    checkTestDeployment loweredProject programArchitecture
-    checkProjectBoxSources loweredProject programArchitecture
+    checked <- checkDeployment chatty project deployment
+    let loweredProject = checkedLowered checked
+        programArchitecture = checkedArchitecture checked
     -- | Load the transactional worst-case execution paths
     when chatty (putStrLn . debugMessage $ "Loading transactional worst-case execution paths")
     pathProject <- loadWCEPathModules loweredProject (efpFolder config)
