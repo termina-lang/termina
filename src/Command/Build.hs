@@ -2,13 +2,14 @@
 
 module Command.Build (
     buildCmdArgsParser, buildCommand, generateCommand, BuildCmdArgs(..),
-    Selection(..), selectDeployments, nothingSelected, verifyLocalFolders, buildDeployment, announce, runMake
+    Selection(..), selectDeployments, nothingSelected, verifyLocalFolders, buildDeployment, announce, runMake,
+    CheckedDeployment(..), checkDeployment
 ) where
 
 import Configuration.Configuration
 import Configuration.Manifest
 import Command.Project (loadProject)
-import Command.Sources (LoadedProject(..), buildSources, localFolders)
+import Command.Sources (LoadedProject(..), Sources, buildSources, localFolders)
 import Command.Utils
 import Control.Exception (IOException, try)
 import Data.Maybe (fromMaybe, isJust)
@@ -57,6 +58,7 @@ import Text.Read
 import Data.Char
 import qualified Data.ByteString.Lazy as BL
 import Elaboration (ElaborationReport)
+import Semantic.Types (SemanticAnn)
 import Elaboration.Report (checksReport)
 
 
@@ -465,10 +467,25 @@ writeProvenance config modules = do
     toPair [hash, path] = [(normalise path, hash)]
     toPair _ = []
 
--- | Generate the C and the Makefile of a deployment of a project. It gives the
--- modules of the deployment with their source files, and its groups of C.
-generateDeployment :: BuildCmdArgs -> LoadedProject -> Deployment -> IO ([(QualifiedName, FilePath)], [ExternGroup])
-generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _) project deployment = do
+-- | A deployment loaded, type checked and analysed, up to the checks of its
+-- architecture.
+data CheckedDeployment = CheckedDeployment {
+    checkedSources :: !Sources,
+    checkedModules :: !ParsedProject,
+    -- | The modules in the order in which they are type checked
+    checkedOrder :: ![QualifiedName],
+    checkedMonadicTypes :: !MonadicTypes,
+    checkedLowered :: !LoweredProject,
+    checkedElaborated :: !ElaboratedProject,
+    -- | The run-time checks that each module keeps
+    checkedReports :: !(M.Map QualifiedName ElaborationReport),
+    checkedArchitecture :: !(TerminaProgArch SemanticAnn)
+  }
+
+-- | Load the modules of a deployment of a project and check them up to its
+-- architecture. It stops at the first error.
+checkDeployment :: Bool -> LoadedProject -> Deployment -> IO CheckedDeployment
+checkDeployment chatty project deployment = do
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
         mainFolder = deploymentMainFolder deployment
@@ -534,6 +551,17 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
     checkActivationCycles loweredProject programArchitecture
     checkTestDeployment loweredProject programArchitecture
     checkProjectBoxSources loweredProject programArchitecture
+    return (CheckedDeployment sources parsedProject orderedDependencies monadicTypes loweredProject
+        elaboratedProject checksReports programArchitecture)
+
+-- | Generate the C and the Makefile of a deployment of a project. It gives the
+-- modules of the deployment with their source files, and its groups of C.
+generateDeployment :: BuildCmdArgs -> LoadedProject -> Deployment -> IO ([(QualifiedName, FilePath)], [ExternGroup])
+generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _) project deployment = do
+    CheckedDeployment sources parsedProject _ monadicTypes loweredProject elaboratedProject checksReports programArchitecture
+        <- checkDeployment chatty project deployment
+    let config = deploymentConfig deployment
+        plt = deploymentPlatform deployment
     -- | Generate the code with the #line pragmas and the plain C, which have
     -- the same groups of C
     externsOf <- forM [deploymentConfig deployment, deploymentPlainConfig deployment] $ \outConfig -> do
