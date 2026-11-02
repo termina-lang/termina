@@ -8,7 +8,7 @@ module Command.Test (
     TestCase(..), testCases
 ) where
 
-import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, nothingSelected, selectDeployments)
+import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, nothingSelected, selectDeployments, verifyLocalFolders)
 import Command.Project (loadProject)
 import Command.Common (loadTerminaModule, loadModules)
 import Command.Deliver (deliverableInfo)
@@ -226,6 +226,8 @@ runTests mName mPlatform mProfile mExecutor mServer mXsdb offline mode = do
     deployments <- either cannotRun return (selectDeployments manifest selection mPlatform mProfile)
     when (null deployments) $
         putStrLn (infoMessage (nothingSelected manifest selection mPlatform)) >> exitSuccess
+    checked <- try (verifyLocalFolders project deployments) :: IO (Either ExitCode ())
+    either (const (exitWith (ExitFailure 2))) return checked
     -- | A port in --gdb is the port of one board
     let boards = nub [ deploymentPlatform d | d <- deployments, deploymentPlatform d /= POSIXGCC ]
     when (mServer /= Nothing && length boards /= 1) $

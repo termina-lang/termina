@@ -2,7 +2,7 @@
 
 module Command.Build (
     buildCmdArgsParser, buildCommand, generateCommand, BuildCmdArgs(..),
-    Selection(..), selectDeployments, nothingSelected, buildDeployment, announce, runMake
+    Selection(..), selectDeployments, nothingSelected, verifyLocalFolders, buildDeployment, announce, runMake
 ) where
 
 import Configuration.Configuration
@@ -27,7 +27,7 @@ import System.Directory
 import qualified Data.Map.Strict as M
 import Modules.Modules
 import Generator.Monadic
-import Data.List (foldl')
+import Data.List (foldl', nub)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Generator.LanguageC.Printer (runCPrinter)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
@@ -319,7 +319,32 @@ selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile offlin
     let manifest = loadedManifest project
     deployments <- either dieWithError return $ selectDeployments manifest selection mPlatform mProfile
     when (null deployments) (putStrLn . infoMessage $ nothingSelected manifest selection mPlatform)
+    verifyLocalFolders project deployments
     return (project, deployments)
+
+-- | The test of a deployment, whose main module is in tests/<name>, or
+-- nothing for the application.
+deploymentTest :: Deployment -> Maybe String
+deploymentTest deployment =
+    case splitDirectories (deploymentMainFolder deployment) of
+        ["tests", testName] -> Just testName
+        _ -> Nothing
+
+-- | Stop when a deployment in release sees a local folder. Otherwise, warn once
+-- of each local folder that the deployments see.
+verifyLocalFolders :: LoadedProject -> [Deployment] -> IO ()
+verifyLocalFolders project deployments =
+    case [ folder | (deployment, folder) <- seen, profile (deploymentConfig deployment) == Release ] of
+        (folder : _) -> dieWithError $ folder ++ " is a local folder, and a release is built only from tagged dependencies. "
+            ++ "Point it to a tag of its repository."
+        [] -> forM_ (nub (map snd seen)) $ \folder ->
+            putStrLn . warnMessage $ folder ++ " is a local folder, so this build cannot be reproduced from termina.lock."
+
+  where
+
+    seen = [ (deployment, folder)
+           | deployment <- deployments
+           , folder <- localFolders (buildSources project (deploymentTest deployment) (deploymentMainFolder deployment)) ]
 
 -- | The deployments of a selection. The application of a library gives none,
 -- and so do the tests of a project without tests or of a platform on which no
@@ -447,17 +472,9 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
         mainFolder = deploymentMainFolder deployment
-        -- The main module of a test is in tests/<name>
-        mTest = case splitDirectories mainFolder of
-            ["tests", testName] -> Just testName
-            _ -> Nothing
+        mTest = deploymentTest deployment
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
     let sources = buildSources project mTest mainFolder
-    -- A library of a local folder is not in the lock, so the build cannot be reproduced.
-    forM_ (localFolders sources) $ \folder -> case profile config of
-        Release -> dieWithError $ folder ++ " is a local folder, and a release is built only from tagged dependencies. "
-            ++ "Point it to a tag of its repository."
-        Debug -> putStrLn . warnMessage $ folder ++ " is a local folder, so this build cannot be reproduced from termina.lock."
     -- | Load the module that wires the deployment
     let mainModulePath = mainFolder </> deploymentMainModule deployment <.> "fin"
     when chatty (putStrLn . debugMessage $ "Loading the main module: \"" ++ mainModulePath ++ "\"")
