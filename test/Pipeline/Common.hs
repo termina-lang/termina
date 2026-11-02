@@ -68,8 +68,7 @@ import Utils.Annotations (QualifiedName, annotateError, Location(Internal))
 
 import ControlFlow.Architecture (runGenArchitecture, pruneUnconnectedSystemElements)
 import ControlFlow.Architecture.Types (TerminaProgArch)
-import ControlFlow.Architecture.Checks
-import ControlFlow.Architecture.Checks.Instances (runCheckInstanceModules)
+import ControlFlow.Architecture.Checks (runArchitectureChecks)
 import ControlFlow.ConstFolding (runConstFolding, constFoldModule)
 import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
 import ControlFlow.ValueAnalysis (runValueAnalysisCheck)
@@ -169,10 +168,7 @@ runProjectPipeline cfg sources = do
   maybe (Right ()) (Left . failure files)
     (sideEffectCheckModules TestPlatform elaborated)
   progArch <- genProjectArchitecture cfg files foldedProject ordered
-  stage files (case ordered of
-    [] -> Right ()
-    _ -> runCheckInstanceModules (last ordered) progArch)
-  runChecks files progArch
+  stage files (runArchitectureChecks ordered progArch)
   pure (PipelineResult foldedProject ordered progArch elaborated reports)
 
 -- | The typed AST of one module of a project, which is the stage the language
@@ -407,20 +403,6 @@ genProjectArchitecture cfg files loweredProject = go (initialProg cfg)
       case runGenArchitecture tp m (loweredAST . metadata $ loweredProject M.! m) of
         Left err -> Left (failure files err)
         Right tp' -> go tp' ms
-
-runChecks :: M.Map FilePath Text -> TerminaProgArch SemanticAnn -> Either Failure ()
-runChecks files progArch =
-  stage files $
-    sequence_ [ runCheckEmitterConnections progArch
-              , runCheckChannelConnections progArch
-              , runCheckResourceUsage progArch
-              , runCheckPoolUsage progArch
-              , runCheckDequeConnections progArch
-              , runCheckTaskPriorities progArch
-              , runCheckSystemExceptAction progArch
-              , runCheckActivationCycles progArch
-              , runCheckTestDeployment progArch
-              , runCheckBoxSources progArch ]
 
 renderModule :: TerminaConfig -> ElaboratedModule -> Either Failure Text
 renderModule cfg eModule =

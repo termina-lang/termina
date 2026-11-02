@@ -22,8 +22,7 @@ import Modules.Modules
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import ControlFlow.Architecture
 import ControlFlow.Architecture.Types
-import ControlFlow.Architecture.Checks
-import ControlFlow.Architecture.Checks.Instances (runCheckInstanceModules)
+import ControlFlow.Architecture.Checks (runArchitectureChecks)
 import Core.AST
     ( TerminaModule'(frags, modules), ModuleImport'(..) )
 import Configuration.Configuration (TerminaConfig(..))
@@ -186,132 +185,12 @@ genArchitecture loweredProject initialTerminaProgram orderedDependencies = do
           dieWithReport (toText err sourceFilesMap)
         Right tp' -> genArchitecture' tp' ms
 
-checkEmitterConnections :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
-checkEmitterConnections loweredProject progArchitecture =
-  let result = runCheckEmitterConnections progArchitecture in
-  case result of
-    Left err ->
-      let sourceFilesMap =
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty loweredProject in
-      dieWithReport (toText err sourceFilesMap)
-    Right _ -> return ()
-
-checkChannelConnections :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
-checkChannelConnections loweredProject progArchitecture =
-  let result = runCheckChannelConnections progArchitecture in
-  case result of
-    Left err ->
-      let sourceFilesMap =
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty loweredProject in
-      dieWithReport (toText err sourceFilesMap)
-    Right _ -> return ()
-
-checkResourceUsage :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
-checkResourceUsage loweredProject progArchitecture =
-  let result = runCheckResourceUsage progArchitecture in
-  case result of
-    Left err ->
-      let sourceFilesMap =
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty loweredProject in
-      dieWithReport (toText err sourceFilesMap)
-    Right _ -> return ()
-
-checkTaskPriorities :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
-checkTaskPriorities loweredProject progArchitecture =
-  let result = runCheckTaskPriorities progArchitecture in
-  case result of
-    Left err ->
-      let sourceFilesMap =
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty loweredProject in
-      dieWithReport (toText err sourceFilesMap)
-    Right _ -> return ()
-
-checkSystemExceptAction :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
-checkSystemExceptAction loweredProject progArchitecture =
-  let result = runCheckSystemExceptAction progArchitecture in
-  case result of
-    Left err ->
-      let sourceFilesMap =
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty loweredProject in
-      dieWithReport (toText err sourceFilesMap)
-    Right _ -> return ()
-
-checkActivationCycles :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
-checkActivationCycles loweredProject progArchitecture =
-  let result = runCheckActivationCycles progArchitecture in
-  case result of
-    Left err ->
-      let sourceFilesMap =
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty loweredProject in
-      dieWithReport (toText err sourceFilesMap)
-    Right _ -> return ()
-
--- | The main module is the last one in the order of dependencies
-checkInstanceModules :: LoweredProject -> [QualifiedName] -> TerminaProgArch SemanticAnn -> IO ()
-checkInstanceModules loweredProject orderedDependencies progArchitecture =
-  case orderedDependencies of
-    [] -> return ()
-    _ ->
-      case runCheckInstanceModules (last orderedDependencies) progArchitecture of
-        Left err ->
-          let sourceFilesMap =
-                M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                    M.empty loweredProject in
-          dieWithReport (toText err sourceFilesMap)
-        Right _ -> return ()
-
-checkTestDeployment :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
-checkTestDeployment loweredProject progArchitecture =
-  let result = runCheckTestDeployment progArchitecture in
-  case result of
-    Left err ->
-      let sourceFilesMap =
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty loweredProject in
-      dieWithReport (toText err sourceFilesMap)
-    Right _ -> return ()
-
-checkPoolUsage :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
-checkPoolUsage loweredProject progArchitecture =
-  let result = runCheckPoolUsage progArchitecture in
-  case result of
-    Left err ->
-      let sourceFilesMap =
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty loweredProject in
-      dieWithReport (toText err sourceFilesMap)
-    Right _ -> return ()
-
-checkDequeConnections :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
-checkDequeConnections loweredProject progArchitecture =
-  let result = runCheckDequeConnections progArchitecture in
-  case result of
-    Left err ->
-      let sourceFilesMap =
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty loweredProject in
-      dieWithReport (toText err sourceFilesMap)
-    Right _ -> return ()
-
-checkProjectBoxSources :: LoweredProject -> TerminaProgArch SemanticAnn -> IO ()
-checkProjectBoxSources loweredProject progArchitecture =
-  let result = runCheckBoxSources progArchitecture in
-  case result of
-    Left err ->
-      -- | Create the source files map. This map will be used to obtainn the source files that
-      -- will be feed to the error pretty printer. The source files map must use as key the
-      -- path of the source file and as element the text of the source file.
-      let sourceFilesMap =
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty loweredProject in
-      dieWithReport (toText err sourceFilesMap)
-    Right _ -> return ()
+-- | Runs every check over the architecture of the program, stopping at the
+-- first error.
+architectureCheck :: LoweredProject -> [QualifiedName] -> TerminaProgArch SemanticAnn -> IO ()
+architectureCheck loweredProject orderedDependencies progArchitecture =
+  either (\err -> dieWithReport (toText err (projectSourceFiles loweredProject))) return
+    (runArchitectureChecks orderedDependencies progArchitecture)
 
 constFolding :: TerminaConfig -> Platform -> LoweredProject -> IO (LoweredProject, ProjectConstEnvs)
 constFolding config plt loweredProject =

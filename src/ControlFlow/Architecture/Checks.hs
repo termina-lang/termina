@@ -1,4 +1,5 @@
 module ControlFlow.Architecture.Checks (
+    runArchitectureChecks,
     runCheckPoolUsage,
     runCheckDequeConnections,
     runCheckResourceUsage,
@@ -18,6 +19,35 @@ import ControlFlow.Architecture.Errors
 import ControlFlow.Architecture.Checks.BoxSources
 import ControlFlow.Architecture.Checks.Connections
 import ControlFlow.Architecture.Checks.Tests
+import ControlFlow.Architecture.Checks.Instances
+import Utils.Annotations (QualifiedName)
+
+-- | Runs every check over the architecture of a program, in order, and gives
+-- the first error. The modules go in the order of their dependencies, so the
+-- main module is the last one.
+runArchitectureChecks ::
+    [QualifiedName]
+    -> TerminaProgArch SemanticAnn
+    -> Either ArchitectureError ()
+runArchitectureChecks orderedModules progArch =
+    mapM_ ($ progArch) (instanceChecks ++ checks)
+
+  where
+
+    instanceChecks = [runCheckInstanceModules (last orderedModules) | not (null orderedModules)]
+
+    checks =
+      [ runCheckEmitterConnections
+      , runCheckChannelConnections
+      , runCheckResourceUsage
+      , runCheckPoolUsage
+      , runCheckDequeConnections
+      , runCheckTaskPriorities
+      , runCheckSystemExceptAction
+      , runCheckActivationCycles
+      , runCheckTestDeployment
+      , runCheckBoxSources
+      ]
 
 runCheckPoolUsage :: 
     TerminaProgArch SemanticAnn 

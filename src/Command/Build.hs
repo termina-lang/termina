@@ -540,17 +540,7 @@ checkDeployment chatty project deployment = do
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
     programArchitecture <- genArchitecture loweredProject (getPlatformInitialProgram config plt) orderedDependencies
-    checkInstanceModules loweredProject orderedDependencies programArchitecture
-    checkEmitterConnections loweredProject programArchitecture
-    checkChannelConnections loweredProject programArchitecture
-    checkResourceUsage loweredProject programArchitecture
-    checkPoolUsage loweredProject programArchitecture
-    checkDequeConnections loweredProject programArchitecture
-    checkTaskPriorities loweredProject programArchitecture
-    checkSystemExceptAction loweredProject programArchitecture
-    checkActivationCycles loweredProject programArchitecture
-    checkTestDeployment loweredProject programArchitecture
-    checkProjectBoxSources loweredProject programArchitecture
+    architectureCheck loweredProject orderedDependencies programArchitecture
     return (CheckedDeployment sources parsedProject orderedDependencies monadicTypes loweredProject
         elaboratedProject checksReports programArchitecture)
 
