@@ -4,7 +4,7 @@ module LSP.Check (
     openProject, checkProject
 ) where
 
-import Command.Common (loadMainModule, orderedModules, sourceTexts)
+import Command.Common (libraryPlatforms, loadExportedModules, loadMainModule, orderedModules, sourceTexts, typeLibrary)
 import Command.Pipeline (checkModules)
 import Command.Sources (LoadedProject(..), buildSources, readProject, withTexts)
 import Command.Types (ParsedProject, TypedProject, SemanticData(typedAST))
@@ -46,29 +46,50 @@ openProject = do
                 Left errs -> errorM (T.pack (concat (take 1 errs)))
                 Right project -> modify (\s -> s { loaded = Just project })
 
--- | Check the application of the project with the text of the files open in
--- the editor. The modules of the check replace those of the state, and its
--- error, if there is one, is published in the file where it is. A module that
--- cannot be loaded leaves the modules of the state as they were.
+-- | Check the project with the text of the files open in the editor: the
+-- application, or the exported modules of a library. The modules of the check
+-- replace those of the state, and its error, if there is one, is published in
+-- the file where it is. A module that cannot be loaded leaves the modules of
+-- the state as they were.
 checkProject :: HandlerM ()
 checkProject = do
     mProject <- gets loaded
     texts <- editorTexts
-    case mProject >>= \project -> (,) (withTexts texts project) <$> appDeployment (loadedManifest project) of
-        Nothing -> return ()
-        Just (project, deployment) -> do
-            let mainFolder = normalise (loadedRoot project </> deploymentMainFolder deployment)
-                mainFile = mainFolder </> deploymentMainModule deployment <.> "fin"
-                sources = buildSources project Nothing mainFolder
-                files = sourceTexts sources
-            loadedMain <- liftIO (loadMainModule sources mainFolder (deploymentMainModule deployment))
-            case loadedMain >>= \(_, parsedProject) -> (,) parsedProject <$> orderedModules parsedProject of
-                Left failure -> publishDiagnostics (failureDiagnosticsIn mainFile files failure)
-                Right (parsedProject, order) -> do
-                    let (typedProject, result) =
-                            checkModules (deploymentConfig deployment) (deploymentPlatform deployment) parsedProject order
-                    modify (\s -> s { project_modules = storedModules parsedProject typedProject })
-                    publishDiagnostics (either (failureDiagnosticsIn mainFile files) (const M.empty) result)
+    forM_ (withTexts texts <$> mProject) $ \project ->
+        maybe (checkLibrary project) (checkApplication project) (appDeployment (loadedManifest project))
+
+-- | Check the application of a project as the build does.
+checkApplication :: LoadedProject -> Deployment -> HandlerM ()
+checkApplication project deployment = do
+    let mainFolder = normalise (loadedRoot project </> deploymentMainFolder deployment)
+        mainFile = mainFolder </> deploymentMainModule deployment <.> "fin"
+        sources = buildSources project Nothing mainFolder
+        files = sourceTexts sources
+    loadedMain <- liftIO (loadMainModule sources mainFolder (deploymentMainModule deployment))
+    case loadedMain >>= \(_, parsedProject) -> (,) parsedProject <$> orderedModules parsedProject of
+        Left failure -> publishDiagnostics (failureDiagnosticsIn mainFile files failure)
+        Right (parsedProject, order) -> do
+            let (typedProject, result) =
+                    checkModules (deploymentConfig deployment) (deploymentPlatform deployment) parsedProject order
+            modify (\s -> s { project_modules = storedModules parsedProject typedProject })
+            publishDiagnostics (either (failureDiagnosticsIn mainFile files) (const M.empty) result)
+
+-- | Type check the exported modules of a library on the first platform on
+-- which the build checks them.
+checkLibrary :: LoadedProject -> HandlerM ()
+checkLibrary project = do
+    let manifest = loadedManifest project
+        root = loadedRoot project
+        manifestFile = root </> "termina.yaml"
+        files = sourceTexts (buildSources project Nothing (normalise (root </> "src")))
+    loadedLibrary <- liftIO (loadExportedModules project)
+    case (loadedLibrary, libraryPlatforms manifest) of
+        (Left failure, _) -> publishDiagnostics (failureDiagnosticsIn manifestFile files failure)
+        (Right _, []) -> return ()
+        (Right (parsedProject, order), plt : _) -> do
+            let (typedProject, failure) = typeLibrary manifest plt parsedProject order
+            modify (\s -> s { project_modules = storedModules parsedProject typedProject })
+            publishDiagnostics (maybe M.empty (failureDiagnosticsIn manifestFile files) failure)
 
 -- | The text of the files open in the editor, by their path.
 editorTexts :: HandlerM (M.Map FilePath T.Text)

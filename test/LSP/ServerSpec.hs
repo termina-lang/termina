@@ -59,15 +59,19 @@ project =
       , "exports: [lib]" ])
   , ("lib/src/lib/half.fin", "function half(x : u32) -> u32 {\n    return x / 2;\n}\n") ]
 
--- | Run a session against a server on the application of a project, written
--- to a temporary folder. The server runs in this process, through two pipes,
--- with the folder of the application as its working folder, as the editor
--- starts it. The session is given the folder that holds the project.
+-- | Run a session against a server on the application of the project.
 withServer :: (FilePath -> Session a) -> IO a
-withServer session = do
+withServer = withServerIn "app"
+
+-- | Run a session against a server on a folder of the project, written to a
+-- temporary folder. The server runs in this process, through two pipes, with
+-- that folder as its working folder, as the editor starts it. The session is
+-- given the folder that holds the project.
+withServerIn :: FilePath -> (FilePath -> Session a) -> IO a
+withServerIn folder session = do
     tmp <- getTemporaryDirectory >>= canonicalizePath
     let base = tmp </> "termina-lsp-spec"
-        root = base </> "app"
+        root = base </> folder
     removePathForcibly base
     forM_ project $ \(path, text) -> do
         createDirectoryIfMissing True (base </> takeDirectory path)
@@ -124,6 +128,13 @@ spec = describe "language server" $ do
   it "marks an error in a module of a local folder" $
     withServer $ \base -> do
       half <- openDoc (base </> "lib" </> "src" </> "lib" </> "half.fin") "termina"
+      changeDoc half [replaceAll "function half(x : u32) -> u32 {\n    return true;\n}\n"]
+      codes <- errorCodesOf half
+      liftIO (codes `shouldBe` ["SE-238"])
+
+  it "marks a type error in an exported module of a library" $
+    withServerIn "lib" $ \_ -> do
+      half <- openDoc "src/lib/half.fin" "termina"
       changeDoc half [replaceAll "function half(x : u32) -> u32 {\n    return true;\n}\n"]
       codes <- errorCodesOf half
       liftIO (codes `shouldBe` ["SE-238"])

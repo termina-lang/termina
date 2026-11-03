@@ -1,9 +1,16 @@
 module Command.Common where
 
+import Command.Pipeline (typeProject)
 import Command.Utils
 import Command.Sources
 import Command.Types
+import Configuration.Configuration
+import Configuration.Manifest
+import Configuration.Namespace (exportedModules)
 import Configuration.Parsed
+import Configuration.Platform
+import Generator.Environment (getPlatformInitialGlobalEnv)
+import Semantic.Environment (makeInitialGlobalEnv)
 import qualified Data.Map.Lazy as ML
 import Data.List (find)
 import Modules.Utils (buildModuleName, qualifiedToModuleName)
@@ -149,6 +156,39 @@ loadMainModule sources mainFolder mainModule = do
     Right parsedMain -> do
       imported <- loadModules sources mainFolder (importedModules parsedMain)
       return ((\parsedModules -> (parsedMain, M.insert (qualifiedName parsedMain) parsedMain parsedModules)) <$> imported)
+
+-- | Load the exported modules of a library and the modules they import, in
+-- the order in which they are type checked. It gives the first error.
+loadExportedModules :: LoadedProject -> IO (Either CheckFailure (ParsedProject, [QualifiedName]))
+loadExportedModules project = do
+  let root = loadedRoot project
+      src = normalise (root </> "src")
+      sources = buildSources project Nothing src
+  roots <- exportedModules root (loadedManifest project)
+  loaded <- loadModules sources src [ModuleDependency qname Internal | qname <- roots]
+  return (loaded >>= \parsedModules -> (,) parsedModules <$> orderedModules parsedModules)
+
+-- | Type check the modules of a library on a platform, as those of a test
+-- build. It gives the modules type checked up to the first error, and the
+-- error.
+typeLibrary :: Manifest -> Platform -> ParsedProject -> [QualifiedName] -> (TypedProject, Maybe CheckFailure)
+typeLibrary manifest plt = typeProject (makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt))
+
+  where
+
+    config = (defaultConfig (T.unpack (projectName (manifestProject manifest))) plt) {
+        sysPrintOutputBufferSize = manifestPrintBufSize manifest,
+        sysReadInputBufferSize = manifestReadBufSize manifest,
+        deploymentKind = TestBuild (T.pack "library")
+      }
+
+-- | The platforms on which a library is type checked: those of its tests, or
+-- the test platform when it has none.
+libraryPlatforms :: Manifest -> [Platform]
+libraryPlatforms manifest =
+  case foldr (\plt acc -> if plt `elem` acc then acc else plt : acc) [] (concatMap testPlatforms (M.elems (manifestTests manifest))) of
+    [] -> [TestPlatform]
+    plts -> plts
 
 -- | The modules in the order in which they are type checked, or the cycle of
 -- imports between them.

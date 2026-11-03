@@ -47,12 +47,9 @@ import Data.Aeson.Encode.Pretty (Config(..), defConfig, encodePretty', keyOrder)
 import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
 import EFP.Schedulability.WCEPath.Printer
 import Command.Common
-import Command.Pipeline (CheckedModules(..), checkModules, typeProject)
+import Command.Pipeline (CheckedModules(..), checkModules)
 import Command.Extern (ExternGroup, parsedExterns, prepareExtern, verifyLoadedExterns)
 import Configuration.ExternCheck (checkExternModules)
-import Configuration.Namespace (exportedModules)
-import Generator.Environment (getPlatformInitialGlobalEnv)
-import Semantic.Environment (makeInitialGlobalEnv)
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.PlantUML
 import Extras.PlantUML.Printer
@@ -506,33 +503,20 @@ checkDeployment chatty project deployment = do
 -- The modules are checked as those of a test build.
 checkExportedModules :: Bool -> LoadedProject -> IO ()
 checkExportedModules chatty project = do
-    roots <- exportedModules "." manifest
-    let sources = buildSources project Nothing "src"
-        files = sourceTexts sources
-    parsedModules <- loadModules sources "src" [ModuleDependency root Internal | root <- roots] >>= orDieWithFailure files
+    let files = sourceTexts (buildSources project Nothing "src")
+    (parsedModules, order) <- loadExportedModules project >>= orDieWithFailure files
     -- | Check that each module with extern functions has its entry in the manifest
     case checkExternModules "the project" "src" (manifestExtern manifest) Nothing (map parsedExterns (M.elems parsedModules)) of
         [] -> return ()
         errs -> dieWithFirstError errs
-    order <- orDieWithFailure files (orderedModules parsedModules)
-    forM_ libraryPlatforms $ \plt -> do
+    forM_ (libraryPlatforms manifest) $ \plt -> do
         when chatty (putStrLn . debugMessage $ "Type checking the exported modules on " ++ show plt)
-        let config = (defaultConfig (T.unpack (projectName (manifestProject manifest))) plt) {
-                sysPrintOutputBufferSize = manifestPrintBufSize manifest,
-                sysReadInputBufferSize = manifestReadBufSize manifest,
-                deploymentKind = TestBuild "library"
-              }
         orDieWithFailure (projectSourceFiles parsedModules)
-          (maybe (Right ()) Left (snd (typeProject (makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)) parsedModules order)))
+          (maybe (Right ()) Left (snd (typeLibrary manifest plt parsedModules order)))
 
   where
 
     manifest = loadedManifest project
-
-    libraryPlatforms =
-        case foldr (\plt acc -> if plt `elem` acc then acc else plt : acc) [] (concatMap testPlatforms (M.elems (manifestTests manifest))) of
-            [] -> [TestPlatform]
-            plts -> plts
 
 -- | Generate the C and the Makefile of a deployment of a project. It gives the
 -- modules of the deployment with their source files, and its groups of C.
