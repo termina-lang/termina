@@ -19,7 +19,7 @@ import System.FilePath
 
 import Command.Dependencies
 import Command.Project (Dependencies(..), loadProject)
-import Command.Utils (Place, currentPlace, dieWithFirstError, infoMessage, loadLock, loadManifest, warnMessage)
+import Command.Utils (Place, currentPlace, dieWithFirstError, infoMessage, loadLock, loadManifest, projectRoot, warnMessage)
 import Configuration.Fetch (resolveTag)
 import Configuration.Lock
 import Configuration.Manifest
@@ -41,14 +41,14 @@ verifyCmdArgsParser = pure VerifyCmdArgs
 
 updateCommand :: UpdateCmdArgs -> IO ()
 updateCommand (UpdateCmdArgs _ True) = do
-    result <- checkTags "."
+    result <- checkTags projectRoot
     case result of
         Left errs -> dieWithFirstError errs
         Right [] -> putStrLn (infoMessage "termina.lock matches termina.yaml and the tags of its repositories")
         Right drift -> mapM_ (putStrLn . warnMessage) drift >> exitFailure
 updateCommand (UpdateCmdArgs mDep False) = do
     place <- currentPlace
-    result <- updateDependencies place "." mDep
+    result <- updateDependencies place projectRoot mDep
     case result of
         Left errs -> dieWithFirstError errs
         Right (warnings, report) -> do

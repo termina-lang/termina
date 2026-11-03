@@ -34,7 +34,7 @@ import Semantic.Environment (DeclaredEnv, declaredNames)
 import Utils.Graph (TopSortError(..), topSortFromDepList)
 import Utils.Errors (ErrorMessage(toText, toDiagnostics, errorIdent))
 import qualified Language.LSP.Protocol.Types as LSP
-import Control.Monad (forM_, unless, when)
+import Control.Monad (filterM, forM_, unless, when)
 import Data.Maybe (listToMaybe, mapMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -264,6 +264,39 @@ projectSourceFiles =
 -- modules of the project, and stop.
 orDieWithFailure :: M.Map FilePath T.Text -> Either CheckFailure a -> IO a
 orDieWithFailure files = either (\failure -> dieWithReport (failureMessage failure files)) return
+
+-- | The folder of the project of a command, which is the folder where
+-- termina runs once enterProject has gone to it.
+projectRoot :: FilePath
+projectRoot = "."
+
+-- | Go to the folder of the project: the nearest folder with a termina.yaml,
+-- from the current one up. A folder inside the vendor/ of a project is a copy
+-- of one of its dependencies, so the project is the one that holds it.
+-- Stop when no folder up has a termina.yaml.
+enterProject :: IO ()
+enterProject = do
+  here <- getCurrentDirectory
+  found <- filterM (\folder -> doesFileExist (folder </> "termina.yaml")) (ancestors here)
+  case found of
+    [] -> dieWithError $ "no termina.yaml in " ++ here ++ " or in any folder above it"
+    nearest : _ -> do
+      holders <- filterM (\folder -> doesFileExist (folder </> "termina.yaml")) (vendorHolders nearest)
+      setCurrentDirectory (case holders of
+        holder : _ -> holder
+        [] -> nearest)
+
+  where
+
+    -- | A folder and the folders above it, the nearest first
+    ancestors folder =
+      let parts = splitDirectories folder
+      in [ joinPath (take n parts) | n <- [length parts, length parts - 1 .. 1] ]
+
+    -- | The folders that hold a vendor/ above a folder, the nearest first
+    vendorHolders folder =
+      let parts = splitDirectories folder
+      in [ joinPath (take n parts) | n <- [length parts - 1, length parts - 2 .. 1], parts !! n == "vendor" ]
 
 -- | Load the "termina.yaml" of a project, given its folder, and check the
 -- folders of the project against it, giving every problem found.

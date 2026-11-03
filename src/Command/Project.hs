@@ -30,23 +30,23 @@ data Dependencies =
 -- that they are.
 loadProject :: Dependencies -> IO LoadedProject
 loadProject dependencies = do
-    manifest <- loadManifest "." >>= either dieWithFirstError return
-    own <- readProjectModules "." manifest
+    manifest <- loadManifest projectRoot >>= either dieWithFirstError return
+    own <- readProjectModules projectRoot manifest
     -- | Read the modules that the extern sections name.
     -- A module that does not parse stops with the error of the parser.
-    (sections, unparsed) <- readExternSections "." own manifest
+    (sections, unparsed) <- readExternSections projectRoot own manifest
     forM_ unparsed $ \(qname, file) ->
         maybe (parseTerminaFile qname file) (parsedOrDie qname file) (ML.lookup (normalise file) own)
     unless (null (checkExternSections sections)) $ dieWithFirstError (checkExternSections sections)
-    exportErrors <- checkExports "." own manifest
+    exportErrors <- checkExports projectRoot own manifest
     unless (null exportErrors) $ dieWithFirstError exportErrors
-    lock <- loadLock "." >>= either dieWithFirstError return
+    lock <- loadLock projectRoot >>= either dieWithFirstError return
     place <- currentPlace
     Sync _ warnings packages locals <- case dependencies of
         Update fetching -> do
-            synced <- syncDependencies place fetching True "." manifest lock >>= either dieWithFirstError return
+            synced <- syncDependencies place fetching True projectRoot manifest lock >>= either dieWithFirstError return
             mapM_ (putStrLn . infoMessage . ("termina.lock: " ++) . describeChange) (syncChanges synced)
             return synced
-        Frozen -> syncFrozen place "." manifest lock >>= either dieWithFirstError return
+        Frozen -> syncFrozen place projectRoot manifest lock >>= either dieWithFirstError return
     mapM_ (putStrLn . warnMessage) warnings
-    return (LoadedProject "." manifest packages locals own)
+    return (LoadedProject projectRoot manifest packages locals own)

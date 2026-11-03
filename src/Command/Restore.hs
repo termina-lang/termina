@@ -14,7 +14,7 @@ import Options.Applicative
 import System.Directory (removePathForcibly)
 
 import Command.Dependencies (FetchingCommand(..), PackageError(..), describeObtainErrors)
-import Command.Utils (Place, currentPlace, dieWithFirstError, infoMessage, loadLock)
+import Command.Utils (Place, currentPlace, dieWithFirstError, infoMessage, loadLock, projectRoot)
 import Configuration.Fetch
 import Configuration.Lock
 import Configuration.Package
@@ -31,7 +31,7 @@ restoreCmdArgsParser = pure RestoreCmdArgs
 restoreCommand :: RestoreCmdArgs -> IO ()
 restoreCommand _ = do
     place <- currentPlace
-    result <- restoreVendor place "."
+    result <- restoreVendor place projectRoot
     case result of
         Left errs -> dieWithFirstError errs
         Right [] -> putStrLn (infoMessage "vendor/ matches termina.lock")

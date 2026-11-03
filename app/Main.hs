@@ -14,6 +14,7 @@ import Command.Test
 import Command.Try
 import Command.LSP
 import Command.Sched
+import Command.Utils (enterProject)
 import System.IO (BufferMode(LineBuffering), hSetBuffering, stdout)
 
 data Command =
@@ -107,16 +108,18 @@ main = do
     cmd <- customExecParser (prefs showHelpOnEmpty) $ info (commandParser <**> simpleVersioner ("termina " ++ publicVersion) <**> helper)
         (fullDesc
             <> header "termina: a domain-specific language for real-time critical systems" )
+    -- | The commands on a project run from its folder, which they look for
+    -- from the current one up
     case cmd of
         New cmdargs -> newCommand cmdargs
-        Generate cmdargs -> generateCommand cmdargs
-        Build cmdargs -> buildCommand cmdargs
-        Deliver cmdargs -> deliverCommand cmdargs
-        Test cmdargs -> testCommand cmdargs
+        Generate cmdargs -> enterProject >> generateCommand cmdargs
+        Build cmdargs -> enterProject >> buildCommand cmdargs
+        Deliver cmdargs -> enterProject >> deliverCommand cmdargs
+        Test cmdargs -> enterProject >> testCommand cmdargs
         Try cmdargs -> tryCommand cmdargs
-        LSP cmdargs -> lspCommand cmdargs
-        Sched cmdargs -> schedCommand cmdargs
-        Add cmdargs -> addCommand cmdargs
-        Restore cmdargs -> restoreCommand cmdargs
-        Update cmdargs -> updateCommand cmdargs
-        Verify cmdargs -> verifyCommand cmdargs
+        LSP cmdargs -> enterProject >> lspCommand cmdargs
+        Sched cmdargs -> enterProject >> schedCommand cmdargs
+        Add cmdargs -> enterProject >> addCommand cmdargs
+        Restore cmdargs -> enterProject >> restoreCommand cmdargs
+        Update cmdargs -> enterProject >> updateCommand cmdargs
+        Verify cmdargs -> enterProject >> verifyCommand cmdargs

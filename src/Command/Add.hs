@@ -17,7 +17,7 @@ import Options.Applicative
 import System.FilePath
 
 import Command.Dependencies
-import Command.Utils (Place(..), currentPlace, dieWithFirstError, warnMessage, infoMessage, loadLock)
+import Command.Utils (Place(..), currentPlace, dieWithFirstError, warnMessage, infoMessage, loadLock, projectRoot)
 import Configuration.Lock
 import Configuration.Manifest
 import Configuration.Resolve (ResolvedDependency(..))
@@ -40,7 +40,7 @@ data AddReport = AddReport {
 addCommand :: AddCmdArgs -> IO ()
 addCommand (AddCmdArgs url tag mTest) = do
     place <- currentPlace
-    result <- addDependency place "." (T.pack url) (T.pack tag) mTest
+    result <- addDependency place projectRoot (T.pack url) (T.pack tag) mTest
     case result of
         Left errs -> dieWithFirstError errs
         Right report -> do

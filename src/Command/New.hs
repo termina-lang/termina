@@ -236,7 +236,7 @@ initRepository chatty project = do
 
 -- | Command handler for the "new" command
 newCommand :: NewCmdArgs -> IO ()
-newCommand (NewTest testName chatty) = newTestCommand testName chatty
+newCommand (NewTest testName chatty) = enterProject >> newTestCommand testName chatty
 newCommand (NewProject project mPltName kind mExports vcs vscode chatty) = do
     validateProjectName project
     plt <- case (kind, mPltName) of
@@ -307,7 +307,7 @@ newCommand (NewProject project mPltName kind mExports vcs vscode chatty) = do
 -- read back, both are undone.
 newTestCommand :: String -> Bool -> IO ()
 newTestCommand testName chatty = do
-    manifest <- loadManifest "." >>= either dieWithFirstError return
+    manifest <- loadManifest projectRoot >>= either dieWithFirstError return
     unless (isSnakeCase testName) $
         dieWithError $ "The name of a test is lowercase snake_case: \"" ++ testName ++ "\""
     when (T.pack testName `M.member` manifestTests manifest) $
@@ -324,7 +324,7 @@ newTestCommand testName chatty = do
     writeFile testFile (emptyTestModuleContent testName)
     when chatty (putStrLn . debugMessage $ "Adding the test to " ++ manifestFile)
     writeFile manifestFile updated
-    reloaded <- loadManifest "."
+    reloaded <- loadManifest projectRoot
     case reloaded of
         Right _ -> when chatty (putStrLn . debugMessage $ "Test created successfully")
         Left err -> do
