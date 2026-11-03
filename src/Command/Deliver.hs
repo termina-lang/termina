@@ -21,6 +21,7 @@ import Configuration.Manifest
 import Generator.Makefile.AST
 import Generator.Makefile.Printer
 import Utils.Annotations (QualifiedName)
+import Utils.Files (filesUnder)
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
@@ -134,9 +135,11 @@ deliverDeployment chatty loaded archive withTrace deployment = do
     sources <- fromOutput (list "SRCS")
     let externSrcs = [ groupFolder g </> src | g <- externs, src <- groupSources g ]
         externLibs = [ groupFolder g </> lib | g <- externs, lib <- groupLibraries g ]
-    headers <- map (makeRelative plain) . filter ((== ".h") . takeExtension) <$> filesUnder (plain </> "include")
+    headers <- map ("include" </>) . filter ((== ".h") . takeExtension) <$> filesUnder (plain </> "include")
     -- | The headers of each group of C, which its sources include
-    externHeaders <- concat <$> forM externs (\g -> map (makeRelative plain) <$> filesUnder (plain </> groupFolder g </> externHeaderFolder))
+    externHeaders <- concat <$> forM externs (\g ->
+        let headerFolder = groupFolder g </> externHeaderFolder
+        in map (headerFolder </>) <$> filesUnder (plain </> headerFolder))
     forM_ (sources ++ headers ++ externSrcs ++ externHeaders ++ externLibs) $ \file -> copyInto (plain </> file) (folder </> file)
     -- | The files of the OSAL that the build opens, as the dependency files
     -- of its objects list them, and those named in the flags, such as a
@@ -154,7 +157,7 @@ deliverDeployment chatty loaded archive withTrace deployment = do
             genDeliverableMakefile config info (map relocated osalSources) sources externs (testModules config modules)
     TIO.writeFile (folder </> "Makefile") makefile
     -- | The files delivered, as they are on disk
-    delivered <- map (makeRelative folder) <$> filesUnder folder
+    delivered <- filesUnder folder
     -- | Build the deliverable and compare its binary with the one of the C
     -- with the #line pragmas, both without debugging information
     runMake label folder []
@@ -496,15 +499,6 @@ licenseFiles osalDir used = do
     licensesIn dir = do
       entries <- listDirectory dir
       filterM doesFileExist [ dir </> e | e <- sort entries, "LICENSE" `isPrefixOf` e ]
-
-filesUnder :: FilePath -> IO [FilePath]
-filesUnder dir = do
-    exists <- doesDirectoryExist dir
-    if not exists then return [] else do
-      entries <- map (dir </>) . sort <$> listDirectory dir
-      concat <$> mapM (\e -> do
-        isDir <- doesDirectoryExist e
-        if isDir then filesUnder e else return [e]) entries
 
 copyInto :: FilePath -> FilePath -> IO ()
 copyInto from to = do
