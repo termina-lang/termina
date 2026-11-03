@@ -6,9 +6,9 @@
 module Configuration.AddSpec (spec) where
 
 import Command.Add
-import Command.Dependencies (Fetching(..), Sync(..), credentialsMessage, describeChange, syncDependencies)
+import Command.Dependencies (Fetching(..), FetchingCommand(..), Sync(..), credentialsMessage, describeChange, syncDependencies, syncFrozen)
 import Command.Restore (restoreVendor)
-import Command.Update (checkTags, updateDependencies, verifyProject)
+import Command.Update (checkTags, updateDependencies)
 import Command.Utils (Place(..), loadLock)
 import Configuration.Lock
 import Configuration.Manifest (decodeManifest)
@@ -152,7 +152,7 @@ spec = do
     let sync project = do
           manifest <- either error id . decodeManifest <$> BS.readFile (project </> "termina.yaml")
           lock <- either (error . unlines) id <$> loadLock project
-          fmap (map describeChange . syncChanges) <$> syncDependencies Computer "termina build" Reuse True project manifest lock
+          fmap (map describeChange . syncChanges) <$> syncDependencies Computer (Reuse BuildCommand) True project manifest lock
         edit project from to = do
           text <- readFile (project </> "termina.yaml")
           length text `seq` writeFile (project </> "termina.yaml") (replace from to text)
@@ -241,19 +241,23 @@ spec = do
 
     it "checks without network that vendor/ and the lock match the manifest" $
       withProject "verify" "" $ \repos project -> do
+        let verify = do
+              manifest <- either error id . decodeManifest <$> BS.readFile (project </> "termina.yaml")
+              lock <- either (error . unlines) id <$> loadLock project
+              fmap (const ()) <$> syncFrozen Computer project manifest lock
         library repos "pus" [] "v0.1.0"
         void $ add project "pus" "v0.1.0" Nothing
-        verifyProject Computer project `shouldReturn` Right ()
+        verify `shouldReturn` Right ()
         edit project "\"v0.1.0\"" "\"v0.2.0\""
-        verifyProject Computer project `shouldReturn` Left
+        verify `shouldReturn` Left
           [ "https://example.invalid/acme/pus v0.2.0 (required by app): termina.lock has v0.1.0 instead, and fetching it needs the network. "
             ++ "Run termina build without --offline, or termina update, to update termina.lock." ]
         edit project "dependencies:\n  - git: https://example.invalid/acme/pus\n    rev: \"v0.2.0\"\n" ""
-        verifyProject Computer project `shouldReturn` Left
+        verify `shouldReturn` Left
           [ "termina.lock has https://example.invalid/acme/pus v0.1.0, which termina.yaml no longer needs. "
             ++ "Run termina build or termina update to update termina.lock." ]
         edit project "profile: release\n" "profile: release\ndependencies:\n  - path: ../drivers\n"
-        verifyProject Computer project `shouldReturn` Left ["termina.yaml takes ../drivers from a local folder, which termina.lock cannot pin."]
+        verify `shouldReturn` Left ["termina.yaml takes ../drivers from a local folder, which termina.lock cannot pin."]
 
   describe "termina restore" $ do
 
@@ -299,7 +303,7 @@ spec = do
           ["This container has no SSH keys, so it cannot clone over SSH. Run termina add on your computer or in VS Code."]
 
     it "gives the clone to run on the host for every package without credentials" $
-      credentialsMessage "termina add" [(url "a", "v1"), (url "b", "v2")] `shouldBe` intercalate "\n"
+      credentialsMessage AddCommand [(url "a", "v1"), (url "b", "v2")] `shouldBe` intercalate "\n"
         [ "git has no credentials in this container for:"
         , "  https://example.invalid/acme/a v1"
         , "  https://example.invalid/acme/b v2"

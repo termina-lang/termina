@@ -12,9 +12,8 @@ module Command.Deliver (
 
 import Command.Build
 import Command.Extern (ExternGroup(..), groupObject, groupObjects)
-import Command.Project (loadProject)
+import Command.Project (Dependencies(..), loadProject)
 import Command.Sources (LoadedProject(..))
-import Command.Update (verifyProject)
 import Command.Utils
 import Configuration.Configuration
 import Configuration.Manifest
@@ -71,10 +70,9 @@ deliverCommand :: DeliverCmdArgs -> IO ()
 deliverCommand (DeliverCmdArgs chatty withTests archive withTrace) = do
     when (withTrace && not archive) $
       dieWithError $ "--with-trace adds a binary to the archive: use it with --archive"
-    -- A deliverable is built from the state in git, which verify checks without writing.
-    place <- currentPlace
-    verifyProject place "." >>= either dieWithFirstError return
-    loaded <- loadProject True
+    -- A deliverable is built from the state in git, with termina.lock and
+    -- vendor/ as they are.
+    loaded <- loadProject Frozen
     let manifest = loadedManifest loaded
         hasApp = isJust (appDeployment manifest)
         selection = case (withTests, hasApp) of

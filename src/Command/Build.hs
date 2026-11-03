@@ -8,7 +8,8 @@ module Command.Build (
 
 import Configuration.Configuration
 import Configuration.Manifest
-import Command.Project (loadProject)
+import Command.Dependencies (Fetching(..), FetchingCommand(..))
+import Command.Project (Dependencies(..), loadProject)
 import Command.Sources (LoadedProject(..), Sources, buildSources, localFolders)
 import Command.Utils
 import Control.Exception (IOException, try)
@@ -308,7 +309,7 @@ genMonadicHeaderFiles params plt monadicTypes = do
 selectedDeployments :: BuildCmdArgs -> IO (LoadedProject, [Deployment])
 selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile offline) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
-    project <- loadProject offline
+    project <- loadProject (Update (if offline then Offline else Reuse BuildCommand))
     case manifestNature (loadedManifest project) of
         Library _ -> checkExportedModules chatty project
         Application _ -> return ()

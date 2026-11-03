@@ -29,7 +29,8 @@ import qualified Data.ByteString as BS
 import qualified Data.Text.Encoding as TE
 import Command.Build (CheckedDeployment(..), checkDeployment)
 import Command.Pipeline (CheckedModules(..))
-import Command.Project (loadProject)
+import Command.Dependencies (Fetching(..), FetchingCommand(..))
+import Command.Project (Dependencies(..), loadProject)
 import Command.Sources (LoadedProject(..))
 import Configuration.Manifest (Deployment(..), appDeployment)
 import EFP.Schedulability.WCEPath.Parsing
@@ -645,7 +646,7 @@ genMASTModels reduction config arch sitMap trPathMap = do
 schedCommand :: SchedCmdArgs -> IO ()
 schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT writeMAST reduction) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
-    project <- loadProject False
+    project <- loadProject (Update (Reuse SchedCommand))
     deployment <- maybe (dieWithError "the project is a library and has no application") return
         (appDeployment (loadedManifest project))
     let config = deploymentConfig deployment

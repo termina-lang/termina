@@ -6,7 +6,7 @@
 module Command.Update (
     updateCmdArgsParser, updateCommand, UpdateCmdArgs,
     verifyCmdArgsParser, verifyCommand, VerifyCmdArgs,
-    updateDependencies, checkTags, verifyProject
+    updateDependencies, checkTags
 ) where
 
 import Control.Monad
@@ -18,6 +18,7 @@ import System.Exit (exitFailure)
 import System.FilePath
 
 import Command.Dependencies
+import Command.Project (Dependencies(..), loadProject)
 import Command.Utils (Place, currentPlace, dieWithFirstError, infoMessage, loadLock, warnMessage)
 import Configuration.Fetch (resolveTag)
 import Configuration.Lock
@@ -56,8 +57,8 @@ updateCommand (UpdateCmdArgs mDep False) = do
 
 verifyCommand :: VerifyCmdArgs -> IO ()
 verifyCommand _ = do
-    place <- currentPlace
-    verifyProject place "." >>= either dieWithFirstError (const (putStrLn (infoMessage "vendor/ and termina.lock match termina.yaml")))
+    _ <- loadProject Frozen
+    putStrLn (infoMessage "vendor/ and termina.lock match termina.yaml")
 
 -- | The manifest and the lock of the project in a folder.
 loadProjectFiles :: FilePath -> IO (Either [String] (Manifest, Lock))
@@ -89,7 +90,7 @@ updateDependencies place root mDep = do
                 Just dep | not (any (matches dep) known) ->
                     return (Left [dep ++ " is not a dependency of this project."])
                 _ -> do
-                    synced <- syncDependencies place "termina update" (Refresh (maybe (const True) matches mDep)) True root manifest lock
+                    synced <- syncDependencies place (Refresh UpdateCommand (maybe (const True) matches mDep)) True root manifest lock
                     return $ flip fmap synced $ \(Sync changes warnings _ _) ->
                         (warnings, if null changes then ["termina.lock is up to date"] else map (("termina.lock: " ++) . describeChange) changes)
 
@@ -124,28 +125,3 @@ checkTags root = do
   where
 
     shortSha = take 7 . T.unpack
-
--- | Check, without network and without writing, that every package that the
--- manifest needs is in the lock at its tag, that its copy in vendor/ matches
--- the lock, that the lock holds nothing else, and that no dependency comes
--- from a local folder.
-verifyProject :: Place -> FilePath -> IO (Either [String] ())
-verifyProject place root = do
-    files <- loadProjectFiles root
-    case files of
-        Left errs -> return (Left errs)
-        Right (manifest, lock) ->
-            case [p | DepPath p <- manifestDependencies manifest ++ concatMap testDependencies (M.elems (manifestTests manifest))] of
-                (p : _) -> return (Left ["termina.yaml takes " ++ p ++ " from a local folder, which termina.lock cannot pin."])
-                [] -> do
-                    synced <- syncDependencies place "termina verify" Offline False root manifest lock
-                    return $ synced >>= \(Sync changes _ _ _) -> case changes of
-                        [] -> Right ()
-                        _ -> Left (map describe changes)
-
-  where
-
-    describe (Removed l) = "termina.lock has " ++ T.unpack (lockedUrl l) ++ " " ++ T.unpack (lockedRev l)
-        ++ ", which termina.yaml no longer needs. Run termina build or termina update to update termina.lock."
-    describe change = "termina.lock does not match termina.yaml: " ++ describeChange change
-        ++ ". Run termina build or termina update to update termina.lock."

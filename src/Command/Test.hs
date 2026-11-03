@@ -9,7 +9,8 @@ module Command.Test (
 ) where
 
 import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, checkExportedModules, nothingSelected, selectDeployments, verifyLocalFolders)
-import Command.Project (loadProject)
+import Command.Dependencies (Fetching(..), FetchingCommand(..))
+import Command.Project (Dependencies(..), loadProject)
 import Command.Common (loadMainModule, orderedModules, sourceTexts)
 import Command.Deliver (deliverableInfo)
 import Command.Sources (LoadedProject(..), buildSources, readProject)
@@ -206,7 +207,7 @@ runTests mName mPlatform mProfile withGdb mServer mXsdb offline mode = do
     loaded <- try (case mode of
         Recorded _ -> (\m -> LoadedProject "." m M.empty M.empty M.empty) <$> (loadManifest >>= either dieWithFirstError return)
         _ -> do
-            loadedProject <- loadProject offline
+            loadedProject <- loadProject (Update (if offline then Offline else Reuse TestCommand))
             case manifestNature (loadedManifest loadedProject) of
                 Library _ -> checkExportedModules False loadedProject
                 Application _ -> return ()

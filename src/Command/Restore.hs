@@ -13,7 +13,7 @@ import qualified Data.Text as T
 import Options.Applicative
 import System.Directory (removePathForcibly)
 
-import Command.Dependencies (PackageError(..), describeObtainErrors)
+import Command.Dependencies (FetchingCommand(..), PackageError(..), describeObtainErrors)
 import Command.Utils (Place, currentPlace, dieWithFirstError, infoMessage, loadLock)
 import Configuration.Fetch
 import Configuration.Lock
@@ -56,7 +56,7 @@ restoreVendor place root = do
                     return $ Right
                         [ "restored vendor/" ++ T.unpack (normalizeUrl (lockedUrl locked)) ++ " (" ++ T.unpack (lockedRev locked) ++ ")"
                         | Right (locked, _, _) <- results ]
-                errs -> return (Left (describeObtainErrors place "termina restore" errs))
+                errs -> return (Left (describeObtainErrors place (Just RestoreCommand) errs))
 
   where
 

@@ -1,12 +1,13 @@
 -- | Loading of the project before its deployments are built.
 module Command.Project (
+    Dependencies(..),
     loadProject
 ) where
 
 import Configuration.ExternCheck (readExternSections, checkExternSections)
 import Configuration.Namespace (checkExports)
 import Command.Common
-import Command.Dependencies (Fetching(..), Sync(..), syncDependencies, describeChange)
+import Command.Dependencies (Fetching(..), Sync(..), syncDependencies, syncFrozen, describeChange)
 import Command.Sources (LoadedProject(..), readProjectModules)
 import qualified Data.Map.Lazy as ML
 import System.FilePath (normalise)
@@ -14,13 +15,21 @@ import Command.Utils
 
 import Control.Monad
 
+-- | What a command does with the dependencies of the project.
+data Dependencies =
+    -- | Bring termina.lock and vendor/ up to date with the manifest
+    Update Fetching
+    -- | Take termina.lock and vendor/ as they are, without network, and stop
+    -- when they do not match the manifest or a dependency is a local folder
+  | Frozen
+
 -- | Load the project for the commands that build.
 -- It reads the manifest and the modules of the project, and checks the extern
 -- sections and the exports of a library.
--- It updates termina.lock and vendor/ from the manifest.
--- When offline is set, it does not fetch the dependencies.
-loadProject :: Bool -> IO LoadedProject
-loadProject offline = do
+-- It brings termina.lock and vendor/ up to date with the manifest, or checks
+-- that they are.
+loadProject :: Dependencies -> IO LoadedProject
+loadProject dependencies = do
     manifest <- loadManifest >>= either dieWithFirstError return
     own <- readProjectModules "." manifest
     -- | Read the modules that the extern sections name.
@@ -33,8 +42,11 @@ loadProject offline = do
     unless (null exportErrors) $ dieWithFirstError exportErrors
     lock <- loadLock "." >>= either dieWithFirstError return
     place <- currentPlace
-    Sync changes warnings packages locals <- syncDependencies place "termina build" (if offline then Offline else Reuse) True "." manifest lock
-        >>= either dieWithFirstError return
+    Sync _ warnings packages locals <- case dependencies of
+        Update fetching -> do
+            synced <- syncDependencies place fetching True "." manifest lock >>= either dieWithFirstError return
+            mapM_ (putStrLn . infoMessage . ("termina.lock: " ++) . describeChange) (syncChanges synced)
+            return synced
+        Frozen -> syncFrozen place "." manifest lock >>= either dieWithFirstError return
     mapM_ (putStrLn . warnMessage) warnings
-    mapM_ (putStrLn . infoMessage . ("termina.lock: " ++) . describeChange) changes
     return (LoadedProject "." manifest packages locals own)

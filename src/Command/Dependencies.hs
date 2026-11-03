@@ -4,10 +4,12 @@
 -- the manifest into the lock and "vendor/", and the description of what fails.
 module Command.Dependencies (
     PackageError(..),
+    FetchingCommand(..),
     Fetching(..),
     LockChange(..),
     Sync(..),
     syncDependencies,
+    syncFrozen,
     describeChange,
     describePackageError,
     describeObtainErrors,
@@ -47,16 +49,37 @@ data PackageError =
     | NeedsNetwork (Maybe T.Text)
   deriving (Eq, Show)
 
--- | Where the packages of a synchronization come from.
+-- | A command that may fetch a package, which the errors that need
+-- credentials name.
+data FetchingCommand = AddCommand | BuildCommand | TestCommand | SchedCommand | UpdateCommand | RestoreCommand
+  deriving (Eq, Show)
+
+-- | A command as the user writes it.
+commandLine :: FetchingCommand -> String
+commandLine AddCommand = "termina add"
+commandLine BuildCommand = "termina build"
+commandLine TestCommand = "termina test"
+commandLine SchedCommand = "termina sched"
+commandLine UpdateCommand = "termina update"
+commandLine RestoreCommand = "termina restore"
+
+-- | Where the packages of a synchronization come from. A mode that may fetch
+-- carries the command that runs it.
 data Fetching =
     -- | Only from vendor/: the lock has to have every package with its tag
     Offline
     -- | From vendor/ when the lock has the package with the same tag, and
     -- from its repository otherwise
-    | Reuse
+    | Reuse FetchingCommand
     -- | From the repository for the packages that the function selects, by
     -- normalized URL, and as Reuse for the rest
-    | Refresh (T.Text -> Bool)
+    | Refresh FetchingCommand (T.Text -> Bool)
+
+-- | The command of a mode that may fetch.
+fetchingCommand :: Fetching -> Maybe FetchingCommand
+fetchingCommand Offline = Nothing
+fetchingCommand (Reuse command) = Just command
+fetchingCommand (Refresh command _) = Just command
 
 -- | How the lock changes: a package that enters it, one that moves to
 -- another tag or commit, and one that leaves it.
@@ -83,8 +106,8 @@ data Sync = Sync {
 -- and checks the graph. Then it writes the copies that change, removes those
 -- that left and writes the lock. Nothing is written when anything fails, nor
 -- when the caller only wants to know the changes.
-syncDependencies :: Place -> String -> Fetching -> Bool -> FilePath -> Manifest -> Lock -> IO (Either [String] Sync)
-syncDependencies place commandName fetching write root manifest lock = do
+syncDependencies :: Place -> Fetching -> Bool -> FilePath -> Manifest -> Lock -> IO (Either [String] Sync)
+syncDependencies place fetching write root manifest lock = do
     used <- newIORef []
     localResult <- readLocalPackages [(root, p) | DepPath p <- allDependencies]
     case localResult of
@@ -94,7 +117,7 @@ syncDependencies place commandName fetching write root manifest lock = do
                         | l <- M.elems locals, DepGit g <- manifestDependencies (packageManifest l) ]
             resolution <- resolveWith (obtain used) manifest extra
             case resolution of
-                Left errs -> return (Left (describeObtainErrors place commandName errs))
+                Left errs -> return (Left (describeObtainErrors place (fetchingCommand fetching) errs))
                 Right res ->
                     case checkGraph manifest (map resolvedPackage (M.elems (resolvedDependencies res)) ++ M.elems locals) of
                         [] -> Right <$> commit res locals used
@@ -111,7 +134,7 @@ syncDependencies place commandName fetching write root manifest lock = do
     obtain used u t =
         let locked = M.lookup (normalizeUrl u) oldPackages
         in case (fetching, locked) of
-            (Refresh selected, _) | selected (normalizeUrl u) -> fromGit used u t
+            (Refresh _ selected, _) | selected (normalizeUrl u) -> fromGit used u t
             (_, Just l) | lockedRev l == t -> fromVendor l
             (Offline, _) -> return (Left (NeedsNetwork (lockedRev <$> locked)))
             _ -> fromGit used u t
@@ -183,6 +206,30 @@ describeChange (Changed l p)
     | otherwise = T.unpack (resolvedUrl p) ++ " " ++ T.unpack (lockedRev l) ++ " -> " ++ T.unpack (resolvedTag p)
 describeChange (Removed l) = "removed " ++ T.unpack (lockedUrl l) ++ " " ++ T.unpack (lockedRev l)
 
+-- | Check, without network and without writing, that the lock and vendor/
+-- match a manifest and that no dependency comes from a local folder.
+syncFrozen :: Place -> FilePath -> Manifest -> Lock -> IO (Either [String] Sync)
+syncFrozen place root manifest lock =
+    case [ p | DepPath p <- manifestDependencies manifest ++ concatMap testDependencies (M.elems (manifestTests manifest)) ] of
+        p : _ -> return (Left [localFolderError p])
+        [] -> do
+            synced <- syncDependencies place Offline False root manifest lock
+            return $ synced >>= \s ->
+                if null (syncChanges s) then Right s else Left (map lockMismatch (syncChanges s))
+
+-- | A change that the lock needs, as an error of a command that does not
+-- write the lock.
+lockMismatch :: LockChange -> String
+lockMismatch (Removed l) = "termina.lock has " ++ T.unpack (lockedUrl l) ++ " " ++ T.unpack (lockedRev l)
+    ++ ", which termina.yaml no longer needs. Run termina build or termina update to update termina.lock."
+lockMismatch change = "termina.lock does not match termina.yaml: " ++ describeChange change
+    ++ ". Run termina build or termina update to update termina.lock."
+
+-- | A dependency from a local folder, as an error of a command that needs
+-- every dependency pinned by the lock.
+localFolderError :: FilePath -> String
+localFolderError path = "termina.yaml takes " ++ path ++ " from a local folder, which termina.lock cannot pin."
+
 -- | The overrides of the root in force, and those of the dependencies that
 -- do not count.
 overrideWarnings :: Resolution -> [String]
@@ -213,10 +260,10 @@ misspelled = "GitHub also asks for credentials when a repository does not exist,
 -- | The errors of bringing packages. In a command-line container, the
 -- packages that need credentials go first and together, with the ways to
 -- bring them, so that the user clones all of them on the computer at once.
-describeObtainErrors :: Place -> String -> [ResolveError PackageError] -> [String]
-describeObtainErrors place commandName errs
-    | place == CommandLineContainer && not (null credentials) =
-        credentialsMessage commandName credentials : map (describeResolveError describePackageError) (filter (not . needsCredentials) errs)
+describeObtainErrors :: Place -> Maybe FetchingCommand -> [ResolveError PackageError] -> [String]
+describeObtainErrors place mCommand errs
+    | place == CommandLineContainer, Just command <- mCommand, not (null credentials) =
+        credentialsMessage command credentials : map (describeResolveError describePackageError) (filter (not . needsCredentials) errs)
     | otherwise = map (describeResolveError describePackageError) errs
 
   where
@@ -229,15 +276,15 @@ describeObtainErrors place commandName errs
 -- | The ways to bring the packages that need credentials when the tool runs
 -- in a command-line container, which has none, for the command that needs
 -- them.
-credentialsMessage :: String -> [(T.Text, T.Text)] -> String
-credentialsMessage commandName packages = intercalate "\n" $
+credentialsMessage :: FetchingCommand -> [(T.Text, T.Text)] -> String
+credentialsMessage command packages = intercalate "\n" $
     ["git has no credentials in this container for:"]
     ++ ["  " ++ T.unpack u ++ " " ++ T.unpack t | (u, t) <- packages]
     ++ [ "To bring them, do one of these:"
        , "  1. On your computer, from the project folder, run:" ]
     ++ [ "       git clone --branch " ++ T.unpack t ++ " --depth 1 " ++ T.unpack u ++ " .termina/fetch/" ++ T.unpack (normalizeUrl u)
        | (u, t) <- packages ]
-    ++ [ "     and then run " ++ commandName ++ " again here."
-       , "  2. Run " ++ commandName ++ " with termina installed on your computer."
+    ++ [ "     and then run " ++ commandLine command ++ " again here."
+       , "  2. Run " ++ commandLine command ++ " with termina installed on your computer."
        , "  3. Open the project in VS Code, which passes your credentials to its container."
        , misspelled ]
