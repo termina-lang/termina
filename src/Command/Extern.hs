@@ -67,14 +67,14 @@ groupObjects :: ExternGroup -> String
 groupObjects g = if null (groupVariable g) then "EXTERN_OBJS" else groupVariable g ++ "_EXTERN_OBJS"
 
 -- | Copy the C that the modules of the build need on the selected platform
--- to the output folder, and give its groups: one for the project, with its C
--- and, in a test, the C of the test, and one for each dependency whose loaded
--- modules have C. A file that
+-- to each of the output folders given, and give its groups: one for the
+-- project, with its C and, in a test, the C of the test, and one for each
+-- dependency whose loaded modules have C. A file that
 -- both sections of the project have would overwrite the other in the output
 -- folder, so it is an error, and so are two dependencies whose C would go to
 -- the same place.
-prepareExtern :: TerminaConfig -> ParsedProject -> Sources -> [(FilePath, ExternConfig)] -> IO [ExternGroup]
-prepareExtern config project sources folders = do
+prepareExtern :: TerminaConfig -> [FilePath] -> ParsedProject -> Sources -> [(FilePath, ExternConfig)] -> IO [ExternGroup]
+prepareExtern config outputs project sources folders = do
   checked <- forM folders $ \(folder, extern) -> do
     present <- filesUnder folder
     map (folder,) <$> usedFiles config "termina.yaml" (ownerOfFolder folder) (loadedFrom project folder) present extern
@@ -104,12 +104,14 @@ prepareExtern config project sources folders = do
       _ -> takeDirectory (makeRelative "vendor" (folderPath f)) ++ " and " ++ takeDirectory (makeRelative "vendor" (folderPath other))
         ++ " give the same name, " ++ groupObjects g ++ ", to the objects of their C in the Makefile"
     _ -> return ()
-  copyExtern (outputFolder config </> externFolder) =<< mapM (\(folder, rel) -> (rel,) <$> BS.readFile (folder </> rel)) files
-  forM_ dependencies $ \(_, p, used, g) ->
-    let contents = M.fromList [ (path, bytes) | FetchedFile path _ bytes <- packageFiles p ]
-    in copyExtern (outputFolder config </> groupFolder g)
-         [ (file, bytes) | file <- used, Just bytes <- [M.lookup (externFolder ++ "/" ++ file) contents] ]
-  removeStaleGroups (outputFolder config) (map (\(_, _, _, g) -> groupFolder g) dependencies)
+  projectFiles <- mapM (\(folder, rel) -> (rel,) <$> BS.readFile (folder </> rel)) files
+  forM_ outputs $ \out -> do
+    copyExtern (out </> externFolder) projectFiles
+    forM_ dependencies $ \(_, p, used, g) ->
+      let contents = M.fromList [ (path, bytes) | FetchedFile path _ bytes <- packageFiles p ]
+      in copyExtern (out </> groupFolder g)
+           [ (file, bytes) | file <- used, Just bytes <- [M.lookup (externFolder ++ "/" ++ file) contents] ]
+    removeStaleGroups out (map (\(_, _, _, g) -> groupFolder g) dependencies)
   return (projectGroups ++ [ g | (_, _, _, g) <- dependencies ])
 
   where

@@ -526,12 +526,12 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
         <- checkDeployment chatty project deployment
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
-    -- | Generate the code with the #line pragmas and the plain C, which have
-    -- the same groups of C
-    externsOf <- forM [deploymentConfig deployment, deploymentPlainConfig deployment] $ \outConfig -> do
+        outConfigs = [deploymentConfig deployment, deploymentPlainConfig deployment]
+    -- | Copy the C of the deployment to the output folders of the code with the
+    -- #line pragmas and of the plain C, which have the same groups of C
+    externs <- prepareExtern config (map outputFolder outConfigs) parsedProject sources (deploymentExterns deployment)
+    forM_ outConfigs $ \outConfig -> do
       when chatty (putStrLn . debugMessage $ "Generating code into \"" ++ outputFolder outConfig ++ "\"")
-      -- | Copy the C of the deployment to the output folder
-      externs <- prepareExtern outConfig parsedProject sources (deploymentExterns deployment)
       genModules outConfig plt monadicTypes elaboratedProject
       genInitFile outConfig plt elaboratedProject
       genPlatformCode outConfig plt loweredProject programArchitecture externs
@@ -543,7 +543,6 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
       removeStaleFiles (out </> "src") [".c"] [out </> "src" </> m <.> "c" | m <- moduleNames]
       removeStaleFiles (out </> "include") [".h"]
         ([out </> "include" </> m <.> "h" | m <- moduleNames] ++ [out </> "include" </> genConfigPathName] ++ monadicHeaders)
-      return externs
     genChecksReportFile config loweredProject checksReports
     when genTransactionalWCEPs $
       when chatty (putStrLn . debugMessage $ "Generating transactional worst-case execution paths") >>
@@ -554,4 +553,4 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
         when chatty (putStrLn . debugMessage $ "Generating component diagram") >>
         genComponentDiagramFile config programArchitecture param
     when chatty (putStrLn . debugMessage $ "Build completed successfully")
-    return ([(qualifiedName m, fullPath m) | m <- M.elems elaboratedProject], concat (take 1 externsOf))
+    return ([(qualifiedName m, fullPath m) | m <- M.elems elaboratedProject], externs)
