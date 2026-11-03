@@ -125,7 +125,7 @@ publishDiagnostics diags = do
 -- its index when it has been type checked.
 storedModules :: ParsedProject -> TypedProject -> M.Map FilePath TerminaStoredModule
 storedModules parsedProject typedProject = M.fromList
-    [ (Mod.fullPath m, TerminaStoredModule (Mod.fullPath m) (Mod.importedModules m) (Mod.sourcecode m) []
-        (Just (Mod.metadata m)) (Mod.metadata <$> typed) (maybe emptyIndex (indexModule . typedAST . Mod.metadata) typed))
+    [ (Mod.fullPath m, TerminaStoredModule (Mod.sourcecode m)
+        (Mod.metadata <$> typed) (maybe emptyIndex (indexModule . typedAST . Mod.metadata) typed))
     | m <- M.elems parsedProject
     , let typed = M.lookup (Mod.qualifiedName m) typedProject ]

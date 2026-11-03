@@ -17,7 +17,6 @@ import ControlFlow.SideEffects (runSideEffectCheck)
 import ControlFlow.SideEffects.Errors (SideEffectsError)
 import Configuration.Platform (Platform)
 import ControlFlow.ExitPaths
-import Configuration.Configuration
 import Configuration.Lock (Lock, decodeLockFile)
 import Configuration.Manifest
 import System.Directory
@@ -295,12 +294,6 @@ dieWithReport report = TIO.hPutStrLn stderr report >> exitFailure
 -- as the type checker does.
 dieWithFirstError :: [String] -> IO a
 dieWithFirstError = dieWithError . concat . take 1
-
--- | The configuration of the application of the project.
-loadConfig :: (MonadIO m) => m (Either [String] TerminaConfig)
-loadConfig = do
-    result <- loadManifest
-    return $ result >>= maybe (Left ["the project is a library and has no application"]) Right . appConfig
 
 sortProjectDepsOrLoop
   :: ProjectDependencies
