@@ -558,7 +558,7 @@ listTests json = do
     -- | A test that cannot be read exits with 2, as in a run
     loaded <- try (do
         manifest <- loadManifest >>= either dieWithFirstError return
-        project <- readProject manifest
+        project <- readProject manifest >>= either dieWithFirstError return
         forM (M.toList (manifestTests manifest)) $ \(testName, entry) -> do
           cases <- loadTestCases project (T.unpack testName)
           return (testName, entry, cases)) :: IO (Either ExitCode [(T.Text, TestEntry, [TestCase])])

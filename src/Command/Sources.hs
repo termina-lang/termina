@@ -31,7 +31,7 @@ import qualified Data.Text as T
 import System.Directory
 import System.FilePath
 
-import Command.Utils (dieWithFirstError, loadLock)
+import Command.Utils (loadLock)
 import Configuration.Fetch (FetchedFile(..))
 import Configuration.Local
 import Configuration.Lock
@@ -87,22 +87,31 @@ data LoadedProject = LoadedProject {
   } deriving Show
 
 -- | Read a project and its dependencies from disk, without updating the lock
--- or vendor/. It stops at the first error.
-readProject :: Manifest -> IO LoadedProject
+-- or vendor/. It gives the errors of the lock, of the local folders or of the
+-- first package of vendor/ that cannot be read.
+readProject :: Manifest -> IO (Either [String] LoadedProject)
 readProject manifest = do
-    lock <- loadLock "." >>= either dieWithFirstError return
-    locals <- readLocalPackages [(".", p) | DepPath p <- allDependencies] >>= either dieWithFirstError return
-    vendored <- forM (lockPackages lock) $ \l -> do
-        let url = lockedUrl l
-        files <- readPackage "." url
-        either (\err -> dieWithFirstError ["vendor/" ++ T.unpack (normalizeUrl url) ++ ": " ++ err]) (return . (,) (normalizeUrl url)) $
-            packageFromFiles (FromGit url (lockedRev l) (lockedCommit l)) (packageDir "." url) [FetchedFile p "100644" b | (p, b) <- files]
-    own <- readProjectModules manifest
-    return (LoadedProject manifest (M.fromList vendored) locals own)
+    lockRead <- loadLock "."
+    case lockRead of
+        Left errs -> return (Left errs)
+        Right lock -> do
+            localsRead <- readLocalPackages [(".", p) | DepPath p <- allDependencies]
+            case localsRead of
+                Left errs -> return (Left errs)
+                Right locals -> do
+                    vendored <- mapM vendoredPackage (lockPackages lock)
+                    own <- readProjectModules manifest
+                    return ((\packages -> LoadedProject manifest (M.fromList packages) locals own) <$> sequence vendored)
 
   where
 
     allDependencies = manifestDependencies manifest ++ concatMap testDependencies (M.elems (manifestTests manifest))
+
+    vendoredPackage l = do
+        let url = lockedUrl l
+        files <- readPackage "." url
+        return $ either (\err -> Left ["vendor/" ++ T.unpack (normalizeUrl url) ++ ": " ++ err]) (Right . (,) (normalizeUrl url)) $
+            packageFromFiles (FromGit url (lockedRev l) (lockedCommit l)) (packageDir "." url) [FetchedFile p "100644" b | (p, b) <- files]
 
 -- | The project with the text of some of its module files replaced.
 -- The texts are given by the path of their file from the project folder.

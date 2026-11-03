@@ -67,7 +67,7 @@ withLoaded action = do
         let manifest = manifestOf $ header "obdh" ++ "app:\n  platform: posix-gcc\n  profile: release\n" ++ deps ["pus"]
                 ++ "  - path: libs/drivers\n"
                 ++ "tests:\n  hk:\n    platforms: [posix-gcc]\n    timeout: 10\n    dependencies:\n      - git: " ++ T.unpack (url "fixtures") ++ "\n        rev: \"v1\"\n"
-        readProject manifest >>= action
+        readProject manifest >>= either (error . unlines) action
 
 vendored :: String -> FilePath
 vendored name = normalise (packageDir "." (url name) </> "src")
