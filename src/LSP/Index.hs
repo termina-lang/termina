@@ -320,7 +320,7 @@ objRefs locals (SAST.Unbox obj _) = objRefs locals obj
 memberAccess :: Locals -> SAST.Object SemanticAnn -> Identifier -> SemanticAnn
     -> [Entry]
 memberAccess locals obj ident ann =
-    thisAccess ++ objRefs locals obj
+    thisAccess ++ typeOf ann ++ objRefs locals obj
 
     where
 

@@ -164,6 +164,17 @@ spec = describe "language server" $ do
       codes <- errorCodesOf app
       liftIO (codes `shouldBe` ["AE-001"])
 
+  it "gives the type of a field on a hover" $
+    withServer $ \_ -> do
+      app <- openDoc "app/app.fin" "termina"
+      assigned <- getHover app (positionOf "count = twice" appModule)
+      passed <- getHover app (positionOf "count))" appModule)
+      onSelf <- getHover app (positionOf "self->count = twice" appModule)
+      liftIO $ do
+        fmap (^. L.contents) assigned `shouldBe` Just (InL (MarkupContent MarkupKind_Markdown "```termina\nu32\n```"))
+        fmap (^. L.contents) passed `shouldBe` Just (InL (MarkupContent MarkupKind_Markdown "```termina\nu32\n```"))
+        fmap (^. L.contents) onSelf `shouldNotBe` fmap (^. L.contents) assigned
+
   it "goes to the definition of a function of a local folder" $
     withServer $ \base -> do
       app <- openDoc "app/app.fin" "termina"
