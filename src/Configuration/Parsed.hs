@@ -6,6 +6,7 @@ module Configuration.Parsed (
     ParsedFile,
     ParsedFiles,
     parseFile,
+    parseText,
     parseFolder,
     parsePackage,
     parsedTree
@@ -43,8 +44,13 @@ parseFile :: QualifiedName -> FilePath -> BS.ByteString -> ParsedFile
 parseFile qname file bytes =
     case TE.decodeUtf8' bytes of
         Left _ -> Left NotUtf8
-        Right text -> either (Left . InvalidSyntax text) (\ast -> Right (text, ast))
-            (runParser terminaModuleParser qname file (T.unpack text))
+        Right text -> parseText qname file text
+
+-- | Parse the text of a module, given its qualified name and its file.
+parseText :: QualifiedName -> FilePath -> T.Text -> ParsedFile
+parseText qname file text =
+    either (Left . InvalidSyntax text) (\ast -> Right (text, ast))
+        (runParser terminaModuleParser qname file (T.unpack text))
 
 -- | The modules of a source folder by their path from the project folder,
 -- given the files of the source folder by their path in it.

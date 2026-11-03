@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | A project with its dependencies, and the source folders of a build with
--- what the modules of each one see: their own folder and those of the
--- dependencies that their manifest declares.
+-- | Loading of a project with its dependencies, and the source folders of
+-- each build.
+-- A source folder gives the folders whose modules its own modules can import.
 module Command.Sources (
     Owner(..),
     SourceFolder(..),
@@ -11,6 +11,7 @@ module Command.Sources (
     LoadedProject(..),
     readProject,
     readProjectModules,
+    withTexts,
     buildSources,
     lookupModule,
     hiddenMessage,
@@ -21,7 +22,8 @@ module Command.Sources (
 
 import Control.Monad
 import qualified Data.ByteString as BS
-import Data.List (find)
+import Data.List (find, stripPrefix)
+import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Map.Lazy as ML
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -101,6 +103,38 @@ readProject manifest = do
   where
 
     allDependencies = manifestDependencies manifest ++ concatMap testDependencies (M.elems (manifestTests manifest))
+
+-- | The project with the text of some of its module files replaced.
+-- The texts are given by the path of their file from the project folder.
+-- A file that the project and its dependencies do not have is left out.
+withTexts :: M.Map FilePath T.Text -> LoadedProject -> LoadedProject
+withTexts texts project = project {
+    loadedRemotes = M.map inPackage (loadedRemotes project),
+    loadedLocals = M.map inPackage (loadedLocals project),
+    loadedProjectModules = replaced (sourceFolders ++ mainFolders) (loadedProjectModules project)
+  }
+
+  where
+
+    tests = ["tests" </> T.unpack t | t <- M.keys (manifestTests (loadedManifest project))]
+
+    -- | The folders of the project, and whether they hold only main modules
+    sourceFolders = [ (folder, False) | folder <- "src" : map (</> "src") tests ]
+    mainFolders = [ (folder, True) | folder <- "app" : tests ]
+
+    inPackage package = package {
+        packageModules = replaced [(normalise (packageFolder package </> "src"), False)] (packageModules package)
+      }
+
+    replaced folders = ML.mapWithKey (\file parsed -> fromMaybe parsed (M.lookup file texts >>= reparsed folders file))
+
+    -- | The file parsed again with its text, as a module of the first folder
+    -- that holds it
+    reparsed folders file text = listToMaybe
+        [ parseText (dropExtension rel) file text
+        | (folder, mainOnly) <- folders
+        , Just rel <- [stripPrefix (addTrailingPathSeparator folder) file]
+        , not mainOnly || length (splitDirectories rel) == 1 ]
 
 -- | The modules of a project: those of src/ and of the src/ of each test, and
 -- the main modules of app/ and of each test, read from disk.

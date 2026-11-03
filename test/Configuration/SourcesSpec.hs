@@ -6,9 +6,13 @@ module Configuration.SourcesSpec (spec) where
 
 import Command.Sources
 import Configuration.Lock
+import Configuration.Package (Package(..))
+import Configuration.Parsed (ParseFailure(..), ParsedFiles)
 import Configuration.Vendor (packageDir)
 
 import Control.Monad (forM_)
+import qualified Data.Map.Lazy as ML
+import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import System.Directory
 import System.FilePath
@@ -23,10 +27,16 @@ deps :: [String] -> String
 deps [] = ""
 deps names = "dependencies:\n" ++ concat ["  - git: " ++ T.unpack (url n) ++ "\n    rev: \"v1\"\n" | n <- names]
 
+-- | The sources of the build of the application and of the test hk of the
+-- project of withLoaded.
+withProject :: (Sources -> Sources -> IO a) -> IO a
+withProject action =
+    withLoaded $ \project -> action (buildSources project Nothing "app") (buildSources project (Just "hk") ("tests" </> "hk"))
+
 -- | obdh declares pus, which declares ccsds; the test hk declares fixtures;
 -- and obdh has a module of its own with the name of one of pus.
-withProject :: (Sources -> Sources -> IO a) -> IO a
-withProject action = do
+withLoaded :: (LoadedProject -> IO a) -> IO a
+withLoaded action = do
     tmp <- getTemporaryDirectory
     let root = tmp </> "termina-sources-spec"
     removePathForcibly root
@@ -47,8 +57,7 @@ withProject action = do
         let manifest = manifestOf $ header "obdh" ++ "app:\n  platform: posix-gcc\n  profile: release\n" ++ deps ["pus"]
                 ++ "  - path: libs/drivers\n"
                 ++ "tests:\n  hk:\n    platforms: [posix-gcc]\n    timeout: 10\n    dependencies:\n      - git: " ++ T.unpack (url "fixtures") ++ "\n        rev: \"v1\"\n"
-        project <- readProject manifest
-        action (buildSources project Nothing "app") (buildSources project (Just "hk") ("tests" </> "hk"))
+        readProject manifest >>= action
 
 vendored :: String -> FilePath
 vendored name = normalise (packageDir "." (url name) </> "src")
@@ -100,3 +109,26 @@ spec = describe "source folders of a build" $ do
       lookupIn app "src" "pus/m" `shouldBe`
         ("src/pus/m.fin has the same name as the module pus.m of the dependency pus, in " ++ vendored "pus"
           ++ "/. Two modules of a build cannot have the same name.")
+
+  it "takes the text given for a module of the project, of a test and of a local folder" $
+    withLoaded $ \project -> do
+      let texts = M.fromList [ (file, "not termina") | file <- ["src/obdh/tm.fin", "tests/hk/src/hk/h.fin", "libs/drivers/src/drivers/uart.fin"] ]
+          changed = withTexts texts project
+          locals = ML.unions (map packageModules (M.elems (loadedLocals changed)))
+      textOf "src/obdh/tm.fin" (loadedProjectModules changed) `shouldBe` Just "not termina"
+      textOf "tests/hk/src/hk/h.fin" (loadedProjectModules changed) `shouldBe` Just "not termina"
+      textOf "libs/drivers/src/drivers/uart.fin" locals `shouldBe` Just "not termina"
+      textOf "libs/drivers/src/support/fake.fin" locals `shouldBe` Just ""
+
+  it "leaves out the text of a file that the project does not have" $
+    withLoaded $ \project ->
+      ML.member "src/obdh/new.fin" (loadedProjectModules (withTexts (M.singleton "src/obdh/new.fin" "") project)) `shouldBe` False
+
+-- | The text of a module file, parsed or not.
+textOf :: FilePath -> ParsedFiles -> Maybe T.Text
+textOf file files = either failedText (Just . fst) =<< ML.lookup file files
+
+  where
+
+    failedText (InvalidSyntax text _) = Just text
+    failedText NotUtf8 = Nothing
