@@ -14,7 +14,7 @@ import Command.Common (loadTerminaModule, loadModules)
 import Command.Deliver (deliverableInfo)
 import Command.Sources (LoadedProject(..), buildSources, readProject)
 import Configuration.Configuration
-import Configuration.Platform (Platform(..), callSite, checkPlatform, gdbServerPort, xsdbServerPort)
+import Configuration.Platform (Platform(..), callSite, checkPlatform, gdbServerPort)
 import Runner.Analysis (TestResult(TestResult), Run(..), RunEnd(..), AddressKind(..), analyse, addressesOf, renderReport, exitCodeOf)
 import Runner.Descriptor (Descriptor(..), DescriptorCase, Symbols(..), readDescriptor)
 import qualified Runner.Descriptor as D
@@ -295,14 +295,58 @@ data Servers = Servers (String, Maybe Int) (String, Maybe Int)
 xsdbScript :: FilePath
 xsdbScript = "assets" </> "xsdb" </> "init" <.> "tcl"
 
--- | The commands of the console that reset a board and load the binary; the
--- PYNQ is prepared before with the XSDB script of the project
-launchSequence :: Platform -> [String]
-launchSequence plt =
-    case plt of
-        FreeRTOS10STM32L432NUCLEOL432KC -> ["monitor reset", "load"]
-        RTEMS5LEON3SFNEXYSA7 -> ["monitor reset", "load"]
-        _ -> ["load"]
+-- | How the binary of a test is launched on a platform.
+data Target = Target {
+    -- | The test runs on a board, and its binary is read with the tools of the
+    -- cross toolchain
+    targetBoard :: Bool,
+    targetLauncher :: Launcher,
+    -- | What is done before each run
+    targetPrepare :: IO (Either String ())
+  }
+
+-- | The target of a platform.
+targetOf :: Platform -> Executor -> Servers -> Target
+targetOf POSIXGCC ProcessExecutor _ = Target False AsProcess (return (Right ()))
+targetOf POSIXGCC GdbExecutor _ = Target False (UnderGdb "gdb" NativeProcess) (return (Right ()))
+targetOf RTEMS5LEON3SFNEXYSA7 _ servers = boardTarget RTEMS5LEON3SFNEXYSA7 ["monitor reset", "load"] servers
+targetOf FreeRTOS10STM32L432NUCLEOL432KC _ servers = boardTarget FreeRTOS10STM32L432NUCLEOL432KC ["monitor reset", "load"] servers
+-- | The PYNQ is prepared before each run by its XSDB server, which sources the
+-- script of the project. The script resets the board, initializes its PS and
+-- loads its bitstream. The XSDB server listens on port 3122, or on the one of
+-- --xsdb.
+targetOf RTEMS6ZYNQ7000PYNQZ2 _ (Servers gdb (xsdbHost, mXsdbPort)) =
+    Target True (UnderGdb "gdb-multiarch" (RemoteServer (gdbAddress RTEMS6ZYNQ7000PYNQZ2 gdb) ["load"])) prepare
+
+  where
+
+    port = fromMaybe 3122 mXsdbPort
+
+    prepare = do
+        hasScript <- doesFileExist xsdbScript
+        if not hasScript
+            then return (Left ("the " ++ show RTEMS6ZYNQ7000PYNQZ2 ++ " is prepared before each run with "
+                ++ xsdbScript ++ ", which resets the board, initializes its PS and loads its bitstream, and the project has none"))
+            else do
+                done <- prepareBoard xsdbHost port xsdbScript
+                return (either (Left . notPrepared) Right done)
+
+    notPrepared err = "the XSDB server at " ++ xsdbHost ++ ":" ++ show port ++ " did not prepare the board: "
+        ++ err ++ "; it is started from the root of the project with xsdb -eval \"xsdbserver start -port "
+        ++ show port ++ "; vwait forever\""
+
+targetOf TestPlatform _ _ = error "no test runs on the test platform"
+
+-- | A board under gdb-multiarch, through its GDB server.
+-- The commands given reset the board and load the binary.
+boardTarget :: Platform -> [String] -> Servers -> Target
+boardTarget plt commands (Servers gdb _) =
+    Target True (UnderGdb "gdb-multiarch" (RemoteServer (gdbAddress plt gdb) commands)) (return (Right ()))
+
+-- | The address of the GDB server of a board: its host, and the port given or
+-- the one of the platform.
+gdbAddress :: Platform -> (String, Maybe Int) -> String
+gdbAddress plt (host, mPort) = host ++ ":" ++ maybe "" show (maybe (gdbServerPort plt) Just mPort)
 
 invalid :: TerminaConfig -> String -> TestResult
 invalid config reason = TestResult (labelOf config) (Just reason) [] Nothing
@@ -315,68 +359,46 @@ data Planned = Planned Integer [DescriptorCase] FilePath FilePath
 -- the toolchain, natively or through the GDB server of a board
 data Launcher = AsProcess | UnderGdb FilePath GdbTarget
 
--- | Runs a test that is built: on posix as a process or under gdb, and on a
--- board under the GDB of its toolchain, through its GDB server at the host and
--- at the port of the platform or of --gdb; the PYNQ is prepared before each
--- run through its XSDB server
+-- | Run a test that is built on the target of its platform, and write its
+-- report. With --record, it decodes the record of a previous run instead.
 runDeployment :: Executor -> Servers -> Mode -> Deployment -> IO Int
-runDeployment executor (Servers (host, mPort) (xsdbHost, mXsdbPort)) mode deployment = do
+runDeployment executor servers mode deployment = do
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
         folder = outputFolder config
         binary = folder </> "bin" </> T.unpack (name config)
-        board = plt /= POSIXGCC
-        address = host ++ ":" ++ maybe "" show (maybe (gdbServerPort plt) Just mPort)
-        xsdbPort = maybe (xsdbServerPort plt) Just mXsdbPort
+        target = targetOf plt executor servers
+        -- | The debugger that runs the test, which a record does not need
+        debugger = case (targetLauncher target, mode) of
+            (_, Recorded _) -> Nothing
+            (UnderGdb gdb _, _) -> Just gdb
+            (AsProcess, _) -> Nothing
     loaded <- readDescriptor (folder </> "test" <.> "json")
     case loaded of
       Left err -> do
         evidence <- evidenceOf config mode Nothing (executorOf executor plt)
         finish config evidence Nothing M.empty (invalid config ("its descriptor cannot be read: " ++ err))
       Right descriptor -> do
-        prefix <- if board
+        prefix <- if targetBoard target
             then M.findWithDefault "" "EXPANDED_CROSS" <$> deliverableInfo (labelOf config) folder
             else return ""
-        let fromRecord = case mode of
-                Recorded _ -> True
-                _ -> False
-            -- The boards run under gdb-multiarch, and posix under the gdb of the host
-            debugger = if board then "gdb-multiarch" else "gdb"
-            usesGdb = (board || executor == GdbExecutor) && not fromRecord
-            launcher =
-                if board then UnderGdb debugger (RemoteServer address (launchSequence plt))
-                else if executor == GdbExecutor then UnderGdb debugger NativeProcess
-                else AsProcess
-        found <- if usesGdb then findExecutable debugger else return Nothing
+        found <- maybe (return Nothing) findExecutable debugger
         version <- maybe (return Nothing) debuggerVersion found
         evidence <- (\e -> e { evidenceDebugger = version })
             <$> evidenceOf config mode (descriptorTimeout descriptor) (executorOf executor plt)
-        hasScript <- doesFileExist xsdbScript
-        let available = if usesGdb && found == Nothing
-                then Left (debugger ++ ", which runs the test" ++ (if board then " on the board" else "")
-                           ++ ", is not in the PATH")
-                else Right ()
-            prepared = case (xsdbPort, fromRecord) of
-                (Nothing, _) -> Right Nothing
-                (_, True) -> Right Nothing
-                (Just port, False) -> if hasScript then Right (Just port)
-                    else Left ("the " ++ show plt ++ " is prepared before each run with " ++ xsdbScript
-                               ++ ", which resets the board, initializes its PS and loads its bitstream, and the project has none")
-        case available >> prepared >> plan folder descriptor of
+        let available = case (debugger, found) of
+                (Just gdb, Nothing) -> Left (gdb ++ ", which runs the test"
+                    ++ (if targetBoard target then " on the board" else "") ++ ", is not in the PATH")
+                _ -> Right ()
+        case available >> plan folder descriptor of
           Left err -> finish config evidence (Just descriptor) M.empty (invalid config err)
           Right planned -> do
             stamp <- stampAddress prefix binary
             either (putStrLn . warnMessage) (const (return ())) stamp
-            let prepare = case either (const Nothing) id prepared of
-                    Nothing -> return (Right ())
-                    Just port -> do
-                        done <- prepareBoard xsdbHost port xsdbScript
-                        return $ either (\err -> Left ("the XSDB server at " ++ xsdbHost ++ ":" ++ show port
-                            ++ " did not prepare the board: " ++ err ++ "; it is started from the root of the project with xsdb -eval \"xsdbserver start -port "
-                            ++ show port ++ "; vwait forever\"")) Right done
-                run p = case mode of
+            let run p = case mode of
                     Recorded given -> readRecord (platformLayout plt) descriptor (either (const Nothing) Just stamp) given
-                    _ -> prepare >>= either (return . Left) (const (execute config launcher (platformLayout plt) descriptor binary (either (const Nothing) Just stamp) p))
+                    _ -> targetPrepare target >>= either (return . Left)
+                        (const (execute config (targetLauncher target) (platformLayout plt) descriptor binary (either (const Nothing) Just stamp) p))
             ran <- runAll run planned
             case ran of
               Left err -> finish config evidence (Just descriptor) M.empty (invalid config err)
