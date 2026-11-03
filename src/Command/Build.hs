@@ -506,7 +506,7 @@ checkDeployment chatty project deployment = do
         $ sortProjectDepsOrLoop projectDependencies
     when chatty (putStrLn . debugMessage $ "Checking project modules")
     checked <- orDieWithFailure (projectSourceFiles parsedProject)
-      (checkModules config plt parsedProject orderedDependencies)
+      (snd (checkModules config plt parsedProject orderedDependencies))
     return (CheckedDeployment sources parsedProject orderedDependencies checked)
 
 -- | Type check the exported modules of a library and the modules they import.
@@ -532,8 +532,8 @@ checkExportedModules chatty project = do
                 sysReadInputBufferSize = manifestReadBufSize manifest,
                 deploymentKind = TestBuild "library"
               }
-        void (orDieWithFailure (projectSourceFiles parsedModules)
-          (typeProject (makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)) parsedModules orderedModules))
+        orDieWithFailure (projectSourceFiles parsedModules)
+          (maybe (Right ()) Left (snd (typeProject (makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)) parsedModules orderedModules)))
 
   where
 

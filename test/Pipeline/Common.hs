@@ -4,6 +4,7 @@ module Pipeline.Common
   , runChecksReport
   , runFullProjectApp
   , runTypedModule
+  , runTypedModules
   , renderMainFile
   , renderMainFileOn
   , renderInitFile
@@ -143,9 +144,23 @@ runProjectPipeline cfg sources = do
   let files = M.fromList [ (qname, pack src) | (qname, src) <- sources ]
   parsedProject <- M.fromList <$> mapM parseModule sources
   ordered <- orderModules parsedProject
-  checked <- checkedOrFailure files (checkModules cfg TestPlatform parsedProject ordered)
+  checked <- checkedOrFailure files (snd (checkModules cfg TestPlatform parsedProject ordered))
   pure (PipelineResult (checkedLowered checked) ordered (checkedArchitecture checked)
     (checkedElaborated checked) (checkedReports checked))
+
+-- | The modules of a project that keep their types after its checks, and the
+-- code of the error that stops them.
+runTypedModules :: [(QualifiedName, String)] -> ([QualifiedName], Maybe String)
+runTypedModules sources = either (\f -> ([], Just (code f))) id $ do
+  let files = M.fromList [ (qname, pack src) | (qname, src) <- sources ]
+  parsedProject <- M.fromList <$> mapM parseModule sources
+  ordered <- orderModules parsedProject
+  let (typedProject, result) = checkModules configParams TestPlatform parsedProject ordered
+  pure (M.keys typedProject, either (Just . code) (const Nothing) (checkedOrFailure files result))
+
+  where
+
+    code = T.unpack . failCode
 
 -- | The typed AST of one module of a project, which is the stage the language
 -- server keeps and the one its index is built from. The stages after it, basic
@@ -156,7 +171,8 @@ runTypedModule target sources = do
   let files = M.fromList [ (qname, pack src) | (qname, src) <- sources ]
   parsedProject <- M.fromList <$> mapM parseModule sources
   ordered <- orderModules parsedProject
-  typedProject <- checkedOrFailure files (typeProject (initialEnv configParams) parsedProject ordered)
+  let (typedProject, typeFailure) = typeProject (initialEnv configParams) parsedProject ordered
+  checkedOrFailure files (maybe (Right ()) Left typeFailure)
   pure (typedAST . metadata $ typedProject M.! target)
 
 -- | Render the generated @main@ file (task/emitter installation, the app init

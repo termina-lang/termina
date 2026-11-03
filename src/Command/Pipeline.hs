@@ -40,20 +40,29 @@ data CheckedModules = CheckedModules {
   }
 
 -- | Check the modules of a deployment, given in the order in which they are
--- type checked.
-checkModules :: TerminaConfig -> Platform -> ParsedProject -> [QualifiedName] -> Either CheckFailure CheckedModules
-checkModules config plt parsedProject orderedModules = do
-    let initialEnv = makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)
-    typedProject <- typeProject initialEnv parsedProject orderedModules
-    rawLoweredProject <- lowerModules typedProject
-    maybe (Right ()) Left (loweredChecks rawLoweredProject)
-    (loweredProject, constEnvs) <- foldProject config plt rawLoweredProject orderedModules
-    valueEvidence <- analyseValues plt constEnvs loweredProject orderedModules
-    let (elaboratedProject, checksReports) = elaborateProject valueEvidence loweredProject
-    sideEffectCheck plt elaboratedProject
-    programArchitecture <- genProjectArchitecture (getPlatformInitialProgram config plt) loweredProject orderedModules
-    architectureCheck orderedModules programArchitecture
-    return (CheckedModules (monadicTypesOf typedProject) loweredProject elaboratedProject checksReports programArchitecture)
+-- type checked. It gives the modules type checked, all of them or those
+-- before the first type error, and the result of the checks.
+checkModules :: TerminaConfig -> Platform -> ParsedProject -> [QualifiedName]
+  -> (TypedProject, Either CheckFailure CheckedModules)
+checkModules config plt parsedProject orderedModules =
+    (typedProject, maybe (checkTyped typedProject) Left typeFailure)
+
+  where
+
+    initialEnv = makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)
+
+    (typedProject, typeFailure) = typeProject initialEnv parsedProject orderedModules
+
+    checkTyped typed = do
+        rawLoweredProject <- lowerModules typed
+        maybe (Right ()) Left (loweredChecks rawLoweredProject)
+        (loweredProject, constEnvs) <- foldProject config plt rawLoweredProject orderedModules
+        valueEvidence <- analyseValues plt constEnvs loweredProject orderedModules
+        let (elaboratedProject, checksReports) = elaborateProject valueEvidence loweredProject
+        sideEffectCheck plt elaboratedProject
+        programArchitecture <- genProjectArchitecture (getPlatformInitialProgram config plt) loweredProject orderedModules
+        architectureCheck orderedModules programArchitecture
+        return (CheckedModules (monadicTypesOf typed) loweredProject elaboratedProject checksReports programArchitecture)
 
 -- | Obtain the basic-block AST of the modules.
 lowerModules :: TypedProject -> Either CheckFailure LoweredProject
@@ -78,21 +87,23 @@ architectureCheck :: [QualifiedName] -> TerminaProgArch SemanticAnn -> Either Ch
 architectureCheck orderedModules = either (Left . checkFailure) Right . runArchitectureChecks orderedModules
 
 -- | Type check the modules of a project in order, starting from an
--- environment.
-typeProject :: Environment -> ParsedProject -> [QualifiedName] -> Either CheckFailure TypedProject
+-- environment. It gives the modules type checked up to the first error, and
+-- the error.
+typeProject :: Environment -> ParsedProject -> [QualifiedName] -> (TypedProject, Maybe CheckFailure)
 typeProject initialEnv parsedProject =
     typeModules M.empty (addDeclaredNames (projectDeclaredNames parsedProject) initialEnv)
 
   where
 
-    typeModules typedProject _ [] = Right typedProject
-    typeModules typedProject env (m:ms) = do
+    typeModules typedProject _ [] = (typedProject, Nothing)
+    typeModules typedProject env (m:ms) =
       let parsedModule = parsedProject M.! m
           vmods = S.fromList $ getVisibleModules (M.map visibleModules typedProject) (importedModules parsedModule)
-      (typedProgram, env') <- either (Left . checkFailure) Right $
-        runTypeChecking env (typeTerminaModule (S.insert m vmods) . parsedAST . metadata $ parsedModule)
-      let typedModule = parsedModule { visibleModules = S.toList vmods, metadata = SemanticData typedProgram }
-      typeModules (M.insert m typedModule typedProject) env' ms
+      in case runTypeChecking env (typeTerminaModule (S.insert m vmods) . parsedAST . metadata $ parsedModule) of
+          Left err -> (typedProject, Just (checkFailure err))
+          Right (typedProgram, env') ->
+            let typedModule = parsedModule { visibleModules = S.toList vmods, metadata = SemanticData typedProgram }
+            in typeModules (M.insert m typedModule typedProject) env' ms
 
 -- | Fold the constants of the modules in order. The constants of a module are
 -- passed on to the modules after it.

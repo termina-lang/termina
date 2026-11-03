@@ -28,6 +28,15 @@ mainModule =
 project :: [(String, String)]
 project = [("lib/types", libTypes), ("test", mainModule)]
 
+-- | The main module with a function that returns a value of another type.
+brokenModule :: String
+brokenModule =
+    "import lib.types;\n" ++
+    "\n" ++
+    "function bad() -> u32 {\n" ++
+    "    return true;\n" ++
+    "}"
+
 spec :: Spec
 spec = do
   describe "Full pipeline across multiple modules" $ do
@@ -35,3 +44,7 @@ spec = do
       goldenC "multimodule_main" (buildAndRenderModule "test" project)
     it "Renders the imported type-provider module" $
       goldenC "multimodule_lib_types" (buildAndRenderModule "lib/types" project)
+    it "Keeps the types of every module when the checks pass" $
+      runTypedModules project `shouldBe` (["lib/types", "test"], Nothing)
+    it "Keeps the types of the modules before a type error" $
+      runTypedModules [("lib/types", libTypes), ("test", brokenModule)] `shouldBe` (["lib/types"], Just "SE-238")
