@@ -12,7 +12,7 @@ import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment
 import Command.Dependencies (Fetching(..), FetchingCommand(..))
 import Command.Project (Dependencies(..), loadProject)
 import Command.Common (loadMainModule, orderedModules, sourceTexts)
-import Command.Provenance (deliverableInfo)
+import Command.Provenance (buildInfo)
 import Command.Sources (LoadedProject(..), buildSources, readProject)
 import Configuration.Configuration
 import Configuration.Platform (Platform(..), callSite, checkPlatform, gdbServerPort)
@@ -364,7 +364,7 @@ runDeployment withGdb servers mode deployment = do
         finish config evidence Nothing M.empty (invalid config ("its descriptor cannot be read: " ++ err))
       Right descriptor -> do
         prefix <- if targetBoard target
-            then M.findWithDefault "" "EXPANDED_CROSS" <$> deliverableInfo (labelOf config) folder
+            then M.findWithDefault "" "EXPANDED_CROSS" <$> buildInfo (labelOf config) folder
             else return ""
         found <- maybe (return Nothing) findExecutable debugger
         version <- maybe (return Nothing) debuggerVersion found

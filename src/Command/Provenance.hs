@@ -7,7 +7,7 @@
 module Command.Provenance (
     provenanceFields,
     writeProvenanceFile,
-    deliverableInfo,
+    buildInfo,
     readHashes,
     terminaVersion
 ) where
@@ -79,12 +79,12 @@ writeProvenanceFile folder fields =
     keys = ["name", "deployment", "platform", "profile", "termina", "osal", "compiler", "binary", "modules", "files",
             "path", "module", "origin", "source", "object"]
 
--- | The values that the deliverable-info target of the generated Makefile
+-- | The values that the build-info target of the generated Makefile
 -- prints, one per line, as "NAME=value", and "VAR NAME=value" for the
 -- variables of the OSAL and of the toolchain.
-deliverableInfo :: String -> FilePath -> IO (M.Map String String)
-deliverableInfo label folder = do
-    (code, out, err) <- readProcessWithExitCode "make" ["-s", "--no-print-directory", "-C", folder, "deliverable-info"] ""
+buildInfo :: String -> FilePath -> IO (M.Map String String)
+buildInfo label folder = do
+    (code, out, err) <- readProcessWithExitCode "make" ["-s", "--no-print-directory", "-C", folder, "build-info"] ""
     case code of
         ExitSuccess -> return . M.fromList . map (fmap (drop 1) . break (== '=')) . filter ('=' `elem`) . lines $ out
         ExitFailure _ -> dieWithError $ "make failed to give the values of the build of " ++ label ++ ":\n" ++ err

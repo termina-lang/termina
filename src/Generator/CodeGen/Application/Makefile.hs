@@ -123,8 +123,8 @@ genMakefile params loweredProject externs unitTest =
             -- | The resolved values that termina deliver writes into the flat
             -- Makefile of the deliverable, one per line. CROSS goes
             -- unexpanded, so that it keeps the variable of the toolchain.
-            MRule ".PHONY" ["deliverable-info"] [],
-            MRule "deliverable-info" [] $
+            MRule ".PHONY" ["build-info"] [],
+            MRule "build-info" [] $
                 map (\v -> MakeCommand False [MFragment $ "$(info " ++ v ++ "=$(" ++ v ++ "))"]) deliverableVariables
                 ++ [
                     MakeCommand False [MFragment "$(info CROSS=$(value CROSS))"],

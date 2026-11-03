@@ -2,7 +2,7 @@
 -- and rewrites their paths for the flat Makefile of the deliverable.
 module Configuration.DeliverSpec (spec) where
 
-import Command.Deliver (dependencies, inFolder, pathsIn, relocate, toolchainVariables)
+import Command.Deliver (dependencies, inFolder, pathsIn, relocatePaths, toolchainVariables)
 
 import Data.List (isPrefixOf)
 import qualified Data.Map.Strict as M
@@ -51,26 +51,26 @@ spec = describe "termina deliver" $ do
       filter ("/" `isPrefixOf`) (concatMap pathsIn ["-T/opt/termina/osal/x.ld", "-Wl,-Map=/a/b.map", "-isystem", "/opt/rcc/include"])
         `shouldBe` ["/opt/termina/osal/x.ld", "/a/b.map", "/opt/rcc/include"]
 
-  describe "relocate" $ do
+  describe "relocatePaths" $ do
 
     it "makes the output folder the folder of the deliverable" $
-      map (relocate substitutions) ["/home/u/obdh/output/app/include", "/home/u/obdh/output/app"]
+      map (relocatePaths substitutions) ["/home/u/obdh/output/app/include", "/home/u/obdh/output/app"]
         `shouldBe` ["include", "."]
 
     it "moves the OSAL to its folder in the deliverable" $
-      relocate substitutions "-T/opt/termina/osal/platform/x.ld" `shouldBe` "-Tosal/platform/x.ld"
+      relocatePaths substitutions "-T/opt/termina/osal/platform/x.ld" `shouldBe` "-Tosal/platform/x.ld"
 
     it "writes back the variable of the toolchain" $
-      relocate substitutions "-B/opt/rcc/lib" `shouldBe` "-B$(TERMINA_RCC_DIR)/lib"
+      relocatePaths substitutions "-B/opt/rcc/lib" `shouldBe` "-B$(TERMINA_RCC_DIR)/lib"
 
     it "leaves a folder that only contains another as its middle part" $
-      relocate substitutions "/home/u/opt/rcc/lib" `shouldBe` "/home/u/opt/rcc/lib"
+      relocatePaths substitutions "/home/u/opt/rcc/lib" `shouldBe` "/home/u/opt/rcc/lib"
 
     it "leaves a folder that only shares the beginning of the name" $
-      relocate substitutions "/opt/rcc-1.3.2/bin" `shouldBe` "/opt/rcc-1.3.2/bin"
+      relocatePaths substitutions "/opt/rcc-1.3.2/bin" `shouldBe` "/opt/rcc-1.3.2/bin"
 
     it "rewrites a path after a comma and an =" $
-      relocate substitutions "-Wl,-Map=/home/u/obdh/output/app/bin/x.map" `shouldBe` "-Wl,-Map=bin/x.map"
+      relocatePaths substitutions "-Wl,-Map=/home/u/obdh/output/app/bin/x.map" `shouldBe` "-Wl,-Map=bin/x.map"
 
   describe "toolchainVariables" $ do
 

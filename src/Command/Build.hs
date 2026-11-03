@@ -47,7 +47,7 @@ import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
 import EFP.Schedulability.WCEPath.Printer
 import Command.Common
 import Command.Pipeline (CheckedModules(..), checkModules)
-import Command.Provenance (deliverableInfo, provenanceFields, readHashes, writeProvenanceFile)
+import Command.Provenance (buildInfo, provenanceFields, readHashes, writeProvenanceFile)
 import Command.Extern (ExternGroup, parsedExterns, prepareExtern, verifyLoadedExterns)
 import Configuration.ExternCheck (checkExternModules)
 import ControlFlow.Architecture.Types
@@ -405,7 +405,7 @@ buildDeployment args project deployment = do
     let config = deploymentConfig deployment
     runMake (deploymentLabel deployment) (outputFolder config) []
     runMake (deploymentLabel deployment) (outputFolder config) ["-s", "stripped-hashes"]
-    info <- deliverableInfo (deploymentLabel deployment) (outputFolder config)
+    info <- buildInfo (deploymentLabel deployment) (outputFolder config)
     hashes <- readHashes (outputFolder config </> "bin" </> "stripped.sha256")
     provenanceFields config info hashes modules >>= writeProvenanceFile (outputFolder config)
     return built

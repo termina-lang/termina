@@ -7,13 +7,13 @@
 -- the #line pragmas.
 module Command.Deliver (
     deliverCmdArgsParser, deliverCommand, DeliverCmdArgs,
-    dependencies, inFolder, pathsIn, relocate, toolchainVariables, deliverableInfo
+    dependencies, inFolder, pathsIn, relocatePaths, toolchainVariables
 ) where
 
 import Command.Build
 import Command.Extern (ExternGroup(..), groupObject, groupObjects)
 import Command.Project (Dependencies(..), loadProject)
-import Command.Provenance (deliverableInfo, provenanceFields, readHashes, writeProvenanceFile)
+import Command.Provenance (buildInfo, provenanceFields, readHashes, writeProvenanceFile)
 import Command.Sources (LoadedProject(..))
 import Command.Utils
 import Configuration.Configuration
@@ -102,12 +102,12 @@ deliverDeployment chatty loaded archive withTrace deployment = do
     -- | The build with the #line pragmas gives the values of the Makefile,
     -- the dependency files and the binary to compare with
     (modules, externs) <- buildDeployment (BuildCmdArgs chatty False Nothing SelectApp Nothing Nothing True) loaded deployment
-    info <- deliverableInfo label built
+    info <- buildInfo label built
     let value key = M.findWithDefault "" key info
         list key = words (value key)
         osalDir = dropTrailingPathSeparator (value "TERMINA_OSAL_DIR")
         outDir = dropTrailingPathSeparator (value "R")
-        relocated = relocate (deliverableSubstitutions info)
+        relocated = relocatePaths (deliverableSubstitutions info)
     -- | The values of make are lists separated by spaces, and the paths in
     -- them are rewritten by their folder, so both folders must be absolute
     -- and have no spaces
@@ -240,16 +240,16 @@ pathsIn word = [ path | part <- wordParts word, let (_, path, _) = splitPart par
 -- | Replace the paths of a word. A path is replaced by the longest folder of
 -- the substitutions that it is or that it lies in; the output folder becomes
 -- the folder of the deliverable itself.
-relocate :: [(String, String)] -> String -> String
-relocate substitutions = concatMap relocatePart . wordParts
+relocatePaths :: [(String, String)] -> String -> String
+relocatePaths substitutions = concatMap relocatePart . wordParts
 
   where
 
     relocatePart part =
       let (option, path, delimiter) = splitPart part in
-      option ++ relocatePath path ++ delimiter
+      option ++ replacePath path ++ delimiter
 
-    relocatePath path =
+    replacePath path =
       case [ (old, new) | (old, new) <- sortOn (negate . length . fst) substitutions, not (null old), old == path || inFolder old path ] of
         [] -> path
         (old, new) : _ ->
@@ -351,19 +351,19 @@ genDeliverableMakefile config info osalSources sources externs testQNames =
     -- which the target that printed the values named after itself, goes
     -- next to the binary.
     flags key = unwords
-        . map (replaceMap . relocate substitutions)
+        . map (replaceMap . relocatePaths substitutions)
         . filter (not . ("-ffile-prefix-map=" `isPrefixOf`))
         . words $ value key
 
     replaceMap tok
-        | "deliverable-info.map" `isSuffixOf` tok = take (length tok - length ("deliverable-info.map" :: String)) tok ++ "$@.map"
+        | "build-info.map" `isSuffixOf` tok = take (length tok - length ("build-info.map" :: String)) tok ++ "$@.map"
         | otherwise = tok
 
     crossTool tool =
         let cross = value "EXPANDED_CROSS" in
         if not (null cross) && cross `isPrefixOf` tool
             then "$(CROSS)" ++ drop (length cross) tool
-            else unwords (map (relocate substitutions) (words tool))
+            else unwords (map (relocatePaths substitutions) (words tool))
 
     hasAssembly = any ((== ".s") . takeExtension) osalSources
 
