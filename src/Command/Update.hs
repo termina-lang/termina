@@ -19,7 +19,7 @@ import System.FilePath
 
 import Command.Dependencies
 import Command.Project (Dependencies(..), loadProject)
-import Command.Utils (Place, currentPlace, dieWithFirstError, infoMessage, loadLock, warnMessage)
+import Command.Utils (Place, currentPlace, dieWithFirstError, infoMessage, loadLock, loadManifest, warnMessage)
 import Configuration.Fetch (resolveTag)
 import Configuration.Lock
 import Configuration.Manifest
@@ -60,10 +60,11 @@ verifyCommand _ = do
     _ <- loadProject Frozen
     putStrLn (infoMessage "vendor/ and termina.lock match termina.yaml")
 
--- | The manifest and the lock of the project in a folder.
+-- | The manifest and the lock of the project in a folder, with the folders of
+-- the project checked against the manifest.
 loadProjectFiles :: FilePath -> IO (Either [String] (Manifest, Lock))
 loadProjectFiles root = do
-    manifest <- either (Left . pure . ("termina.yaml: " ++)) Right <$> decodeManifestFile (root </> "termina.yaml")
+    manifest <- loadManifest root
     lock <- loadLock root
     return ((,) <$> manifest <*> lock)
 

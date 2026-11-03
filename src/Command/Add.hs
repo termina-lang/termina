@@ -58,7 +58,10 @@ addDependency place root url tag mTest = do
     case (,) <$> (text >>= either (Left . pure) Right . prepare) <*> lockResult of
         Left errs -> return (Left errs)
         Right ((newText, manifest), lock) -> do
-            synced <- syncDependencies place (Reuse AddCommand) True root manifest lock
+            layoutErrors <- checkLayout root manifest
+            synced <- if null layoutErrors
+                then syncDependencies place (Reuse AddCommand) True root manifest lock
+                else return (Left layoutErrors)
             case synced of
                 Left errs -> return (Left errs)
                 Right (Sync changes warnings _ _) -> do

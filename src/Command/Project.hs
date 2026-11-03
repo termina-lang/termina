@@ -30,7 +30,7 @@ data Dependencies =
 -- that they are.
 loadProject :: Dependencies -> IO LoadedProject
 loadProject dependencies = do
-    manifest <- loadManifest >>= either dieWithFirstError return
+    manifest <- loadManifest "." >>= either dieWithFirstError return
     own <- readProjectModules "." manifest
     -- | Read the modules that the extern sections name.
     -- A module that does not parse stops with the error of the parser.

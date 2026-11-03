@@ -265,15 +265,15 @@ projectSourceFiles =
 orDieWithFailure :: M.Map FilePath T.Text -> Either CheckFailure a -> IO a
 orDieWithFailure files = either (\failure -> dieWithReport (failureMessage failure files)) return
 
--- | Load "termina.yaml" and check the folders of the project against it,
--- giving every problem found.
-loadManifest :: (MonadIO m) => m (Either [String] Manifest)
-loadManifest = liftIO $ do
-    result <- decodeManifestFile "termina.yaml"
+-- | Load the "termina.yaml" of a project, given its folder, and check the
+-- folders of the project against it, giving every problem found.
+loadManifest :: (MonadIO m) => FilePath -> m (Either [String] Manifest)
+loadManifest root = liftIO $ do
+    result <- decodeManifestFile (root </> "termina.yaml")
     case result of
         Left err -> return (Left ["termina.yaml: " ++ err])
         Right manifest -> do
-            layoutErrors <- checkLayout "." manifest
+            layoutErrors <- checkLayout root manifest
             return $ if null layoutErrors then Right manifest else Left layoutErrors
 
 -- | Load the "termina.lock" of a project, which is empty when there is none.

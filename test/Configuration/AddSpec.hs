@@ -14,7 +14,7 @@ import Configuration.Lock
 import Configuration.Manifest (decodeManifest)
 
 import Control.Exception (bracket_)
-import Control.Monad (forM_, void)
+import Control.Monad (forM_, void, when)
 import qualified Data.ByteString.Char8 as BS
 import Data.List (intercalate, isInfixOf, isPrefixOf)
 import qualified Data.Text as T
@@ -56,6 +56,12 @@ withProject label tests action = do
     createDirectoryIfMissing True repos
     createDirectoryIfMissing True project
     writeFile (project </> "termina.yaml") (header "app" ++ "app:\n  platform: posix-gcc\n  profile: release\n" ++ tests)
+    -- | The folders that the manifest asks for: app/ and the one of the test hk
+    createDirectoryIfMissing True (project </> "app")
+    writeFile (project </> "app" </> "app.fin") ""
+    when ("hk:" `isInfixOf` tests) $ do
+        createDirectoryIfMissing True (project </> "tests" </> "hk")
+        writeFile (project </> "tests" </> "hk" </> "test.fin") ""
     bracket_
         (setEnv "GIT_CONFIG_COUNT" "1" >> setEnv "GIT_CONFIG_KEY_0" ("url.file://" ++ repos ++ "/.insteadOf")
             >> setEnv "GIT_CONFIG_VALUE_0" "https://example.invalid/")
@@ -104,6 +110,15 @@ spec = do
         result `shouldSatisfy` either (any ("version conflict on example.invalid/acme/hal" `isInfixOf`)) (const False)
         mapM (BS.readFile . (project </>)) ["termina.yaml", "termina.lock"] `shouldReturn` original
         doesDirectoryExist (project </> "vendor" </> "example.invalid" </> "acme" </> "boards") `shouldReturn` False
+
+    it "refuses a project whose folders do not match its manifest, as update does" $
+      withProject "layout" "" $ \repos project -> do
+        library repos "pus" [] "v0.1.0"
+        removeFile (project </> "app" </> "app.fin")
+        removeDirectory (project </> "app")
+        let noApp = Left ["termina.yaml: the manifest has an app section but there is no app/ folder"]
+        add project "pus" "v0.1.0" Nothing `shouldReturn` noApp
+        fmap (const ()) <$> updateDependencies Computer project Nothing `shouldReturn` noApp
 
     it "refuses a package that is not a library" $
       withProject "invalid" "" $ \repos project -> do

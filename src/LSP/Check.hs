@@ -40,7 +40,7 @@ import Text.Parsec.Pos (sourceName)
 openProject :: HandlerM ()
 openProject = do
     root <- liftIO (getCurrentDirectory >>= canonicalizePath)
-    manifestRead <- liftIO loadManifest
+    manifestRead <- liftIO (loadManifest root)
     case manifestRead of
         Left errs -> errorM (T.pack (concat (take 1 errs)))
         Right manifest -> do
