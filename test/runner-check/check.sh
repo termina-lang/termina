@@ -43,15 +43,15 @@ frame() {
 check expected.txt
 check expected-isolated.txt outcomes --isolated
 
-# The executor of the boards, under the native gdb
+# The binaries under the native gdb, as on the boards
 if command -v gdb >/dev/null 2>&1; then
-    check expected.txt --executor gdb
-    check expected-isolated.txt outcomes --isolated --executor gdb
-    check expected-exception.txt exception --executor gdb
+    check expected.txt --with-gdb
+    check expected-isolated.txt outcomes --isolated --with-gdb
+    check expected-exception.txt exception --with-gdb
     frame "runner_at at src/runner/values.fin:8"
     frame "CException__out_of_bounds at tests/exception/test.fin:17"
 else
-    echo "gdb not found: the executor of gdb is not checked"
+    echo "gdb not found: --with-gdb is not checked"
 fi
 
 if [ "$failed" -eq 0 ]; then

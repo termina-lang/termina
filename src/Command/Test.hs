@@ -71,7 +71,7 @@ data TestCmdArgs =
         (Maybe String) -- ^ Only this case
         Bool -- ^ Run each case in a process of its own
         (Maybe FilePath) -- ^ The folder of a record dumped outside the runner
-        (Maybe Executor) -- ^ How the binary of a test is run
+        Bool -- ^ Run the binary of posix-gcc under gdb
         (Maybe Server) -- ^ The GDB server of the board
         (Maybe Server) -- ^ The XSDB command server of the PYNQ
         Bool -- ^ Fail instead of fetching the dependencies
@@ -101,10 +101,8 @@ testCmdArgsParser = TestCmdArgs
           ( O.long "record"
           <> O.metavar "FOLDER"
           <> O.help "Report the record that a debugging session dumped to FOLDER/header.bin and FOLDER/area.bin, without building nor running"))
-    <*> O.optional (O.option (O.eitherReader readExecutor)
-          ( O.long "executor"
-          <> O.metavar "process|gdb"
-          <> O.help "On posix-gcc, run the binary as a process (default) or under gdb, as on a board"))
+    <*> O.switch (O.long "with-gdb"
+        <> O.help "On posix-gcc, run the binary under gdb, which gives the backtrace of an exception")
     <*> O.optional (O.option (O.eitherReader (readServer "GDB server"))
           ( O.long "gdb"
           <> O.metavar "HOST[:PORT]"
@@ -129,13 +127,6 @@ testCmdArgsParser = TestCmdArgs
             "release" -> Right Release
             other -> Left $ "Unknown profile: " ++ other ++ " (use debug or release)"
 
-    readExecutor :: String -> Either String Executor
-    readExecutor executorName =
-        case executorName of
-            "process" -> Right ProcessExecutor
-            "gdb" -> Right GdbExecutor
-            other -> Left $ "Unknown executor: " ++ other ++ " (use process or gdb)"
-
     -- | A host, or a host and a port after the last colon
     readServer :: String -> String -> Either String Server
     readServer kind text =
@@ -146,10 +137,6 @@ testCmdArgsParser = TestCmdArgs
                     then Right (Server (reverse host) (Just (read (reverse port))))
                     else Left ("the " ++ kind ++ " " ++ text ++ " is not HOST or HOST:PORT")
             _ -> if null text then Left ("the " ++ kind ++ " is empty") else Right (Server text Nothing)
-
--- | How the binary of a test is run on posix: as a process of the host, or under GDB
-data Executor = ProcessExecutor | GdbExecutor
-  deriving (Eq, Show)
 
 -- | The host of a server of a board, and its port when it is not the one of the platform
 data Server = Server String (Maybe Int)
@@ -173,13 +160,13 @@ data Mode =
 
 -- | Command handler for the "test" command
 testCommand :: TestCmdArgs -> IO ()
-testCommand (TestCmdArgs mName mPlatform mProfile mCase isolated mRecord mExecutor mServer mXsdb offline list json)
+testCommand (TestCmdArgs mName mPlatform mProfile mCase isolated mRecord withGdb mServer mXsdb offline list json)
     | list = either cannotRun (const (listTests json)) (listOnly [
         (isJust mName, "the name of a test"), (isJust mPlatform, "--platform"), (isJust mProfile, "--profile"),
         (isJust mCase, "--case"), (isolated, "--isolated"), (isJust mRecord, "--record"),
-        (isJust mExecutor, "--executor"), (isJust mServer, "--gdb"), (isJust mXsdb, "--xsdb"), (offline, "--offline")])
+        (withGdb, "--with-gdb"), (isJust mServer, "--gdb"), (isJust mXsdb, "--xsdb"), (offline, "--offline")])
     | json = cannotRun "--json needs --list"
-    | otherwise = either cannotRun (runTests mName mPlatform mProfile mExecutor mServer mXsdb offline) (modeOf mName mCase isolated mRecord offline)
+    | otherwise = either cannotRun (runTests mName mPlatform mProfile withGdb mServer mXsdb offline) (modeOf mName mCase isolated mRecord offline)
 
 -- | A test that cannot be run exits with 2
 cannotRun :: String -> IO a
@@ -214,8 +201,8 @@ modeOf mName mCase isolated mRecord offline =
 -- a test cannot be built or read, also when the project cannot be loaded. A
 -- record is decoded with the binary already built, and only the manifest is
 -- read.
-runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Maybe Executor -> Maybe Server -> Maybe Server -> Bool -> Mode -> IO ()
-runTests mName mPlatform mProfile mExecutor mServer mXsdb offline mode = do
+runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Bool -> Maybe Server -> Maybe Server -> Bool -> Mode -> IO ()
+runTests mName mPlatform mProfile withGdb mServer mXsdb offline mode = do
     loaded <- try (case mode of
         Recorded _ -> (\m -> LoadedProject m M.empty M.empty M.empty) <$> (loadManifest >>= either dieWithFirstError return)
         _ -> do
@@ -234,21 +221,20 @@ runTests mName mPlatform mProfile mExecutor mServer mXsdb offline mode = do
     checked <- try (verifyLocalFolders project deployments) :: IO (Either ExitCode ())
     either (const (exitWith (ExitFailure 2))) return checked
     -- | A port in --gdb is the port of one board
-    let boards = nub [ deploymentPlatform d | d <- deployments, deploymentPlatform d /= POSIXGCC ]
+    let platforms = nub (map deploymentPlatform deployments)
+        boards = filter (/= POSIXGCC) platforms
     when (mServer /= Nothing && length boards /= 1) $
-        cannotRun ("--gdb names the GDB server of one board, and the command selects "
-            ++ (if null boards then "none" else intercalate ", " (map show boards)) ++ "; choose one with --platform")
-    when (mXsdb /= Nothing && RTEMS6ZYNQ7000PYNQZ2 `notElem` boards) $
-        cannotRun ("--xsdb names the XSDB server that prepares " ++ show RTEMS6ZYNQ7000PYNQZ2 ++ ", which the command does not select")
-    when (mExecutor == Just ProcessExecutor && not (null boards)) $
-        cannotRun ("a board runs only under GDB, and the command selects "
-            ++ intercalate ", " (map show boards) ++ "; choose " ++ show POSIXGCC ++ " with --platform")
+        cannotRun "--gdb can only be used when the tests run on a single board. Choose one with --platform"
+    when (mXsdb /= Nothing && RTEMS6ZYNQ7000PYNQZ2 `notElem` platforms) $
+        cannotRun ("--xsdb is for " ++ show RTEMS6ZYNQ7000PYNQZ2 ++ ", and no test of the selection runs on it")
+    when (withGdb && POSIXGCC `notElem` platforms) $
+        cannotRun ("--with-gdb is for " ++ show POSIXGCC ++ ", and no test of the selection runs on it")
     host <- gdbHost mServer
     let servers = Servers (host, mServer >>= \(Server _ port) -> port)
                           (maybe host (\(Server h _) -> h) mXsdb, mXsdb >>= \(Server _ port) -> port)
     codes <- case (mode, deployments) of
         -- | A record is decoded with the binary already built, which made it
-        (Recorded _, [deployment]) -> (: []) <$> runDeployment GdbExecutor servers mode deployment
+        (Recorded _, [deployment]) -> (: []) <$> runDeployment True servers mode deployment
         (Recorded _, _) -> cannotRun ("--record decodes the record of one platform, and the test has "
             ++ intercalate ", " (map (show . deploymentPlatform) deployments) ++ "; choose one with --platform")
         _ -> forM deployments $ \deployment -> do
@@ -258,9 +244,9 @@ runTests mName mPlatform mProfile mExecutor mServer mXsdb offline mode = do
                 Left _ -> do
                     let config = deploymentConfig deployment
                     createDirectoryIfMissing True (outputFolder config)
-                    evidence <- evidenceOf config mode Nothing (executorOf (maybe ProcessExecutor id mExecutor) (deploymentPlatform deployment))
+                    evidence <- evidenceOf config mode Nothing (targetLauncher (targetOf (deploymentPlatform deployment) withGdb servers))
                     finish config evidence Nothing M.empty (invalid config "it does not build")
-                Right _ -> runDeployment (maybe ProcessExecutor id mExecutor) servers mode deployment
+                Right _ -> runDeployment withGdb servers mode deployment
     let worst = maximum (0 : codes)
     if worst == 0 then exitSuccess else exitWith (ExitFailure worst)
 
@@ -282,10 +268,6 @@ gdbHost mServer =
                 Just host -> host
                 Nothing -> if marked /= Nothing || docker then "host.docker.internal" else "localhost"
 
--- | The executor of a test: a board runs only under GDB
-executorOf :: Executor -> Platform -> Executor
-executorOf executor plt = if plt /= POSIXGCC then GdbExecutor else executor
-
 -- | The host and the port of the GDB server of a board and of the XSDB server
 -- of the PYNQ, each port when it is not the one of the platform
 data Servers = Servers (String, Maybe Int) (String, Maybe Int)
@@ -305,10 +287,11 @@ data Target = Target {
     targetPrepare :: IO (Either String ())
   }
 
--- | The target of a platform.
-targetOf :: Platform -> Executor -> Servers -> Target
-targetOf POSIXGCC ProcessExecutor _ = Target False AsProcess (return (Right ()))
-targetOf POSIXGCC GdbExecutor _ = Target False (UnderGdb "gdb" NativeProcess) (return (Right ()))
+-- | The target of a platform. On posix-gcc, the binary runs under gdb when
+-- asked.
+targetOf :: Platform -> Bool -> Servers -> Target
+targetOf POSIXGCC False _ = Target False AsProcess (return (Right ()))
+targetOf POSIXGCC True _ = Target False (UnderGdb "gdb" NativeProcess) (return (Right ()))
 targetOf RTEMS5LEON3SFNEXYSA7 _ servers = boardTarget RTEMS5LEON3SFNEXYSA7 ["monitor reset", "load"] servers
 targetOf FreeRTOS10STM32L432NUCLEOL432KC _ servers = boardTarget FreeRTOS10STM32L432NUCLEOL432KC ["monitor reset", "load"] servers
 -- | The PYNQ is prepared before each run by its XSDB server, which sources the
@@ -361,13 +344,13 @@ data Launcher = AsProcess | UnderGdb FilePath GdbTarget
 
 -- | Run a test that is built on the target of its platform, and write its
 -- report. With --record, it decodes the record of a previous run instead.
-runDeployment :: Executor -> Servers -> Mode -> Deployment -> IO Int
-runDeployment executor servers mode deployment = do
+runDeployment :: Bool -> Servers -> Mode -> Deployment -> IO Int
+runDeployment withGdb servers mode deployment = do
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
         folder = outputFolder config
         binary = folder </> "bin" </> T.unpack (name config)
-        target = targetOf plt executor servers
+        target = targetOf plt withGdb servers
         -- | The debugger that runs the test, which a record does not need
         debugger = case (targetLauncher target, mode) of
             (_, Recorded _) -> Nothing
@@ -376,7 +359,7 @@ runDeployment executor servers mode deployment = do
     loaded <- readDescriptor (folder </> "test" <.> "json")
     case loaded of
       Left err -> do
-        evidence <- evidenceOf config mode Nothing (executorOf executor plt)
+        evidence <- evidenceOf config mode Nothing (targetLauncher target)
         finish config evidence Nothing M.empty (invalid config ("its descriptor cannot be read: " ++ err))
       Right descriptor -> do
         prefix <- if targetBoard target
@@ -385,7 +368,7 @@ runDeployment executor servers mode deployment = do
         found <- maybe (return Nothing) findExecutable debugger
         version <- maybe (return Nothing) debuggerVersion found
         evidence <- (\e -> e { evidenceDebugger = version })
-            <$> evidenceOf config mode (descriptorTimeout descriptor) (executorOf executor plt)
+            <$> evidenceOf config mode (descriptorTimeout descriptor) (targetLauncher target)
         let available = case (debugger, found) of
                 (Just gdb, Nothing) -> Left (gdb ++ ", which runs the test"
                     ++ (if targetBoard target then " on the board" else "") ++ ", is not in the PATH")
@@ -523,8 +506,8 @@ finish config evidence mDescriptor locations result = do
 
 -- | What ties the result to the build: the commit of the project, the hash of
 -- the binary and the hashes of provenance.json
-evidenceOf :: TerminaConfig -> Mode -> Maybe Integer -> Executor -> IO Evidence
-evidenceOf config mode seconds executor = do
+evidenceOf :: TerminaConfig -> Mode -> Maybe Integer -> Launcher -> IO Evidence
+evidenceOf config mode seconds launcher = do
     let folder = outputFolder config
         binary = folder </> "bin" </> T.unpack (name config)
         provenanceFile = folder </> "provenance" <.> "json"
@@ -546,9 +529,9 @@ evidenceOf config mode seconds executor = do
             OneCase _ -> "case"
             Isolated -> "isolated"
             Recorded _ -> "record",
-        evidenceExecutor = case executor of
-            ProcessExecutor -> "process"
-            GdbExecutor -> "gdb",
+        evidenceExecutor = case launcher of
+            AsProcess -> "process"
+            UnderGdb _ _ -> "gdb",
         evidenceDebugger = Nothing,
         evidenceTimeout = seconds,
         evidenceCommit = case (sha, status) of
