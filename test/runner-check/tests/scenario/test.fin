@@ -36,15 +36,15 @@ task class CScenario {
     }
 };
 
-channel start : MsgQueue<TimeVal; 1>;
+channel start_channel : MsgQueue<TimeVal; 1>;
 
-handler starter : CStarter = { init_ev <- system_init, start_out -> start };
+handler starter : CStarter = { init_ev <- system_init, start_out -> start_channel };
 
 emitter timer : PeriodicTimer = { period = {tv_sec = 0, tv_usec = 100000} };
 
 #[priority(10)]
 task scenario : CScenario = {
-    start_in <- start,
+    start_in <- start_channel,
     tick_in <- timer,
     chk <-> test_checks,
     scn <-> test_scenario,
