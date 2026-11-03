@@ -13,15 +13,20 @@ import Language.LSP.Protocol.Types
 import qualified Control.Concurrent.MVar as MVar
 import LSP.Handlers
 import Colog.Core (LogAction (..), WithSeverity (..))
-import System.IO (stdin, stdout)
+import System.IO (Handle, stdin, stdout)
 
 
 lspRunServer :: IO ()
-lspRunServer = do
+lspRunServer = lspRunServerWith stdin stdout
+
+-- | Run the language server, reading the messages of the client from a handle
+-- and writing the answers to another.
+lspRunServerWith :: Handle -> Handle -> IO ()
+lspRunServerWith input output = do
 
   st <- MVar.newMVar (ServerState Nothing mempty)
 
-  void $ runServerWithHandles logger logger stdin stdout $
+  void $ runServerWithHandles logger logger input output $
     ServerDefinition
       { parseConfig = const $ const $ Right ()
       , onConfigChange = const $ pure ()
