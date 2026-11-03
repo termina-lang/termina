@@ -43,12 +43,11 @@ import Utils.Annotations
 import qualified Data.Set as S
 import Generator.CodeGen.Application.Status (runGenStatusHeaderFile, genStatusPathName)
 import Generator.CodeGen.Application.Result (runGenResultHeaderFile, genResultPathName)
-import Data.Aeson (object, (.=))
-import Data.Aeson.Encode.Pretty (Config(..), defConfig, encodePretty', keyOrder)
 import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
 import EFP.Schedulability.WCEPath.Printer
 import Command.Common
 import Command.Pipeline (CheckedModules(..), checkModules)
+import Command.Provenance (deliverableInfo, provenanceFields, readHashes, writeProvenanceFile)
 import Command.Extern (ExternGroup, parsedExterns, prepareExtern, verifyLoadedExterns)
 import Configuration.ExternCheck (checkExternModules)
 import ControlFlow.Architecture.Types
@@ -406,7 +405,9 @@ buildDeployment args project deployment = do
     let config = deploymentConfig deployment
     runMake (deploymentLabel deployment) (outputFolder config) []
     runMake (deploymentLabel deployment) (outputFolder config) ["-s", "stripped-hashes"]
-    writeProvenance config modules
+    info <- deliverableInfo (deploymentLabel deployment) (outputFolder config)
+    hashes <- readHashes (outputFolder config </> "bin" </> "stripped.sha256")
+    provenanceFields config info hashes modules >>= writeProvenanceFile (outputFolder config)
     return built
 
 -- | Say which deployment comes next when there are several.
@@ -421,46 +422,6 @@ runMake label folder targets = do
         Left err -> dieWithError $ "Could not run make: " ++ show (err :: IOException)
         Right ExitSuccess -> return ()
         Right (ExitFailure _) -> dieWithError $ "make failed for " ++ label ++ " in " ++ folder
-
--- | Write provenance.json of a build: its binary and each module, where its
--- source comes from, with the SHA-256 of their objects without debugging
--- information, which the Makefile leaves in bin/stripped.sha256.
-writeProvenance :: TerminaConfig -> [(QualifiedName, FilePath)] -> IO ()
-writeProvenance config modules = do
-    let folder = outputFolder config
-        hashesFile = folder </> "bin" </> "stripped.sha256"
-        binary = "bin" </> T.unpack (name config)
-    hashesExist <- doesFileExist hashesFile
-    hashes <- if hashesExist
-        then M.fromList . concatMap (toPair . words) . lines <$> readFile hashesFile
-        else return M.empty
-    let objectOf qname = "obj" </> "src" </> qname <.> "o"
-        originOf source = if take 1 (splitDirectories source) == ["tests"] then "test" else "project" :: String
-        moduleEntry (qname, source) = object [
-            "module" .= map (\c -> if c == '/' then '.' else c) qname,
-            "origin" .= originOf source,
-            "source" .= source,
-            "object" .= objectOf qname,
-            "stripped-sha256" .= M.lookup (objectOf qname) hashes
-          ]
-        provenance = object [
-            "name" .= name config,
-            "deployment" .= (if isTestBuild config then "test" else "app" :: String),
-            "platform" .= platform config,
-            "profile" .= profile config,
-            "binary" .= object [
-                "path" .= binary,
-                "stripped-sha256" .= M.lookup binary hashes
-              ],
-            "modules" .= map moduleEntry modules
-          ]
-    BL.writeFile (folder </> "provenance" <.> "json") $
-      encodePretty' defConfig { confCompare = keyOrder ["name", "deployment", "platform", "profile", "binary", "modules", "path", "module", "origin", "source", "object"] } provenance
-
-  where
-
-    toPair [hash, path] = [(normalise path, hash)]
-    toPair _ = []
 
 -- | A deployment loaded, type checked and analysed, up to the checks of its
 -- architecture.

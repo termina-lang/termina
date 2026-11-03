@@ -12,7 +12,7 @@ import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment
 import Command.Dependencies (Fetching(..), FetchingCommand(..))
 import Command.Project (Dependencies(..), loadProject)
 import Command.Common (loadMainModule, orderedModules, sourceTexts)
-import Command.Deliver (deliverableInfo)
+import Command.Provenance (deliverableInfo)
 import Command.Sources (LoadedProject(..), buildSources, readProject)
 import Configuration.Configuration
 import Configuration.Platform (Platform(..), callSite, checkPlatform, gdbServerPort)

@@ -13,6 +13,7 @@ module Command.Deliver (
 import Command.Build
 import Command.Extern (ExternGroup(..), groupObject, groupObjects)
 import Command.Project (Dependencies(..), loadProject)
+import Command.Provenance (deliverableInfo, provenanceFields, readHashes, writeProvenanceFile)
 import Command.Sources (LoadedProject(..))
 import Command.Utils
 import Configuration.Configuration
@@ -27,7 +28,6 @@ import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import Control.Monad
 import Data.Aeson (object, (.=))
-import Data.Aeson.Encode.Pretty (Config(..), defConfig, encodePretty', keyOrder)
 import qualified Data.ByteString.Lazy as BL
 import Data.Char (isSpace)
 import Data.List (intercalate, isPrefixOf, isSuffixOf, sortOn, nub, sort)
@@ -35,13 +35,9 @@ import qualified Data.Map.Strict as M
 import Data.Maybe (isJust)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import Data.Version (versionBranch)
 import qualified Options.Applicative as O
-import Paths_termina (version)
 import System.Directory
-import System.Exit
 import System.FilePath
-import System.Process (readProcessWithExitCode)
 
 -- | Data type for the "deliver" command arguments
 data DeliverCmdArgs =
@@ -168,32 +164,11 @@ deliverDeployment chatty loaded archive withTrace deployment = do
               dieWithError $ "the binary of the deliverable of " ++ label ++ " differs without debugging information from the one built from the C with the #line pragmas ("
                 ++ h2 ++ " in " ++ folder ++ ", " ++ h1 ++ " in " ++ built ++ ")"
         _ -> dieWithError $ "the binaries of " ++ label ++ " have no hashes to compare (is " ++ value "OBJCOPY" ++ " installed?)"
-    -- | provenance.json of the deliverable
+    -- | provenance.json of the deliverable, which adds its files to the one
+    -- of a build
     fileHashes <- mapM (\f -> (f,) <$> sha256File (folder </> f)) delivered
-    osalVersion <- readOsalVersion osalDir
-    let objectOf qname = "obj" </> "src" </> qname <.> "o"
-        moduleEntry (qname, _) = object [
-            "module" .= map (\c -> if c == '/' then '.' else c) qname,
-            "object" .= objectOf qname,
-            "stripped-sha256" .= M.lookup (objectOf qname) deliveredHashes
-          ]
-        provenance = object [
-            "name" .= name config,
-            "deployment" .= (if isTestBuild config then "test" else "app" :: String),
-            "platform" .= platform config,
-            "profile" .= profile config,
-            "termina" .= terminaVersion,
-            "osal" .= osalVersion,
-            "compiler" .= value "CC_VERSION",
-            "binary" .= object [
-                "path" .= binary,
-                "stripped-sha256" .= M.lookup binary deliveredHashes
-              ],
-            "modules" .= map moduleEntry modules,
-            "files" .= map (\(f, h) -> object ["path" .= f, "sha256" .= h]) fileHashes
-          ]
-    BL.writeFile (folder </> "provenance" <.> "json") $
-      encodePretty' defConfig { confCompare = keyOrder ["name", "deployment", "platform", "profile", "termina", "osal", "compiler", "binary", "modules", "files", "path", "module", "object"] } provenance
+    fields <- provenanceFields config info deliveredHashes modules
+    writeProvenanceFile folder (fields ++ ["files" .= map (\(f, h) -> object ["path" .= f, "sha256" .= h]) fileHashes])
     when archive $ do
       let project = manifestProject (loadedManifest loaded)
           archiveName = intercalate "-" $
@@ -209,16 +184,6 @@ deliverDeployment chatty loaded archive withTrace deployment = do
             ++ [("trace" </> T.unpack (name config), built </> binary) | withTrace]
       writeArchive archiveFile archiveName contents
       when chatty (putStrLn . debugMessage $ "Archive written to \"" ++ archiveFile ++ "\"")
-
--- | The values that the deliverable-info target of the generated Makefile
--- prints, one per line, as "NAME=value", and "VAR NAME=value" for the
--- variables of the OSAL and of the toolchain.
-deliverableInfo :: String -> FilePath -> IO (M.Map String String)
-deliverableInfo label folder = do
-    (code, out, err) <- readProcessWithExitCode "make" ["-s", "--no-print-directory", "-C", folder, "deliverable-info"] ""
-    case code of
-        ExitSuccess -> return . M.fromList . map (fmap (drop 1) . break (== '=')) . filter ('=' `elem`) . lines $ out
-        ExitFailure _ -> dieWithError $ "make failed to give the values of the build of " ++ label ++ ":\n" ++ err
 
 -- | The paths that the values of the build name, and what the flat Makefile
 -- writes in their place: the output folder is the folder of the deliverable,
@@ -502,29 +467,6 @@ copyInto :: FilePath -> FilePath -> IO ()
 copyInto from to = do
     createDirectoryIfMissing True (takeDirectory to)
     copyFileWithMetadata from to
-
--- | The hashes that the stripped-hashes target writes, by path.
-readHashes :: FilePath -> IO (M.Map FilePath String)
-readHashes file = do
-    exists <- doesFileExist file
-    if not exists then return M.empty else
-      M.fromList . concatMap (toPair . words) . lines <$> readFile file
-
-  where
-
-    toPair [hash, path] = [(normalise path, hash)]
-    toPair _ = []
-
-readOsalVersion :: FilePath -> IO (Maybe String)
-readOsalVersion osalDir = do
-    let file = osalDir </> "VERSION"
-    exists <- doesFileExist file
-    if exists then Just . filter (not . isSpace) <$> readFile file else return Nothing
-
--- | The package version is PVP (X.Y.Z.0); the public one drops the fourth
--- component.
-terminaVersion :: String
-terminaVersion = intercalate "." (map show (take 3 (versionBranch version)))
 
 -- | Pack the files into a .tar.gz under a folder of the given name. Every
 -- entry has the same time and no owner, and is executable when its file is,
