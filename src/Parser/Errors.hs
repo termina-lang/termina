@@ -9,6 +9,8 @@ import Utils.Errors
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
 import Text.Parsec.Error
+import Data.List (intercalate)
+import System.FilePath (addTrailingPathSeparator)
 
 ----------------------------------------
 -- Type checker error handling
@@ -18,7 +20,7 @@ data Error
     EEmptyModuleName -- ^ Empty module name (Internal)
     | EParseError ParseError
     | EInvalidModuleName QualifiedName -- ^ Invalid module name (PE-002)
-    | EImportedFileNotFound QualifiedName -- ^ Imported file not found (PE-003)
+    | EImportedFileNotFound QualifiedName FilePath [FilePath] -- ^ Imported module in none of the folders that the importer, given by its file, sees (PE-003)
     | EImportedFilesLoop [ModuleDependency] -- ^ Imported files loop (PE-004)
     | EImportedModuleHidden T.Text -- ^ Imported module in a folder the importer does not see (PE-005)
     | EImportedModuleNotExported T.Text -- ^ Imported module outside the exports of a library (PE-006)
@@ -38,9 +40,18 @@ instance Diagnosable Error where
         diagnostic "PE-002" "invalid module name"
             ("Invalid module name: " <> emph (T.pack (show qname)) <> ".\n" <>
                 "No modules can be located at the root level.")
-    describe (EImportedFileNotFound qname) =
+    describe (EImportedFileNotFound qname importer folders) =
         diagnostic "PE-003" "imported file not found"
-            ("Imported file invalid or not found: " <> T.pack (show qname))
+            ("The module " <> T.pack (map (\c -> if c == '/' then '.' else c) qname)
+                <> " is in none of the folders that " <> T.pack importer <> " sees: "
+                <> T.pack (inWords (map addTrailingPathSeparator folders)) <> ".")
+
+        where
+
+            -- | The folders with commas between them and "and" before the last
+            inWords [] = ""
+            inWords [one] = one
+            inWords several = intercalate ", " (init several) ++ " and " ++ last several
     describe (EImportedFilesLoop _imports) =
         diagnostic "PE-004" "cycle between project source files"
             "A recursive module import loop has been detected."
