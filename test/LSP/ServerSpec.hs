@@ -175,6 +175,17 @@ spec = describe "language server" $ do
         fmap (^. L.contents) passed `shouldBe` Just (InL (MarkupContent MarkupKind_Markdown "```termina\nu32\n```"))
         fmap (^. L.contents) onSelf `shouldNotBe` fmap (^. L.contents) assigned
 
+  it "keeps the hover of a module while it has a type error" $
+    withServer $ \_ -> do
+      app <- openDoc "app/app.fin" "termina"
+      let broken = T.replace "twice(half" "thrice(half" appModule
+      changeDoc app [replaceAll broken]
+      codes <- errorCodesOf app
+      kept <- getHover app (positionOf "count = thrice" broken)
+      liftIO $ do
+        codes `shouldBe` ["SE-092"]
+        fmap (^. L.contents) kept `shouldBe` Just (InL (MarkupContent MarkupKind_Markdown "```termina\nu32\n```"))
+
   it "goes to the definition of a function of a local folder" $
     withServer $ \base -> do
       app <- openDoc "app/app.fin" "termina"

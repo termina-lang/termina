@@ -12,7 +12,7 @@ import Command.Utils (CheckFailure(..), loadManifest)
 import Configuration.Manifest
 import LSP.Index (emptyIndex, indexModule)
 import LSP.Logging (errorM)
-import LSP.Modules (TerminaStoredModule(TerminaStoredModule))
+import LSP.Modules (TerminaStoredModule(..))
 import LSP.Monad
 import LSP.Utils (emitDiagnostics)
 import qualified Modules.Modules as Mod
@@ -74,7 +74,7 @@ checkApplication project deployment = do
         Right (parsedProject, order) -> do
             let (typedProject, result) =
                     checkModules (deploymentConfig deployment) (deploymentPlatform deployment) parsedProject order
-            modify (\s -> s { project_modules = storedModules parsedProject typedProject })
+            modify (\s -> s { project_modules = keepIndexes (project_modules s) (storedModules parsedProject typedProject) })
             publishDiagnostics (either (failureDiagnosticsIn mainFile files) (const M.empty) result)
 
 -- | Type check the exported modules of a library on the first platform on
@@ -91,7 +91,7 @@ checkLibrary project = do
         (Right _, []) -> return ()
         (Right (parsedProject, order), plt : _) -> do
             let (typedProject, failure) = typeLibrary manifest plt parsedProject order
-            modify (\s -> s { project_modules = storedModules parsedProject typedProject })
+            modify (\s -> s { project_modules = keepIndexes (project_modules s) (storedModules parsedProject typedProject) })
             publishDiagnostics (maybe M.empty (failureDiagnosticsIn manifestFile files) failure)
 
 -- | Read again from disk a file that the editor has saved or closed, so that
@@ -135,6 +135,19 @@ publishDiagnostics diags = do
     forM_ (S.toList (S.union before (M.keysSet diags))) $ \file ->
         emitDiagnostics file (M.findWithDefault [] file diags)
     modify (\s -> s { published = M.keysSet diags })
+
+-- | The modules of a check, with those that the check has not type checked
+-- keeping the types and the index of the last check that gave them, so that the
+-- editor can still navigate a module while it has an error.
+keepIndexes :: M.Map FilePath TerminaStoredModule -> M.Map FilePath TerminaStoredModule -> M.Map FilePath TerminaStoredModule
+keepIndexes previous = M.mapWithKey keep
+
+  where
+
+    keep file stored =
+        case (semantic stored, M.lookup file previous) of
+            (Nothing, Just old) -> stored { semantic = semantic old, moduleIndex = moduleIndex old }
+            _ -> stored
 
 -- | The modules of a check, by the path of their file, each with its types and
 -- its index when it has been type checked.
