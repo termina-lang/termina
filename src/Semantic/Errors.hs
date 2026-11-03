@@ -1015,6 +1015,7 @@ instance Diagnosable Error where
             CStandardLibrary -> "belongs to the standard library of C"
             CImplementation -> "begins with an underscore and an uppercase letter, which C keeps for the\nimplementation (ISO/IEC 9899 7.1.3)"
             CPlatform plt -> "is declared by the headers of the target platform " <> T.pack (show plt)
+            CLinked plt -> "collides with a symbol of the target platform " <> T.pack (show plt)
             TerminaType -> "is a type of Termina"
     describe (EReferenceToPackedMember ident) =
         diagnostic "SE-212" "reference to a packed struct member"

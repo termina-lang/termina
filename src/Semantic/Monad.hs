@@ -119,6 +119,14 @@ checkReservedName loc ident = do
     Nothing -> return ()
     Just reservedBy -> throwError $ annotateError loc $ EReservedIdentifier ident reservedBy
 
+-- | Reject a top-level name that takes a symbol the platform links.
+checkLinkedName :: Location -> Identifier -> SemanticMonad ()
+checkLinkedName loc ident = do
+  plt <- gets targetPlatform
+  case linkedName plt ident of
+    Nothing -> return ()
+    Just reservedBy -> throwError $ annotateError loc $ EReservedIdentifier ident reservedBy
+
 -- | Reject, outside a test, what only a test may use. The argument names it
 -- in the message.
 onlyInTest :: Location -> String -> SemanticMonad ()
@@ -151,6 +159,7 @@ insertGlobal ident entry err =
     { Just l -> throwError (annotateError (location entry) (err l)) ;
       Nothing -> do
         checkReservedName (location entry) ident
+        checkLinkedName (location entry) ident
         modify (\s -> s{global = M.insert ident entry (global s)}) ;
     }
   -- if b then throwError (annotateError (location entry) getError)

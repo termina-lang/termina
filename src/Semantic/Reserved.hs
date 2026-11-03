@@ -13,8 +13,14 @@
 -- translation unit that includes <termina.h> and compiled with the compiler and
 -- the flags of that platform; the generator lives in tools/reserved of
 -- termina-osal and its output is the Semantic.Reserved.* modules.
+--
+-- Each of those modules also lists the global symbols of what a deployment of
+-- the platform links: the OSAL, the RTOS, the C library and the start files. No
+-- header has to declare them, and a Termina name that takes one either fails to
+-- link or, with a static library, replaces the definition of the library
+-- without any error.
 module Semantic.Reserved (
-    ReservedBy(..), reservedName
+    ReservedBy(..), reservedName, linkedName
 ) where
 
 import Core.AST (Identifier)
@@ -40,6 +46,8 @@ data ReservedBy =
     -- | A name that the platform declares in the headers a generated module
     -- includes.
     | CPlatform Platform
+    -- | A global symbol of what a deployment of the platform links.
+    | CLinked Platform
     -- | The name of a type of Termina that takes type arguments.
     | TerminaType
   deriving (Eq, Show)
@@ -55,6 +63,13 @@ reservedName plt ident =
   else if underscoreUpper ident then Just CImplementation
   else if S.member ident (platformNames plt) then Just (CPlatform plt)
   else Nothing
+
+-- | Whether a top-level element takes a symbol that the platform links. A local
+-- object hides the global symbol in C and never reaches the linker, so the
+-- check is for top-level names only.
+linkedName :: Platform -> Identifier -> Maybe ReservedBy
+linkedName plt ident =
+  if S.member ident (linkedNames plt) then Just (CLinked plt) else Nothing
 
 -- | The types of Termina that take type arguments, which the type checker
 -- recognises by their shape instead of reading them from the global
@@ -73,6 +88,13 @@ platformNames FreeRTOS10STM32L432NUCLEOL432KC = FreeRTOS10STM32L432NUCLEOL432KC.
 platformNames RTEMS6ZYNQ7000PYNQZ2 = RTEMS6ZYNQ7000PYNQZ2.reservedNames
 -- | The platform of the test suite links against no library at all.
 platformNames TestPlatform = S.empty
+
+linkedNames :: Platform -> S.Set Identifier
+linkedNames POSIXGCC = POSIXGCC.linkedNames
+linkedNames RTEMS5LEON3SFNEXYSA7 = RTEMS5LEON3SFNEXYSA7.linkedNames
+linkedNames FreeRTOS10STM32L432NUCLEOL432KC = FreeRTOS10STM32L432NUCLEOL432KC.linkedNames
+linkedNames RTEMS6ZYNQ7000PYNQZ2 = RTEMS6ZYNQ7000PYNQZ2.linkedNames
+linkedNames TestPlatform = S.empty
 
 -- | An underscore followed by an uppercase letter is reserved for any use, at
 -- any scope, and an object identifier may take that shape:

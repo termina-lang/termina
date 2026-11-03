@@ -9,7 +9,7 @@ import Semantic.Common (typeCheckErrorOn, typeCheckErrorPosOn)
 
 import Test.Hspec
 import Data.Text (pack)
-import Configuration.Platform (Platform(POSIXGCC, TestPlatform))
+import Configuration.Platform (Platform(POSIXGCC, RTEMS5LEON3SFNEXYSA7, FreeRTOS10STM32L432NUCLEOL432KC, TestPlatform))
 
 -- | @index@ is not in the standard library of C, it comes from <strings.h>,
 -- which <string.h> pulls in on the platforms whose flags ask for it. So the
@@ -82,6 +82,27 @@ globalNamedMemcpy =
   "    return 0 : u32;\n" ++
   "}\n"
 
+-- | @start@ is the label where the BSP of the LEON3 begins, in its start.o, and
+-- @vTaskDelay@ a function of the kernel of FreeRTOS, which the OSAL of the
+-- Nucleo compiles. No header that a generated module includes declares either.
+globalNamedStart, globalNamedVTaskDelay :: String
+globalNamedStart =
+  "function start() -> u32 {\n" ++
+  "    return 0 : u32;\n" ++
+  "}\n"
+globalNamedVTaskDelay =
+  "function vTaskDelay() -> u32 {\n" ++
+  "    return 0 : u32;\n" ++
+  "}\n"
+
+-- | A local object hides the symbol of the same name and never reaches the
+-- linker.
+paramNamedStart :: String
+paramNamedStart =
+  "function begin(start : u32) -> u32 {\n" ++
+  "    return start;\n" ++
+  "}\n"
+
 -- | Names that only look like the ones of the library.
 globalNamedMemory :: String
 globalNamedMemory =
@@ -146,3 +167,15 @@ spec = do
       typeCheckErrorOn POSIXGCC localNamedIndex `shouldBe` Just (pack "SE-213")
     it "accepts the same name on a platform that declares nothing" $
       typeCheckErrorOn TestPlatform localNamedIndex `shouldBe` Nothing
+
+  describe "SE-213: what the platform links" $ do
+    it "rejects a function named start on the Nexys, whose BSP defines it" $
+      typeCheckErrorOn RTEMS5LEON3SFNEXYSA7 globalNamedStart `shouldBe` Just (pack "SE-213")
+    it "accepts a function named start on the Nucleo" $
+      typeCheckErrorOn FreeRTOS10STM32L432NUCLEOL432KC globalNamedStart `shouldBe` Nothing
+    it "rejects a function named vTaskDelay on the Nucleo, whose OSAL compiles FreeRTOS" $
+      typeCheckErrorOn FreeRTOS10STM32L432NUCLEOL432KC globalNamedVTaskDelay `shouldBe` Just (pack "SE-213")
+    it "accepts a function named vTaskDelay on the Nexys" $
+      typeCheckErrorOn RTEMS5LEON3SFNEXYSA7 globalNamedVTaskDelay `shouldBe` Nothing
+    it "accepts a parameter named start on the Nexys" $
+      typeCheckErrorOn RTEMS5LEON3SFNEXYSA7 paramNamedStart `shouldBe` Nothing
