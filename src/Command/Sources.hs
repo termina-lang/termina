@@ -77,6 +77,9 @@ type Sources = [SourceFolder]
 
 -- | A project and its dependencies.
 data LoadedProject = LoadedProject {
+    -- | The folder of the project, which starts the path of every folder and
+    -- file of the project and of its dependencies
+    loadedRoot :: !FilePath,
     loadedManifest :: !Manifest,
     -- | The packages of vendor/ by normalized URL
     loadedRemotes :: !(M.Map T.Text Package),
@@ -87,21 +90,22 @@ data LoadedProject = LoadedProject {
   } deriving Show
 
 -- | Read a project and its dependencies from disk, without updating the lock
--- or vendor/. It gives the errors of the lock, of the local folders or of the
--- first package of vendor/ that cannot be read.
-readProject :: Manifest -> IO (Either [String] LoadedProject)
-readProject manifest = do
-    lockRead <- loadLock "."
+-- or vendor/, given the folder of the project. It gives the errors of the
+-- lock, of the local folders or of the first package of vendor/ that cannot be
+-- read.
+readProject :: FilePath -> Manifest -> IO (Either [String] LoadedProject)
+readProject root manifest = do
+    lockRead <- loadLock root
     case lockRead of
         Left errs -> return (Left errs)
         Right lock -> do
-            localsRead <- readLocalPackages [(".", p) | DepPath p <- allDependencies]
+            localsRead <- readLocalPackages [(root, p) | DepPath p <- allDependencies]
             case localsRead of
                 Left errs -> return (Left errs)
                 Right locals -> do
                     vendored <- mapM vendoredPackage (lockPackages lock)
-                    own <- readProjectModules manifest
-                    return ((\packages -> LoadedProject manifest (M.fromList packages) locals own) <$> sequence vendored)
+                    own <- readProjectModules root manifest
+                    return ((\packages -> LoadedProject root manifest (M.fromList packages) locals own) <$> sequence vendored)
 
   where
 
@@ -109,12 +113,13 @@ readProject manifest = do
 
     vendoredPackage l = do
         let url = lockedUrl l
-        files <- readPackage "." url
+        files <- readPackage root url
         return $ either (\err -> Left ["vendor/" ++ T.unpack (normalizeUrl url) ++ ": " ++ err]) (Right . (,) (normalizeUrl url)) $
-            packageFromFiles (FromGit url (lockedRev l) (lockedCommit l)) (packageDir "." url) [FetchedFile p "100644" b | (p, b) <- files]
+            packageFromFiles (FromGit url (lockedRev l) (lockedCommit l)) (packageDir root url) [FetchedFile p "100644" b | (p, b) <- files]
 
 -- | The project with the text of some of its module files replaced.
--- The texts are given by the path of their file from the project folder.
+-- The texts are given by the path of their file, which starts with the folder
+-- of the project.
 -- A file that the project and its dependencies do not have is left out.
 withTexts :: M.Map FilePath T.Text -> LoadedProject -> LoadedProject
 withTexts texts project = project {
@@ -128,8 +133,10 @@ withTexts texts project = project {
     tests = ["tests" </> T.unpack t | t <- M.keys (manifestTests (loadedManifest project))]
 
     -- | The folders of the project, and whether they hold only main modules
-    sourceFolders = [ (folder, False) | folder <- "src" : map (</> "src") tests ]
-    mainFolders = [ (folder, True) | folder <- "app" : tests ]
+    sourceFolders = [ (inRoot folder, False) | folder <- "src" : map (</> "src") tests ]
+    mainFolders = [ (inRoot folder, True) | folder <- "app" : tests ]
+
+    inRoot folder = normalise (loadedRoot project </> folder)
 
     inPackage package = package {
         packageModules = replaced [(normalise (packageFolder package </> "src"), False)] (packageModules package)
@@ -146,16 +153,19 @@ withTexts texts project = project {
         , not mainOnly || length (splitDirectories rel) == 1 ]
 
 -- | The modules of a project: those of src/ and of the src/ of each test, and
--- the main modules of app/ and of each test, read from disk.
-readProjectModules :: Manifest -> IO ParsedFiles
-readProjectModules manifest = do
-    sources <- mapM readSourceFolder ("src" : map (</> "src") tests)
-    mains <- mapM readMainFolder ("app" : tests)
+-- the main modules of app/ and of each test, read from disk, given the folder
+-- of the project.
+readProjectModules :: FilePath -> Manifest -> IO ParsedFiles
+readProjectModules root manifest = do
+    sources <- mapM (readSourceFolder . inRoot) ("src" : map (</> "src") tests)
+    mains <- mapM (readMainFolder . inRoot) ("app" : tests)
     return (ML.unions (sources ++ mains))
 
   where
 
     tests = ["tests" </> T.unpack t | t <- M.keys (manifestTests manifest)]
+
+    inRoot folder = normalise (root </> folder)
 
 -- | The modules of the folder of a main module, without its subfolders, read
 -- from disk.
@@ -176,13 +186,15 @@ readSourceFolder folder = do
 -- folder of its main module. Only the local folders that the dependencies of
 -- the project and of the test reach are included.
 buildSources :: LoadedProject -> Maybe String -> FilePath -> Sources
-buildSources (LoadedProject manifest vendored admitted own) mTest mainFolder =
-    sources vendored (reachedLocals admitted [(".", p) | DepPath p <- manifestDependencies manifest])
-        (reachedLocals admitted [(".", p) | DepPath p <- testDeps])
+buildSources (LoadedProject root manifest vendored admitted own) mTest mainFolder =
+    sources vendored (reachedLocals admitted [(root, p) | DepPath p <- manifestDependencies manifest])
+        (reachedLocals admitted [(root, p) | DepPath p <- testDeps])
 
   where
 
     keysOf deps = [normalizeUrl (gitUrl g) | DepGit g <- deps]
+
+    src = normalise (root </> "src")
 
     nameOf = T.unpack . projectName . manifestProject
 
@@ -206,16 +218,16 @@ buildSources (LoadedProject manifest vendored admitted own) mTest mainFolder =
             localSrc folder = normalise (folder </> "src")
             localKeys l = keysOf (manifestDependencies (packageManifest l))
             localPaths l = [localFolderOf (packageFolder l) p | DepPath p <- manifestDependencies (packageManifest l)]
-            startsOf deps = [localFolderOf "." p | DepPath p <- deps]
+            startsOf deps = [localFolderOf root p | DepPath p <- deps]
             gitStartsOf keys ls = [(k, Nothing) | k <- keys] ++ [(k, Just (nameOf (packageManifest l))) | l <- M.elems ls, k <- localKeys l]
             rootStarts = gitStartsOf rootKeys rootLocals
             rootGraph = closure rootStarts
             graph = closure (rootStarts ++ gitStartsOf testKeys testLocals)
             locals = M.union rootLocals testLocals
-            projectSees = "src" : map folderOf rootKeys ++ map localSrc (startsOf (manifestDependencies manifest))
-            testSees = "src" : testSrc ++ map folderOf (rootKeys ++ testKeys)
+            projectSees = src : map folderOf rootKeys ++ map localSrc (startsOf (manifestDependencies manifest))
+            testSees = src : testSrc ++ map folderOf (rootKeys ++ testKeys)
                 ++ map localSrc (startsOf (manifestDependencies manifest) ++ startsOf testDeps)
-            testSrc = maybe [] (\t -> ["tests" </> t </> "src"]) mTest
+            testSrc = maybe [] (\t -> [normalise (root </> "tests" </> t </> "src")]) mTest
             mainSees = maybe projectSees (const testSees) mTest
             mainOwner = maybe Project TestOf mTest
             vendoredFolder k p via = SourceFolder (folderOf k)
@@ -225,7 +237,7 @@ buildSources (LoadedProject manifest vendored admitted own) mTest mainFolder =
                 (LocalPackage (nameOf (packageManifest l)) (if M.member (packageFolder l) rootLocals then Nothing else mTest))
                 (localSrc (packageFolder l) : map folderOf (localKeys l) ++ map localSrc (localPaths l))
                 (Just (manifestPrefixes (packageManifest l))) (packageModules l) (Just l)
-        in [SourceFolder mainFolder mainOwner mainSees Nothing own Nothing, SourceFolder "src" Project projectSees Nothing own Nothing]
+        in [SourceFolder mainFolder mainOwner mainSees Nothing own Nothing, SourceFolder src Project projectSees Nothing own Nothing]
             ++ [SourceFolder f (TestOf t) testSees Nothing own Nothing | Just t <- [mTest], f <- testSrc]
             ++ [vendoredFolder k p via | (k, via) <- M.toList graph, Just p <- [M.lookup k packages]]
             ++ map localFolder' (M.elems locals)

@@ -204,7 +204,7 @@ modeOf mName mCase isolated mRecord offline =
 runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Bool -> Maybe Server -> Maybe Server -> Bool -> Mode -> IO ()
 runTests mName mPlatform mProfile withGdb mServer mXsdb offline mode = do
     loaded <- try (case mode of
-        Recorded _ -> (\m -> LoadedProject m M.empty M.empty M.empty) <$> (loadManifest >>= either dieWithFirstError return)
+        Recorded _ -> (\m -> LoadedProject "." m M.empty M.empty M.empty) <$> (loadManifest >>= either dieWithFirstError return)
         _ -> do
             loadedProject <- loadProject offline
             case manifestNature (loadedManifest loadedProject) of
@@ -558,7 +558,7 @@ listTests json = do
     -- | A test that cannot be read exits with 2, as in a run
     loaded <- try (do
         manifest <- loadManifest >>= either dieWithFirstError return
-        project <- readProject manifest >>= either dieWithFirstError return
+        project <- readProject "." manifest >>= either dieWithFirstError return
         forM (M.toList (manifestTests manifest)) $ \(testName, entry) -> do
           cases <- loadTestCases project (T.unpack testName)
           return (testName, entry, cases)) :: IO (Either ExitCode [(T.Text, TestEntry, [TestCase])])

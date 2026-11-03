@@ -159,7 +159,7 @@ errorToDiagnostics (AnnotatedError err pos) _files =
 -- | The LSP location of a position in the source, which a related piece of
 -- information needs so that the editor can navigate to it.
 loc2Location :: Location -> Maybe LSP.Location
-loc2Location pos@(Position file _ _) = Just (LSP.Location (LSP.filePathToUri file) (loc2Range pos))
+loc2Location pos@(Position _ start _) = Just (LSP.Location (LSP.filePathToUri (sourceName start)) (loc2Range pos))
 loc2Location _ = Nothing
 
 class ErrorMessage a where

@@ -11,6 +11,7 @@ import Configuration.Lock
 import Configuration.Package (Package(..))
 import Configuration.Parsed (ParseFailure(..), ParsedFiles)
 import Configuration.Vendor (packageDir)
+import Modules.Modules (TerminaModuleData(fullPath))
 
 import Control.Monad (forM_)
 import qualified Data.ByteString as BS
@@ -67,7 +68,7 @@ withLoaded action = do
         let manifest = manifestOf $ header "obdh" ++ "app:\n  platform: posix-gcc\n  profile: release\n" ++ deps ["pus"]
                 ++ "  - path: libs/drivers\n"
                 ++ "tests:\n  hk:\n    platforms: [posix-gcc]\n    timeout: 10\n    dependencies:\n      - git: " ++ T.unpack (url "fixtures") ++ "\n        rev: \"v1\"\n"
-        readProject manifest >>= either (error . unlines) action
+        readProject "." manifest >>= either (error . unlines) action
 
 vendored :: String -> FilePath
 vendored name = normalise (packageDir "." (url name) </> "src")
@@ -150,6 +151,15 @@ spec = describe "source folders of a build" $ do
 
   it "loads a module whose imports the build sees" $
     loadCode "obdh/tm" `shouldReturn` Nothing
+
+  it "starts the paths of the folders and of the modules with the folder of the project" $
+    withLoaded $ \project -> do
+      root <- getCurrentDirectory
+      Right fromRoot <- readProject root (loadedManifest project)
+      let sources = buildSources fromRoot Nothing (root </> "app")
+      lookupIn sources (root </> "src") "drivers/uart" `shouldBe` ("found in " ++ root </> "libs" </> "drivers" </> "src")
+      loaded <- loadTerminaModule sources (root </> "src") "obdh/tm"
+      either (const Nothing) (Just . fullPath) loaded `shouldBe` Just (root </> "src" </> "obdh" </> "tm.fin")
 
   it "leaves out the text of a file that the project does not have" $
     withLoaded $ \project ->

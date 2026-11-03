@@ -37,7 +37,7 @@ exportErrorsWith label files yaml = do
   case either (Left . show) parseManifest (decodeEither' (BS.pack yaml)) of
     Left err -> expectationFailure err >> return []
     Right manifest -> do
-      parsed <- withCurrentDirectory root (readProjectModules manifest)
+      parsed <- withCurrentDirectory root (readProjectModules "." manifest)
       checkExports root parsed manifest
 
 spec :: Spec

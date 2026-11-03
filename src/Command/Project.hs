@@ -22,7 +22,7 @@ import Control.Monad
 loadProject :: Bool -> IO LoadedProject
 loadProject offline = do
     manifest <- loadManifest >>= either dieWithFirstError return
-    own <- readProjectModules manifest
+    own <- readProjectModules "." manifest
     -- | Read the modules that the extern sections name.
     -- A module that does not parse stops with the error of the parser.
     (sections, unparsed) <- readExternSections "." own manifest
@@ -37,4 +37,4 @@ loadProject offline = do
         >>= either dieWithFirstError return
     mapM_ (putStrLn . warnMessage) warnings
     mapM_ (putStrLn . infoMessage . ("termina.lock: " ++) . describeChange) changes
-    return (LoadedProject manifest packages locals own)
+    return (LoadedProject "." manifest packages locals own)
