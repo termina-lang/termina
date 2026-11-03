@@ -51,6 +51,10 @@ instance Annotated (AnnotatedError a) where
   getAnnotation (AnnotatedError _err ann) = ann
 
   updateAnnotation (AnnotatedError err _) = AnnotatedError err
+
+instance Located (AnnotatedError a Location) where
+  getLocation = getAnnotation
+  updateLocation = updateAnnotation
   
 getError :: AnnotatedError a b -> a
 getError (AnnotatedError err _ann) = err

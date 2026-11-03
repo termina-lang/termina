@@ -139,6 +139,17 @@ loadModules sources importer imported = loadModules' M.empty [(dep, importer) | 
     let parts = splitDirectories path
     in joinPath (take (length parts - length (splitDirectories qname)) parts)
 
+-- | Load the main module of a build, from its folder and its qualified name,
+-- and the modules it imports. It gives the first error.
+loadMainModule :: Sources -> FilePath -> QualifiedName -> IO (Either CheckFailure (ParsedModule, ParsedProject))
+loadMainModule sources mainFolder mainModule = do
+  loadedMain <- loadTerminaModule sources mainFolder mainModule
+  case loadedMain of
+    Left failure -> return (Left failure)
+    Right parsedMain -> do
+      imported <- loadModules sources mainFolder (importedModules parsedMain)
+      return ((\parsedModules -> (parsedMain, M.insert (qualifiedName parsedMain) parsedMain parsedModules)) <$> imported)
+
 -- | The modules in the order in which they are type checked, or the cycle of
 -- imports between them.
 orderedModules :: ParsedProject -> Either CheckFailure [QualifiedName]

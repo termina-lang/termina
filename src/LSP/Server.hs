@@ -24,7 +24,7 @@ lspRunServer = lspRunServerWith stdin stdout
 lspRunServerWith :: Handle -> Handle -> IO ()
 lspRunServerWith input output = do
 
-  st <- MVar.newMVar (ServerState Nothing mempty)
+  st <- MVar.newMVar (ServerState Nothing mempty mempty)
 
   void $ runServerWithHandles logger logger input output $
     ServerDefinition

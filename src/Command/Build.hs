@@ -485,14 +485,10 @@ checkDeployment chatty project deployment = do
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
     let sources = buildSources project mTest mainFolder
         files = sourceTexts sources
-    -- | Load the module that wires the deployment
+    -- | Load the module that wires the deployment and the modules it imports
     let mainModulePath = mainFolder </> deploymentMainModule deployment <.> "fin"
     when chatty (putStrLn . debugMessage $ "Loading the main module: \"" ++ mainModulePath ++ "\"")
-    appModule <- loadTerminaModule sources mainFolder (deploymentMainModule deployment) >>= orDieWithFailure files
-    -- | Load the project
-    when chatty (putStrLn . debugMessage $ "Loading project modules")
-    parsedModules <- loadModules sources mainFolder (importedModules appModule) >>= orDieWithFailure files
-    let parsedProject = M.insert (qualifiedName appModule) appModule parsedModules
+    (appModule, parsedProject) <- loadMainModule sources mainFolder (deploymentMainModule deployment) >>= orDieWithFailure files
     -- | The modules of the deployment with extern functions have their entries
     verifyLoadedExterns appModule (maybe externFolder (\t -> "tests" </> t </> externFolder) mTest)
       parsedProject (deploymentExterns deployment)

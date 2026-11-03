@@ -33,7 +33,8 @@ import Control.Monad.IO.Class
 import qualified Data.Map.Strict as M
 import Semantic.Environment (DeclaredEnv, declaredNames)
 import Utils.Graph (TopSortError(..), topSortFromDepList)
-import Utils.Errors (ErrorMessage(toText, errorIdent))
+import Utils.Errors (ErrorMessage(toText, toDiagnostics, errorIdent))
+import qualified Language.LSP.Protocol.Types as LSP
 import Control.Monad (forM_, unless, when)
 import Data.Maybe (listToMaybe, mapMaybe)
 import qualified Data.Text as T
@@ -245,10 +246,15 @@ data CheckFailure = CheckFailure
   , failureShown :: String
     -- | The message, given the source of every module of the project.
   , failureMessage :: M.Map FilePath T.Text -> T.Text
+    -- | The diagnostics of the editor, given the source of every module of
+    -- the project.
+  , failureDiagnostics :: M.Map FilePath T.Text -> [LSP.Diagnostic]
+    -- | Where the error is, or Internal when it has no place in the source.
+  , failureLocation :: Location
   }
 
-checkFailure :: (ErrorMessage e, Show e) => e -> CheckFailure
-checkFailure err = CheckFailure (errorIdent err) (show err) (toText err)
+checkFailure :: (ErrorMessage e, Show e, Located e) => e -> CheckFailure
+checkFailure err = CheckFailure (errorIdent err) (show err) (toText err) (toDiagnostics err) (getLocation err)
 
 -- | The source of each module of a project, which is what the error printer
 -- quotes from.

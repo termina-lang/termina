@@ -10,7 +10,7 @@ module Command.Test (
 
 import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, checkExportedModules, nothingSelected, selectDeployments, verifyLocalFolders)
 import Command.Project (loadProject)
-import Command.Common (loadTerminaModule, loadModules, orderedModules, sourceTexts)
+import Command.Common (loadMainModule, orderedModules, sourceTexts)
 import Command.Deliver (deliverableInfo)
 import Command.Sources (LoadedProject(..), buildSources, readProject)
 import Configuration.Configuration
@@ -603,9 +603,7 @@ loadTestCases project testName = do
     let testFolder = "tests" </> testName
         sources = buildSources project (Just testName) testFolder
         files = sourceTexts sources
-    testModule <- loadTerminaModule sources testFolder "test" >>= orDieWithFailure files
-    parsedModules <- loadModules sources testFolder (importedModules testModule) >>= orDieWithFailure files
-    let parsedProject = M.insert (qualifiedName testModule) testModule parsedModules
+    (_, parsedProject) <- loadMainModule sources testFolder "test" >>= orDieWithFailure files
     order <- orDieWithFailure files (orderedModules parsedProject)
     either dieWithError return $
       testCases [parsedAST . metadata $ parsedProject M.! m | m <- order]

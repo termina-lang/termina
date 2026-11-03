@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Lowering.Errors where
+import Utils.Annotations (Located(..), Location(Internal))
 import Utils.Errors
 import qualified Language.LSP.Protocol.Types as LSP
 import qualified Data.Text as T
@@ -10,6 +11,11 @@ import qualified Data.Text as T
 -- an unexpected situation has occurred.
 newtype LoweringError = InternalError String
     deriving (Show)
+
+-- | An internal error has no place in the source.
+instance Located LoweringError where
+    getLocation _ = Internal
+    updateLocation err _ = err
 
 instance ErrorMessage LoweringError where
 

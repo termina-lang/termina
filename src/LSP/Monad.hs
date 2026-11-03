@@ -4,20 +4,23 @@
 module LSP.Monad where
     
 import Language.LSP.Server ( LspT, LanguageContextEnv, runLspT )
-import Configuration.Configuration
+import Command.Sources (LoadedProject)
 import Control.Monad.State
 import Control.Concurrent.MVar
 import Control.Monad.Reader
 import qualified Data.Map.Strict as M
-import LSP.Modules 
+import qualified Data.Set as S
+import LSP.Modules
 
-import Utils.Annotations
-
-data ServerState = 
+data ServerState =
   ServerState {
-    config :: Maybe TerminaConfig,
-    project_modules :: M.Map QualifiedName TerminaStoredModule
-  } 
+    -- | The project read from disk when the server starts
+    loaded :: Maybe LoadedProject,
+    -- | The modules of the last check, by the absolute path of their file
+    project_modules :: M.Map FilePath TerminaStoredModule,
+    -- | The files whose diagnostics the server has published and not cleared
+    published :: S.Set FilePath
+  }
 
 type HandlerM = LspT () (ReaderT (MVar ServerState) IO)
 
