@@ -82,19 +82,24 @@ lspCommandParser = LSP
 
 commandParser :: Parser Command
 commandParser = subparser
-  ( command "new" (info newCommandParser ( progDesc "Setup a new project" ))
- <> command "add" (info addCommandParser ( progDesc "Add a dependency to the project or to one of its tests" ))
- <> command "restore" (info restoreCommandParser ( progDesc "Bring back the copies in vendor/ that do not match termina.lock" ))
- <> command "update" (info updateCommandParser ( progDesc "Resolve the tags of termina.yaml again, also those that termina.lock already has" ))
- <> command "verify" (info verifyCommandParser ( progDesc "Check without network that vendor/ and termina.lock match termina.yaml" ))
- <> command "generate" (info generateCommandParser ( progDesc "Generate the C code and the Makefile of the project" ))
- <> command "build" (info buildCommandParser ( progDesc "Generate and compile the project" ))
- <> command "deliver" (info deliverCommandParser ( progDesc "Build the self-contained deliverable of the project" ))
- <> command "test" (info testCommandParser ( progDesc "Build and run the tests of the project, or list them" ))
- <> command "try"(info tryCommandParser ( progDesc "Translate a single file" ))
- <> command "lsp" (info lspCommandParser ( progDesc "Start language server" ))
- <> command "sched" (info schedCommandParser ( progDesc "Generate scheduling models" ))
+  ( withHelp "new" newCommandParser "Setup a new project"
+ <> withHelp "add" addCommandParser "Add a dependency to the project or to one of its tests"
+ <> withHelp "restore" restoreCommandParser "Bring back the copies in vendor/ that do not match termina.lock"
+ <> withHelp "update" updateCommandParser "Resolve the tags of termina.yaml again, also those that termina.lock already has"
+ <> withHelp "verify" verifyCommandParser "Check without network that vendor/ and termina.lock match termina.yaml"
+ <> withHelp "generate" generateCommandParser "Generate the C code and the Makefile of the project"
+ <> withHelp "build" buildCommandParser "Generate and compile the project"
+ <> withHelp "deliver" deliverCommandParser "Build the self-contained deliverable of the project"
+ <> withHelp "test" testCommandParser "Build and run the tests of the project, or list them"
+ <> withHelp "try" tryCommandParser "Translate a single file"
+ <> withHelp "lsp" lspCommandParser "Start language server"
+ <> withHelp "sched" schedCommandParser "Generate scheduling models"
   )
+
+  where
+
+    -- | A command whose own --help lists its options
+    withHelp name parser desc = command name (info (parser <**> helper) (progDesc desc))
 
 -- The package version is PVP (X.Y.Z.0); the public one drops the fourth
 -- component.
