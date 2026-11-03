@@ -69,7 +69,7 @@ loadTerminaModule sources root filePath = do
               (EImportedModuleHidden (T.pack (hiddenMessage folder importerOwner (qualifiedToModuleName qname)))))
             NotExported folder -> Left (loadFailure ann
               (EImportedModuleNotExported (T.pack (notExportedMessage folder (qualifiedToModuleName qname)))))
-            Missing -> Left (loadFailure ann (EImportedFileNotFound qname (root </> filePath <.> "fin") (nub seen)))
+            Missing -> Left (loadFailure ann (EImportedModuleNotFound qname (root </> filePath <.> "fin") (nub seen)))
 
 -- | Read a Termina file and parse it, without its imports.
 readTerminaFile ::
@@ -138,7 +138,7 @@ loadModules sources importer imported = loadModules' M.empty [(dep, importer) | 
               Right loadedModule -> loadModules' (M.insert qname loadedModule fsLoaded)
                 (fss ++ [(dep, folder) | dep <- importedModules loadedModule])
       Ambiguous a b -> return (Left (loadFailure ann (EModuleNameCollision (T.pack (collisionMessage sources qname a b)))))
-      _ -> return (Left (loadFailure ann (EImportedFileNotFound qname (addTrailingPathSeparator from)
+      _ -> return (Left (loadFailure ann (EImportedModuleNotFound qname (addTrailingPathSeparator from)
               (nub (maybe [from] folderSees (find ((== from) . folderPath) sources))))))
 
   -- | The source folder of a module, from its file and its qualified name.

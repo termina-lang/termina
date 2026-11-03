@@ -1,8 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- | Parser-stage error codes (PE-NNN), asserted on the parser stage in
--- isolation (no type checking). PE-002 (module at the project root) and PE-003
--- (imported file not found) come from the on-disk module loader and are not
--- reachable from in-memory sources, so they are left uncovered on purpose.
+-- isolation (no type checking). The codes of the module loader, PE-002, PE-003
+-- and PE-005 to PE-008, are tested in Configuration.SourcesSpec.
 module Parser.Negative.CodeSpec (spec) where
 
 import Parser.Common (parserStageErrorCode)

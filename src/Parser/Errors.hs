@@ -20,7 +20,7 @@ data Error
     EEmptyModuleName -- ^ Empty module name (Internal)
     | EParseError ParseError
     | EInvalidModuleName QualifiedName -- ^ Invalid module name (PE-002)
-    | EImportedFileNotFound QualifiedName FilePath [FilePath] -- ^ Imported module in none of the folders that the importer, given by its file, sees (PE-003)
+    | EImportedModuleNotFound QualifiedName FilePath [FilePath] -- ^ Imported module in none of the folders that the importer, given by its file, sees (PE-003)
     | EImportedFilesLoop [ModuleDependency] -- ^ Imported files loop (PE-004)
     | EImportedModuleHidden T.Text -- ^ Imported module in a folder the importer does not see (PE-005)
     | EImportedModuleNotExported T.Text -- ^ Imported module outside the exports of a library (PE-006)
@@ -40,8 +40,8 @@ instance Diagnosable Error where
         diagnostic "PE-002" "invalid module name"
             ("Invalid module name: " <> emph (T.pack (show qname)) <> ".\n" <>
                 "No modules can be located at the root level.")
-    describe (EImportedFileNotFound qname importer folders) =
-        diagnostic "PE-003" "imported file not found"
+    describe (EImportedModuleNotFound qname importer folders) =
+        diagnostic "PE-003" "imported module not found"
             ("The module " <> T.pack (map (\c -> if c == '/' then '.' else c) qname)
                 <> " is in none of the folders that " <> T.pack importer <> " sees: "
                 <> T.pack (inWords (map addTrailingPathSeparator folders)) <> ".")
