@@ -20,6 +20,10 @@ data Error
     | EInvalidModuleName QualifiedName -- ^ Invalid module name (PE-002)
     | EImportedFileNotFound QualifiedName -- ^ Imported file not found (PE-003)
     | EImportedFilesLoop [ModuleDependency] -- ^ Imported files loop (PE-004)
+    | EImportedModuleHidden T.Text -- ^ Imported module in a folder the importer does not see (PE-005)
+    | EImportedModuleNotExported T.Text -- ^ Imported module outside the exports of a library (PE-006)
+    | EModuleNameCollision T.Text -- ^ Two modules of a build with one name (PE-007)
+    | EInvalidUtf8 -- ^ Module file that is not valid UTF-8 (PE-008)
   deriving Show
 
 type ParsingErrors = AnnotatedError Error Location
@@ -40,6 +44,14 @@ instance Diagnosable Error where
     describe (EImportedFilesLoop _imports) =
         diagnostic "PE-004" "cycle between project source files"
             "A recursive module import loop has been detected."
+    describe (EImportedModuleHidden detail) =
+        diagnostic "PE-005" "imported module not visible" detail
+    describe (EImportedModuleNotExported detail) =
+        diagnostic "PE-006" "imported module not exported" detail
+    describe (EModuleNameCollision detail) =
+        diagnostic "PE-007" "two modules with the same name" detail
+    describe EInvalidUtf8 =
+        diagnostic "PE-008" "invalid file encoding" "The file is not valid UTF-8."
     describe EEmptyModuleName = diagnosticWithoutDetail "Internal" "internal error"
 
 instance ErrorMessage ParsingErrors where

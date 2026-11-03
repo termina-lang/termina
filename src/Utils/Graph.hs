@@ -1,5 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Utils.Graph where
 
@@ -26,6 +27,9 @@ data TopSt k e
   = St
   -- Temporary marked set
   { getTemp :: M.Map k e
+  -- The temporary marked elements in the order of the recursion, the last one
+  -- first
+  , getPath :: [e]
   -- Permanent marked set
   , getPerm :: S.Set k
   , res :: [k]
@@ -35,10 +39,10 @@ class (Ord k) => GraphKey k e where
   graphKey :: e -> k
 
 emptyTopS :: TopSt k e
-emptyTopS = St M.empty S.empty []
+emptyTopS = St M.empty [] S.empty []
 
 addTemp :: (GraphKey k e) => k -> e -> TopSt k e -> TopSt k e
-addTemp k e st = st{getTemp = M.insert k e (getTemp st)}
+addTemp k e st = st{getTemp = M.insert k e (getTemp st), getPath = e : getPath st}
 
 -- Add to temp and perm sets
 addPerm :: GraphKey k e => k -> TopSt k e -> TopSt k e
@@ -50,10 +54,11 @@ addL a st = st{res=a : res st}
 
 -- Remove or nothing.
 rmTemp :: GraphKey k e => k -> TopSt k e -> TopSt k e
-rmTemp a st = st{getTemp = M.delete a (getTemp st)}
+rmTemp a st = st{getTemp = M.delete a (getTemp st), getPath = filter ((/= a) . graphKey) (getPath st)}
 
 data TopSortError k e
-  = ELoop [e] -- ^ Loop Error fund.
+  = ELoop [e] -- ^ The elements of a loop in the order of the recursion, the first one repeated at the end
+
   | ENotFound e k -- ^ Internal error.
   deriving Show
 
@@ -69,9 +74,8 @@ instance GraphKey String String where
 
 -------------------------------------------------
 -- Note [0]
--- We return two elements forming a cycle (loop).
--- These elements may be part of the loop, but the ones causing it may be two
--- others.
+-- A loop is given by the elements of the recursion from the first one whose
+-- key is repeated, followed by the element that repeats it.
 -------------------------------------------------
 -- | Main function giving a solution to all contraints or a loop.
 topSort
@@ -123,7 +127,7 @@ topSortInternal graph =
 
 -- | Performs the DFS visit for a specific dependency 'src' of a 'parent' node.
 -- It detects cycles and adds nodes to the sorted list in reverse post-order.
-visit :: GraphKey k e => Graph k e -> k -> e -> TopSort k e ()
+visit :: forall k e. GraphKey k e => Graph k e -> k -> e -> TopSort k e ()
 visit graph parent src
   -- Retrieve the set of permanently marked nodes from the state.
   = gets getPerm >>= \permSet ->
@@ -143,9 +147,10 @@ visit graph parent src
         -- If 'src' is in the temporary set, it means we have encountered 'src' again
         -- while it's already being processed (i.e., it's an ancestor in the DFS tree).
         -- This indicates a cycle in the graph.
-        -- Throw an ELoop error, providing the elements currently in the temporary set
-        -- (which form part of the cycle) plus the current 'src' element.
-        (throwError (ELoop (M.elems tempSet ++ [src])))
+        -- Throw an ELoop error, providing the elements of the recursion from the
+        -- one with the key of 'src', in their order, plus the current 'src' element.
+        (gets getPath >>= \path ->
+          throwError (ELoop (dropWhile ((/= (graphKey src :: k)) . graphKey) (reverse path) ++ [src])))
       -- Mark 'src' temporarily by adding its key and the element itself to the temporary set.
       -- This signifies that 'src' is now in the current recursion path.
       -- temp mark |src|

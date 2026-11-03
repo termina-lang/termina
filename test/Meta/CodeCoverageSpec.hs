@@ -30,10 +30,7 @@ families :: [Family]
 families =
   [ Family "Parser (PE)" "PE"
       "src/Parser/Errors.hs"
-      ["test/Parser/Negative/CodeSpec.hs"] []
-      -- PE-002 (module at project root) and PE-003 (imported file not found)
-      -- come from the on-disk module loader, unreachable from in-memory sources.
-      ["PE-002", "PE-003"]
+      ["test/Parser/Negative/CodeSpec.hs", "test/Configuration/SourcesSpec.hs"] [] []
   , Family "Semantic (SE)" "SE"
       "src/Semantic/Errors.hs"
       -- Most SE codes are tested via fixtures; the float-exclusive ones (e.g.

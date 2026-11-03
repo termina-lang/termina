@@ -484,26 +484,21 @@ checkDeployment chatty project deployment = do
         mTest = deploymentTest deployment
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
     let sources = buildSources project mTest mainFolder
+        files = sourceTexts sources
     -- | Load the module that wires the deployment
     let mainModulePath = mainFolder </> deploymentMainModule deployment <.> "fin"
     when chatty (putStrLn . debugMessage $ "Loading the main module: \"" ++ mainModulePath ++ "\"")
-    appModule <- loadTerminaModule sources mainFolder (deploymentMainModule deployment)
+    appModule <- loadTerminaModule sources mainFolder (deploymentMainModule deployment) >>= orDieWithFailure files
     -- | Load the project
     when chatty (putStrLn . debugMessage $ "Loading project modules")
-    parsedModules <- loadModules sources mainFolder (importedModules appModule)
+    parsedModules <- loadModules sources mainFolder (importedModules appModule) >>= orDieWithFailure files
     let parsedProject = M.insert (qualifiedName appModule) appModule parsedModules
     -- | The modules of the deployment with extern functions have their entries
     verifyLoadedExterns appModule (maybe externFolder (\t -> "tests" </> t </> externFolder) mTest)
       parsedProject (deploymentExterns deployment)
     -- | Detect any possible loops in the project
     when chatty (putStrLn . debugMessage $ "Ordering project modules")
-    let projectDependencies = M.map importedModules parsedProject
-    orderedDependencies <-
-      either
-        (\files ->
-          dieWithError . T.unpack $ "Detected cycle between project source files: " <> T.intercalate " -> " (map (T.pack . show) files))
-        return
-        $ sortProjectDepsOrLoop projectDependencies
+    orderedDependencies <- orDieWithFailure files (orderedModules parsedProject)
     when chatty (putStrLn . debugMessage $ "Checking project modules")
     checked <- orDieWithFailure (projectSourceFiles parsedProject)
       (snd (checkModules config plt parsedProject orderedDependencies))
@@ -516,15 +511,14 @@ checkDeployment chatty project deployment = do
 checkExportedModules :: Bool -> LoadedProject -> IO ()
 checkExportedModules chatty project = do
     roots <- exportedModules "." manifest
-    parsedModules <- loadModules (buildSources project Nothing "src") "src" [ModuleDependency root Internal | root <- roots]
+    let sources = buildSources project Nothing "src"
+        files = sourceTexts sources
+    parsedModules <- loadModules sources "src" [ModuleDependency root Internal | root <- roots] >>= orDieWithFailure files
     -- | Check that each module with extern functions has its entry in the manifest
     case checkExternModules "the project" "src" (manifestExtern manifest) Nothing (map parsedExterns (M.elems parsedModules)) of
         [] -> return ()
         errs -> dieWithFirstError errs
-    orderedModules <- either
-        (\files -> dieWithError $ "detected cycle between the exported modules of the library: " ++ show files)
-        return
-        (sortProjectDepsOrLoop (M.map importedModules parsedModules))
+    order <- orDieWithFailure files (orderedModules parsedModules)
     forM_ libraryPlatforms $ \plt -> do
         when chatty (putStrLn . debugMessage $ "Type checking the exported modules on " ++ show plt)
         let config = (defaultConfig (T.unpack (projectName (manifestProject manifest))) plt) {
@@ -533,7 +527,7 @@ checkExportedModules chatty project = do
                 deploymentKind = TestBuild "library"
               }
         orDieWithFailure (projectSourceFiles parsedModules)
-          (maybe (Right ()) Left (snd (typeProject (makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)) parsedModules orderedModules)))
+          (maybe (Right ()) Left (snd (typeProject (makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)) parsedModules order)))
 
   where
 

@@ -4,6 +4,7 @@
 module Parser.Negative.DetailSpec (spec) where
 
 import Parser.Common (parserStageError, moduleStageError)
+import Modules.Modules (ModuleDependency(..))
 import Parser.Errors (Error(..))
 import Utils.Annotations (AnnotatedError(..))
 import Text.Parsec.Error (errorMessages, messageString)
@@ -13,6 +14,14 @@ import Test.Hspec
 modA, modB :: String
 modA = unlines ["import pkg.b;", "", "function fa() -> u32 { return 0 : u32; }"]
 modB = unlines ["import pkg.a;", "", "function fb() -> u32 { return 0 : u32; }"]
+
+-- | app/main imports pkg/x, which imports the cycle between pkg/a and pkg/b.
+cycleBehindX :: [(String, String)]
+cycleBehindX =
+  [ ("app/main", unlines ["import pkg.x;", "", "function fm() -> u32 { return 0 : u32; }"])
+  , ("pkg/x", unlines ["import pkg.a;", "", "function fx() -> u32 { return 0 : u32; }"])
+  , ("pkg/a", modA)
+  , ("pkg/b", modB) ]
 
 -- | The messages of the parse error of a single module, or Nothing if the
 -- module parses or fails for another reason.
@@ -54,6 +63,10 @@ spec = describe "Parser stage: error detail" $ do
     parserStageError [("pkg/a", modA), ("pkg/b", modB)] `shouldSatisfy` \case
       Just (AnnotatedError (EImportedFilesLoop deps) _) -> not (null deps)
       _ -> False
+  it "PE-004 gives the modules of the cycle in the order of the imports" $
+    (case parserStageError cycleBehindX of
+      Just (AnnotatedError (EImportedFilesLoop deps) _) -> Just [ qname | ModuleDependency qname _ <- deps ]
+      _ -> Nothing) `shouldBe` Just ["pkg/a", "pkg/b", "pkg/a"]
   describe "PE-001 rejects an invalid module path, with that message alone" $ do
     it "when it begins with termina" $
       parseMessages "import termina.types;" `shouldBe` Just ["User-defined modules are not allowed in the termina namespace: termina.types."]

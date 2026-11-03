@@ -4,13 +4,16 @@
 -- folder of the importer sees, over a project with its packages in vendor/.
 module Configuration.SourcesSpec (spec) where
 
+import Command.Common (loadTerminaModule)
 import Command.Sources
+import Command.Utils (CheckFailure(..))
 import Configuration.Lock
 import Configuration.Package (Package(..))
 import Configuration.Parsed (ParseFailure(..), ParsedFiles)
 import Configuration.Vendor (packageDir)
 
 import Control.Monad (forM_)
+import qualified Data.ByteString as BS
 import qualified Data.Map.Lazy as ML
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
@@ -53,6 +56,13 @@ withLoaded action = do
         package "ccsds" []
         package "fixtures" []
         forM_ ["src/obdh/tm.fin", "src/pus/m.fin", "tests/hk/src/hk/h.fin"] (`write` "")
+        -- | Modules whose loading fails
+        write "src/bad/missing.fin" "import obdh.nothing;\n"
+        write "src/bad/hidden.fin" "import ccsds.m;\n"
+        write "src/bad/root.fin" "import nothing;\n"
+        write "src/bad/private.fin" "import support.fake;\n"
+        write "src/bad/twice.fin" "import pus.m;\n"
+        BS.writeFile "src/bad/latin1.fin" (BS.pack [0xff])
         writeLockFile "termina.lock" (Lock 1 [LockedPackage (url n) "v1" (T.pack (replicate 40 'a')) (T.pack ("sha256:" ++ replicate 64 'b')) | n <- ["pus", "ccsds", "fixtures"]])
         let manifest = manifestOf $ header "obdh" ++ "app:\n  platform: posix-gcc\n  profile: release\n" ++ deps ["pus"]
                 ++ "  - path: libs/drivers\n"
@@ -120,9 +130,37 @@ spec = describe "source folders of a build" $ do
       textOf "libs/drivers/src/drivers/uart.fin" locals `shouldBe` Just "not termina"
       textOf "libs/drivers/src/support/fake.fin" locals `shouldBe` Just ""
 
+  it "PE-002: a module imports one at the root of a source folder" $
+    loadCode "bad/root" `shouldReturn` Just "PE-002"
+
+  it "PE-003: a module imports one that no folder of the build has" $
+    loadCode "bad/missing" `shouldReturn` Just "PE-003"
+
+  it "PE-005: a module imports one of a folder that it does not see" $
+    loadCode "bad/hidden" `shouldReturn` Just "PE-005"
+
+  it "PE-006: a module imports one of a local folder outside its exports" $
+    loadCode "bad/private" `shouldReturn` Just "PE-006"
+
+  it "PE-007: a module imports a name that two folders of the build have" $
+    loadCode "bad/twice" `shouldReturn` Just "PE-007"
+
+  it "PE-008: a module file is not valid UTF-8" $
+    loadCode "bad/latin1" `shouldReturn` Just "PE-008"
+
+  it "loads a module whose imports the build sees" $
+    loadCode "obdh/tm" `shouldReturn` Nothing
+
   it "leaves out the text of a file that the project does not have" $
     withLoaded $ \project ->
       ML.member "src/obdh/new.fin" (loadedProjectModules (withTexts (M.singleton "src/obdh/new.fin" "") project)) `shouldBe` False
+
+-- | The code of the error that the loading of a module of src/ gives in the
+-- build of the application.
+loadCode :: FilePath -> IO (Maybe T.Text)
+loadCode qname =
+    withLoaded $ \project ->
+        either (Just . failureCode) (const Nothing) <$> loadTerminaModule (buildSources project Nothing "app") "src" qname
 
 -- | The text of a module file, parsed or not.
 textOf :: FilePath -> ParsedFiles -> Maybe T.Text

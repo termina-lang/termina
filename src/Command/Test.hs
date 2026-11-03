@@ -10,7 +10,7 @@ module Command.Test (
 
 import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, checkExportedModules, nothingSelected, selectDeployments, verifyLocalFolders)
 import Command.Project (loadProject)
-import Command.Common (loadTerminaModule, loadModules)
+import Command.Common (loadTerminaModule, loadModules, orderedModules, sourceTexts)
 import Command.Deliver (deliverableInfo)
 import Command.Sources (LoadedProject(..), buildSources, readProject)
 import Configuration.Configuration
@@ -602,15 +602,13 @@ loadTestCases :: LoadedProject -> String -> IO [TestCase]
 loadTestCases project testName = do
     let testFolder = "tests" </> testName
         sources = buildSources project (Just testName) testFolder
-    testModule <- loadTerminaModule sources testFolder "test"
-    parsedModules <- loadModules sources testFolder (importedModules testModule)
+        files = sourceTexts sources
+    testModule <- loadTerminaModule sources testFolder "test" >>= orDieWithFailure files
+    parsedModules <- loadModules sources testFolder (importedModules testModule) >>= orDieWithFailure files
     let parsedProject = M.insert (qualifiedName testModule) testModule parsedModules
-    orderedModules <- either
-        (\cycleFiles -> dieWithError $ "Detected cycle between the source files of the test " ++ testName ++ ": " ++ show cycleFiles)
-        return
-        (sortProjectDepsOrLoop (M.map importedModules parsedProject))
+    order <- orDieWithFailure files (orderedModules parsedProject)
     either dieWithError return $
-      testCases [parsedAST . metadata $ parsedProject M.! m | m <- orderedModules]
+      testCases [parsedAST . metadata $ parsedProject M.! m | m <- order]
 
 -- | The cases of a test in the order in which the harness numbers them.
 testCases :: [AnnotatedProgram ParserAnn] -> Either String [TestCase]
