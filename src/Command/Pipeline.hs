@@ -15,6 +15,7 @@ import ControlFlow.Architecture.Types (TerminaProgArch)
 import ControlFlow.ConstFolding (runConstFolding, constFoldModule)
 import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
 import ControlFlow.ValueAnalysis (runValueAnalysisCheck)
+import Control.Applicative ((<|>))
 import Data.List (foldl')
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -45,7 +46,7 @@ checkModules config plt parsedProject orderedModules = do
     let initialEnv = makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)
     typedProject <- typeProject initialEnv parsedProject orderedModules
     rawLoweredProject <- lowerModules typedProject
-    loweredChecks rawLoweredProject
+    maybe (Right ()) Left (loweredChecks rawLoweredProject)
     (loweredProject, constEnvs) <- foldProject config plt rawLoweredProject orderedModules
     valueEvidence <- analyseValues plt constEnvs loweredProject orderedModules
     let (elaboratedProject, checksReports) = elaborateProject valueEvidence loweredProject
@@ -60,13 +61,13 @@ lowerModules = either (Left . checkFailure) Right . lowerProject
 
 -- | Check the paths, the definite assignment, the boxes, the deques and the
 -- scope of the variables of the basic-block AST, in this order.
-loweredChecks :: LoweredProject -> Either CheckFailure ()
-loweredChecks project = do
-    maybe (Right ()) (Left . checkFailure) (basicBlockPathsCheckModules project)
-    maybe (Right ()) (Left . checkFailure) (varUsageCheckModules project)
-    maybe (Right ()) (Left . checkFailure) (boxUsageCheckModules project)
-    maybe (Right ()) (Left . checkFailure) (dequeUsageCheckModules project)
-    maybe (Right ()) (Left . checkFailure) (varScopeCheckModules project)
+loweredChecks :: LoweredProject -> Maybe CheckFailure
+loweredChecks project =
+    (checkFailure <$> basicBlockPathsCheckModules project)
+    <|> (checkFailure <$> varUsageCheckModules project)
+    <|> (checkFailure <$> boxUsageCheckModules project)
+    <|> (checkFailure <$> dequeUsageCheckModules project)
+    <|> (checkFailure <$> varScopeCheckModules project)
 
 -- | Check the side effects of the elaborated modules.
 sideEffectCheck :: Platform -> ElaboratedProject -> Either CheckFailure ()

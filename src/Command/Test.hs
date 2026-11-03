@@ -8,7 +8,7 @@ module Command.Test (
     TestCase(..), testCases
 ) where
 
-import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, nothingSelected, selectDeployments, verifyLocalFolders)
+import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, checkExportedModules, nothingSelected, selectDeployments, verifyLocalFolders)
 import Command.Project (loadProject)
 import Command.Common (loadTerminaModule, loadModules)
 import Command.Deliver (deliverableInfo)
@@ -218,7 +218,12 @@ runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Maybe Exec
 runTests mName mPlatform mProfile mExecutor mServer mXsdb offline mode = do
     loaded <- try (case mode of
         Recorded _ -> (\m -> LoadedProject m M.empty M.empty M.empty) <$> (loadManifest >>= either dieWithFirstError return)
-        _ -> loadProject False offline) :: IO (Either ExitCode LoadedProject)
+        _ -> do
+            loadedProject <- loadProject offline
+            case manifestNature (loadedManifest loadedProject) of
+                Library _ -> checkExportedModules False loadedProject
+                Application _ -> return ()
+            return loadedProject) :: IO (Either ExitCode LoadedProject)
     project <- either (const (exitWith (ExitFailure 2))) return loaded
     let manifest = loadedManifest project
         selection = maybe SelectTests SelectTest mName

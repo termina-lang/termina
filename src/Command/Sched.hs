@@ -649,7 +649,7 @@ genMASTModels reduction config arch sitMap trPathMap = do
 schedCommand :: SchedCmdArgs -> IO ()
 schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT writeMAST reduction) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
-    project <- loadProject chatty False
+    project <- loadProject False
     deployment <- maybe (dieWithError "the project is a library and has no application") return
         (appDeployment (loadedManifest project))
     let config = deploymentConfig deployment

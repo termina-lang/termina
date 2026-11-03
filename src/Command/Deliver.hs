@@ -73,7 +73,7 @@ deliverCommand (DeliverCmdArgs chatty withTests archive withTrace) = do
     -- A deliverable is built from the state in git, which verify checks without writing.
     place <- currentPlace
     verifyProject place "." >>= either dieWithFirstError return
-    loaded <- loadProject chatty True
+    loaded <- loadProject True
     let manifest = loadedManifest loaded
         hasApp = isJust (appDeployment manifest)
         selection = case (withTests, hasApp) of
@@ -82,6 +82,9 @@ deliverCommand (DeliverCmdArgs chatty withTests archive withTrace) = do
             (True, False) -> SelectTests
     unless (hasApp || withTests) $
       dieWithError $ "the project is a library and has no application: deliver its tests with --tests"
+    case manifestNature manifest of
+        Library _ -> checkExportedModules chatty loaded
+        Application _ -> return ()
     deployments <- either dieWithError return $ selectDeployments manifest selection Nothing Nothing
     when (null deployments) (putStrLn . infoMessage $ nothingSelected manifest selection Nothing)
     forM_ deployments $ \deployment -> do

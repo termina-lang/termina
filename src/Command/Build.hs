@@ -3,7 +3,7 @@
 module Command.Build (
     buildCmdArgsParser, buildCommand, generateCommand, BuildCmdArgs(..),
     Selection(..), selectDeployments, nothingSelected, verifyLocalFolders, buildDeployment, announce, runMake,
-    CheckedDeployment(..), checkDeployment
+    CheckedDeployment(..), checkDeployment, checkExportedModules
 ) where
 
 import Configuration.Configuration
@@ -47,8 +47,12 @@ import Data.Aeson.Encode.Pretty (Config(..), defConfig, encodePretty', keyOrder)
 import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
 import EFP.Schedulability.WCEPath.Printer
 import Command.Common
-import Command.Pipeline (CheckedModules(..), checkModules)
-import Command.Extern (ExternGroup, prepareExtern, verifyLoadedExterns)
+import Command.Pipeline (CheckedModules(..), checkModules, typeProject)
+import Command.Extern (ExternGroup, parsedExterns, prepareExtern, verifyLoadedExterns)
+import Configuration.ExternCheck (checkExternModules)
+import Configuration.Namespace (exportedModules)
+import Generator.Environment (getPlatformInitialGlobalEnv)
+import Semantic.Environment (makeInitialGlobalEnv)
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.PlantUML
 import Extras.PlantUML.Printer
@@ -307,7 +311,10 @@ genMonadicHeaderFiles params plt monadicTypes = do
 selectedDeployments :: BuildCmdArgs -> IO (LoadedProject, [Deployment])
 selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile offline) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
-    project <- loadProject chatty offline
+    project <- loadProject offline
+    case manifestNature (loadedManifest project) of
+        Library _ -> checkExportedModules chatty project
+        Application _ -> return ()
     let manifest = loadedManifest project
     deployments <- either dieWithError return $ selectDeployments manifest selection mPlatform mProfile
     when (null deployments) (putStrLn . infoMessage $ nothingSelected manifest selection mPlatform)
@@ -371,7 +378,7 @@ selectDeployments manifest selection mPlatform mProfile =
 nothingSelected :: Manifest -> Selection -> Maybe Platform -> String
 nothingSelected manifest selection mPlatform =
     case selection of
-        SelectApp -> "the library has no application. Its exported modules have been checked; build its tests with --test, --tests or --all"
+        SelectApp -> "the project is a library. Build its tests with --test, --tests or --all"
         _ | M.null (manifestTests manifest) -> "the project has no tests"
           | otherwise -> "no test runs on " ++ maybe "" show mPlatform
 
@@ -501,6 +508,41 @@ checkDeployment chatty project deployment = do
     checked <- orDieWithFailure (projectSourceFiles parsedProject)
       (checkModules config plt parsedProject orderedDependencies)
     return (CheckedDeployment sources parsedProject orderedDependencies checked)
+
+-- | Type check the exported modules of a library and the modules they import.
+-- The modules are checked on each platform of the tests of the library, or on
+-- the test platform when it has no tests.
+-- The modules are checked as those of a test build.
+checkExportedModules :: Bool -> LoadedProject -> IO ()
+checkExportedModules chatty project = do
+    roots <- exportedModules "." manifest
+    parsedModules <- loadModules (buildSources project Nothing "src") "src" [ModuleDependency root Internal | root <- roots]
+    -- | Check that each module with extern functions has its entry in the manifest
+    case checkExternModules "the project" "src" (manifestExtern manifest) Nothing (map parsedExterns (M.elems parsedModules)) of
+        [] -> return ()
+        errs -> dieWithFirstError errs
+    orderedModules <- either
+        (\files -> dieWithError $ "detected cycle between the exported modules of the library: " ++ show files)
+        return
+        (sortProjectDepsOrLoop (M.map importedModules parsedModules))
+    forM_ libraryPlatforms $ \plt -> do
+        when chatty (putStrLn . debugMessage $ "Type checking the exported modules on " ++ show plt)
+        let config = (defaultConfig (T.unpack (projectName (manifestProject manifest))) plt) {
+                sysPrintOutputBufferSize = manifestPrintBufSize manifest,
+                sysReadInputBufferSize = manifestReadBufSize manifest,
+                deploymentKind = TestBuild "library"
+              }
+        void (orDieWithFailure (projectSourceFiles parsedModules)
+          (typeProject (makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)) parsedModules orderedModules))
+
+  where
+
+    manifest = loadedManifest project
+
+    libraryPlatforms =
+        case foldr (\plt acc -> if plt `elem` acc then acc else plt : acc) [] (concatMap testPlatforms (M.elems (manifestTests manifest))) of
+            [] -> [TestPlatform]
+            plts -> plts
 
 -- | Generate the C and the Makefile of a deployment of a project. It gives the
 -- modules of the deployment with their source files, and its groups of C.
