@@ -32,7 +32,6 @@ import qualified Data.Text.Encoding as TE
 import Data.Text (Text, pack)
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
-import Data.Time (UTCTime(..), fromGregorian, secondsToDiffTime)
 
 import Parser.Parsing (terminaModuleParser)
 import Text.Parsec (runParser)
@@ -312,7 +311,7 @@ parseModule (qname, src) =
       (annotateError Internal (EParseError err) :: ParsingErrors))
     Right (Termina imports prog) -> do
       deps <- mapM toDep imports
-      pure (qname, TerminaModuleData qname qname dummyTime deps [] (pack src) (ParsingData prog))
+      pure (qname, TerminaModuleData qname qname deps [] (pack src) (ParsingData prog))
 
   where
 
@@ -347,10 +346,6 @@ initialEnv :: TerminaConfig -> Environment
 initialEnv cfg = makeInitialGlobalEnv (Just cfg) TestPlatform
                (getPlatformInitialGlobalEnv cfg TestPlatform)
 
--- | A placeholder modification time: only the IO file-caching logic in
--- Command.Build reads it; the pure pipeline never inspects it.
-dummyTime :: UTCTime
-dummyTime = UTCTime (fromGregorian 1997 8 29) (secondsToDiffTime (2 * 3600 + 14 * 60))
 
 -- Error plumbing ------------------------------------------------------------
 

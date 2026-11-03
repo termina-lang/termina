@@ -18,7 +18,6 @@ import Modules.Utils (buildModuleName, qualifiedToModuleName)
 import qualified Data.Text as T
 
 import System.FilePath
-import System.Directory
 import Parser.AST (TerminaModule)
 import Parser.Types (ParserAnn)
 import Parser.Errors
@@ -46,13 +45,10 @@ loadTerminaModule sources root filePath = do
   let fullP = root </> filePath <.> "fin"
       inFolder = find ((== root) . folderPath) sources >>= ML.lookup (normalise fullP) . folderModules
   parsedFile <- maybe (readTerminaFile filePath fullP) return inFolder
-  case parsedModule filePath fullP parsedFile of
-    Left failure -> return (Left failure)
-    Right (src_code, term) -> do
-      mod_time <- getModificationTime fullP
-      return $ do
-        imports <- mapM importOf (modules term)
-        Right (TerminaModuleData filePath fullP mod_time imports [] src_code (ParsingData . frags $ term))
+  return $ do
+    (src_code, term) <- parsedModule filePath fullP parsedFile
+    imports <- mapM importOf (modules term)
+    Right (TerminaModuleData filePath fullP imports [] src_code (ParsingData . frags $ term))
 
   where
 

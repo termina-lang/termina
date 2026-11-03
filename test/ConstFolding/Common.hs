@@ -6,7 +6,6 @@ module ConstFolding.Common (constFoldError) where
 
 import Text.Parsec (runP)
 import Data.Text (pack)
-import Data.Time (UTCTime(..), fromGregorian, secondsToDiffTime)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
@@ -34,8 +33,5 @@ constFoldError input = case runP (contents topLevel) "test" "" input of
       Right (typed, _) -> case runLowerModule typed of
         Left err -> error $ "Basic Blocks error: " ++ show err
         Right bb ->
-          let bbModule = TerminaModuleData "test" "test" dummyTime [] [] (pack input) (BasicBlockData bb)
+          let bbModule = TerminaModuleData "test" "test" [] [] (pack input) (BasicBlockData bb)
           in either Just (const Nothing) (runConstFolding (ConstFoldEnv M.empty TestPlatform defaultMicrosecondsPerTick) (constFoldModule bbModule))
-
-dummyTime :: UTCTime
-dummyTime = UTCTime (fromGregorian 1997 8 29) (secondsToDiffTime 0)

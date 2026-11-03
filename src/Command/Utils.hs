@@ -193,7 +193,6 @@ lowerTypedModule typedModule = do
         Right bbAST -> pure $ TerminaModuleData
             (qualifiedName typedModule)
             (fullPath typedModule)
-            (modificationTime typedModule)
             (importedModules typedModule)
             (visibleModules typedModule)
             (sourcecode typedModule)

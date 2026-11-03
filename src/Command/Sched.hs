@@ -120,7 +120,6 @@ loadRTModule rtModelFile = do
   sourceFileExists <- doesFileExist rtModelFile
   unless sourceFileExists (dieWithError $ "RT model file \"" ++ rtModelFile ++ "\" does not exist")
   src_code <- TE.decodeUtf8 <$> BS.readFile rtModelFile
-  mod_time <- getModificationTime rtModelFile
   -- parse it
   case runParser terminaRTParser rtModelFile rtModelFile (T.unpack src_code) of
     Left err ->
@@ -128,7 +127,7 @@ loadRTModule rtModelFile = do
           fileMap = M.singleton rtModelFile src_code
       in
       dieWithReport (toText pErr fileMap)
-    Right term -> return $ TerminaModuleData rtModelFile rtModelFile mod_time [] [] src_code (ParsingRTData term)
+    Right term -> return $ TerminaModuleData rtModelFile rtModelFile [] [] src_code (ParsingRTData term)
 
 typeRTModule :: TerminaProgArch SemanticAnn
   -> WCEPathMap WCEPSemAnn
@@ -153,7 +152,6 @@ typeRTModule arch trPathMap loweredProject pathProject rtModule = do
     (Right tyElems) -> return $ TerminaModuleData
         (qualifiedName rtModule)
         (fullPath rtModule)
-        (modificationTime rtModule)
         []
         []
         (sourcecode rtModule)
@@ -228,7 +226,6 @@ loadWCETModules loweredProject efpPath = do
   loadWCETModule fullP filePath = do
     -- read it
     src_code <- TE.decodeUtf8 <$> BS.readFile fullP
-    mod_time <- getModificationTime fullP
     -- parse it
     case runParser terminaWCETParser filePath fullP (T.unpack src_code) of
       Left err ->
@@ -236,7 +233,7 @@ loadWCETModules loweredProject efpPath = do
             fileMap = M.singleton fullP src_code
         in
         dieWithReport (toText pErr fileMap)
-      Right term -> return $ TerminaModuleData filePath fullP mod_time [] [] src_code (WCETData term)
+      Right term -> return $ TerminaModuleData filePath fullP [] [] src_code (WCETData term)
 
 -- | Type check the transactional worst-case execution paths of the project modules
 typeWCETModules :: TerminaProgArch SemanticAnn
@@ -300,7 +297,6 @@ loadWCEPathModules loweredProject efpPath = do
   loadPathModule fullP filePath = do
     -- read it
     src_code <- TE.decodeUtf8 <$> BS.readFile fullP
-    mod_time <- getModificationTime fullP
     -- parse it
     case runParser terminaTransPathsParser filePath fullP (T.unpack src_code) of
       Left err ->
@@ -308,7 +304,7 @@ loadWCEPathModules loweredProject efpPath = do
             fileMap = M.singleton fullP src_code
         in
         dieWithReport (toText pErr fileMap)
-      Right term -> return $ TerminaModuleData filePath fullP mod_time [] [] src_code (TransPathData term)
+      Right term -> return $ TerminaModuleData filePath fullP [] [] src_code (TransPathData term)
 
 -- | Type check the transactional worst-case execution paths of the project modules
 typeWCEPathModules :: TerminaProgArch SemanticAnn

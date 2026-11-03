@@ -897,10 +897,10 @@ foldElement (ExternFunction ident params mrty mode mods ann) = do
   return $ ExternFunction ident params' mrty' mode mods ann'
 
 constFoldModule :: BasicBlocksModule -> ConstFoldMonad BasicBlocksModule
-constFoldModule (TerminaModuleData modQualifiedName modFullPath 
-    modModificationTime modImportedModules modVisibleModules modSourcecode (BasicBlockData ast)) =
-    TerminaModuleData modQualifiedName modFullPath 
-        modModificationTime modImportedModules modVisibleModules modSourcecode . BasicBlockData <$> mapM foldElement ast
+constFoldModule (TerminaModuleData modQualifiedName modFullPath
+    modImportedModules modVisibleModules modSourcecode (BasicBlockData ast)) =
+    TerminaModuleData modQualifiedName modFullPath
+        modImportedModules modVisibleModules modSourcecode . BasicBlockData <$> mapM foldElement ast
 
 runConstFolding
   :: ConstFoldEnv
