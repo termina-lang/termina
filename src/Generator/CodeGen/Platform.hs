@@ -19,21 +19,26 @@ import Command.Extern (ExternGroup)
 import Generator.Makefile.Printer
 import Generator.CodeGen.Application.Config
 import Generator.TestDescriptor (genTestDescriptor)
+import Core.TestCases (typedCases)
+import Modules.Modules (metadata)
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.Map.Strict as M
 import qualified Data.Text.Encoding as TE
 
 genPlatformCode :: TerminaConfig -> Platform -> LoweredProject -> TerminaProgArch SemanticAnn -> [ExternGroup] -> IO ()
 genPlatformCode _ TestPlatform _ _ _ = return ()
 genPlatformCode params plt loweredProject progArchitecture externs = do
+  cases <- if isTestBuild params
+    then either dieWithError return $ typedCases (concatMap (loweredAST . metadata) (M.elems loweredProject))
+    else return []
   stamp <- if isTestBuild params
-    then case genTestDescriptor params loweredProject progArchitecture of
-      Left err -> dieWithError err
-      Right (descriptor, stamp) -> do
-        writeIfChanged (destinationPath </> "test" <.> "json") (TE.decodeUtf8 (BL.toStrict descriptor))
-        return stamp
+    then do
+      let (descriptor, stamp) = genTestDescriptor params loweredProject progArchitecture cases
+      writeIfChanged (destinationPath </> "test" <.> "json") (TE.decodeUtf8 (BL.toStrict descriptor))
+      return stamp
     else return 0
 
-  case runGenMainFile params plt mainFile stamp progArchitecture of
+  case runGenMainFile params plt mainFile stamp cases progArchitecture of
     Left err -> dieWithError $ show err
     Right cMainFile -> writeIfChanged mainFile $ runCPrinter (lineDirectives params) cMainFile
 

@@ -10,7 +10,7 @@ module Generator.TestDescriptor (
 import Command.Types (LoweredProject)
 import Configuration.Configuration
 import ControlFlow.Architecture.Types
-import ControlFlow.Architecture.Utils (architectureCases, blocksIn, classMemberFunctions, isUnitTest)
+import ControlFlow.Architecture.Utils (blocksIn, classMemberFunctions, isUnitTest)
 import Core.TestCases (NumberedCase(..))
 import Generator.CodeGen.Application.Utils (emitterIdOrder, taskIdOrder)
 import Generator.CodeGen.Common (testHarness)
@@ -34,10 +34,8 @@ import System.FilePath ((</>))
 import Text.Printf (printf)
 
 -- | The text of the descriptor and its stamp
-genTestDescriptor :: TerminaConfig -> LoweredProject -> TerminaProgArch SemanticAnn -> Either String (BL.ByteString, Word32)
-genTestDescriptor config loweredProject progArchitecture = do
-    cases <- either (\(ident, cls) -> Left $ "the test instance " ++ ident ++ " is of type " ++ cls ++ ", which is not a test class")
-        Right (architectureCases progArchitecture)
+genTestDescriptor :: TerminaConfig -> LoweredProject -> TerminaProgArch SemanticAnn -> [NumberedCase] -> (BL.ByteString, Word32)
+genTestDescriptor config loweredProject progArchitecture cases =
     let unitTest = isUnitTest progArchitecture
         rest = [
             "version" .= (1 :: Integer),
@@ -57,7 +55,7 @@ genTestDescriptor config loweredProject progArchitecture = do
               ]
           ]
         stamp = stampOf (render (object rest))
-    return (render (object (("stamp" .= (printf "0x%08x" stamp :: String)) : rest)), stamp)
+    in (render (object (("stamp" .= (printf "0x%08x" stamp :: String)) : rest)), stamp)
 
     where
 

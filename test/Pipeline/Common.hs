@@ -46,6 +46,7 @@ import Generator.Environment (getPlatformInitialGlobalEnv)
 import Generator.CodeGen.Module (runGenSourceFile)
 import Generator.CodeGen.Application.Glue (runGenMainFile)
 import Generator.TestDescriptor (genTestDescriptor)
+import Core.TestCases (NumberedCase, typedCases)
 import Data.Word (Word32)
 import Generator.CodeGen.Application.Config (runGenConfigFile)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
@@ -189,8 +190,12 @@ renderMainFileOn :: Platform -> TerminaProgArch SemanticAnn -> Either Text Text
 renderMainFileOn = renderMainFileWithOn configParams
 
 renderMainFileWithOn :: TerminaConfig -> Platform -> TerminaProgArch SemanticAnn -> Either Text Text
-renderMainFileWithOn cfg plt progArch =
-  case runGenMainFile cfg plt "main" 0 progArch of
+renderMainFileWithOn cfg plt = renderMainFileWithCases cfg plt []
+
+-- | 'renderMainFile' with the cases of a unit test.
+renderMainFileWithCases :: TerminaConfig -> Platform -> [NumberedCase] -> TerminaProgArch SemanticAnn -> Either Text Text
+renderMainFileWithCases cfg plt cases progArch =
+  case runGenMainFile cfg plt "main" 0 cases progArch of
     Left err -> Left . T.pack $ show err
     Right cFile -> Right $ runCPrinter False cFile
 
@@ -250,15 +255,18 @@ runTestApp :: String
 runTestApp input = runFullProjectAppWith testConfigParams [("test", input)]
 
 -- | 'renderMainFile' for the deployment of a test.
-renderTestMainFile :: TerminaProgArch SemanticAnn -> Either Text Text
-renderTestMainFile = renderMainFileWith testConfigParams
+renderTestMainFile :: (TerminaProgArch SemanticAnn, [(QualifiedName, AnnotatedProgram SemanticAnn)]) -> Either Text Text
+renderTestMainFile (progArch, prjprogs) = do
+  cases <- either (Left . pack) Right (typedCases (concatMap snd prjprogs))
+  renderMainFileWithCases testConfigParams TestPlatform cases progArch
 
 -- | The descriptor of a unit test in a module named @test@, and its stamp.
 runTestDescriptor :: String -> Either Failure (BL.ByteString, Word32)
 runTestDescriptor input = do
   result <- runProjectPipeline testConfigParams [("test", input)]
-  either (\err -> Left (Failure (pack err) (pack err))) Right
-    (genTestDescriptor testConfigParams (foldedModules result) (programArch result))
+  cases <- either (\err -> Left (Failure (pack err) (pack err))) Right
+    (typedCases (concatMap (loweredAST . metadata) (M.elems (foldedModules result))))
+  pure (genTestDescriptor testConfigParams (foldedModules result) (programArch result) cases)
 
 -- | 'runFullProjectBuild' for the deployment of a test, in a module named @test@.
 runTestBuild :: String -> Either Failure (M.Map QualifiedName Text)

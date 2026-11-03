@@ -670,8 +670,8 @@ genScenarioHarness =
         ]
 
 -- | The task of the harness, which runs each selected case after the reset
-genTestHarness :: TerminaProgArch SemanticAnn -> CGenerator [CFileItem]
-genTestHarness progArchitecture = do
+genTestHarness :: [NumberedCase] -> CGenerator [CFileItem]
+genTestHarness cases = do
     harnessTaskId <- genDefineTaskIdLabel testHarness
     harnessEmitterId <- genDefineEmitterIdLabel testHarness
     let cEventType = termina__event_t
@@ -682,14 +682,11 @@ genTestHarness progArchitecture = do
                 "port_id" @.= (dec 0 @: size_t)
             ] @.: cEventType
         cEventObj = eventParam @: cEventType
-    cCases <- case architectureCases progArchitecture of
-        Left (_, cls) -> throwError $ InternalError $ "Unknown test class: " ++ show cls
-        Right cases -> return cases
     return [pre_cr $ static_function testHarnessFunction ["arg" @: (_const . ptr $ void)] @-> void $
             trail_cr . block $
                 genDiscardedParameters [("arg", _const . ptr $ void)]
                 ++ [pre_cr $ var eventParam (_const cEventType) @:= cEvent]
-                ++ map (genCaseBlock cEventObj) cCases
+                ++ map (genCaseBlock cEventObj) cases
                 ++ [pre_cr $ termina__test__end @@ []]
         ]
 
@@ -757,9 +754,10 @@ genAppInit initSteps = do
 
 genMainFile :: QualifiedName
     -> Word32
+    -> [NumberedCase]
     -> TerminaProgArch SemanticAnn
     -> CGenerator CFile
-genMainFile mName stamp progArchitecture = do
+genMainFile mName stamp cases progArchitecture = do
     let includeTermina = CPPDirective (CPPInclude True "termina.h") (internalAnn (CPPDirectiveAnn True))
     sinkPortMessageQueues <- getSinkPortMessageQueues progArchitecture
     channelMessageQueues <- getChannelsMessageQueues progArchitecture
@@ -793,7 +791,7 @@ genMainFile mName stamp progArchitecture = do
     testRecord <- if testBuild then genTestRecord stamp else return []
     testReset <- if level == Just UnitTest then genTestReset progArchitecture (not (null initPools)) (not (null enableProtection)) else return []
     testHarnessTask <- case level of
-        Just UnitTest -> genTestHarness progArchitecture
+        Just UnitTest -> genTestHarness cases
         Just ConcurrentTest -> genScenarioHarness
         Nothing -> return []
     let harnessDeclaration = [
@@ -841,10 +839,11 @@ runGenMainFile ::
     -> Platform
     -> QualifiedName
     -> Word32 -- ^ the stamp of the descriptor of a unit test
+    -> [NumberedCase] -- ^ the cases of a unit test
     -> TerminaProgArch SemanticAnn
     -> Either CGeneratorError CFile
-runGenMainFile config plt mainFilePath stamp progArchitecture =
-    case runState (runExceptT (genMainFile mainFilePath stamp progArchitecture))
+runGenMainFile config plt mainFilePath stamp cases progArchitecture =
+    case runState (runExceptT (genMainFile mainFilePath stamp cases progArchitecture))
         (CGeneratorEnv mainFilePath S.empty emptyMonadicTypes config plt False) of
     (Left err, _) -> Left err
     (Right cFile, _) -> Right cFile

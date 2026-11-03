@@ -45,7 +45,7 @@ import Command.Utils
 import Configuration.Manifest
 import Configuration.Namespace (locationLine)
 import Core.AST
-import Core.TestCases (NumberedCase(caseLocation), numberCases)
+import Core.TestCases (NumberedCase(caseLocation), parsedCases)
 import qualified Core.TestCases as NC
 import Modules.Modules
 import Parser.AST
@@ -612,19 +612,12 @@ loadTestCases project testName = do
 -- | The cases of a test in the order in which the harness numbers them.
 testCases :: [AnnotatedProgram ParserAnn] -> Either String [TestCase]
 testCases programs =
-    case numberCases instances testClasses of
-        Left (ident, cls) -> Left $ "the test instance " ++ ident ++ " is of type " ++ cls ++ ", which is not a test class"
-        Right cases -> Right [ TestCase (NC.caseInstance c) (NC.caseName c) (fileOf loc) (locationLine loc)
-                             | c <- cases, let loc = caseLocation c ]
+    map testCase <$> parsedCases (concat programs)
 
   where
 
-    elements = concat programs
-
-    instances = [ (ident, cls, ann) | GlobalDeclaration (Test ident (TSDefinedType cls []) _ _ ann) <- elements ]
-
-    testClasses = M.fromList [ (ident, [ (cname, ann) | ClassCase _ cname _ _ ann <- members ])
-                             | TypeDefinition (Class TestClass ident members _ _) _ <- elements ]
+    testCase c = let loc = caseLocation c in
+        TestCase (NC.caseInstance c) (NC.caseName c) (fileOf loc) (locationLine loc)
 
     fileOf (Position _ start _) = sourceName start
     fileOf _ = ""

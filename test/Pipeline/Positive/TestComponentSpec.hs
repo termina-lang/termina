@@ -145,14 +145,14 @@ spec = describe "Full pipeline: the components of a unit test" $ do
   it "includes the module of the test instances in the main file" $
     case runTestApp functionTest of
       Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
-      Right (progArch, _) ->
+      Right app ->
         either (expectationFailure . unpack)
           (\c -> unpack c `shouldContain` "#include \"test.h\"")
-          (renderTestMainFile progArch)
+          (renderTestMainFile app)
   it "sets up the test pool, the test channel and the test emitter in the main file" $
     case runTestApp unitTest of
       Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
-      Right (progArch, _) ->
+      Right app ->
         either (expectationFailure . unpack)
           (\c -> do
             unpack c `shouldContain` "static max_align_t termina__pool_memory__tm_pool["
@@ -161,11 +161,11 @@ spec = describe "Full pipeline: the components of a unit test" $ do
             unpack c `shouldContain` "tms.task_id = termina__test__harness__task_id;\n    tms.task_msg_queue_id = tms__event_msg_queue_id;\n    tms.channel_msg_queue_id = tms__channel_msg_queue_id;\n    tms.port_id = 0U;"
             unpack c `shouldContain` "tick.emitter_id = tick__emitter_id;\n    tick.type = termina__emitter_connection_type__task;\n    tick.task.task_id = uut__task_id;\n    tick.task.task_msg_queue_id = uut__task_msg_queue_id;\n    tick.task.sink_msgq_id = uut__tick__sink_msg_queue_id;\n    tick.task.sink_port_id = CExecutor__tick;"
             unpack c `shouldContain` "uut.tick = uut__tick__sink_msg_queue_id;")
-          (renderTestMainFile progArch)
+          (renderTestMainFile app)
   it "runs the cases in the task of the harness, after the reset" $
     case runTestApp unitTest of
       Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
-      Right (progArch, _) ->
+      Right app ->
         either (expectationFailure . unpack)
           (\c -> do
             -- The record of the test, with stamp zero until the descriptor exists
@@ -191,27 +191,27 @@ spec = describe "Full pipeline: the components of a unit test" $ do
             unpack c `shouldContain` "if (termina__test__selected(1U)) {"
             unpack c `shouldContain` "termina__test__case_begin(1U);\n        termina__app__test_reset();\n        CExecutorTests__fires(&termina__ev, &exec_tests);\n        termina__test__case_end();"
             unpack c `shouldContain` "termina__test__end();")
-          (renderTestMainFile progArch)
+          (renderTestMainFile app)
   it "numbers the cases in the order of declaration, as termina test --list" $
     case runTestApp orderTest of
       Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
-      Right (progArch, _) ->
+      Right app ->
         either (expectationFailure . unpack)
           (\c -> do
             unpack c `shouldContain` "termina__test__case_begin(1U);\n        termina__app__test_reset();\n        CTickerTests__zeta(&termina__ev, &b_tests);"
             unpack c `shouldContain` "termina__test__case_begin(2U);\n        termina__app__test_reset();\n        CTickerTests__alpha(&termina__ev, &b_tests);"
             unpack c `shouldContain` "termina__test__case_begin(3U);\n        termina__app__test_reset();\n        CTickerTests__zeta(&termina__ev, &a_tests);"
             unpack c `shouldContain` "termina__test__case_begin(4U);\n        termina__app__test_reset();\n        CTickerTests__alpha(&termina__ev, &a_tests);")
-          (renderTestMainFile progArch)
+          (renderTestMainFile app)
   it "reaches the action of a handler through a function of the main file" $
     case runTestApp handlerTest of
       Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
-      Right (progArch, _) ->
+      Right app ->
         either (expectationFailure . unpack)
           (\c -> do
             unpack c `shouldContain` "static void termina__test_fire__irq(const termina__event_t * const termina__ev,\n                                    const void * const value) {\n    \n    CRx__on_rx(termina__ev, &rx, *(const uint32_t *)value);\n\n}"
             unpack c `shouldContain` "irq.emitter_id = irq__emitter_id;\n    irq.type = termina__emitter_connection_type__handler;\n    irq.handler.handler_id = rx__handler_id;\n    irq.handler.handler_action = &termina__test_fire__irq;")
-          (renderTestMainFile progArch)
+          (renderTestMainFile app)
   it "calls fire, pending and take with the functions of the runtime" $
     case runTestBuild unitTest of
       Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
@@ -244,12 +244,12 @@ spec = describe "Full pipeline: the components of a unit test" $ do
   it "creates the two queues of the test channel" $
     case runTestApp unitTest of
       Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
-      Right (progArch, _) ->
+      Right app ->
         either (expectationFailure . unpack)
           (\c -> do
             unpack c `shouldContain` "termina__msg_queue__init(tms__channel_msg_queue_id,\n                                 sizeof(termina__box_t), 4U, status);"
             unpack c `shouldContain` "termina__msg_queue__init(tms__event_msg_queue_id,\n                                 sizeof(termina__event_t), 4U, status);")
-          (renderTestMainFile progArch)
+          (renderTestMainFile app)
   it "wires the ports to the functions of the runtime" $
     case runTestApp unitTest of
       Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)

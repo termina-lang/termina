@@ -72,7 +72,7 @@ spec = describe "Full pipeline: the test resources" $ do
     Left err ->
       it "builds a concurrent test" $
         expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
-    Right (progArch, prjprogs) -> do
+    Right app@(progArch, prjprogs) -> do
       it "points the access ports to the functions of the runtime" $
         either (expectationFailure . unpack)
           (\c -> do
@@ -90,7 +90,7 @@ spec = describe "Full pipeline: the test resources" $ do
             unpack c `shouldContain` "termina__test__scenario__harness();"
             unpack c `shouldContain` "except_connection.handler_action = &termina__test__except_hook;"
             unpack c `shouldContain` "termina__test__header_t termina__test__header;")
-          (renderTestMainFile progArch)
+          (renderTestMainFile app)
       it "gives the harness and its queue their identifiers in a concurrent test" $
         either (expectationFailure . unpack)
           (\c -> do
@@ -102,11 +102,11 @@ spec = describe "Full pipeline: the test resources" $ do
     Left err ->
       it "builds a unit test" $
         expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
-    Right (progArch, _) ->
+    Right app ->
       it "protects test_checks with a mutex at the ceiling of its two tasks" $
         either (expectationFailure . unpack)
           (\c -> do
             unpack c `shouldContain` "termina__mutex__init(test_checks__mutex_id,"
             unpack c `shouldContain` "test_checks._lock_type.type = termina__resource_lock_type__mutex;"
             unpack c `shouldContain` "test_checks._lock_type.mutex.mutex_id = test_checks__mutex_id;")
-          (renderTestMainFile progArch)
+          (renderTestMainFile app)
