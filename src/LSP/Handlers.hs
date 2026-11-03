@@ -6,9 +6,10 @@ module LSP.Handlers where
 import Control.Lens ((^.))
 import Language.LSP.Server
 import Language.LSP.Protocol.Message
-import LSP.Check (openProject, checkProject)
+import LSP.Check (openProject, checkProject, reloadFile)
 import LSP.Monad
 import Language.LSP.Protocol.Types
+import Control.Monad (forM_)
 import Control.Monad.State
 
 import qualified Language.LSP.Protocol.Lens as J
@@ -194,6 +195,17 @@ initialized = notificationHandler SMethod_Initialized $ \_msg -> checkProject
 didOpen :: Handlers HandlerM
 didOpen = notificationHandler SMethod_TextDocumentDidOpen $ \_msg -> checkProject
 
+-- | A file saved or closed in the editor is read again from disk.
+didSave :: Handlers HandlerM
+didSave = notificationHandler SMethod_TextDocumentDidSave $ \msg -> do
+  forM_ (uriToFilePath (msg ^. J.params . J.textDocument . J.uri)) reloadFile
+  checkProject
+
+didClose :: Handlers HandlerM
+didClose = notificationHandler SMethod_TextDocumentDidClose $ \msg -> do
+  forM_ (uriToFilePath (msg ^. J.params . J.textDocument . J.uri)) reloadFile
+  checkProject
+
 handlers :: Handlers HandlerM
 handlers =
   mconcat
@@ -202,6 +214,8 @@ handlers =
         return ()
       , initialized
       , didOpen
+      , didSave
+      , didClose
       , requestDefinition
       , requestReferences
       , requestHighlight

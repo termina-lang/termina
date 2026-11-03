@@ -125,6 +125,17 @@ spec = describe "language server" $ do
         codes `shouldBe` ["SE-238"]
         cleared `shouldBe` []
 
+  it "keeps the text of a file saved and closed, read again from disk" $
+    withServer $ \base -> do
+      let broken = "function twice(x : u32) -> u32 {\n    return true;\n}\n"
+      twice <- openDoc "src/util/twice.fin" "termina"
+      changeDoc twice [replaceAll broken]
+      _ <- errorCodesOf twice
+      liftIO (writeFile (base </> "app" </> "src" </> "util" </> "twice.fin") (T.unpack broken))
+      closeDoc twice
+      codes <- errorCodesOf twice
+      liftIO (codes `shouldBe` ["SE-238"])
+
   it "marks an error in a module of a local folder" $
     withServer $ \base -> do
       half <- openDoc (base </> "lib" </> "src" </> "lib" </> "half.fin") "termina"

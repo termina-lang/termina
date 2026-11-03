@@ -1,7 +1,7 @@
 -- | The project of the language server, read and checked as the build reads
 -- and checks it, with the text of the files open in the editor.
 module LSP.Check (
-    openProject, checkProject
+    openProject, checkProject, reloadFile
 ) where
 
 import Command.Common (libraryPlatforms, loadExportedModules, loadMainModule, orderedModules, sourceTexts, typeLibrary)
@@ -18,12 +18,15 @@ import LSP.Utils (emitDiagnostics)
 import qualified Modules.Modules as Mod
 import Utils.Annotations (Location(Position))
 
+import Control.Exception (IOException, try)
 import Control.Lens ((^.))
 import Control.Monad (forM_)
 import Control.Monad.State
+import qualified Data.ByteString as BS
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import qualified Language.LSP.Protocol.Types as LSP
 import Language.LSP.Server (getVirtualFiles)
 import Language.LSP.VFS (vfsMap, virtualFileText)
@@ -90,6 +93,18 @@ checkLibrary project = do
             let (typedProject, failure) = typeLibrary manifest plt parsedProject order
             modify (\s -> s { project_modules = storedModules parsedProject typedProject })
             publishDiagnostics (maybe M.empty (failureDiagnosticsIn manifestFile files) failure)
+
+-- | Read again from disk a file that the editor has saved or closed, so that
+-- the project keeps its text once the editor no longer holds it. A file that
+-- cannot be read or is not valid UTF-8 is left as it was.
+reloadFile :: FilePath -> HandlerM ()
+reloadFile path = do
+    bytes <- liftIO (try (BS.readFile path)) :: HandlerM (Either IOException BS.ByteString)
+    case bytes of
+        Left _ -> return ()
+        Right content -> case TE.decodeUtf8' content of
+            Left _ -> return ()
+            Right text -> modify (\s -> s { loaded = withTexts (M.singleton (normalise path) text) <$> loaded s })
 
 -- | The text of the files open in the editor, by their path.
 editorTexts :: HandlerM (M.Map FilePath T.Text)
