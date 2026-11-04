@@ -7,12 +7,14 @@ import Command.Types
 import Configuration.Configuration
 import Configuration.Manifest
 import Configuration.Namespace (exportedModules)
+import Configuration.Package (Package(..))
 import Configuration.Parsed
 import Configuration.Platform
+import Configuration.Prefix (manifestPrefixes, ownsModule)
 import Generator.Environment (getPlatformInitialGlobalEnv)
 import Semantic.Environment (makeInitialGlobalEnv)
 import qualified Data.Map.Lazy as ML
-import Data.List (find, nub)
+import Data.List (find, isPrefixOf, nub)
 import Modules.Utils (buildModuleName, qualifiedToModuleName)
 
 import qualified Data.Text as T
@@ -117,7 +119,15 @@ loadModules
   -> FilePath
   -> [ModuleDependency]
   -> IO (Either CheckFailure ParsedProject)
-loadModules sources importer imported = loadModules' M.empty [(dep, importer) | dep <- imported]
+loadModules sources importer imported = loadModulesFrom sources [(dep, importer) | dep <- imported]
+
+-- | Load modules, each one looked up from the folder given with it, and
+-- everything they import in turn. It gives the first error.
+loadModulesFrom
+  :: Sources
+  -> [(ModuleDependency, FilePath)]
+  -> IO (Either CheckFailure ParsedProject)
+loadModulesFrom sources = loadModules' M.empty
 
   where
 
@@ -157,16 +167,33 @@ loadMainModule sources mainFolder mainModule = do
       imported <- loadModules sources mainFolder (importedModules parsedMain)
       return ((\parsedModules -> (parsedMain, M.insert (qualifiedName parsedMain) parsedMain parsedModules)) <$> imported)
 
--- | Load the exported modules of a library and the modules they import, in
--- the order in which they are type checked. It gives the first error.
+-- | Load the exported modules of a library, the exported modules of every
+-- package that its dependencies reach, and the modules they import, in the
+-- order in which they are type checked. It gives the first error.
 loadExportedModules :: LoadedProject -> IO (Either CheckFailure (ParsedProject, [QualifiedName]))
 loadExportedModules project = do
   let root = loadedRoot project
       src = normalise (root </> "src")
       sources = buildSources project Nothing src
   roots <- exportedModules root (loadedManifest project)
-  loaded <- loadModules sources src [ModuleDependency qname Internal | qname <- roots]
+  loaded <- loadModulesFrom sources
+    ([(ModuleDependency qname Internal, src) | qname <- roots] ++ dependencyRoots sources)
   return (loaded >>= \parsedModules -> (,) parsedModules <$> orderedModules parsedModules)
+
+  where
+
+    -- | The exported modules of each package of the build, each one with the
+    -- folder of its package. A build without a test has only the packages that
+    -- the dependencies of the project reach.
+    dependencyRoots sources =
+      [ (ModuleDependency qname Internal, folderPath folder)
+      | folder <- sources
+      , Just package <- [folderPackage folder]
+      , file <- ML.keys (folderModules folder)
+      , addTrailingPathSeparator (folderPath folder) `isPrefixOf` file
+      , takeExtension file == ".fin"
+      , let qname = dropExtension (makeRelative (folderPath folder) file)
+      , any (`ownsModule` splitDirectories qname) (manifestPrefixes (packageManifest package)) ]
 
 -- | Type check the modules of a library on a platform, as those of a test
 -- build. It gives the modules type checked up to the first error, and the

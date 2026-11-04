@@ -467,8 +467,10 @@ checkExportedModules :: Bool -> LoadedProject -> IO ()
 checkExportedModules chatty project = do
     let files = sourceTexts (buildSources project Nothing "src")
     (parsedModules, order) <- loadExportedModules project >>= orDieWithFailure files
-    -- | Check that each module with extern functions has its entry in the manifest
-    case checkExternModules "the project" "src" (manifestExtern manifest) Nothing (map parsedExterns (M.elems parsedModules)) of
+    -- | Check that each module of the library with extern functions has its
+    -- entry in the manifest. Those of the dependencies are in their own.
+    let ownModules = filter (\m -> fullPath m == src </> qualifiedName m <.> "fin") (M.elems parsedModules)
+    case checkExternModules "the project" "src" (manifestExtern manifest) Nothing (map parsedExterns ownModules) of
         [] -> return ()
         errs -> dieWithFirstError errs
     forM_ (libraryPlatforms manifest) $ \plt -> do
@@ -479,6 +481,8 @@ checkExportedModules chatty project = do
   where
 
     manifest = loadedManifest project
+
+    src = normalise (loadedRoot project </> "src")
 
 -- | Generate the C and the Makefile of a deployment of a project. It gives the
 -- modules of the deployment with their source files, and its groups of C.
