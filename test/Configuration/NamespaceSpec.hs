@@ -105,6 +105,13 @@ spec = describe "exports" $ do
         (library ["pus"])
         `shouldReturn` ["src/pus/cases.fin:1: the exported module pus.cases declares the test class PusCases, which only a test or a module that is not exported may hold"]
 
+    it "rejects an instance in an exported module, and lets a constant and a module that is not exported hold one" $
+      exportErrorsWith "instance"
+        [ ("src/pus/wiring.fin", "const MAX : u32 = 4;\nchannel tm : MsgQueue<u32; 4>;\n")
+        , ("src/test_support/wiring.fin", "channel tc : MsgQueue<u32; 4>;\n") ]
+        (library ["pus"])
+        `shouldReturn` ["src/pus/wiring.fin:2: the exported module pus.wiring declares the instance tm, which only the app.fin of an application or the test.fin of a test may hold"]
+
   describe "exported modules to type check" $
 
     it "gives the exported modules, those that do not parse included, and none of the others" $ do

@@ -36,8 +36,9 @@ data SourceModule = SourceModule {
 
 -- | Check the exports of a library, and give every problem found: a prefix
 -- listed twice, two prefixes that overlap, a prefix without modules, and an
--- exported module that imports a module that is not exported or declares a
--- test class. Only the exported modules are read, and an application has none.
+-- exported module that imports a module that is not exported, or declares a
+-- test class or an instance. Only the exported modules are read, and an
+-- application has none.
 checkExports :: FilePath -> ParsedFiles -> Manifest -> IO [String]
 checkExports root parsed manifest =
     case manifestNature manifest of
@@ -74,7 +75,7 @@ checkExports root parsed manifest =
             Nothing -> []
             Just _ -> case moduleParsed m of
                 Nothing -> []
-                Just ast -> importErrors prefixes names m ast ++ testClassErrors m ast
+                Just ast -> importErrors prefixes names m ast ++ testClassErrors m ast ++ instanceErrors m ast
 
     importErrors prefixes names m ast =
         [ at m (locationLine ann) ++ "the exported module " ++ dottedName (moduleSegments m) ++ " imports "
@@ -88,6 +89,22 @@ checkExports root parsed manifest =
         [ at m (locationLine loc) ++ "the exported module " ++ dottedName (moduleSegments m) ++ " declares the test class "
             ++ ident ++ ", which only a test or a module that is not exported may hold"
         | TypeDefinition (Class TestClass ident _ _ _) loc <- frags ast ]
+
+    -- | An exported module declares no instance, which a deployment only
+    -- takes from its main module (AE-023).
+    instanceErrors m ast =
+        [ at m (locationLine loc) ++ "the exported module " ++ dottedName (moduleSegments m) ++ " declares the instance "
+            ++ ident ++ ", which only the app.fin of an application or the test.fin of a test may hold"
+        | GlobalDeclaration g <- frags ast, Just (ident, loc) <- [instanceOf g] ]
+
+    instanceOf = \case
+        Task ident _ _ _ loc -> Just (ident, loc)
+        Resource ident _ _ _ loc -> Just (ident, loc)
+        Channel ident _ _ _ loc -> Just (ident, loc)
+        Emitter ident _ _ _ loc -> Just (ident, loc)
+        Handler ident _ _ _ loc -> Just (ident, loc)
+        Test ident _ _ _ loc -> Just (ident, loc)
+        _ -> Nothing
 
     at m line = moduleFile m ++ ":" ++ show line ++ ": "
 
