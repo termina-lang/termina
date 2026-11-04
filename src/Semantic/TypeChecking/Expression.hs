@@ -22,6 +22,8 @@ import qualified Data.Map.Strict as M
 -- Libaries and stuff
 
 import qualified Data.List  (find, sortOn)
+import Data.Maybe (isJust)
+import Semantic.Modifiers
 
 -- import Control.Monad.State as ST
 import Parser.Types
@@ -669,16 +671,26 @@ typeLHSObject = typeObject getLHSVarTy
 typeGlobalObject = typeObject getGlobalVarTy
 ----------------------------------------
 
--- | Types the modifiers of a declaration, none of which may appear twice.
+-- | Types the modifiers of a declaration, which must be among those that it
+-- accepts, with a value when they take one, and none of them twice.
 typeModifiers :: Location
+  -> Declaration
   -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -> [Modifier ParserAnn]
   -> SemanticMonad [SAST.Modifier SemanticAnn]
-typeModifiers loc typeObj mods = do
+typeModifiers loc declaration typeObj mods = do
+  mapM_ checkAccepted mods
   checkDuplicated [] mods
   mapM (typeModifier loc typeObj) mods
 
   where
+
+    checkAccepted :: Modifier ParserAnn -> SemanticMonad ()
+    checkAccepted (Modifier ident value) =
+      case lookup ident (acceptedModifiers declaration) of
+        Nothing -> throwError $ annotateError loc (EUnknownModifier ident declaration)
+        Just takesValue -> when (takesValue /= isJust value) $
+          throwError $ annotateError loc (EModifierValue ident takesValue)
 
     checkDuplicated :: [Identifier] -> [Modifier ParserAnn] -> SemanticMonad ()
     checkDuplicated _ [] = return ()

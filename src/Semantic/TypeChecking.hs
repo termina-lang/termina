@@ -34,6 +34,7 @@ import Semantic.TypeChecking.Global
 import Semantic.TypeChecking.TypeDefinition
     ( typeParameter, typeTypeDefinition )
 import Semantic.TypeChecking.Expression
+import Semantic.Modifiers (Declaration(..))
 import Data.Bifunctor
 import Semantic.Environment
 import Utils.Monad
@@ -53,7 +54,7 @@ typeElement (Function ident ps_ts mts bret mds_ts anns) = do
           return typedParam)
       typedBret <- typeBlock mty bret
       return (ps_ty, typedBret)
-  mds_ty <- typeModifiers anns typeGlobalObject mds_ts
+  mds_ty <- typeModifiers anns FunctionDeclaration typeGlobalObject mds_ts
   let functionSeman = FunctionSeman ps_ty (fromMaybe TUnit mty) Returns
   return (Function ident ps_ty mty typedBret mds_ty (SemanticAnn (FnTy functionSeman) anns), LocatedElement (GFun functionSeman) anns)
 typeElement (ExternFunction ident ps_ts mts mode mds_ts anns) = do
@@ -67,7 +68,7 @@ typeElement (ExternFunction ident ps_ts mts mode mds_ts anns) = do
       typedParam <- typeParameter anns param
       insertLocalImmutObj pann paramId (paramType typedParam)
       return typedParam)
-  mds_ty <- typeModifiers anns typeGlobalObject mds_ts
+  mds_ty <- typeModifiers anns ExternFunctionDeclaration typeGlobalObject mds_ts
   let functionSeman = FunctionSeman ps_ty (fromMaybe TUnit mty) mode
   return (ExternFunction ident ps_ty mty mode mds_ty (SemanticAnn (FnTy functionSeman) anns), LocatedElement (GFun functionSeman) anns)
 typeElement (GlobalDeclaration gbl) = first GlobalDeclaration <$> typeGlobal gbl

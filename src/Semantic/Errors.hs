@@ -6,6 +6,7 @@ module Semantic.Errors where
 
 -- Termina AST
 import Semantic.AST
+import Semantic.Modifiers
 import Semantic.Reserved (ReservedBy(..))
 import Utils.Annotations
 import Utils.Errors
@@ -130,6 +131,8 @@ data Error
   | EReturnValueNotUnit -- ^ Return value not expected
   | EReturnValueTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Return value of another type (SE-238)
   | EGlobalNameUsedByDependency Identifier Location -- ^ Global name taken by a local of a dependency (SE-239)
+  | EUnknownModifier Identifier Declaration -- ^ Modifier that the declaration does not accept (SE-240)
+  | EModifierValue Identifier Bool -- ^ Modifier with a value it does not take, or without the one it takes (SE-241)
   | EInvalidArrayType (TerminaType SemanticAnn) -- ^ Invalid array type
   | EInvalidBoxType (TerminaType SemanticAnn) -- ^ Invalid box type
   | ENoTypeFound Identifier -- ^ Type not found
@@ -1106,6 +1109,19 @@ instance Diagnosable Error where
         relatedTo localPos "the dependency uses the name here" $
         diagnostic "SE-239" "global name used by a dependency"
             ("A module of a dependency uses \x1b[31m" <> T.pack ident <> "\x1b[0m as the name of a local object, and the project cannot change it.\n" <> "Rename this declaration.")
+    describe (EUnknownModifier modifier declaration) =
+        diagnostic "SE-240" "unknown modifier"
+            ("The modifier \x1b[31m" <> T.pack modifier <> "\x1b[0m does not apply to " <> T.pack (declarationName declaration) <> ".\n"
+              <> case map fst (acceptedModifiers declaration) of
+                   [] -> "This declaration accepts no modifier."
+                   [m] -> "This declaration accepts only the modifier \x1b[31m" <> T.pack m <> "\x1b[0m."
+                   ms -> "This declaration accepts the modifiers " <> T.intercalate ", " (map (\m -> "\x1b[31m" <> T.pack m <> "\x1b[0m") (init ms))
+                           <> " and \x1b[31m" <> T.pack (last ms) <> "\x1b[0m.")
+    describe (EModifierValue modifier takesValue) =
+        diagnostic "SE-241" "modifier value"
+            (if takesValue
+               then "The modifier \x1b[31m" <> T.pack modifier <> "\x1b[0m takes a value, as in \x1b[31m#[" <> T.pack modifier <> "(N)]\x1b[0m."
+               else "The modifier \x1b[31m" <> T.pack modifier <> "\x1b[0m takes no value: write \x1b[31m#[" <> T.pack modifier <> "]\x1b[0m.")
 
     -- | The two clauses below pick their detail with a case, which the script
     -- that moved the rest of this table does not read, so they were moved by
