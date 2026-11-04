@@ -16,7 +16,7 @@ module Command.Extern (
 ) where
 
 import Configuration.Configuration
-import Configuration.ExternCheck (ModuleExterns(..), checkExternModules, ownerOfFolder)
+import Configuration.ExternCheck (ModuleExterns(..), SectionOwner(..), checkExternModules, ownerOfFolder, sectionOf)
 import Configuration.Fetch (FetchedFile(..))
 import Configuration.Manifest (Manifest(..), ProjectInfo(..))
 import Configuration.Package (packageFiles, packageManifest)
@@ -94,7 +94,7 @@ prepareExtern config outputs project sources folders = do
         manifest = packageManifest p
         library = T.unpack (projectName (manifestProject manifest))
         present = [ rel | FetchedFile path _ _ <- packageFiles p, Just rel <- [stripPrefix (externFolder ++ "/") path] ]
-    used <- usedFiles config (root </> "termina.yaml") ("the dependency " ++ library) (loadedFrom project extern) present (exportedExtern manifest)
+    used <- usedFiles config (root </> "termina.yaml") (DependencySection library) (loadedFrom project extern) present (exportedExtern manifest)
     return [ (f, p, used, groupOf library (variableOf f) (destinationOf f) used [extern]) | not (null used) ]
   -- | Two dependencies whose objects would have one variable, or whose C would go to one folder
   forM_ (groupBy ((==) `on` (\(_, _, _, g) -> groupVariable g)) (sortOn (\(_, _, _, g) -> groupVariable g) dependencies)) $ \case
@@ -154,11 +154,11 @@ removeStaleGroups out kept =
 -- selected platform, relative to its folder, given the manifest that declares
 -- the section, its owner and the files of the folder. A loaded module with
 -- libraries has them for the selected platform.
-usedFiles :: TerminaConfig -> FilePath -> String -> S.Set T.Text -> [FilePath] -> ExternConfig -> IO [FilePath]
+usedFiles :: TerminaConfig -> FilePath -> SectionOwner -> S.Set T.Text -> [FilePath] -> ExternConfig -> IO [FilePath]
 usedFiles config manifestPath owner loaded present (ExternConfig moduleEntries) = do
   forM_ (M.toList loadedEntries) $ \(modName, entry) ->
     unless (M.null (entryLibraries entry) || M.member (platform config) (entryLibraries entry)) $
-      dieWithError $ manifestPath ++ ": the extern section of " ++ owner ++ " lists libraries of " ++ T.unpack modName
+      dieWithError $ manifestPath ++ ": " ++ sectionOf owner ++ " lists libraries of " ++ T.unpack modName
         ++ " for other platforms, and none for " ++ T.unpack (platform config)
   return . nub $ concat
     [ concatMap (listedFiles present . (externSourceFolder </>)) srcs

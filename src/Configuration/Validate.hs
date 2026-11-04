@@ -16,7 +16,7 @@ import qualified Data.Text as T
 import System.FilePath
 
 import Configuration.Configuration
-import Configuration.ExternCheck (ExternSection(..), checkExternSections, checkExternModules, sourceExterns)
+import Configuration.ExternCheck (ExternSection(..), SectionOwner(..), checkExternSections, checkExternModules, sourceExterns)
 import Configuration.Fetch (FetchedFile(..))
 import Configuration.Manifest
 import Configuration.Namespace (SourceModule(..))
@@ -61,7 +61,7 @@ checkPackage package =
 
       where
 
-        owner = "the package"
+        owner = PackageSection
 
         config = exportedExtern manifest
 

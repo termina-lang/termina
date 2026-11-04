@@ -37,12 +37,12 @@ seenOf ms = [ (externSegments m, externFile m) | m <- ms ]
 -- | The section of the project, with the modules uart and util; the entries
 -- name the modules that are listed.
 project :: [(T.Text, ExternEntry)] -> [FilePath] -> ExternSection
-project entries files = ExternSection "the project" "extern" "src" (ExternConfig (M.fromList entries))
+project entries files = ExternSection ProjectSection "extern" "src" (ExternConfig (M.fromList entries))
     files (map externSegments [uart, util]) (seenOf [uart, util, clock]) [uart, util]
 
 -- | The section of the test hk, with the module fake.clock.
 test :: [(T.Text, ExternEntry)] -> [FilePath] -> ExternSection
-test entries files = ExternSection "the test hk" "tests/hk/extern" "tests/hk/src" (ExternConfig (M.fromList entries))
+test entries files = ExternSection (TestSection "hk") "tests/hk/extern" "tests/hk/src" (ExternConfig (M.fromList entries))
     files [externSegments clock] (seenOf [uart, util, clock]) [clock]
 
 good :: ExternSection
@@ -105,13 +105,13 @@ spec = do
   describe "the modules" $ do
 
     it "rejects a module with an extern function and no entry" $
-      checkExternModules "the test hk" "tests/hk/src" (ExternConfig M.empty) Nothing [clock, util]
+      checkExternModules (TestSection "hk") "tests/hk/src" (ExternConfig M.empty) Nothing [clock, util]
         `shouldBe` [ "tests/hk/src/fake/clock.fin:1: the module fake.clock declares the extern function now and is not listed in the extern section of the test hk" ]
 
     it "accepts a module with its entry" $
-      checkExternModules "the project" "src" (sectionConfig good) Nothing [uart, util] `shouldBe` []
+      checkExternModules ProjectSection "src" (sectionConfig good) Nothing [uart, util] `shouldBe` []
 
     it "rejects an extern function in the module that wires the deployment" $
-      checkExternModules "the project" "src" (sectionConfig good) (Just (externs "app" "app.fin" "\nextern function seven() -> u32;\n")) []
+      checkExternModules ProjectSection "src" (sectionConfig good) (Just (externs "app" "app.fin" "\nextern function seven() -> u32;\n")) []
         `shouldBe` [ "app/app.fin:2: app.fin cannot declare the extern function seven. Declare it in a module of src/ "
                        ++ "and list that module in the extern section of the project" ]

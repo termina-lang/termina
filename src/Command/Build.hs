@@ -49,7 +49,7 @@ import Command.Common
 import Command.Pipeline (CheckedModules(..), checkModules)
 import Command.Provenance (buildInfo, provenanceFields, readHashes, writeProvenanceFile)
 import Command.Extern (ExternGroup, parsedExterns, prepareExtern, verifyLoadedExterns)
-import Configuration.ExternCheck (checkExternModules)
+import Configuration.ExternCheck (SectionOwner(..), checkExternModules)
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.PlantUML
 import Extras.PlantUML.Printer
@@ -471,7 +471,7 @@ checkExportedModules chatty project = do
     -- | Check that each module of the library with extern functions has its
     -- entry in the manifest. Those of the dependencies are in their own.
     let projectModules = filter (\m -> fullPath m == src </> qualifiedName m <.> "fin") (M.elems parsedModules)
-    case checkExternModules "the project" "src" (manifestExtern manifest) Nothing (map parsedExterns projectModules) of
+    case checkExternModules ProjectSection "src" (manifestExtern manifest) Nothing (map parsedExterns projectModules) of
         [] -> return ()
         errs -> dieWithFirstError errs
     forM_ (libraryPlatforms manifest) $ \plt -> do

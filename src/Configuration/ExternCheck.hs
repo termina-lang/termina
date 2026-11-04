@@ -7,12 +7,14 @@
 -- library, and those that a deployment loads.
 module Configuration.ExternCheck (
     ExternSection(..),
+    SectionOwner(..),
     ModuleExterns(..),
     checkExternSections,
     checkExternModules,
     sourceExterns,
     readExternSections,
-    ownerOfFolder
+    ownerOfFolder,
+    sectionOf
 ) where
 
 import Control.Monad
@@ -35,10 +37,27 @@ import Generator.CodeGen.Application.Result (genResultPathName)
 import Utils.Annotations (Location)
 import Utils.Files (filesUnder)
 
+-- | Who a section of "extern" belongs to.
+data SectionOwner =
+    ProjectSection
+    -- | A test, by its name
+    | TestSection !String
+    -- | A package being admitted
+    | PackageSection
+    -- | A dependency of the build, by the name of its library
+    | DependencySection !String
+  deriving (Eq, Show)
+
+-- | The owner of a section as the messages name it.
+ownerName :: SectionOwner -> String
+ownerName ProjectSection = "the project"
+ownerName (TestSection t) = "the test " ++ t
+ownerName PackageSection = "the package"
+ownerName (DependencySection library) = "the dependency " ++ library
+
 -- | A section of "extern" with what its checks read.
 data ExternSection = ExternSection {
-    -- | Who it belongs to, as the messages name it: "the project", "the test hk"
-    sectionOwner :: !String,
+    sectionOwner :: !SectionOwner,
     -- | Its "extern" folder
     sectionFolder :: !FilePath,
     -- | The source folder of its modules
@@ -130,7 +149,7 @@ checkExternSections sections = concatMap errorsOf sections
         | any (segments `isPrefixOf`) (sectionModules s) =
             [listing' ++ ", which is a folder (" ++ sectionSourceFolder s </> joinPath segments ++ ") and not a module"]
         | other : _ <- [ o | o <- sections, sectionFolder o /= sectionFolder s, segments `elem` sectionModules o ] =
-            [listing' ++ ", which is a module of " ++ sectionOwner other ++ " (" ++ moduleOf other
+            [listing' ++ ", which is a module of " ++ ownerName (sectionOwner other) ++ " (" ++ moduleOf other
                 ++ "). Move its entry to " ++ sectionOf (sectionOwner other)]
         | otherwise =
             [listing' ++ ", which is not a module (" ++ moduleOf s ++ " does not exist)"]
@@ -177,7 +196,7 @@ checkExternSections sections = concatMap errorsOf sections
 -- source folder, given by its owner, its source folder and its entries. The
 -- module that wires a deployment has no entry, so it declares no extern
 -- function.
-checkExternModules :: String -> FilePath -> ExternConfig -> Maybe ModuleExterns -> [ModuleExterns] -> [String]
+checkExternModules :: SectionOwner -> FilePath -> ExternConfig -> Maybe ModuleExterns -> [ModuleExterns] -> [String]
 checkExternModules owner srcFolder config mainModule externs =
     [ externFile m ++ ":" ++ show (locationLine ann) ++ ": " ++ takeFileName (externFile m)
         ++ " cannot declare the extern function " ++ ident ++ ". Declare it in a module of "
@@ -189,8 +208,8 @@ checkExternModules owner srcFolder config mainModule externs =
        , (ident, ann) : _ <- [externDeclared m]
        , not (M.member (T.pack (dottedName (externSegments m))) (externModules config)) ]
 
-sectionOf :: String -> String
-sectionOf owner = "the extern section of " ++ owner
+sectionOf :: SectionOwner -> String
+sectionOf owner = "the extern section of " ++ ownerName owner
 
 -- | The file of the manifest, which the errors of the entries of a section
 -- name.
@@ -223,10 +242,9 @@ readExternSections root parsed manifest = do
         return ( ExternSection (ownerOfFolder folder) folder src config files names seen (mapMaybe sourceExterns listed)
                , [ (joinPath (moduleSegments m), moduleFile m) | m <- listed, isNothing (moduleParsed m) ] )
 
--- | Who the "extern" folder of the project or of a test belongs to, as the
--- messages name it.
-ownerOfFolder :: FilePath -> String
+-- | Who the "extern" folder of the project or of a test belongs to.
+ownerOfFolder :: FilePath -> SectionOwner
 ownerOfFolder folder =
     case splitDirectories folder of
-        ["tests", testName, _] -> "the test " ++ testName
-        _ -> "the project"
+        ["tests", testName, _] -> TestSection testName
+        _ -> ProjectSection
