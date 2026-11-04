@@ -225,6 +225,40 @@ genResourceLockings :: TerminaProgArch a -> ResourceLockingMap
 genResourceLockings programArchitecture =
   evalState (genResourceLockingsInternal programArchitecture >> gets resLockingMap) (ResLockingSt M.empty)
 
+-- | Checks if a handler is the one connected to system_except
+isExceptHandler :: TerminaProgArch a -> Identifier -> Bool
+isExceptHandler programArchitecture ident =
+    case M.lookup "system_except" (emitterTargets programArchitecture) of
+        Just (ident', _, _) -> ident == ident'
+        Nothing -> False
+
+-- | The resources and pools that the handler connected to system_except
+-- reaches, directly or through other resources, and that are protected by a
+-- lock. The runtime withdraws their protection before it calls the handler.
+getExceptProtectedResources :: TerminaProgArch a -> [Identifier]
+getExceptProtectedResources programArchitecture =
+    case M.lookup "system_except" (emitterTargets programArchitecture) of
+        Nothing -> []
+        Just (handler, _, _) ->
+            filter isProtected . S.toList $ reach S.empty (M.findWithDefault [] handler usageGraph)
+
+    where
+
+        usageGraph = genResourceUsageGraph programArchitecture
+        resLockMap = genResourceLockings programArchitecture
+
+        reach :: S.Set Identifier -> [Identifier] -> S.Set Identifier
+        reach visited [] = visited
+        reach visited (r : rs)
+            | S.member r visited = reach visited rs
+            | otherwise = reach (S.insert r visited) (M.findWithDefault [] r usageGraph ++ rs)
+
+        isProtected :: Identifier -> Bool
+        isProtected r = case M.lookup r resLockMap of
+            Just ResourceLockNone -> False
+            Just _ -> True
+            Nothing -> False
+
 genResourceLockingsInternal :: TerminaProgArch a -> ResLockingMonad ()
 genResourceLockingsInternal programArchitecture =
   let resIds = M.keys $ resources programArchitecture
@@ -270,8 +304,10 @@ genResourceLockingsInternal programArchitecture =
               Right paths -> do
                 let dest = head <$> paths
                 -- We must filter out the initialization handler, as it does not require locking,
-                -- and the resources that only a test instance reaches, where a path ends
-                let filteredDest = filter (\d -> not (isInitHandler d) && isTaskOrHandler d) dest
+                -- the handler of system_except, which runs with every other user stopped and the
+                -- protection of what it reaches withdrawn, and the resources that only a test
+                -- instance reaches, where a path ends
+                let filteredDest = filter (\d -> not (isInitHandler d) && not (isExceptHandler programArchitecture d) && isTaskOrHandler d) dest
                  -- Determine the locking mechanism based on the access patterns
                 resLock <- case filteredDest of
                   [] -> return ResourceLockNone

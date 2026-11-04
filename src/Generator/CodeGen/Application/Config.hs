@@ -80,6 +80,9 @@ genConfigFile mName config progArchitecture = do
             pre_cr $ _define "TERMINA__APP_CONFIG__PERIODIC_TIMERS" (Just [show (length (M.elems periodicTimers))]),
             pre_cr $ _define "TERMINA__APP_CONFIG__MUTEXES" (Just [show (length mutexes)]),
             pre_cr $ _define "TERMINA__APP_CONFIG__IRQ_LOCKS" (Just [show (length irqLocks)]),
+            -- | Resources and pools whose protection the runtime withdraws
+            -- before the handler of system_except runs
+            pre_cr $ _define "TERMINA__APP_CONFIG__EXCEPT_PROTECTED" (Just [show (length (getExceptProtectedResources progArchitecture))]),
             pre_cr $ _define "TERMINA__APP_CONFIG__MESSAGE_QUEUES" (Just [show (length msgQueues)])
         ] ++ messageBufferMemory ++
         [

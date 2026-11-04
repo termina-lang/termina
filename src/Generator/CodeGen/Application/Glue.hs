@@ -529,6 +529,35 @@ genInitMessageQueues queues = do
                             ]
                         ]]
 
+-- | Function termina__app__disable_protection. The runtime calls it on the
+-- fatal path, once every other user has stopped and before the handler of
+-- system_except runs, so that the handler takes none of the locks of the
+-- resources and pools it reaches. It is generated only when there is one, and
+-- config.h tells the runtime with TERMINA__APP_CONFIG__EXCEPT_PROTECTED.
+genDisableProtection :: TerminaProgArch SemanticAnn -> CGenerator [CFileItem]
+genDisableProtection progArchitecture = do
+    unprotections <- concat <$> forM (getExceptProtectedResources progArchitecture) genUnprotect
+    return [pre_cr $ function (terminafy $ "app" <::> "disable_protection") [] @-> void $
+            trail_cr . block $ unprotections | not (null unprotections)]
+
+    where
+
+        lockTypeOf :: CObject -> CObject
+        lockTypeOf obj = obj @. resourceLockTypeField @: termina__resource_lock_type_t @. "type" @: enumFieldType
+
+        noLock :: CExpression
+        noLock = "termina__resource_lock_type__none" @: enumFieldType
+
+        genUnprotect :: Identifier -> CGenerator [CCompoundBlockItem]
+        genUnprotect r
+            | Just res <- M.lookup r (resources progArchitecture) =
+                return [pre_cr $ lockTypeOf (r @: typeDef (resourceClass res)) @= noLock]
+            | M.member r (pools progArchitecture) =
+                return [pre_cr $ lockTypeOf (r @: termina__pool_t) @= noLock]
+            | M.member r (testPools progArchitecture) =
+                return [pre_cr $ lockTypeOf ((r @: typeDef testPool) @. "pool" @: termina__pool_t) @= noLock]
+            | otherwise = throwError $ InternalError $ "Protected resource " ++ show r ++ " not found"
+
 genEnableProtection :: TerminaProgArch SemanticAnn -> CGenerator [CFileItem]
 genEnableProtection progArchitecture = do
     resourceProtections <- concat <$> forM (M.elems $ resources progArchitecture) genEnableProtectionResource
@@ -789,8 +818,9 @@ genMainFile mName stamp cases progArchitecture = do
 
     channelConnections <- genChannelConnections progArchitecture
     enableProtection <- genEnableProtection progArchitecture
+    disableProtection <- genDisableProtection progArchitecture
 
-    initialEventFunction <- (case find (\case { TPSystemInitEmitter {} -> True; _ -> False }) (emitters progArchitecture) of
+    initialEventFunction <-(case find (\case { TPSystemInitEmitter {} -> True; _ -> False }) (emitters progArchitecture) of
         Just systemInitEmitter@(TPSystemInitEmitter {}) ->
             genInitalEventFunction progArchitecture systemInitEmitter
         _ -> return [])
@@ -832,7 +862,7 @@ genMainFile mName stamp cases progArchitecture = do
         ++ cPoolMemoryAreas
         ++ harnessDeclaration
         ++ initTasks ++ initHandlers ++ initEmitters ++ initMutexes ++ initPools ++ initMessageQueues
-        ++ enableProtection ++ channelConnections ++ initialEventFunction
+        ++ enableProtection ++ disableProtection ++ channelConnections ++ initialEventFunction
         ++ testReset ++ testHarnessTask
         ++ [appInit]
 
