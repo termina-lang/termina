@@ -132,6 +132,31 @@ packedMemberReference loc = \case
     structIdentifier (TFixedLocation ty) = structIdentifier ty
     structIdentifier _                   = Nothing
 
+-- | Reject a reference to a fixed-location field or to a part of one. The
+-- field is a pointer to volatile memory in C, and a reference to it, or to a
+-- field or element inside it, would reach the callee without the volatile.
+checkFixedLocationReference :: Location -> SAST.Object SemanticAnn -> SemanticMonad ()
+checkFixedLocationReference loc obj =
+  fixedLocationReference obj >>=
+    mapM_ (throwError . annotateError loc . EReferenceToFixedLocation)
+
+-- | Walks a referenced object's access chain and, if it goes through a
+-- fixed-location field, returns the name of that field.
+fixedLocationReference :: SAST.Object SemanticAnn -> SemanticMonad (Maybe Identifier)
+fixedLocationReference obj = do
+  (_, ty) <- getObjType obj
+  case (ty, obj) of
+    (TFixedLocation _, SAST.MemberAccess _ ident _)            -> return (Just ident)
+    (TFixedLocation _, SAST.DereferenceMemberAccess _ ident _) -> return (Just ident)
+    (TFixedLocation _, SAST.Variable ident _)                  -> return (Just ident)
+    _ -> case obj of
+      SAST.MemberAccess parent _ _            -> fixedLocationReference parent
+      SAST.DereferenceMemberAccess parent _ _ -> fixedLocationReference parent
+      SAST.ArrayIndexExpression base _ _      -> fixedLocationReference base
+      SAST.Dereference base _                 -> fixedLocationReference base
+      SAST.Unbox base _                       -> fixedLocationReference base
+      SAST.Variable {}                        -> return Nothing
+
 -- | Whether a named type is a struct carrying the @packed@ modifier.
 isPackedStruct :: Location -> Identifier -> SemanticMonad Bool
 isPackedStruct loc dident = getGlobalTypeDef loc dident >>= \case
@@ -1491,6 +1516,7 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
     PAST.ArraySlice obj lower upper _anns -> do
       typed_obj <- typeObj obj
       checkPackedMemberReference pann typed_obj
+      checkFixedLocationReference pann typed_obj
       (obj_ak, obj_ty) <- getObjType typed_obj
       typed_lower <- catchMismatch (getAnnotation lower) EArraySliceLowerBoundNotUSize (typeExpression (Just TUSize) typeRHSObject lower)
       typed_upper <- catchMismatch (getAnnotation upper) EArraySliceUpperBoundNotUSize (typeExpression (Just TUSize) typeRHSObject upper)
@@ -1509,6 +1535,7 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
       -- | Type object
       typed_obj <- typeObj rhs_e
       checkPackedMemberReference pann typed_obj
+      checkFixedLocationReference pann typed_obj
       -- | Get the type of the object
       (obj_ak, obj_type) <- getObjType typed_obj
       case obj_type of

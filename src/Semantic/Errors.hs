@@ -133,6 +133,7 @@ data Error
   | EGlobalNameUsedByDependency Identifier Location -- ^ Global name taken by a local of a dependency (SE-239)
   | EUnknownModifier Identifier Declaration -- ^ Modifier that the declaration does not accept (SE-240)
   | EModifierValue Identifier Bool -- ^ Modifier with a value it does not take, or without the one it takes (SE-241)
+  | EReferenceToFixedLocation Identifier -- ^ Reference to a fixed-location field or to a part of one (SE-242)
   | EInvalidArrayType (TerminaType SemanticAnn) -- ^ Invalid array type
   | EInvalidBoxType (TerminaType SemanticAnn) -- ^ Invalid box type
   | ENoTypeFound Identifier -- ^ Type not found
@@ -1122,6 +1123,9 @@ instance Diagnosable Error where
             (if takesValue
                then "The modifier \x1b[31m" <> T.pack modifier <> "\x1b[0m takes a value, as in \x1b[31m#[" <> T.pack modifier <> "(N)]\x1b[0m."
                else "The modifier \x1b[31m" <> T.pack modifier <> "\x1b[0m takes no value: write \x1b[31m#[" <> T.pack modifier <> "]\x1b[0m.")
+    describe (EReferenceToFixedLocation field) =
+        diagnostic "SE-242" "reference to a fixed-location field"
+            ("\x1b[31m" <> T.pack field <> "\x1b[0m is a fixed-location field: a reference cannot point to it or to any part of it.")
 
     -- | The two clauses below pick their detail with a case, which the script
     -- that moved the rest of this table does not read, so they were moved by

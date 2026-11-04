@@ -1,0 +1,24 @@
+struct Desc {
+    master : [u8; 32];
+    size : u32;
+};
+
+function sum(d : &[u8; 32]) -> u32 {
+    var s : u32 = 0;
+    for i : usize in 0 .. 32 {
+        s = s + d[i] as u32;
+    }
+    return s;
+}
+
+interface IR {
+    procedure get(&mut self, r : &mut u32);
+};
+
+resource class CR provides IR {
+    tables : loc [Desc; 4];
+    procedure get(&mut self, r : &mut u32) {
+        *r = sum(&self->tables[1].master);
+        return;
+    }
+};
