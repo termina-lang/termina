@@ -612,7 +612,7 @@ typeMemberFunctionCall ann ak obj_ty ident args =
           case args of
             [elemnt] -> do
               -- Type the first argument element
-              typed_element <- catchMismatch ann (EOutboundPortArgTypeMismatch ty) (typeExpression (Just ty) typeRHSObject elemnt)
+              typed_element <- catchMismatch ann (EOutboundPortArgTypeMismatch ty) (typeArgument ty elemnt)
               return (([builtinParameter "element" ty] , [typed_element]), TUnit)
             _ -> throwError $ annotateError ann (EOutboundPortSendInvalidNumArgs (fromIntegral $ length args))
         _ -> throwError $ annotateError ann $ EOutboundPortInvalidProcedure ident

@@ -609,15 +609,17 @@ genBlocks (SendMessage obj arg ann) = do
             cArg <- genExpression arg
             mCall <- genMsgQueueSendCall cObj cArg cAnn
             return [pre_cr mCall |>> getLocation ann]
-        -- | If it is not an object, must store it in a temporary variable
+        -- | If it is not an object, must store it in a temporary variable,
+        -- initialized as a declaration is when the argument is an initializer
         _ -> do
             cArg <- genExpression arg
+            cInit <- genInitializerExpr arg
             let cArgType = getCExprType cArg
                 cTmp = "msg" @: cArgType
             mCall <- genMsgQueueSendCall cObj cTmp cAnn
             return [
                     no_cr $ block [
-                        no_cr $ var "msg" cArgType @:= cArg |>> getLocation ann,
+                        no_cr $ var "msg" cArgType @:= cInit |>> getLocation ann,
                         no_cr mCall
                     ]
                 ]
