@@ -19,7 +19,6 @@ import Configuration.Fetch
 import Configuration.Lock
 import Configuration.Package
 import Configuration.Resolve (ResolveError(..))
-import Configuration.Validate
 import Configuration.Vendor
 
 data RestoreCmdArgs = RestoreCmdArgs
@@ -60,8 +59,8 @@ restoreVendor place root = do
 
   where
 
-    -- | The locked commit of a package, validated and with the content-hash
-    -- of the lock.
+    -- | The locked commit of a package, with the content-hash of the lock.
+    -- It is not admitted again: the content-hash froze an admitted package.
     bring locked = do
         let url = lockedUrl locked
             tag = lockedRev locked
@@ -71,10 +70,8 @@ restoreVendor place root = do
             Left err -> failed (FetchFailed err)
             Right (Fetched sha files fromPrefetch) -> case packageFromFiles (FromGit url tag sha) (packageDir root url) files of
                 Left err -> failed (InvalidPackage [err])
-                Right package -> case checkPackage package of
-                    [] ->
-                        let vendored = [(p, b) | FetchedFile p _ b <- files, isVendored (packageManifest package) p]
-                        in if contentHash vendored == lockedContentHash locked
-                            then Right (locked, vendored, fromPrefetch)
-                            else failed (VendorMismatch "the files that termina copies from this commit do not match the content-hash of termina.lock")
-                    errs -> failed (InvalidPackage errs)
+                Right package ->
+                    let vendored = [(p, b) | FetchedFile p _ b <- files, isVendored (packageManifest package) p]
+                    in if contentHash vendored == lockedContentHash locked
+                        then Right (locked, vendored, fromPrefetch)
+                        else failed (VendorMismatch "the files that termina copies from this commit do not match the content-hash of termina.lock")

@@ -12,6 +12,7 @@ import Command.Update (checkTags, updateDependencies)
 import Command.Utils (Place(..), loadLock)
 import Configuration.Lock
 import Configuration.Manifest (decodeManifest)
+import Configuration.Vendor (contentHash)
 
 import Control.Exception (bracket_)
 import Control.Monad (forM_, void, when)
@@ -306,6 +307,20 @@ spec = do
         removePathForcibly (pusFolder project)
         restoreVendor Computer project `shouldReturn` Right ["restored vendor/example.invalid/acme/pus (v0.1.0)"]
         BS.readFile (pusFolder project </> "src" </> "pus" </> "m.fin") `shouldReturn` ""
+
+    it "restores a package that the admission would refuse" $
+      withProject "restore-unadmitted" "" $ \repos project -> do
+        let pus = repos </> "acme" </> "pus"
+            manifest = BS.pack (header "pus" ++ "exports: [pus]\ndependencies:\n  - path: ../drivers\n")
+        library repos "pus" [] "v0.1.0"
+        BS.writeFile (pus </> "termina.yaml") manifest
+        void $ git pus ["commit", "-q", "-a", "-m", "path dependency"]
+        void $ git pus ["tag", "-f", "v0.1.0"]
+        sha <- T.strip . T.pack <$> git pus ["rev-parse", "HEAD"]
+        writeLockFile (project </> "termina.lock") $ Lock 1
+          [LockedPackage (url "pus") "v0.1.0" sha (contentHash [("src/pus/m.fin", ""), ("termina.yaml", manifest)])]
+        restoreVendor Computer project `shouldReturn` Right ["restored vendor/example.invalid/acme/pus (v0.1.0)"]
+        BS.readFile (pusFolder project </> "termina.yaml") `shouldReturn` manifest
 
   describe "messages that depend on where termina runs" $ do
 
