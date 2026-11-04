@@ -114,7 +114,8 @@ main = do
         (fullDesc
             <> header "termina: a domain-specific language for real-time critical systems" )
     -- | The commands on a project run from its folder, which they look for
-    -- from the current one up
+    -- from the current one up. The language server looks for it itself, and
+    -- keeps running when there is none.
     case cmd of
         New cmdargs -> newCommand cmdargs
         Generate cmdargs -> enterProject >> generateCommand cmdargs
@@ -122,7 +123,7 @@ main = do
         Deliver cmdargs -> enterProject >> deliverCommand cmdargs
         Test cmdargs -> enterProject >> testCommand cmdargs
         Try cmdargs -> tryCommand cmdargs
-        LSP cmdargs -> enterProject >> lspCommand cmdargs
+        LSP cmdargs -> lspCommand cmdargs
         Sched cmdargs -> enterProject >> schedCommand cmdargs
         Add cmdargs -> enterProject >> addCommand cmdargs
         Restore cmdargs -> enterProject >> restoreCommand cmdargs

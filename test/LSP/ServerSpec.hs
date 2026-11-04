@@ -17,7 +17,7 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Row ((.==))
 import qualified Data.Text as T
 import qualified Language.LSP.Protocol.Lens as L
-import Language.LSP.Protocol.Message (SMethod(SMethod_TextDocumentPublishDiagnostics))
+import Language.LSP.Protocol.Message (SMethod(SMethod_TextDocumentPublishDiagnostics, SMethod_WindowShowMessage))
 import Language.LSP.Protocol.Types
 import Language.LSP.Test
 import System.Directory
@@ -57,7 +57,8 @@ project =
   , ("lib/termina.yaml", T.unlines
       [ "project:", "  name: lib", "  version: 0.1.0", "  manifest-version: 1"
       , "exports: [lib]" ])
-  , ("lib/src/lib/half.fin", "function half(x : u32) -> u32 {\n    return x / 2;\n}\n") ]
+  , ("lib/src/lib/half.fin", "function half(x : u32) -> u32 {\n    return x / 2;\n}\n")
+  , ("loose/main.fin", "import util.twice;\n\nfunction four() -> u32 {\n    return twice(2);\n}\n") ]
 
 -- | Run a session against a server on the application of the project.
 withServer :: (FilePath -> Session a) -> IO a
@@ -80,7 +81,7 @@ withServerIn folder session = do
         (serverIn, clientOut) <- createPipe
         (clientIn, serverOut) <- createPipe
         bracket (forkIO (lspRunServerWith serverIn serverOut)) killThread $ \_ ->
-            runSessionWithHandles clientOut clientIn defaultConfig { messageTimeout = 10 } fullCaps root (session base)
+            runSessionWithHandles clientOut clientIn defaultConfig { messageTimeout = 10, ignoreLogNotifications = False } fullCaps root (session base)
 
 -- | A change that replaces the whole text of a document.
 replaceAll :: T.Text -> TextDocumentContentChangeEvent
@@ -156,6 +157,25 @@ spec = describe "language server" $ do
       changeDoc app [replaceAll ("import util.nothing;\n" <> appModule)]
       codes <- errorCodesOf app
       liftIO (codes `shouldBe` ["PE-003"])
+
+  it "checks the project of the nearest folder above with a termina.yaml" $
+    withServerIn "app/src" $ \_ -> do
+      twice <- openDoc "util/twice.fin" "termina"
+      changeDoc twice [replaceAll "function twice(x : u32) -> u32 {\n    return true;\n}\n"]
+      codes <- errorCodesOf twice
+      liftIO (codes `shouldBe` ["SE-238"])
+
+  it "tells the editor that there is no termina.yaml, and marks nothing" $
+    withServerIn "loose" $ \_ -> do
+      shown <- skipManyTill anyMessage (message SMethod_WindowShowMessage)
+      main <- openDoc "main.fin" "termina"
+      changeDoc main [replaceAll "import util.twice;\n\nfunction four() -> u32 {\n    return twice(4);\n}\n"]
+      _ <- getHover main (Position 3 11)
+      diags <- getCurrentDiagnostics main
+      liftIO $ do
+        shown ^. L.params . L.type_ `shouldBe` MessageType_Error
+        T.unpack (shown ^. L.params . L.message) `shouldContain` "termina.yaml"
+        diags `shouldBe` []
 
   it "marks an error of the architecture" $
     withServer $ \_ -> do

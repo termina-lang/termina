@@ -270,21 +270,25 @@ orDieWithFailure files = either (\failure -> dieWithReport (failureMessage failu
 projectRoot :: FilePath
 projectRoot = "."
 
--- | Go to the folder of the project: the nearest folder with a termina.yaml,
--- from the current one up. A folder inside the vendor/ of a project is a copy
--- of one of its dependencies, so the project is the one that holds it.
--- Stop when no folder up has a termina.yaml.
+-- | Go to the folder of the project, or stop when there is none.
 enterProject :: IO ()
-enterProject = do
+enterProject = findProjectRoot >>= either dieWithError setCurrentDirectory
+
+-- | The folder of the project: the nearest folder with a termina.yaml, from
+-- the current one up. A folder inside the vendor/ of a project is a copy of
+-- one of its dependencies, so the project is the one that holds it. It gives
+-- the error when no folder up has a termina.yaml.
+findProjectRoot :: IO (Either String FilePath)
+findProjectRoot = do
   here <- getCurrentDirectory
   found <- filterM (\folder -> doesFileExist (folder </> "termina.yaml")) (ancestors here)
   case found of
-    [] -> dieWithError $ "no termina.yaml in " ++ here ++ " or in any folder above it"
+    [] -> return (Left ("no termina.yaml in " ++ here ++ " or in any folder above it"))
     nearest : _ -> do
       holders <- filterM (\folder -> doesFileExist (folder </> "termina.yaml")) (vendorHolders nearest)
-      setCurrentDirectory (case holders of
+      return (Right (case holders of
         holder : _ -> holder
-        [] -> nearest)
+        [] -> nearest))
 
   where
 

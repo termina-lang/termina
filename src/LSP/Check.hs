@@ -8,7 +8,7 @@ import Command.Common (libraryPlatforms, loadExportedModules, loadMainModule, or
 import Command.Pipeline (checkModules)
 import Command.Sources (LoadedProject(..), buildSources, dependencyModulesOf, readProject, withTexts)
 import Command.Types (ParsedProject, TypedProject, SemanticData(typedAST))
-import Command.Utils (CheckFailure(..), loadManifest)
+import Command.Utils (CheckFailure(..), findProjectRoot, loadManifest)
 import Configuration.Manifest
 import LSP.Index (emptyIndex, indexModule)
 import LSP.Logging (errorM)
@@ -30,16 +30,26 @@ import qualified Data.Text.Encoding as TE
 import qualified Language.LSP.Protocol.Types as LSP
 import Language.LSP.Server (getVirtualFiles)
 import Language.LSP.VFS (vfsMap, virtualFileText)
-import System.Directory (canonicalizePath, getCurrentDirectory)
+import System.Directory (canonicalizePath, getCurrentDirectory, setCurrentDirectory)
 import System.FilePath
 import Text.Parsec.Pos (sourceName)
 
--- | Read the project of the folder where the server runs, without network,
--- and keep it in the state. An error of the manifest or of the dependencies is
--- shown to the user.
+-- | Read the project of the folder where the server runs, or of the nearest
+-- folder above it with a termina.yaml, without network, and keep it in the
+-- state. When there is no project, or its manifest or its dependencies have
+-- an error, it is shown to the user and the server checks nothing.
 openProject :: HandlerM ()
 openProject = do
-    root <- liftIO (getCurrentDirectory >>= canonicalizePath)
+    found <- liftIO findProjectRoot
+    case found of
+        Left err -> errorM (T.pack err)
+        Right folder -> do
+            root <- liftIO (setCurrentDirectory folder >> getCurrentDirectory >>= canonicalizePath)
+            loadProjectAt root
+
+-- | Read the project of a folder and keep it in the state.
+loadProjectAt :: FilePath -> HandlerM ()
+loadProjectAt root = do
     manifestRead <- liftIO (loadManifest root)
     case manifestRead of
         Left errs -> errorM (T.pack (concat (take 1 errs)))
