@@ -51,10 +51,16 @@ genMakefile params loweredProject externs unitTest =
             MVariable MSimple "TARGET" [MFragment "$(TARGET_DIR_NAME)/$(PROJECT_NAME)"]
         ],
         -- | The tools and the flags of the build, which every object depends
-        -- on, so a change of profile or of platform flags rebuilds them all
+        -- on, so a change of profile or of platform flags rebuilds them all.
+        -- The real folder and the version of the OSAL go with them, since an
+        -- OSAL unpacked behind the same path keeps the dates of its archive.
         MakeBlock [
             MVariable MSimple "TERMINA_FLAGS_FILE" [MFragment "$(OBJ_DIR_NAME)/flags"],
-            MVariable MRecursive "TERMINA_FLAGS" [MFragment "$(CC) $(AS) $(CFLAGS) $(CPPFLAGS) $(ASMFLAGS) $(LDFLAGS)"]
+            MVariable MSimple "TERMINA_OSAL_ID" [MFunction "realpath" [MFragment "$(TERMINA_OSAL_DIR)"], MFunction "shell" [MFragment "cat $(TERMINA_OSAL_DIR)/VERSION 2>/dev/null"]],
+            MVariable MRecursive "TERMINA_FLAGS" [MFragment "$(CC) $(AS) $(CFLAGS) $(CPPFLAGS) $(ASMFLAGS) $(LDFLAGS) $(TERMINA_OSAL_ID)"],
+            -- | The linker scripts that the flags name, which the binary
+            -- depends on
+            MVariable MRecursive "TERMINA_LINKER_SCRIPTS" [MFunction "patsubst" [MFragment "-T%", MFragment "%", MFunction "filter" [MFragment "-T%", MFragment "$(LDFLAGS)"]]]
         ],
         -- The headers of the project are reached through -iquote and not -I,
         -- since every file that includes one of them, generated or of the OSAL,
@@ -133,7 +139,7 @@ genMakefile params loweredProject externs unitTest =
                     MakeCommand False [MFragment "$(info CC_VERSION=$(shell $(CC) --version 2>/dev/null | head -n 1))"],
                     MakeCommand False [MFragment "$(foreach v,$(.VARIABLES),$(if $(findstring $$($(v)),$(value CROSS)),$(info VAR $(v)=$($(v)))))"]
                 ],
-            MRule "$(TARGET)" (["$(OBJS)", "$(TERMINA_FLAGS_FILE)"] ++ ["$R/test.json" | isTestBuild params]) ([
+            MRule "$(TARGET)" (["$(OBJS)", "$(TERMINA_FLAGS_FILE)", "$(TERMINA_LINKER_SCRIPTS)"] ++ ["$R/test.json" | isTestBuild params]) ([
                 MakeCommand False [MFragment "@echo Linking $@"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
                 MakeCommand False [MFragment "@$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@"]

@@ -43,12 +43,20 @@ spec = describe "Makefile: project configuration" $ do
   it "rebuilds every object and the binary when the tools or the flags change" $
     mapM_ (\line -> makefileFor (defaultConfig "test" TestPlatform) `shouldContain` line)
       [ "TERMINA_FLAGS_FILE:=$(OBJ_DIR_NAME)/flags\n"
-      , "TERMINA_FLAGS=$(CC) $(AS) $(CFLAGS) $(CPPFLAGS) $(ASMFLAGS) $(LDFLAGS)\n"
+      , "TERMINA_FLAGS=$(CC) $(AS) $(CFLAGS) $(CPPFLAGS) $(ASMFLAGS) $(LDFLAGS) $(TERMINA_OSAL_ID)\n"
       , "$(TERMINA_FLAGS_FILE): termina-flags\n"
       , "$(OBJ_DIR_NAME)/termina/%.o: $(TERMINA_OSAL_DIR)/%.c $(TERMINA_FLAGS_FILE)\n"
       , "$(OBJ_DIR_NAME)/%.o: $(R)/%.c $(TERMINA_FLAGS_FILE)\n"
-      , "$(TARGET): $(OBJS) $(TERMINA_FLAGS_FILE)\n"
+      , "$(TARGET): $(OBJS) $(TERMINA_FLAGS_FILE) $(TERMINA_LINKER_SCRIPTS)\n"
       ]
+
+  it "rebuilds everything when another OSAL is behind the same path" $
+    makefileFor (defaultConfig "test" TestPlatform) `shouldContain`
+      "TERMINA_OSAL_ID:=$(realpath $(TERMINA_OSAL_DIR)) $(shell cat $(TERMINA_OSAL_DIR)/VERSION 2>/dev/null)\n"
+
+  it "links the binary again when a linker script of the flags changes" $
+    makefileFor (defaultConfig "test" TestPlatform) `shouldContain`
+      "TERMINA_LINKER_SCRIPTS=$(patsubst -T%, %, $(filter -T%, $(LDFLAGS)))\n"
 
   it "puts the binary alone in bin and the files of the build in obj" $
     mapM_ (\line -> makefileFor (defaultConfig "test" TestPlatform) `shouldContain` line)
@@ -75,8 +83,8 @@ spec = describe "Makefile: project configuration" $ do
     let testConfig = (defaultConfig "test" TestPlatform) { deploymentKind = TestBuild (T.pack "hk") }
         unitMakefile = T.unpack . runMakefilePrinter $ genMakefile testConfig M.empty [] True
         concurrentMakefile = makefileFor testConfig
-    unitMakefile `shouldContain` "$(TARGET): $(OBJS) $(TERMINA_FLAGS_FILE) $R/test.json\n"
+    unitMakefile `shouldContain` "$(TARGET): $(OBJS) $(TERMINA_FLAGS_FILE) $(TERMINA_LINKER_SCRIPTS) $R/test.json\n"
     unitMakefile `shouldContain` "$(OBJCOPY) --add-section .termina_test=$R/test.json $@;"
-    concurrentMakefile `shouldContain` "$(TARGET): $(OBJS) $(TERMINA_FLAGS_FILE) $R/test.json\n"
+    concurrentMakefile `shouldContain` "$(TARGET): $(OBJS) $(TERMINA_FLAGS_FILE) $(TERMINA_LINKER_SCRIPTS) $R/test.json\n"
     concurrentMakefile `shouldContain` "$(OBJCOPY) --add-section .termina_test=$R/test.json $@;"
     makefileFor (defaultConfig "test" TestPlatform) `shouldNotContain` "test.json"
