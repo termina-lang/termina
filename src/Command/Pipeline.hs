@@ -23,7 +23,7 @@ import Elaboration (ElaborationReport)
 import Generator.Environment (getPlatformInitialGlobalEnv, getPlatformInitialProgram)
 import Generator.Monadic (MonadicTypes, emptyMonadicTypes, runMapMonadicTypesAnnotatedProgram)
 import Modules.Modules
-import Semantic.Environment (Environment, addDeclaredNames, makeInitialGlobalEnv)
+import Semantic.Environment (Environment(..), addDeclaredNames, makeInitialGlobalEnv)
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import Semantic.Types (SemanticAnn)
 import Utils.Annotations (QualifiedName)
@@ -42,16 +42,16 @@ data CheckedModules = CheckedModules {
 -- | Check the modules of a deployment, given in the order in which they are
 -- type checked. It gives the modules type checked, all of them or those
 -- before the first type error, and the result of the checks.
-checkModules :: TerminaConfig -> Platform -> ParsedProject -> [QualifiedName]
+checkModules :: TerminaConfig -> Platform -> S.Set QualifiedName -> ParsedProject -> [QualifiedName]
   -> (TypedProject, Either CheckFailure CheckedModules)
-checkModules config plt parsedProject orderedModules =
+checkModules config plt deps parsedProject orderedModules =
     (typedProject, maybe (checkTyped typedProject) Left typeFailure)
 
   where
 
     initialEnv = makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)
 
-    (typedProject, typeFailure) = typeProject initialEnv parsedProject orderedModules
+    (typedProject, typeFailure) = typeProject deps initialEnv parsedProject orderedModules
 
     checkTyped typed = do
         rawLoweredProject <- lowerModules typed
@@ -89,11 +89,18 @@ architectureCheck orderedModules = either (Left . checkFailure) Right . runArchi
 -- | Type check the modules of a project in order, starting from an
 -- environment. It gives the modules type checked up to the first error, and
 -- the error.
-typeProject :: Environment -> ParsedProject -> [QualifiedName] -> (TypedProject, Maybe CheckFailure)
-typeProject initialEnv parsedProject =
-    typeModules M.empty (addDeclaredNames (projectDeclaredNames parsedProject) initialEnv)
+typeProject :: S.Set QualifiedName -> Environment -> ParsedProject -> [QualifiedName] -> (TypedProject, Maybe CheckFailure)
+typeProject deps initialEnv parsedProject order =
+    typeModules M.empty
+      ((addDeclaredNames (projectDeclaredNames parsedProject) initialEnv) { dependencyModules = deps })
+      (filter fromDependency order ++ filter (not . fromDependency) order)
 
   where
+
+    -- | A module of a dependency never imports one of the project, so the
+    -- modules of the dependencies can be typed first, and a name that the
+    -- project repeats is reported in the project.
+    fromDependency m = S.member m deps
 
     typeModules typedProject _ [] = (typedProject, Nothing)
     typeModules typedProject env (m:ms) =

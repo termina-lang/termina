@@ -17,6 +17,7 @@ import qualified Data.Map.Lazy as ML
 import Data.List (find, isPrefixOf, nub)
 import Modules.Utils (buildModuleName, qualifiedToModuleName)
 
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import System.FilePath
@@ -175,9 +176,9 @@ loadExportedModules project = do
   let root = loadedRoot project
       src = normalise (root </> "src")
       sources = buildSources project Nothing src
-  roots <- exportedModules root (loadedManifest project)
+  projectRoots <- exportedModules root (loadedManifest project)
   loaded <- loadModulesFrom sources
-    ([(ModuleDependency qname Internal, src) | qname <- roots] ++ dependencyRoots sources)
+    ([(ModuleDependency qname Internal, src) | qname <- projectRoots] ++ dependencyRoots sources)
   return (loaded >>= \parsedModules -> (,) parsedModules <$> orderedModules parsedModules)
 
   where
@@ -198,8 +199,8 @@ loadExportedModules project = do
 -- | Type check the modules of a library on a platform, as those of a test
 -- build. It gives the modules type checked up to the first error, and the
 -- error.
-typeLibrary :: Manifest -> Platform -> ParsedProject -> [QualifiedName] -> (TypedProject, Maybe CheckFailure)
-typeLibrary manifest plt = typeProject (makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt))
+typeLibrary :: Manifest -> Platform -> S.Set QualifiedName -> ParsedProject -> [QualifiedName] -> (TypedProject, Maybe CheckFailure)
+typeLibrary manifest plt deps = typeProject deps (makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt))
 
   where
 

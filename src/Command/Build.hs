@@ -10,7 +10,7 @@ import Configuration.Configuration
 import Configuration.Manifest
 import Command.Dependencies (Fetching(..), FetchingCommand(..))
 import Command.Project (Dependencies(..), loadProject)
-import Command.Sources (LoadedProject(..), Sources, buildSources, localFolders)
+import Command.Sources (LoadedProject(..), Sources, buildSources, dependencyModulesOf, localFolders)
 import Command.Utils
 import Control.Exception (IOException, try)
 import Data.Maybe (fromMaybe, isJust)
@@ -456,7 +456,7 @@ checkDeployment chatty project deployment = do
     orderedDependencies <- orDieWithFailure files (orderedModules parsedProject)
     when chatty (putStrLn . debugMessage $ "Checking project modules")
     checked <- orDieWithFailure (projectSourceFiles parsedProject)
-      (snd (checkModules config plt parsedProject orderedDependencies))
+      (snd (checkModules config plt (dependencyModulesOf sources) parsedProject orderedDependencies))
     return (CheckedDeployment sources parsedProject orderedDependencies checked)
 
 -- | Type check the exported modules of a library and the modules they import.
@@ -465,18 +465,19 @@ checkDeployment chatty project deployment = do
 -- The modules are checked as those of a test build.
 checkExportedModules :: Bool -> LoadedProject -> IO ()
 checkExportedModules chatty project = do
-    let files = sourceTexts (buildSources project Nothing "src")
+    let sources = buildSources project Nothing "src"
+        files = sourceTexts sources
     (parsedModules, order) <- loadExportedModules project >>= orDieWithFailure files
     -- | Check that each module of the library with extern functions has its
     -- entry in the manifest. Those of the dependencies are in their own.
-    let ownModules = filter (\m -> fullPath m == src </> qualifiedName m <.> "fin") (M.elems parsedModules)
-    case checkExternModules "the project" "src" (manifestExtern manifest) Nothing (map parsedExterns ownModules) of
+    let projectModules = filter (\m -> fullPath m == src </> qualifiedName m <.> "fin") (M.elems parsedModules)
+    case checkExternModules "the project" "src" (manifestExtern manifest) Nothing (map parsedExterns projectModules) of
         [] -> return ()
         errs -> dieWithFirstError errs
     forM_ (libraryPlatforms manifest) $ \plt -> do
         when chatty (putStrLn . debugMessage $ "Type checking the exported modules on " ++ show plt)
         orDieWithFailure (projectSourceFiles parsedModules)
-          (maybe (Right ()) Left (snd (typeLibrary manifest plt parsedModules order)))
+          (maybe (Right ()) Left (snd (typeLibrary manifest plt (dependencyModulesOf sources) parsedModules order)))
 
   where
 

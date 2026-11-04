@@ -37,9 +37,10 @@ families =
       -- SE-208) and the detail assertions name their code in the it-label.
       -- SE-214 needs a project with the system-init emitter switched on, which
       -- the fixture harness does not build, so it is tested where that
-      -- configuration already exists.
+      -- configuration already exists. SE-239 needs a project and a
+      -- dependency, which the check of a library builds.
       ["test/Semantic/Negative/FloatSpec.hs", "test/Semantic/Negative/DetailSpec.hs",
-       "test/Pipeline/Positive/InitialEventSpec.hs"]
+       "test/Pipeline/Positive/InitialEventSpec.hs", "test/Configuration/LibraryCheckSpec.hs"]
       ["test/Semantic/fixtures", "test/Semantic/fixtures-test", "test/Semantic/fixtures-multi"]
       []
   , Family "VarUsage (VUE)" "VUE"

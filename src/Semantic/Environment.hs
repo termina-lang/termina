@@ -45,6 +45,9 @@ data Environment
  -- | Whether the program is a test, the only kind of program that may use
  -- test classes, test instances and the components of a unit test
  , testProgram :: Bool
+ -- | The modules of the dependencies, which the project cannot change, so a
+ -- collision with one of their names is reported in the project
+ , dependencyModules :: S.Set QualifiedName
  }
 
 getEntry :: LocatedElement (GEntry SemanticAnn) -> GEntry SemanticAnn
@@ -306,7 +309,7 @@ makeInitialGlobalEnv Nothing plt pltEnvironment =
 -- well: they are as taken as the ones the project declares, and nothing else
 -- fills that map for them.
 makeEnvironment :: GlobalEnv -> Platform -> Bool -> Environment
-makeEnvironment globalEnv = ExprST globalEnv M.empty M.empty S.empty (M.map location globalEnv)
+makeEnvironment globalEnv plt isTest = ExprST globalEnv M.empty M.empty S.empty (M.map location globalEnv) plt isTest S.empty
 
 -- | Take note of the names that the project declares at its top level.
 addDeclaredNames :: DeclaredEnv -> Environment -> Environment

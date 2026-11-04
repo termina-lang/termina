@@ -99,7 +99,7 @@ insertLocalMutObj loc ident ty = do
     Nothing -> do
       checkReservedName loc ident
       modify (\s -> s{local = M.insert ident (LocatedElement (Mutable, ty) loc) (local s)})
-    Just prevloc -> throwError $ annotateError loc $ ESymbolAlreadyDefined (ident, prevloc)
+    Just prevloc -> localAlreadyDefined loc ident prevloc
 
 -- | Insert immutable object (variable) in local scope.
 insertLocalImmutObj :: Location -> Identifier -> TerminaType SemanticAnn -> SemanticMonad ()
@@ -109,7 +109,25 @@ insertLocalImmutObj loc ident ty = do
     Nothing -> do
       checkReservedName loc ident
       modify (\s -> s{local = M.insert ident (LocatedElement (Immutable, ty) loc) (local s)})
-    Just prevloc -> throwError $ annotateError loc $ ESymbolAlreadyDefined (ident, prevloc)
+    Just prevloc -> localAlreadyDefined loc ident prevloc
+
+-- | The error of a local whose name is already taken. When the local is in a
+-- dependency and the name is declared in the project, the error goes to the
+-- declaration of the project, which is the one that can be renamed.
+localAlreadyDefined :: Location -> Identifier -> Location -> SemanticMonad ()
+localAlreadyDefined loc ident prevloc = do
+  deps <- gets dependencyModules
+  if fromDependency deps loc && fromProject deps prevloc
+    then throwError $ annotateError prevloc $ EGlobalNameUsedByDependency ident loc
+    else throwError $ annotateError loc $ ESymbolAlreadyDefined (ident, prevloc)
+
+  where
+
+    fromDependency deps (Position m _ _) = S.member m deps
+    fromDependency _ _ = False
+
+    fromProject deps (Position m _ _) = not (S.member m deps)
+    fromProject _ _ = False
 
 -- | Reject a name that C keeps for itself.
 checkReservedName :: Location -> Identifier -> SemanticMonad ()

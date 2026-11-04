@@ -129,6 +129,7 @@ data Error
   | EReturnValueExpected (TerminaType SemanticAnn) -- ^ Expected return value
   | EReturnValueNotUnit -- ^ Return value not expected
   | EReturnValueTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Return value of another type (SE-238)
+  | EGlobalNameUsedByDependency Identifier Location -- ^ Global name taken by a local of a dependency (SE-239)
   | EInvalidArrayType (TerminaType SemanticAnn) -- ^ Invalid array type
   | EInvalidBoxType (TerminaType SemanticAnn) -- ^ Invalid box type
   | ENoTypeFound Identifier -- ^ Type not found
@@ -1101,6 +1102,10 @@ instance Diagnosable Error where
     describe (EReturnValueTypeMismatch expectedTy actualTy) =
         diagnostic "SE-238" "return value type mismatch"
             ("The function is expected to return a value of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")
+    describe (EGlobalNameUsedByDependency ident localPos) =
+        relatedTo localPos "the dependency uses the name here" $
+        diagnostic "SE-239" "global name used by a dependency"
+            ("A module of a dependency uses \x1b[31m" <> T.pack ident <> "\x1b[0m as the name of a local object, and the project cannot change it.\n" <> "Rename this declaration.")
 
     -- | The two clauses below pick their detail with a case, which the script
     -- that moved the rest of this table does not read, so they were moved by

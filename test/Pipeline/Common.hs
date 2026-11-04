@@ -32,6 +32,7 @@ import qualified Data.Text.Encoding as TE
 import Data.Text (Text, pack)
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 
 import Parser.Parsing (terminaModuleParser)
 import Text.Parsec (runParser)
@@ -144,7 +145,7 @@ runProjectPipeline cfg sources = do
   let files = M.fromList [ (qname, pack src) | (qname, src) <- sources ]
   parsedProject <- M.fromList <$> mapM parseModule sources
   ordered <- orderModules parsedProject
-  checked <- checkedOrFailure files (snd (checkModules cfg TestPlatform parsedProject ordered))
+  checked <- checkedOrFailure files (snd (checkModules cfg TestPlatform S.empty parsedProject ordered))
   pure (PipelineResult (checkedLowered checked) ordered (checkedArchitecture checked)
     (checkedElaborated checked) (checkedReports checked))
 
@@ -155,7 +156,7 @@ runTypedModules sources = either (\f -> ([], Just (code f))) id $ do
   let files = M.fromList [ (qname, pack src) | (qname, src) <- sources ]
   parsedProject <- M.fromList <$> mapM parseModule sources
   ordered <- orderModules parsedProject
-  let (typedProject, result) = checkModules configParams TestPlatform parsedProject ordered
+  let (typedProject, result) = checkModules configParams TestPlatform S.empty parsedProject ordered
   pure (M.keys typedProject, either (Just . code) (const Nothing) (checkedOrFailure files result))
 
   where
@@ -171,7 +172,7 @@ runTypedModule target sources = do
   let files = M.fromList [ (qname, pack src) | (qname, src) <- sources ]
   parsedProject <- M.fromList <$> mapM parseModule sources
   ordered <- orderModules parsedProject
-  let (typedProject, typeFailure) = typeProject (initialEnv configParams) parsedProject ordered
+  let (typedProject, typeFailure) = typeProject S.empty (initialEnv configParams) parsedProject ordered
   checkedOrFailure files (maybe (Right ()) Left typeFailure)
   pure (typedAST . metadata $ typedProject M.! target)
 

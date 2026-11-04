@@ -13,6 +13,7 @@ module Command.Sources (
     readProjectModules,
     withTexts,
     buildSources,
+    dependencyModulesOf,
     lookupModule,
     hiddenMessage,
     notExportedMessage,
@@ -22,7 +23,7 @@ module Command.Sources (
 
 import Control.Monad
 import qualified Data.ByteString as BS
-import Data.List (find, stripPrefix)
+import Data.List (find, isPrefixOf, stripPrefix)
 import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Map.Lazy as ML
 import qualified Data.Map.Strict as M
@@ -241,6 +242,14 @@ buildSources (LoadedProject root manifest vendored admitted own) mTest mainFolde
             ++ [SourceFolder f (TestOf t) testSees Nothing own Nothing | Just t <- [mTest], f <- testSrc]
             ++ [vendoredFolder k p via | (k, via) <- M.toList graph, Just p <- [M.lookup k packages]]
             ++ map localFolder' (M.elems locals)
+
+-- | The modules of the dependencies of a build, packages of vendor/ and local
+-- folders, which the type checker tells from those of the project.
+dependencyModulesOf :: Sources -> S.Set QualifiedName
+dependencyModulesOf sources = S.fromList
+    [ dropExtension (makeRelative (folderPath folder) file)
+    | folder <- sources, Just _ <- [folderPackage folder], file <- ML.keys (folderModules folder)
+    , addTrailingPathSeparator (folderPath folder) `isPrefixOf` file, takeExtension file == ".fin" ]
 
 data Lookup =
     Found FilePath

@@ -6,7 +6,7 @@ module LSP.Check (
 
 import Command.Common (libraryPlatforms, loadExportedModules, loadMainModule, orderedModules, sourceTexts, typeLibrary)
 import Command.Pipeline (checkModules)
-import Command.Sources (LoadedProject(..), buildSources, readProject, withTexts)
+import Command.Sources (LoadedProject(..), buildSources, dependencyModulesOf, readProject, withTexts)
 import Command.Types (ParsedProject, TypedProject, SemanticData(typedAST))
 import Command.Utils (CheckFailure(..), loadManifest)
 import Configuration.Manifest
@@ -73,7 +73,7 @@ checkApplication project deployment = do
         Left failure -> publishDiagnostics (failureDiagnosticsIn mainFile files failure)
         Right (parsedProject, order) -> do
             let (typedProject, result) =
-                    checkModules (deploymentConfig deployment) (deploymentPlatform deployment) parsedProject order
+                    checkModules (deploymentConfig deployment) (deploymentPlatform deployment) (dependencyModulesOf sources) parsedProject order
             modify (\s -> s { project_modules = keepIndexes (project_modules s) (storedModules parsedProject typedProject) })
             publishDiagnostics (either (failureDiagnosticsIn mainFile files) (const M.empty) result)
 
@@ -84,13 +84,14 @@ checkLibrary project = do
     let manifest = loadedManifest project
         root = loadedRoot project
         manifestFile = root </> "termina.yaml"
-        files = sourceTexts (buildSources project Nothing (normalise (root </> "src")))
+        sources = buildSources project Nothing (normalise (root </> "src"))
+        files = sourceTexts sources
     loadedLibrary <- liftIO (loadExportedModules project)
     case (loadedLibrary, libraryPlatforms manifest) of
         (Left failure, _) -> publishDiagnostics (failureDiagnosticsIn manifestFile files failure)
         (Right _, []) -> return ()
         (Right (parsedProject, order), plt : _) -> do
-            let (typedProject, failure) = typeLibrary manifest plt parsedProject order
+            let (typedProject, failure) = typeLibrary manifest plt (dependencyModulesOf sources) parsedProject order
             modify (\s -> s { project_modules = keepIndexes (project_modules s) (storedModules parsedProject typedProject) })
             publishDiagnostics (maybe M.empty (failureDiagnosticsIn manifestFile files) failure)
 
