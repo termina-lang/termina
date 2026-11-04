@@ -169,7 +169,6 @@ parameterTy (TReference _ (TOption (TBoxSubtype _))) = False
 parameterTy (TReference {}) = True
 parameterTy (TOption (TBoxSubtype _)) = False
 parameterTy (TOption ty)      = optionTy ty
-parameterTy (TConstSubtype ty) = constTy ty
 parameterTy _                = False
 
 viewerParamTy :: TerminaType' expr a -> Bool
@@ -195,7 +194,6 @@ viewerParamTy (TReference Immutable ty) = refTy ty
 viewerParamTy (TReference {}) = False
 viewerParamTy (TOption (TBoxSubtype _)) = False
 viewerParamTy (TOption ty)      = optionTy ty
-viewerParamTy (TConstSubtype ty) = constTy ty
 viewerParamTy _                = False
 
 procedureParamTy :: TerminaType' expr a -> Bool
@@ -219,7 +217,6 @@ procedureParamTy (TStatus _)       = True
 procedureParamTy (TReference _ ty) = refTy ty
 procedureParamTy (TOption ty)      = optionTy ty
 procedureParamTy (TBoxSubtype ty)  = boxTy ty
-procedureParamTy (TConstSubtype ty) = constTy ty
 procedureParamTy _                 = False
 
 actionParamTy :: TerminaType' expr a -> Bool
@@ -241,7 +238,6 @@ actionParamTy (TEnum _)        = True
 actionParamTy (TResult _ _)    = True
 actionParamTy (TStatus _)      = True
 actionParamTy (TBoxSubtype ty) = boxTy ty
-actionParamTy (TConstSubtype ty) = constTy ty
 actionParamTy _                = False
 
 classFieldTy :: TerminaType' expr a -> Bool
@@ -344,22 +340,6 @@ refTy _               = False
 boolTy :: TerminaType' expr a -> Bool
 boolTy TBool = True
 boolTy _    = False
-
-constTy :: TerminaType' expr a -> Bool
-constTy TUInt8           = True
-constTy TUInt16          = True
-constTy TUInt32          = True
-constTy TUInt64          = True
-constTy TInt8            = True
-constTy TInt16           = True
-constTy TInt32           = True
-constTy TInt64           = True
-constTy TUSize           = True
-constTy TBool            = True
-constTy TChar            = True
-constTy TFloat32         = True
-constTy TFloat64         = True
-constTy _                = False
 
 -- | Predicate definining when a |TerminaType| is numeric.
 intTy :: TerminaType' expr a -> Bool

@@ -258,9 +258,6 @@ checkTerminaType loc (TAtomicArray ty s) =
     TConstSubtype _ -> return ();
     _ -> throwError $ annotateError loc EExpressionNotConstant
   }
-checkTerminaType loc (TConstSubtype ty) =
-  checkTerminaType loc ty >>
-  constTyOrFail loc ty
 -- The rest of the types are always well defined, since they were
 -- constructed using the |typeTypeSpecifier| function.
 checkTerminaType _ _ = return ()
@@ -901,8 +898,6 @@ typeTypeSpecifier loc typeObj (TSInPort ty action) =
   TInPort <$> typeTypeSpecifier loc typeObj ty <*> pure action
 typeTypeSpecifier loc typeObj (TSOutPort ty) = 
   TOutPort <$> typeTypeSpecifier loc typeObj ty
-typeTypeSpecifier loc typeObj (TSConstSubtype ty) =
-  TConstSubtype <$> typeTypeSpecifier loc typeObj ty
 -- This is explicit just in case
 typeTypeSpecifier _ _ TSUInt8  = return TUInt8
 typeTypeSpecifier _ _ TSUInt16 = return TUInt16

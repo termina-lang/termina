@@ -287,7 +287,6 @@ instance ShowText (TypeSpecifier a) where
     showText TSChar = "char"
     showText TSFloat32 = "f32"
     showText TSFloat64 = "f64"
-    showText (TSConstSubtype ts) = "const " <> showText ts
     showText (TSArray ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
     showText (TSBoxSubtype ts) = "box " <> showText ts
     showText (TSLocation ts) = "loc " <> showText ts

@@ -390,9 +390,6 @@ intTyOrFail pann ty = unless (intTy ty) (throwError (annotateError pann (EExpect
 floatTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 floatTyOrFail pann ty = unless (floatTy ty) (throwError (annotateError pann (EExpectedNumType ty)))
 
-constTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
-constTyOrFail pann ty = unless (constTy ty) (throwError (annotateError pann (EInvalidConstType ty)))
-
 globalConstTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 globalConstTyOrFail pann ty = unless (globalConstTy ty) (throwError (annotateError pann (EInvalidConstType ty)))
 

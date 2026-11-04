@@ -35,10 +35,7 @@ grammarTypes =
 -- | Constructors the parser never builds (produced only by later passes), so a
 -- positive *parser* test cannot assert them. Each entry is justified.
 allowlist :: [String]
-allowlist =
-  -- TSConstSubtype (the @const T@ subtype) is introduced by the semantic phase,
-  -- not the parser: there is no @TSConstSubtype@ in Parsing.hs.
-  [ "TSConstSubtype" ]
+allowlist = []
 
 -- | The constructors of a data declaration, read from source.
 constructorsOf :: String -> String -> [String]

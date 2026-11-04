@@ -152,7 +152,6 @@ data TypeSpecifier' expr a
   = TSUInt8 | TSUInt16 | TSUInt32 | TSUInt64
   | TSInt8 | TSInt16 | TSInt32 | TSInt64 | TSUSize
   | TSBool | TSChar | TSFloat32 | TSFloat64
-  | TSConstSubtype (TypeSpecifier' expr a)
   | TSDefinedType Identifier [TypeParameter' expr a]
   | TSArray (TypeSpecifier' expr a) (expr a)
   -- Non-primitive types
