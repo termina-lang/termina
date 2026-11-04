@@ -40,6 +40,8 @@ genConfigFile mName config progArchitecture = do
     let resLockMap = genResourceLockings progArchitecture
     let mutexes =
             M.filter (\case{ResourceLockMutex {} -> True; _ -> False}) resLockMap
+        irqLocks =
+            M.filter (\case{ResourceLockIrq -> True; _ -> False}) resLockMap
 
     channelMessageQueues <- getChannelsMessageQueues progArchitecture
     sinkPortMessageQueues <- getSinkPortMessageQueues progArchitecture
@@ -50,6 +52,7 @@ genConfigFile mName config progArchitecture = do
 
     cEmitterDefines <- genDefineEmitterId emitterIds
     cMutexDefines <- genDefineMutexId (M.keys mutexes)
+    cIrqLockDefines <- genDefineIrqLockId (M.keys irqLocks)
     cTaskDefines <- genDefineTaskId taskIds
     cHandlerDefines <- genDefineHandlerId (M.keys $ handlers progArchitecture)
     cPoolDefines <- genDefinePoolId poolIds
@@ -65,6 +68,7 @@ genConfigFile mName config progArchitecture = do
             _define "CONFIG_H__" Nothing
         ] ++ cEmitterDefines
         ++ cMutexDefines
+        ++ cIrqLockDefines
         ++ cTaskDefines
         ++ cHandlerDefines
         ++ cMsgQueueDefines
@@ -75,6 +79,7 @@ genConfigFile mName config progArchitecture = do
             pre_cr $ _define "TERMINA__APP_CONFIG__TASKS" (Just [show (length taskIds)]),
             pre_cr $ _define "TERMINA__APP_CONFIG__PERIODIC_TIMERS" (Just [show (length (M.elems periodicTimers))]),
             pre_cr $ _define "TERMINA__APP_CONFIG__MUTEXES" (Just [show (length mutexes)]),
+            pre_cr $ _define "TERMINA__APP_CONFIG__IRQ_LOCKS" (Just [show (length irqLocks)]),
             pre_cr $ _define "TERMINA__APP_CONFIG__MESSAGE_QUEUES" (Just [show (length msgQueues)])
         ] ++ messageBufferMemory ++
         [

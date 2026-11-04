@@ -66,13 +66,11 @@ spec = do
               "    \n" ++
               "    TMChannel * self = (TMChannel *)termina__this;\n" ++
               "\n" ++
-              "    termina__lock_t termina__lock = termina__resource__lock(&termina__ev->owner,\n" ++
-              "                                                            &self->_lock_type);\n" ++
+              "    termina__resource__lock(&termina__ev->owner, &self->_lock_type);\n" ++
               "\n" ++
               "    *packets = self->tm_sent_packets;\n" ++
               "\n" ++
-              "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
-              "                              termina__lock);\n" ++
+              "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -103,13 +101,11 @@ spec = do
               "    \n" ++
               "    UARTDriver * self = (UARTDriver *)termina__this;\n" ++
               "\n" ++
-              "    termina__lock_t termina__lock = termina__resource__lock(&termina__ev->owner,\n" ++
-              "                                                            &self->_lock_type);\n" ++
+              "    termina__resource__lock(&termina__ev->owner, &self->_lock_type);\n" ++
               "\n" ++
               "    *ret = *self->status;\n" ++
               "\n" ++
-              "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
-              "                              termina__lock);\n" ++
+              "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

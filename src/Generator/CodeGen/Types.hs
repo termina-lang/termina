@@ -53,15 +53,16 @@ termina__runtime_operation__test_reset :: CExpression
 termina__runtime_operation__test_reset =
     "termina__runtime_operation__test_reset" @: termina__runtime_operation_t
 
-termina__lock_t, termina__resource_lock_type_t,
-    termina__enum__resource_lock_type__mutex_params_t :: CType
-termina__lock_t = typeDef "termina__lock_t"
+termina__resource_lock_type_t,
+    termina__enum__resource_lock_type__mutex_params_t,
+    termina__enum__resource_lock_type__irq_params_t :: CType
 termina__resource_lock_type_t = typeDef "termina__resource_lock_type_t"
 termina__enum__resource_lock_type__mutex_params_t = typeDef "termina__enum__resource_lock_type__mutex_params_t"
+termina__enum__resource_lock_type__irq_params_t = typeDef "termina__enum__resource_lock_type__irq_params_t"
 
 termina__resource__lock :: CExpression
 termina__resource__lock = "termina__resource__lock" @:
-    CTFunction termina__lock_t 
+    CTFunction void
         [
             -- | const termina__id_t resource_id
             _const . ptr $ _const termina__active_entity_t,
@@ -71,14 +72,12 @@ termina__resource__lock = "termina__resource__lock" @:
 
 termina__resource__unlock :: CExpression
 termina__resource__unlock = "termina__resource__unlock" @:
-    CTFunction termina__lock_t
+    CTFunction void
         [
             -- | const termina__id_t resource_id
             _const . ptr $ _const termina__active_entity_t,
             -- | const termina__resource_lock_type_t lock_type,
-            _const . ptr $ _const termina__resource_lock_type_t,
-            -- | termina__lock_t lock
-            termina__lock_t
+            _const . ptr $ _const termina__resource_lock_type_t
         ]
 
 termina__box_t, _Option__box :: CType

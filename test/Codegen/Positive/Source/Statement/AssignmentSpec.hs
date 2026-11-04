@@ -97,16 +97,14 @@ spec = do
               "    \n" ++
               "    id0 * self = (id0 *)termina__this;\n" ++
               "\n" ++
-              "    termina__lock_t termina__lock = termina__resource__lock(&termina__ev->owner,\n" ++
-              "                                                            &self->_lock_type);\n" ++
+              "    termina__resource__lock(&termina__ev->owner, &self->_lock_type);\n" ++
               "\n" ++
               "    Option__box opt = { ._variant = Option__None };\n" ++
               "\n" ++
               "    opt._variant = Option__Some;\n" ++
               "    opt.Some._0 = box_var0;\n" ++
               "\n" ++
-              "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
-              "                              termina__lock);\n" ++
+              "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -140,8 +138,7 @@ spec = do
               "    \n" ++
               "    id0 * self = (id0 *)termina__this;\n" ++
               "\n" ++
-              "    termina__lock_t termina__lock = termina__resource__lock(&termina__ev->owner,\n" ++
-              "                                                            &self->_lock_type);\n" ++
+              "    termina__resource__lock(&termina__ev->owner, &self->_lock_type);\n" ++
               "\n" ++
               "    uint32_t foo = 0U;\n" ++
               "\n" ++
@@ -151,8 +148,7 @@ spec = do
               "\n" ++
               "    *(uint32_t *)box_var1.data = *(uint32_t *)box_var0.data;\n" ++
               "\n" ++
-              "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
-              "                              termina__lock);\n" ++
+              "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

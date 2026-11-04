@@ -112,8 +112,7 @@ spec = do
              "    \n" ++
              "    id0 * self = (id0 *)termina__this;\n" ++
              "\n" ++
-             "    termina__lock_t termina__lock = termina__resource__lock(&termina__ev->owner,\n" ++
-             "                                                            &self->_lock_type);\n" ++
+             "    termina__resource__lock(&termina__ev->owner, &self->_lock_type);\n" ++
              "\n" ++
              "    *(uint16_t *)foo.data = (uint16_t)(((uint32_t)*(uint16_t *)foo.data + 1024U) & 0xFFFFU);\n" ++
              "\n" ++
@@ -135,8 +134,7 @@ spec = do
              "\n" ++
              "    *(uint16_t *)foo.data = 1024U % termina__check__divisor_u16(*(uint16_t *)foo.data);\n" ++
              "\n" ++
-             "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
-             "                              termina__lock);\n" ++
+             "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type);\n" ++
              "\n" ++
              "    return;\n" ++
              "\n" ++

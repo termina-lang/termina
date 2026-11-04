@@ -167,12 +167,11 @@ resultType = "Result"
 variantParamField :: Integer -> Identifier
 variantParamField = fieldify . show
 
-thatField, thisParam, eventParam, selfParam, lockVar :: Identifier
+thatField, thisParam, eventParam, selfParam :: Identifier
 thatField = fieldify "that"
 thisParam = terminafy "this"
 eventParam = terminafy "ev"
 selfParam = "self"
-lockVar = terminafy "lock"
 
 resourceLockTypeField, taskMsgQueueIDField,
     taskIDField, handlerIDField :: Identifier

@@ -551,10 +551,14 @@ genEnableProtection progArchitecture = do
                 classId = resourceClass res
             case M.lookup resourceId resourceLockingMap of
                 Just ResourceLockNone -> return []
-                Just ResourceLockIrq -> return [
-                        pre_cr $ resourceId @: typeDef classId @. resourceLockTypeField @: termina__resource_lock_type_t @. "type" @: enumFieldType @= 
-                            "termina__resource_lock_type__irq" @: enumFieldType
-                    ]
+                Just ResourceLockIrq -> do
+                    lockId <- genDefineIrqLockIdLabel resourceId
+                    return [
+                        pre_cr $ resourceId @: typeDef classId @. resourceLockTypeField @: termina__resource_lock_type_t @. "type" @: enumFieldType @=
+                            "termina__resource_lock_type__irq" @: enumFieldType,
+                        no_cr $ resourceId @: typeDef classId @. resourceLockTypeField @: termina__resource_lock_type_t @. "irq" @: termina__enum__resource_lock_type__irq_params_t @. "lock_id" @: termina__id_t
+                            @= lockId @: termina__id_t
+                        ]
                 Just (ResourceLockMutex _) -> do
                     mutexId <- genDefineMutexIdLabel resourceId
                     return [
@@ -570,10 +574,14 @@ genEnableProtection progArchitecture = do
         genEnableProtectionPool poolId poolObj = do
             case M.lookup poolId resourceLockingMap of
                 Just ResourceLockNone -> return []
-                Just ResourceLockIrq -> return [
+                Just ResourceLockIrq -> do
+                    lockId <- genDefineIrqLockIdLabel poolId
+                    return [
                         pre_cr $ poolObj @. resourceLockTypeField @: termina__resource_lock_type_t @. "type" @: enumFieldType @=
-                            "termina__resource_lock_type__irq" @: enumFieldType
-                    ]
+                            "termina__resource_lock_type__irq" @: enumFieldType,
+                        no_cr $ poolObj @. resourceLockTypeField @: termina__resource_lock_type_t @. "irq" @: termina__enum__resource_lock_type__irq_params_t @. "lock_id" @: termina__id_t
+                            @= lockId @: termina__id_t
+                        ]
                 Just (ResourceLockMutex _) -> do
                     mutexId <- genDefineMutexIdLabel poolId
                     return [

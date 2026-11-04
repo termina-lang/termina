@@ -35,8 +35,7 @@ void C__set(const termina__event_t * const termina__ev,
     
     C * self = (C *)termina__this;
 
-    termina__lock_t termina__lock = termina__resource__lock(&termina__ev->owner,
-                                                            &self->_lock_type);
+    termina__resource__lock(&termina__ev->owner, &self->_lock_type);
 
     self->v = (size_t)(self->v + code((Pin){ .pin = 2U, .port = 1U },
                                       (Level){ ._variant = Level__Value,
@@ -44,8 +43,7 @@ void C__set(const termina__event_t * const termina__ev,
                                                                                        .port = 0U },
                                                                                 l);
 
-    termina__resource__unlock(&termina__ev->owner, &self->_lock_type,
-                              termina__lock);
+    termina__resource__unlock(&termina__ev->owner, &self->_lock_type);
 
     return;
 

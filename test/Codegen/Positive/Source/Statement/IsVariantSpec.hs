@@ -65,8 +65,7 @@ spec = do
               "    \n" ++
               "    id0 * self = (id0 *)termina__this;\n" ++
               "\n" ++
-              "    termina__lock_t termina__lock = termina__resource__lock(&termina__ev->owner,\n" ++
-              "                                                            &self->_lock_type);\n" ++
+              "    termina__resource__lock(&termina__ev->owner, &self->_lock_type);\n" ++
               "\n" ++
               "    uint32_t foo = 0U;\n" ++
               "\n" ++
@@ -76,8 +75,7 @@ spec = do
               "\n" ++
               "    }\n" ++
               "\n" ++
-              "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type,\n" ++
-              "                              termina__lock);\n" ++
+              "    termina__resource__unlock(&termina__ev->owner, &self->_lock_type);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

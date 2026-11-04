@@ -272,13 +272,12 @@ genConstSelfCastStmt ann identifier = do
     let cExpr = cast (ptr selfCType) (thisParam @: ptr (_const void))
     return $ pre_cr (var selfParam (ptr selfCType) @:= cExpr) |>> getLocation ann
 
--- | termina__lock_t __lock = termina__resource__lock(
---        &__ev->owner, &self->_lock_type);
+-- | termina__resource__lock(&__ev->owner, &self->_lock_type);
 genResourceLockStmt :: SemanticAnn -> Identifier -> CGenerator CCompoundBlockItem
 genResourceLockStmt ann identifier = do
     selfCType <- genType noqual (TStruct identifier)
     cEventObj <- genEventParamObj
-    let lock = var lockVar termina__lock_t @:= termina__resource__lock @@ [
+    let lock = termina__resource__lock @@ [
             addrOf (cEventObj @. "owner" @: termina__id_t),
             addrOf ("self" @: ptr selfCType @. resourceLockTypeField @: termina__resource_lock_type_t)
             ]
@@ -290,8 +289,7 @@ genResourceUnlockStmt ann identifier = do
     cEventObj <- genEventParamObj
     let unlock = termina__resource__unlock @@ [
             addrOf (cEventObj @. "owner" @: termina__id_t),
-            addrOf ("self" @: ptr selfCType @. resourceLockTypeField @: termina__resource_lock_type_t),
-            lockVar @: termina__lock_t
+            addrOf ("self" @: ptr selfCType @. resourceLockTypeField @: termina__resource_lock_type_t)
             ]
     return $ pre_cr unlock |>> getLocation ann
 

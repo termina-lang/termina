@@ -212,6 +212,25 @@ genDefineMutexId (mutex : xs) = do
             this_mutex <- genDefineMutexIdLabel m
             return $ _define this_mutex (Just [show value]) : rest
 
+genDefineIrqLockIdLabel :: Identifier -> CGenerator Identifier
+genDefineIrqLockIdLabel r = return $ r <::> "irq_lock_id"
+
+genDefineIrqLockId :: [Identifier] -> CGenerator [CFileItem]
+genDefineIrqLockId [] = return []
+genDefineIrqLockId (lock : xs) = do
+    this_lock <- genDefineIrqLockIdLabel lock
+    rest <- genDefineIrqLockId' xs 1
+    return $ pre_cr (_define this_lock (Just [show (0 :: Integer)])) : rest
+
+    where
+
+        genDefineIrqLockId' :: [Identifier] -> Integer -> CGenerator [CFileItem]
+        genDefineIrqLockId' [] _ = return []
+        genDefineIrqLockId' (l : xl) value = do
+            rest <- genDefineIrqLockId' xl (value + 1)
+            this_lock <- genDefineIrqLockIdLabel l
+            return $ _define this_lock (Just [show value]) : rest
+
 genDefineTaskIdLabel :: Identifier -> CGenerator Identifier
 genDefineTaskIdLabel t = return $ t <::> "task_id"
 
