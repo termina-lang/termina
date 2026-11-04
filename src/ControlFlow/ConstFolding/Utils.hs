@@ -205,6 +205,8 @@ evalBinOp _ _ RelationalNotEqual (I (TInteger lhs _) _) (I (TInteger rhs _) _) _
     return $ B True
   else
     return $ B False
+evalBinOp _ _ RelationalEqual (B lhs) (B rhs) _ = return $ B (lhs == rhs)
+evalBinOp _ _ RelationalNotEqual (B lhs) (B rhs) _ = return $ B (lhs /= rhs)
 evalBinOp _ _ BitwiseAnd (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty = do
   let result = lhs .&. rhs
   return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)

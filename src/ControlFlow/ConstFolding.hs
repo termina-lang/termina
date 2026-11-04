@@ -846,12 +846,29 @@ foldConstInitializer _ (MonadicVariantInitializer variant ann) = do
     None -> return None
     Success -> return Success
   return $ MonadicVariantInitializer variant' ann'
-foldConstInitializer ty expr =
-  if intTy ty || boolTy ty
+foldConstInitializer ty expr = do
+  computed <- computedHere expr
+  if computed
     then do
       value <- evalConstExpression expr
       return $ Constant value (buildExpAnn (getLocation (getAnnotation expr)) ty)
     else foldExpression expr >>= substituteConstants
+
+  where
+
+    -- | Whether the transpiler works out an expression: an integer or a
+    -- boolean whose operands are integers or booleans too. A comparison of two
+    -- reals or of two characters gives a boolean, but it is left to the C
+    -- compiler.
+    computedHere :: Expression SemanticAnn -> ConstFoldMonad Bool
+    computedHere e = do
+      ty' <- getExprType e
+      if intTy ty' || boolTy (withoutConst ty')
+        then case e of
+          BinOp _ lhs rhs _ -> (&&) <$> computedHere lhs <*> computedHere rhs
+          Casting e' _ _ -> computedHere e'
+          _ -> return True
+        else return False
 
 -- | A component of an aggregate constant initializer, folded with its own type.
 foldConstComponent :: Expression SemanticAnn -> ConstFoldMonad (Expression SemanticAnn)

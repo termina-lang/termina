@@ -1460,15 +1460,8 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     sameEquatableTyBool :: SemanticMonad (SAST.Expression SemanticAnn)
     sameEquatableTyBool =
       case expectedType of
-        (Just TBool) -> do
-          (ty, tyle, tyre) <-
-            sameTypeExpressions eqTy
-              (EBinOpLeftTypeNotEq op) (EBinOpRightTypeNotEq op) le re
-          case ty of
-            TConstSubtype _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann (TConstSubtype TBool))
-            _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
-        Just ty -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
-        Nothing -> do
+        Just ty | not (expectsBool ty) -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
+        _ -> do
           (ty, tyle, tyre) <-
             sameTypeExpressions eqTy
               (EBinOpLeftTypeNotEq op) (EBinOpRightTypeNotEq op) le re
@@ -1481,15 +1474,8 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     sameNumTyBool :: (SAST.TerminaType SemanticAnn -> Bool) -> SemanticMonad (SAST.Expression SemanticAnn)
     sameNumTyBool isValid =
       case expectedType of
-        (Just TBool) -> do
-          (ty, tyle, tyre) <-
-            sameTypeExpressions isValid
-              (EBinOpLeftTypeNotArith op) (EBinOpRightTypeNotArith op) le re
-          case ty of
-            TConstSubtype _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann (TConstSubtype TBool))
-            _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
-        Just ty -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
-        Nothing -> do
+        Just ty | not (expectsBool ty) -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
+        _ -> do
           (ty, tyle, tyre) <-
             sameTypeExpressions isValid
               (EBinOpLeftTypeNotArith op) (EBinOpRightTypeNotArith op) le re
@@ -1502,15 +1488,20 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     sameBoolType :: SemanticMonad (SAST.Expression SemanticAnn)
     sameBoolType =
       case expectedType of
-        (Just TBool) -> do
+        Just ty | not (expectsBool ty) -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
+        _ -> do
           tyle <- catchMismatch pann (EBinOpLeftTypeNotBool op) (typeExpression (Just TBool) typeObj le)
           tyre <- catchMismatch pann (EBinOpRightTypeNotBool op) (typeExpression (Just TBool) typeObj re)
-          return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
-        Just ty -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
-        Nothing -> do
-          tyle <- catchMismatch pann (EBinOpLeftTypeNotBool op) (typeExpression (Just TBool) typeObj le)
-          tyre <- catchMismatch pann (EBinOpRightTypeNotBool op) (typeExpression (Just TBool) typeObj re)
-          return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
+          tyle_ty <- getExprType tyle
+          tyre_ty <- getExprType tyre
+          case (tyle_ty, tyre_ty) of
+            (TConstSubtype _, TConstSubtype _) -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann (TConstSubtype TBool))
+            _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
+
+    -- | A comparison or a logical operation gives a bool, or a const bool when
+    -- it initializes a constant.
+    expectsBool :: SAST.TerminaType SemanticAnn -> Bool
+    expectsBool = boolTy . withoutConst
 typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
   case rhs_e of
     PAST.ArraySlice obj lower upper _anns -> do
