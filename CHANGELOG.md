@@ -15,6 +15,9 @@ Patch versions on either side are interchangeable.
 
 ### Added
 
+- Native binaries: each release carries a tarball for x86_64 Linux and one
+  for arm64 macOS, with `termina` and the OSAL of the same `MAJOR.MINOR`,
+  meant to be unpacked in `/opt`, and a `SHA256SUMS` file.
 - `termina generate`, which writes the C and the Makefile of the project
   without compiling them, so it does not require to have installed any
   of the toolchains.

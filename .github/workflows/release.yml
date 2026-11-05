@@ -1,0 +1,163 @@
+name: Release binaries
+
+# Builds the native tarballs of a release: the transpiler, stripped, with the
+# OSAL of the same MAJOR.MINOR, one per platform, and a SHA256SUMS file.
+#
+# On the push of a tag v*.*.* it uploads them to the GitHub Release of the
+# tag, which the release runbook creates right after pushing the tag; the job
+# waits for it. Run by hand on a branch, it only keeps them as artifacts of
+# the run, so the build can be tried without a tag.
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          # 22.04 so that the binary needs no newer glibc than 2.35
+          - os: ubuntu-22.04
+            target: x86_64-linux
+          - os: macos-14
+            target: aarch64-macos
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Stack and GHC
+        uses: haskell-actions/setup@v2
+        with:
+          enable-stack: true
+          stack-no-global: true
+
+      - name: Cache Stack artifacts
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.stack
+            .stack-work
+          key: release-${{ matrix.os }}-stack-${{ hashFiles('stack.yaml', 'stack.yaml.lock', 'package.yaml') }}
+          restore-keys: |
+            release-${{ matrix.os }}-stack-
+
+      - name: Build the transpiler
+        run: stack build --no-terminal --copy-bins --local-bin-path out
+
+      # The version of package.yaml names the tarball, whatever the ref
+      - name: Read the version
+        id: version
+        shell: bash
+        run: |
+          version=$(sed -n 's/^version: *\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' package.yaml)
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "series=${version%.*}" >> "$GITHUB_OUTPUT"
+
+      # The highest patch of the same MAJOR.MINOR, since patches of the
+      # transpiler and of the OSAL are interchangeable
+      - name: Find the OSAL tag
+        id: osal
+        shell: bash
+        run: |
+          tag=$(git ls-remote --tags --refs https://github.com/termina-lang/termina-osal.git \
+                  "v${{ steps.version.outputs.series }}.*" \
+                | sed 's|.*refs/tags/||' | sort -V | tail -n 1)
+          if [ -z "${tag}" ]; then
+            echo "termina-osal has no tag v${{ steps.version.outputs.series }}.*" >&2
+            exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout the OSAL
+        uses: actions/checkout@v6
+        with:
+          repository: termina-lang/termina-osal
+          ref: ${{ steps.osal.outputs.tag }}
+          path: osal-src
+
+      - name: Pack the tarball
+        id: pack
+        shell: bash
+        run: |
+          name="termina-${{ steps.version.outputs.version }}"
+          file="${name}-${{ matrix.target }}.tar.gz"
+          mkdir -p "dist/${name}/bin"
+          cp out/termina "dist/${name}/bin/termina"
+          strip "dist/${name}/bin/termina"
+          rm -rf osal-src/.git osal-src/.github
+          mv osal-src "dist/${name}/osal"
+          cp LICENSE "dist/${name}/LICENSE"
+          cat > "dist/${name}/README.md" <<EOF
+          # Termina ${{ steps.version.outputs.version }}
+
+          The Termina transpiler for ${{ matrix.target }}, with the Termina OSAL
+          ${{ steps.osal.outputs.tag }} in \`osal/\`.
+
+          Unpack it in \`/opt\`, link \`/opt/termina\` to the folder and add
+          \`/opt/termina/bin\` to the \`PATH\`:
+
+              sudo tar -xzf ${file} -C /opt
+              sudo ln -sfn /opt/${name} /opt/termina
+              export PATH=/opt/termina/bin:\$PATH
+              termina doctor
+
+          The generated Makefile takes the OSAL from \`TERMINA_OSAL_DIR\`, or
+          else from \`/opt/termina/osal\`. On Linux, \`termina\` needs
+          \`libgmp.so.10\`, \`libtinfo.so.6\` and \`libz.so.1\`. The
+          cross-toolchains of the platforms are installed apart; \`termina
+          doctor\` tells where each one is expected.
+          EOF
+          tar -C dist -czf "${file}" "${name}"
+          echo "file=${file}" >> "$GITHUB_OUTPUT"
+
+      - name: Keep the tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: ${{ steps.pack.outputs.file }}
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect the tarballs
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Write SHA256SUMS
+        working-directory: dist
+        run: sha256sum termina-*.tar.gz > SHA256SUMS && cat SHA256SUMS
+
+      - name: Keep the checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: SHA256SUMS
+          path: dist/SHA256SUMS
+
+      # The runbook creates the release after pushing the tag; wait for it
+      - name: Upload to the GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          for i in $(seq 1 30); do
+            if gh release view "${tag}" > /dev/null 2>&1; then
+              gh release upload "${tag}" termina-*.tar.gz SHA256SUMS --clobber
+              exit 0
+            fi
+            sleep 60
+          done
+          echo "No GitHub Release for ${tag} after 30 minutes" >&2
+          exit 1
