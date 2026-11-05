@@ -7,7 +7,7 @@
 -- the #line pragmas.
 module Command.Deliver (
     deliverCmdArgsParser, deliverCommand, DeliverCmdArgs,
-    dependencies, inFolder, pathsIn, relocatePaths, toolchainVariables
+    dependencies, inFolder, pathsIn, relocatePaths, toolchainVariables, releaseBuild
 ) where
 
 import Command.Build
@@ -84,20 +84,37 @@ deliverCommand (DeliverCmdArgs chatty withTests archive withTrace) = do
     when (null deployments) (putStrLn . infoMessage $ nothingSelected manifest selection Nothing)
     forM_ deployments $ \deployment -> do
       announce deployments ("Delivering " ++ deploymentLabel deployment)
-      deliverDeployment chatty loaded archive withTrace deployment
+      deliverDeployment chatty loaded archive withTrace (deliverableFolder (deploymentConfig deployment)) (releaseBuild deployment)
 
 -- | The folder of the deliverable of a deployment: "deliverable/app",
 -- "deliverable/tests/<name>/<platform>".
 deliverableFolder :: TerminaConfig -> FilePath
 deliverableFolder config = outputFolderName </> "deliverable" </> makeRelative outputFolderName (outputFolder config)
 
-deliverDeployment :: Bool -> LoadedProject -> Bool -> Bool -> Deployment -> IO ()
-deliverDeployment chatty loaded archive withTrace deployment = do
+-- | A deployment built in release under ".termina/deliver", whatever the
+-- profile of the manifest, so that delivering leaves the build of the
+-- project in "output" as it is.
+releaseBuild :: Deployment -> Deployment
+releaseBuild deployment = deployment {
+    deploymentConfig = moved (deploymentConfig deployment),
+    deploymentPlainConfig = moved (deploymentPlainConfig deployment)
+  }
+
+  where
+
+    moved config = config {
+        profile = Release,
+        outputFolder = ".termina" </> "deliver" </> makeRelative outputFolderName (outputFolder config)
+      }
+
+-- | Build a deployment and its deliverable in the given folder, and compare
+-- their binaries.
+deliverDeployment :: Bool -> LoadedProject -> Bool -> Bool -> FilePath -> Deployment -> IO ()
+deliverDeployment chatty loaded archive withTrace folder deployment = do
     let config = deploymentConfig deployment
         label = deploymentLabel deployment
         built = outputFolder config
         plain = outputFolder (deploymentPlainConfig deployment)
-        folder = deliverableFolder config
         binary = "bin" </> T.unpack (name config)
     -- | The build with the #line pragmas gives the values of the Makefile,
     -- the dependency files and the binary to compare with

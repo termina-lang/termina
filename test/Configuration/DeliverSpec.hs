@@ -2,10 +2,15 @@
 -- and rewrites their paths for the flat Makefile of the deliverable.
 module Configuration.DeliverSpec (spec) where
 
-import Command.Deliver (dependencies, inFolder, pathsIn, relocatePaths, toolchainVariables)
+import Command.Deliver (dependencies, inFolder, pathsIn, relocatePaths, toolchainVariables, releaseBuild)
+import Configuration.Configuration
+import Configuration.Manifest
 
+import qualified Data.ByteString.Char8 as BS
 import Data.List (isPrefixOf)
 import qualified Data.Map.Strict as M
+import Data.Yaml (decodeEither')
+import System.FilePath
 import Test.Hspec
 
 substitutions :: [(String, String)]
@@ -80,3 +85,15 @@ spec = describe "termina deliver" $ do
 
     it "takes none from an empty CROSS" $
       toolchainVariables (M.fromList [("CROSS", "")]) `shouldBe` []
+
+  describe "releaseBuild" $
+
+    it "builds an application in debug in release under .termina/deliver, out of output" $ do
+      let yaml = "project:\n  name: demo\n  version: 0.1.0\n  manifest-version: 1\napp:\n  platform: posix-gcc\n  profile: debug\n"
+      case either (Left . show) parseManifest (decodeEither' (BS.pack yaml)) >>= maybe (Left "no application") Right . appDeployment of
+        Left err -> expectationFailure err
+        Right deployment -> do
+          let moved = releaseBuild deployment
+          map (\c -> (profile c, outputFolder c)) [deploymentConfig moved, deploymentPlainConfig moved]
+            `shouldBe` [(Release, ".termina" </> "deliver" </> "app"), (Release, ".termina" </> "deliver" </> "plain" </> "app")]
+          profile (deploymentConfig deployment) `shouldBe` Debug
