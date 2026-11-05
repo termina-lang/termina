@@ -34,6 +34,16 @@ gdbServerPort FreeRTOS10STM32L432NUCLEOL432KC = Just 61234
 gdbServerPort RTEMS6ZYNQ7000PYNQZ2 = Just 3000
 gdbServerPort _ = Nothing
 
+-- | Whether an application may replace the linker script of the platform
+-- with its own, the linker-script of the app section of the manifest. The
+-- host links with the default script of its toolchain.
+customLinkerScript :: Platform -> Bool
+customLinkerScript POSIXGCC                        = False
+customLinkerScript RTEMS5LEON3SFNEXYSA7              = True
+customLinkerScript FreeRTOS10STM32L432NUCLEOL432KC = True
+customLinkerScript RTEMS6ZYNQ7000PYNQZ2            = True
+customLinkerScript TestPlatform                    = False
+
 -- | An address inside the call instruction, from the value of
 -- __builtin_return_address(0) in the function it called: on x86-64 and
 -- AArch64 the value is the next instruction; on ARM in Thumb it is the next

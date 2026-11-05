@@ -58,6 +58,11 @@ spec = describe "Makefile: project configuration" $ do
     makefileFor (defaultConfig "test" TestPlatform) `shouldContain`
       "TERMINA_LINKER_SCRIPTS=$(patsubst -T%, %, $(filter -T%, $(LDFLAGS)))\n"
 
+  it "names the linker script of the project before the platform.mk, which reads it" $ do
+    let makefile = makefileFor (defaultConfig "test" TestPlatform) { outputFolder = "output/app", linkerScript = Just "ld/linkcmds" }
+    makefile `shouldContain` "TERMINA_LINKER_SCRIPT:=$(abspath $R/../../ld/linkcmds)\n\ninclude $(TERMINA_OSAL_DIR)/platform/$(PLATFORM)/platform.mk\n"
+    makefileFor (defaultConfig "test" TestPlatform) `shouldNotContain` "TERMINA_LINKER_SCRIPT:="
+
   it "puts the binary alone in bin and the files of the build in obj" $
     mapM_ (\line -> makefileFor (defaultConfig "test" TestPlatform) `shouldContain` line)
       [ "TARGET_DIR_NAME:=$R/bin\n"

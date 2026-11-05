@@ -29,7 +29,7 @@ genMakefile params loweredProject externs unitTest =
             MVariable MConditional "TERMINA_OSAL_DIR" [MFragment "/opt/termina/osal"],
             MVariable MSimple "TERMINA_PROFILE"
                 [MFragment (case profile params of { Debug -> "debug"; Release -> "release" })]
-        ]] ++ testFlags ++ bufferSizeFlags ++ [
+        ]] ++ testFlags ++ bufferSizeFlags ++ linkerScriptFlags ++ [
         MakeBlock [
             MInclude True $ "$(TERMINA_OSAL_DIR)" </> "platform" </> "$(PLATFORM)" </> "platform" <.> "mk"
         ],
@@ -186,6 +186,12 @@ genMakefile params loweredProject externs unitTest =
                     MVariable MSimple "TERMINA_TEST" [MFragment "1"]
                     : [MVariable MAppend "CFLAGS" [MFragment "-DTERMINA__TEST__CLOCK"] | unitTest]
             | isTestBuild params ]
+
+        -- | The linker script of the project, which platform.mk passes to
+        -- the linker in place of its own
+        linkerScriptFlags = [
+                MakeBlock [MVariable MSimple "TERMINA_LINKER_SCRIPT" [MFunction "abspath" [MFragment ("$R" </> projectRoot </> script)]]]
+            | Just script <- [linkerScript params] ]
 
         deliverableVariables = [
             "R", "TERMINA_OSAL_DIR", "TERMINA_PROJECT_DIR", "CC", "AS", "LD", "OBJCOPY", "NM", "OBJDUMP",

@@ -124,7 +124,7 @@ deliverDeployment chatty loaded archive withTrace folder deployment = do
         list key = words (value key)
         osalDir = dropTrailingPathSeparator (value "TERMINA_OSAL_DIR")
         outDir = dropTrailingPathSeparator (value "R")
-        relocated = relocatePaths (deliverableSubstitutions info)
+        relocated = relocatePaths (deliverableSubstitutions config info)
     -- | The values of make are lists separated by spaces, and the paths in
     -- them are rewritten by their folder, so both folders must be absolute
     -- and have no spaces
@@ -164,6 +164,7 @@ deliverDeployment chatty loaded archive withTrace folder deployment = do
         osalUsed = nub . sort . filter (inFolder osalDir) $ osalSources ++ opened ++ named ++ externScript
     licenses <- licenseFiles osalDir osalUsed
     forM_ (map (relativeTo osalDir) (osalUsed ++ licenses)) $ \file -> copyInto (osalDir </> file) (folder </> "osal" </> file)
+    forM_ (projectLinkerScript config info) $ \(script, path) -> copyInto script (folder </> path)
     let makefile = runMakefilePrinter $
             genDeliverableMakefile config info (map relocated osalSources) sources externs (testModules config modules)
     TIO.writeFile (folder </> "Makefile") makefile
@@ -205,16 +206,25 @@ deliverDeployment chatty loaded archive withTrace folder deployment = do
 -- | The paths that the values of the build name, and what the flat Makefile
 -- writes in their place: the output folder is the folder of the deliverable,
 -- the OSAL goes to its "osal" folder, and the folder of the toolchain is
--- written back as the variable from which CROSS takes it.
-deliverableSubstitutions :: M.Map String String -> [(String, String)]
-deliverableSubstitutions info =
+-- written back as the variable from which CROSS takes it. The linker script
+-- of the project goes to the "ld" folder.
+deliverableSubstitutions :: TerminaConfig -> M.Map String String -> [(String, String)]
+deliverableSubstitutions config info =
     sortOn (negate . length . fst) $
         [(dropTrailingPathSeparator (value "R"), ""), (dropTrailingPathSeparator (value "TERMINA_OSAL_DIR"), "osal")]
         ++ [ (v, "$(" ++ var ++ ")") | var <- toolchainVariables info, let v = value ("VAR " ++ var), not (null v) ]
+        ++ maybe [] pure (projectLinkerScript config info)
 
   where
 
     value key = M.findWithDefault "" key info
+
+-- | The linker script of the project, as the build names it, and its path in
+-- the deliverable, under "ld" with its file name.
+projectLinkerScript :: TerminaConfig -> M.Map String String -> Maybe (FilePath, FilePath)
+projectLinkerScript config info =
+    fmap (\path -> (dropTrailingPathSeparator (M.findWithDefault "" "TERMINA_PROJECT_DIR" info) </> path, "ld" </> takeFileName path))
+        (normalise <$> linkerScript config)
 
 -- | The variables that CROSS refers to, which hold the folder of the
 -- toolchain.
@@ -361,7 +371,7 @@ genDeliverableMakefile config info osalSources sources externs testQNames =
 
     value key = M.findWithDefault "" key info
 
-    substitutions = deliverableSubstitutions info
+    substitutions = deliverableSubstitutions config info
 
     -- | The flags with the paths of the deliverable. The prefix map of the
     -- project gives way to the one of the deliverable, and the link map,

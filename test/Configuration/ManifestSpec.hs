@@ -50,7 +50,19 @@ spec = describe "Manifest" $ do
 
     it "reads an application" $
       fmap manifestNature (parsed (project ++ app))
-        `shouldBe` Right (Application (AppDeployment RTEMS5LEON3SFNEXYSA7 Release Nothing))
+        `shouldBe` Right (Application (AppDeployment RTEMS5LEON3SFNEXYSA7 Release Nothing Nothing))
+
+    it "reads the linker script of an application" $
+      fmap manifestNature (parsed (project ++ app ++ "  linker-script: ld/linkcmds\n"))
+        `shouldBe` Right (Application (AppDeployment RTEMS5LEON3SFNEXYSA7 Release Nothing (Just "ld/linkcmds")))
+
+    it "rejects a linker script on a platform that takes none" $
+      (project ++ "app:\n  platform: posix-gcc\n  profile: release\n  linker-script: ld/linkcmds\n")
+        `failsWith` "app.linker-script: the platform posix-gcc takes no linker script"
+
+    it "rejects a linker script outside the project" $
+      (project ++ app ++ "  linker-script: ../linkcmds\n")
+        `failsWith` "app.linker-script: ../linkcmds is outside the project"
 
     it "reads a library" $
       fmap manifestNature (parsed (project ++ "exports:\n  - drivers.gaisler\n"))
@@ -110,7 +122,23 @@ spec = describe "Manifest" $ do
     it "reads the entry of a test" $
       fmap (M.toList . manifestTests)
         (parsed (project ++ app ++ "tests:\n  hk:\n    platforms: [posix-gcc, rtems5-leon3sf-nexysa7]\n    timeout: 10\n"))
-        `shouldBe` Right [(T.pack "hk", TestEntry [POSIXGCC, RTEMS5LEON3SFNEXYSA7] 10 defaultTestLogSize Nothing Nothing emptyExternConfig [])]
+        `shouldBe` Right [(T.pack "hk", TestEntry [POSIXGCC, RTEMS5LEON3SFNEXYSA7] 10 defaultTestLogSize Nothing Nothing emptyExternConfig [] M.empty)]
+
+    it "reads the linker script of a test on one of its platforms" $
+      fmap (M.map testLinkerScripts . manifestTests)
+        (parsed (project ++ app ++ "tests:\n  hk:\n    platforms: [posix-gcc, rtems5-leon3sf-nexysa7]\n    timeout: 10\n"
+                   ++ "    linker-script:\n      rtems5-leon3sf-nexysa7: ld/linkcmds\n"))
+        `shouldBe` Right (M.fromList [(T.pack "hk", M.fromList [(T.pack "rtems5-leon3sf-nexysa7", "ld/linkcmds")])])
+
+    it "rejects the linker script of a test on a platform it does not run on" $
+      (project ++ app ++ "tests:\n  hk:\n    platforms: [posix-gcc]\n    timeout: 10\n"
+         ++ "    linker-script:\n      rtems5-leon3sf-nexysa7: ld/linkcmds\n")
+        `failsWith` "tests.hk.linker-script.rtems5-leon3sf-nexysa7: the test does not run on rtems5-leon3sf-nexysa7"
+
+    it "rejects the linker script of a test on a platform that takes none" $
+      (project ++ app ++ "tests:\n  hk:\n    platforms: [posix-gcc]\n    timeout: 10\n"
+         ++ "    linker-script:\n      posix-gcc: ld/linkcmds\n")
+        `failsWith` "tests.hk.linker-script.posix-gcc: the platform posix-gcc takes no linker script"
 
   describe "deployments" $ do
 
@@ -196,6 +224,19 @@ spec = describe "Manifest" $ do
       errors <- withProject "noapp" ["src/obdh/hk.fin"] (project ++ app)
         (\root m -> checkLayout root m)
       errors `shouldSatisfy` any (isInfixOf "there is no app/ folder")
+
+    it "rejects a linker script that does not exist" $ do
+      errors <- withProject "noscript" ["app/app.fin"] (project ++ app ++ "  linker-script: ld/linkcmds\n")
+        (\root m -> checkLayout root m)
+      errors `shouldBe` ["termina.yaml: the linker script ld/linkcmds does not exist"]
+
+    it "reports once a missing linker script that the application and a test share" $ do
+      errors <- withProject "sharedscript" ["app/app.fin", "tests/hk/test.fin"]
+        (project ++ app ++ "  linker-script: ld/linkcmds\n"
+           ++ "tests:\n  hk:\n    platforms: [rtems5-leon3sf-nexysa7]\n    timeout: 10\n"
+           ++ "    linker-script:\n      rtems5-leon3sf-nexysa7: ld/linkcmds\n")
+        (\root m -> checkLayout root m)
+      errors `shouldBe` ["termina.yaml: the linker script ld/linkcmds does not exist"]
 
   it "writes a manifest for a new application that it reads back" $
     parsed (newApplicationManifest "demo" POSIXGCC) `shouldSatisfy` isRight
