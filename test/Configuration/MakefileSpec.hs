@@ -93,3 +93,6 @@ spec = describe "Makefile: project configuration" $ do
     concurrentMakefile `shouldContain` "$(TARGET): $(OBJS) $(TERMINA_FLAGS_FILE) $(TERMINA_LINKER_SCRIPTS) $R/test.json\n"
     concurrentMakefile `shouldContain` "$(OBJCOPY) --add-section .termina_test=$R/test.json $@;"
     makefileFor (defaultConfig "test" TestPlatform) `shouldNotContain` "test.json"
+
+  it "hashes the binary without the descriptor of a test, which the deliverable does not add" $
+    makefileFor (defaultConfig "test" TestPlatform) `shouldContain` "$(OBJCOPY) --strip-debug --remove-section=.termina_test $$o $$o.stripped"

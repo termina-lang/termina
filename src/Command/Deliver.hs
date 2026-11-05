@@ -349,7 +349,7 @@ genDeliverableMakefile config info osalSources sources externs testQNames =
                 MakeCommand False [MFragment "@$(RM) $(TARGET_DIR_NAME)/stripped.sha256"],
                 MakeCommand False [MFragment $ unwords [
                     "@if command -v $(OBJCOPY) >/dev/null 2>&1; then",
-                    "for o in $(TARGET) $(MODULE_OBJS); do $(OBJCOPY) --strip-debug $$o $$o.stripped || exit 1;",
+                    "for o in $(TARGET) $(MODULE_OBJS); do $(OBJCOPY) --strip-debug --remove-section=.termina_test $$o $$o.stripped || exit 1;",
                     "printf '%s %s\\n' $$($(TERMINA_SHA256) < $$o.stripped | cut -c 1-64) $$o; $(RM) $$o.stripped; done > $(TARGET_DIR_NAME)/stripped.sha256;",
                     "else echo $(OBJCOPY) not found: the objects are not hashed; fi"]]
             ],

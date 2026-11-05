@@ -115,14 +115,14 @@ genMakefile params loweredProject externs unitTest =
                 MakeCommand False [MFragment "@cd $(TERMINA_PROJECT_DIR) && $(CC) $(CFLAGS) $(TERMINA_EXTERN_CPPFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
             ],
             -- | The SHA-256 of the binary and of each module object without
-            -- their debugging information, which the build writes into
-            -- provenance.json
+            -- their debugging information and the descriptor of a test,
+            -- which the build writes into provenance.json
             MRule ".PHONY" ["stripped-hashes"] [],
             MRule "stripped-hashes" ["$(TARGET)", "$(MODULE_OBJS)"] [
                 MakeCommand False [MFragment "@$(RM) $(TARGET_DIR_NAME)/stripped.sha256"],
                 MakeCommand False [MFragment $ unwords [
                     "@if command -v $(OBJCOPY) >/dev/null 2>&1; then",
-                    "for o in $(TARGET) $(MODULE_OBJS); do $(OBJCOPY) --strip-debug $$o $$o.stripped || exit 1;",
+                    "for o in $(TARGET) $(MODULE_OBJS); do $(OBJCOPY) --strip-debug --remove-section=.termina_test $$o $$o.stripped || exit 1;",
                     "printf '%s %s\\n' $$($(TERMINA_SHA256) < $$o.stripped | cut -c 1-64) $${o#$R/}; $(RM) $$o.stripped; done > $(TARGET_DIR_NAME)/stripped.sha256;",
                     "else echo $(OBJCOPY) not found: the objects are not hashed; fi"]]
             ],
