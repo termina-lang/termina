@@ -200,14 +200,15 @@ spec = describe "Manifest" $ do
   it "writes a manifest for a new application that it reads back" $
     parsed (newApplicationManifest "demo" POSIXGCC) `shouldSatisfy` isRight
 
-  it "writes a manifest for a new library that it reads back" $
-    fmap manifestNature (parsed (newLibraryManifest "my-lib" "my_lib"))
-      `shouldBe` Right (Library [Prefix [T.pack "my_lib"]])
+  it "writes a manifest for a new library that it reads back, with the prefix given or with none" $ do
+    fmap manifestNature (parsed (newLibraryManifest "drivers-stm32" (Just "drivers.stm32")))
+      `shouldBe` Right (Library [Prefix [T.pack "drivers", T.pack "stm32"]])
+    fmap manifestNature (parsed (newLibraryManifest "drivers-stm32" Nothing)) `shouldBe` Right (Library [])
 
   it "keeps as text a name or a prefix that YAML would read as a boolean or a number" $ do
     fmap (projectName . manifestProject) (parsed (newApplicationManifest "n" POSIXGCC)) `shouldBe` Right (T.pack "n")
     fmap (projectName . manifestProject) (parsed (newApplicationManifest "123" POSIXGCC)) `shouldBe` Right (T.pack "123")
-    fmap manifestNature (parsed (newLibraryManifest "on" "no"))
+    fmap manifestNature (parsed (newLibraryManifest "on" (Just "no")))
       `shouldBe` Right (Library [Prefix [T.pack "no"]])
 
   describe "new tests" $ do

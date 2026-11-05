@@ -616,19 +616,17 @@ testConfig manifest testName entry plt prf =
         (Nothing, Application app) -> appMicrosecondsPerTick app
         (Nothing, Library _) -> Nothing
 
--- | The manifest of a new library, which exports one prefix. The name and
--- the prefix go in quotes: unquoted, YAML reads "no" or "123" as a boolean
--- or a number.
-newLibraryManifest :: String -> String -> String
-newLibraryManifest projectNameStr prefix = unlines [
+-- | The manifest of a new library, which exports the given prefix, or none
+-- yet. The name and the prefix go in quotes: unquoted, YAML reads "no" or
+-- "123" as a boolean or a number.
+newLibraryManifest :: String -> Maybe String -> String
+newLibraryManifest projectNameStr prefix = unlines $ [
         "project:",
         "  name: " ++ show projectNameStr,
         "  version: 0.1.0",
         "  manifest-version: " ++ show (maximum knownManifestVersions),
-        "",
-        "exports:",
-        "  - " ++ show prefix
-    ]
+        ""
+    ] ++ maybe ["exports: []"] (\p -> ["exports:", "  - " ++ show p]) prefix
 
 -- | The platforms of a new test: the host, and the platform of the
 -- application when it is another one, so that the test passes on both.

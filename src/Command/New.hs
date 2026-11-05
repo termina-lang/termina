@@ -63,7 +63,7 @@ newCmdArgsParser = newTestParser <|> newProjectParser
             <|> flag NewApp NewApp (long "app" <> help "Create an application (default)"))
         <*> optional (strOption (long "exports"
             <> metavar "PREFIX"
-            <> help "Module prefix exported by a new library (default: the name of the project)"))
+            <> help "Module prefix exported by a new library (default: none)"))
         <*> option (eitherReader readVcs) (long "vcs"
             <> value VcsGit
             <> metavar "git|none"
@@ -246,18 +246,15 @@ newCommand (NewProject project mPltName kind mExports vcs vscode chatty) = do
                 putStrLn (errorMessage $ "Unsupported platform: " ++ show pltName) >>
                 showSupportedPlatforms >> exitFailure
             ) return $ checkPlatform pltName
-    -- | The prefix that a new library exports, by default named after the project
+    -- | The prefix that a new library exports, if given: without it, the
+    -- exports of the library start empty
     prefix <- case (kind, mExports) of
         (NewApp, Just _) -> dieWithError $ "An application exports nothing: --exports is only for a library"
         (_, Just given) -> do
             unless (all (isSnakeCase . T.unpack) (T.splitOn (T.pack ".") (T.pack given))) $
                 dieWithError $ "The prefix \"" ++ given ++ "\" is not a module prefix (lowercase snake_case segments separated by dots)"
-            return given
-        (_, Nothing) -> do
-            let named = map (\c -> if c == '-' then '_' else toLower c) project
-            when (kind == NewLib && not (isSnakeCase named)) $
-                dieWithError $ "The name of a library has to make a module prefix: \"" ++ named ++ "\" is not lowercase snake_case (choose one with --exports)"
-            return named
+            return (Just given)
+        (_, Nothing) -> return Nothing
     when chatty (putStrLn . debugMessage $ "Creating new project: " ++ project)
     -- Check if the directory already exists
     exists <- doesPathExist project
@@ -276,8 +273,8 @@ newCommand (NewProject project mPltName kind mExports vcs vscode chatty) = do
         NewLib -> newLibraryManifest project prefix
     when chatty (putStrLn . debugMessage $ "Creating project source modules directory: " ++ sourceModulesFolderPath)
     createDirectory sourceModulesFolderPath
-    when (kind == NewLib) $
-        createDirectoryIfMissing True (sourceModulesFolderPath </> joinPath (map T.unpack (T.splitOn (T.pack ".") (T.pack prefix))))
+    forM_ prefix $ \p ->
+        createDirectoryIfMissing True (sourceModulesFolderPath </> joinPath (map T.unpack (T.splitOn (T.pack ".") (T.pack p))))
     when (kind == NewApp) $ do
         let appFolderPath = project </> appFolder
         when chatty (putStrLn . debugMessage $ "Creating project application directory: " ++ appFolderPath)
