@@ -9,6 +9,7 @@ module Command.Provenance (
     writeProvenanceFile,
     buildInfo,
     readHashes,
+    readOsalVersion,
     terminaVersion
 ) where
 

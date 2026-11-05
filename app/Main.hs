@@ -14,6 +14,8 @@ import Command.Test
 import Command.Try
 import Command.LSP
 import Command.Sched
+import Command.Doctor
+import Command.Clean
 import Command.Utils (enterProject)
 import System.IO (BufferMode(LineBuffering), hSetBuffering, stdout)
 
@@ -30,6 +32,8 @@ data Command =
     | Restore RestoreCmdArgs
     | Update UpdateCmdArgs
     | Verify VerifyCmdArgs
+    | Doctor DoctorCmdArgs
+    | Clean CleanCmdArgs
     deriving Show
 
 newCommandParser :: Parser Command
@@ -51,6 +55,14 @@ updateCommandParser = Update
 verifyCommandParser :: Parser Command
 verifyCommandParser = Verify
     <$> verifyCmdArgsParser
+
+doctorCommandParser :: Parser Command
+doctorCommandParser = Doctor
+    <$> doctorCmdArgsParser
+
+cleanCommandParser :: Parser Command
+cleanCommandParser = Clean
+    <$> cleanCmdArgsParser
 
 generateCommandParser :: Parser Command
 generateCommandParser = Generate
@@ -94,6 +106,8 @@ commandParser = subparser
  <> withHelp "try" tryCommandParser "Translate a single file"
  <> withHelp "lsp" lspCommandParser "Start language server"
  <> withHelp "sched" schedCommandParser "Generate scheduling models"
+ <> withHelp "doctor" doctorCommandParser "Report the OSAL, the tools and the toolchain of each platform found"
+ <> withHelp "clean" cleanCommandParser "Remove output/ and .termina/ of the project"
   )
 
   where
@@ -129,3 +143,5 @@ main = do
         Restore cmdargs -> enterProject >> restoreCommand cmdargs
         Update cmdargs -> enterProject >> updateCommand cmdargs
         Verify cmdargs -> enterProject >> verifyCommand cmdargs
+        Doctor cmdargs -> doctorCommand cmdargs
+        Clean cmdargs -> enterProject >> cleanCommand cmdargs
