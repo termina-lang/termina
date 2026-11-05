@@ -616,16 +616,18 @@ testConfig manifest testName entry plt prf =
         (Nothing, Application app) -> appMicrosecondsPerTick app
         (Nothing, Library _) -> Nothing
 
--- | The manifest of a new library, which exports one prefix.
+-- | The manifest of a new library, which exports one prefix. The name and
+-- the prefix go in quotes: unquoted, YAML reads "no" or "123" as a boolean
+-- or a number.
 newLibraryManifest :: String -> String -> String
 newLibraryManifest projectNameStr prefix = unlines [
         "project:",
-        "  name: " ++ projectNameStr,
+        "  name: " ++ show projectNameStr,
         "  version: 0.1.0",
         "  manifest-version: " ++ show (maximum knownManifestVersions),
         "",
         "exports:",
-        "  - " ++ prefix
+        "  - " ++ show prefix
     ]
 
 -- | The platforms of a new test: the host, and the platform of the
@@ -721,11 +723,11 @@ addDependencyEntry original mTest url tag =
 
     appendEnd block new = let (content, blanks) = splitTrailingBlanks block in content ++ new ++ blanks
 
--- | The manifest of a new application.
+-- | The manifest of a new application, with the name in quotes.
 newApplicationManifest :: String -> Platform -> String
 newApplicationManifest projectNameStr plt = unlines [
         "project:",
-        "  name: " ++ projectNameStr,
+        "  name: " ++ show projectNameStr,
         "  version: 0.1.0",
         "  manifest-version: " ++ show (maximum knownManifestVersions),
         "",

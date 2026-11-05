@@ -204,6 +204,12 @@ spec = describe "Manifest" $ do
     fmap manifestNature (parsed (newLibraryManifest "my-lib" "my_lib"))
       `shouldBe` Right (Library [Prefix [T.pack "my_lib"]])
 
+  it "keeps as text a name or a prefix that YAML would read as a boolean or a number" $ do
+    fmap (projectName . manifestProject) (parsed (newApplicationManifest "n" POSIXGCC)) `shouldBe` Right (T.pack "n")
+    fmap (projectName . manifestProject) (parsed (newApplicationManifest "123" POSIXGCC)) `shouldBe` Right (T.pack "123")
+    fmap manifestNature (parsed (newLibraryManifest "on" "no"))
+      `shouldBe` Right (Library [Prefix [T.pack "no"]])
+
   describe "new tests" $ do
 
     let nexys = project ++ app
