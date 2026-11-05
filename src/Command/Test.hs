@@ -319,7 +319,17 @@ targetOf RTEMS6ZYNQ7000PYNQZ2 _ (Servers gdb (xsdbHost, mXsdbPort)) =
         ++ err ++ "; it is started from the root of the project with xsdb -eval \"xsdbserver start -port "
         ++ show port ++ "; vwait forever\""
 
+-- | The runner does not drive these yet: Spike needs its OpenOCD, and the
+-- NOEL-V its device tree loaded by GRMON before each run.
+targetOf RTEMS6RV32IMSPIKE _ servers = notYetTarget RTEMS6RV32IMSPIKE servers
+targetOf RTEMS6NOEL32IMARTYA7 _ servers = notYetTarget RTEMS6NOEL32IMARTYA7 servers
 targetOf TestPlatform _ _ = error "no test runs on the test platform"
+
+-- | A board on which no test runs yet: every run stops before loading.
+notYetTarget :: Platform -> Servers -> Target
+notYetTarget plt servers = (boardTarget plt ["load"] servers) {
+    targetPrepare = return (Left ("termina test does not run the tests on " ++ show plt ++ " yet"))
+  }
 
 -- | A board under gdb-multiarch, through its GDB server.
 -- The commands given reset the board and load the binary.

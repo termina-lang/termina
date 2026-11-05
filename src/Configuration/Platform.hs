@@ -11,6 +11,8 @@ data Platform =
     | RTEMS5LEON3SFNEXYSA7
     | FreeRTOS10STM32L432NUCLEOL432KC
     | RTEMS6ZYNQ7000PYNQZ2
+    | RTEMS6RV32IMSPIKE
+    | RTEMS6NOEL32IMARTYA7
     | TestPlatform
     deriving Eq
 
@@ -24,14 +26,19 @@ usizeWidth POSIXGCC                        = 64
 usizeWidth RTEMS5LEON3SFNEXYSA7              = 32
 usizeWidth FreeRTOS10STM32L432NUCLEOL432KC = 32
 usizeWidth RTEMS6ZYNQ7000PYNQZ2            = 32
+usizeWidth RTEMS6RV32IMSPIKE               = 32
+usizeWidth RTEMS6NOEL32IMARTYA7            = 32
 usizeWidth TestPlatform                    = 32
 
 -- | The default port of the GDB server of a board, which the debug
--- configurations of termina new and the runner of termina test use
+-- configurations of termina new and the runner of termina test use. Spike has
+-- none of its own: OpenOCD reaches it through remote bitbang and serves GDB.
 gdbServerPort :: Platform -> Maybe Int
 gdbServerPort RTEMS5LEON3SFNEXYSA7 = Just 2222
 gdbServerPort FreeRTOS10STM32L432NUCLEOL432KC = Just 61234
 gdbServerPort RTEMS6ZYNQ7000PYNQZ2 = Just 3000
+gdbServerPort RTEMS6RV32IMSPIKE = Just 3333
+gdbServerPort RTEMS6NOEL32IMARTYA7 = Just 2222
 gdbServerPort _ = Nothing
 
 -- | Whether an application may replace the linker script of the platform
@@ -42,16 +49,21 @@ customLinkerScript POSIXGCC                        = False
 customLinkerScript RTEMS5LEON3SFNEXYSA7              = True
 customLinkerScript FreeRTOS10STM32L432NUCLEOL432KC = True
 customLinkerScript RTEMS6ZYNQ7000PYNQZ2            = True
+customLinkerScript RTEMS6RV32IMSPIKE               = True
+customLinkerScript RTEMS6NOEL32IMARTYA7            = True
 customLinkerScript TestPlatform                    = False
 
 -- | An address inside the call instruction, from the value of
 -- __builtin_return_address(0) in the function it called: on x86-64 and
 -- AArch64 the value is the next instruction; on ARM in Thumb it is the next
--- instruction with bit 0 set; on SPARC it is the call itself
+-- instruction with bit 0 set; on SPARC it is the call itself; on RISC-V
+-- without the C extension it is the next instruction
 callSite :: Platform -> Integer -> Integer
 callSite RTEMS5LEON3SFNEXYSA7 address = address
 callSite FreeRTOS10STM32L432NUCLEOL432KC address = clearBit address 0 - 1
 callSite RTEMS6ZYNQ7000PYNQZ2 address = clearBit address 0 - 1
+callSite RTEMS6RV32IMSPIKE address = address - 1
+callSite RTEMS6NOEL32IMARTYA7 address = address - 1
 callSite POSIXGCC address = address - 1
 callSite TestPlatform address = address - 1
 
@@ -65,6 +77,8 @@ intWidth POSIXGCC                        = 32
 intWidth RTEMS5LEON3SFNEXYSA7              = 32
 intWidth FreeRTOS10STM32L432NUCLEOL432KC = 32
 intWidth RTEMS6ZYNQ7000PYNQZ2            = 32
+intWidth RTEMS6RV32IMSPIKE               = 32
+intWidth RTEMS6NOEL32IMARTYA7            = 32
 intWidth TestPlatform                    = 32
 
 -- | Whether the target requires naturally-aligned memory accesses, i.e. a
@@ -79,6 +93,8 @@ strictAlignment POSIXGCC                        = False   -- x86 host: misaligne
 strictAlignment RTEMS5LEON3SFNEXYSA7              = True    -- SPARC/LEON3: traps
 strictAlignment FreeRTOS10STM32L432NUCLEOL432KC = True    -- Cortex-M: conservative
 strictAlignment RTEMS6ZYNQ7000PYNQZ2            = True    -- Cortex-A9: conservative
+strictAlignment RTEMS6RV32IMSPIKE               = True    -- RISC-V: may trap
+strictAlignment RTEMS6NOEL32IMARTYA7            = True    -- RISC-V: may trap
 strictAlignment TestPlatform                    = True
 
 -- | The maximum number of significant initial characters a generated
@@ -98,6 +114,8 @@ maxIdentifierLength POSIXGCC                        = Nothing
 maxIdentifierLength RTEMS5LEON3SFNEXYSA7              = Nothing
 maxIdentifierLength FreeRTOS10STM32L432NUCLEOL432KC = Nothing
 maxIdentifierLength RTEMS6ZYNQ7000PYNQZ2            = Nothing
+maxIdentifierLength RTEMS6RV32IMSPIKE               = Nothing
+maxIdentifierLength RTEMS6NOEL32IMARTYA7            = Nothing
 maxIdentifierLength TestPlatform                    = Nothing
 
 -- | The longest period, in ticks, that a periodic timer may have on a platform,
@@ -108,6 +126,8 @@ maxTimerPeriodTicks POSIXGCC                        = Nothing
 maxTimerPeriodTicks RTEMS5LEON3SFNEXYSA7              = Just 0xFFFFFFFF
 maxTimerPeriodTicks FreeRTOS10STM32L432NUCLEOL432KC = Just 0xFFFFFFFF
 maxTimerPeriodTicks RTEMS6ZYNQ7000PYNQZ2            = Just 0xFFFFFFFF
+maxTimerPeriodTicks RTEMS6RV32IMSPIKE               = Just 0xFFFFFFFF
+maxTimerPeriodTicks RTEMS6NOEL32IMARTYA7            = Just 0xFFFFFFFF
 maxTimerPeriodTicks TestPlatform                    = Just 0xFFFFFFFF
 
 -- | The stack size, in bytes, of a task without a @stack_size@ modifier. On
@@ -118,6 +138,8 @@ defaultStackSize POSIXGCC                        = 4096
 defaultStackSize RTEMS5LEON3SFNEXYSA7              = 4096
 defaultStackSize FreeRTOS10STM32L432NUCLEOL432KC = 2048
 defaultStackSize RTEMS6ZYNQ7000PYNQZ2            = 4096
+defaultStackSize RTEMS6RV32IMSPIKE               = 4096
+defaultStackSize RTEMS6NOEL32IMARTYA7            = 4096
 defaultStackSize TestPlatform                    = 4096
 
 -- | The interrupts the platform exposes, each one with the vector it is wired
@@ -258,7 +280,15 @@ getPlatformInterruptMap RTEMS6ZYNQ7000PYNQZ2 =
         ("fpga_15_irq",           91),
         ("parity_irq",            92)
     ]
+getPlatformInterruptMap RTEMS6RV32IMSPIKE = plicInterrupts
+getPlatformInterruptMap RTEMS6NOEL32IMARTYA7 = plicInterrupts
 getPlatformInterruptMap TestPlatform = M.empty
+
+-- | The 31 sources of the PLIC of Spike and of the NOEL-V, each one under its
+-- number. RTEMS numbers the external interrupts after the software and the
+-- timer interrupts of the core (RISCV_INTERRUPT_VECTOR_EXTERNAL).
+plicInterrupts :: M.Map Identifier Integer
+plicInterrupts = M.fromList [("irq_" ++ show source, source + 2) | source <- [1 .. 31]]
 
 -- | The size of the interrupt table of the platform, which the runtime
 -- declares and indexes by vector. It is therefore the highest vector plus one
@@ -276,6 +306,8 @@ instance Show Platform where
     show RTEMS5LEON3SFNEXYSA7 = "rtems5-leon3sf-nexysa7"
     show FreeRTOS10STM32L432NUCLEOL432KC = "freertos10-stm32l432-nucleol432kc"
     show RTEMS6ZYNQ7000PYNQZ2 = "rtems6-zynq7000-pynqz2"
+    show RTEMS6RV32IMSPIKE = "rtems6-rv32im-spike"
+    show RTEMS6NOEL32IMARTYA7 = "rtems6-noel32im-artya7"
     show TestPlatform = "test-platform"
 
 checkPlatform :: String -> Maybe Platform
@@ -283,6 +315,8 @@ checkPlatform "posix-gcc" = Just POSIXGCC
 checkPlatform "rtems5-leon3sf-nexysa7" = Just RTEMS5LEON3SFNEXYSA7
 checkPlatform "freertos10-stm32l432-nucleol432kc" = Just FreeRTOS10STM32L432NUCLEOL432KC
 checkPlatform "rtems6-zynq7000-pynqz2" = Just RTEMS6ZYNQ7000PYNQZ2
+checkPlatform "rtems6-rv32im-spike" = Just RTEMS6RV32IMSPIKE
+checkPlatform "rtems6-noel32im-artya7" = Just RTEMS6NOEL32IMARTYA7
 checkPlatform _ = Nothing
 
 supportedPlatforms :: [(Platform, String)]
@@ -290,5 +324,7 @@ supportedPlatforms = [
         (POSIXGCC, "POSIX on GCC"),
         (RTEMS5LEON3SFNEXYSA7, "RTEMS version 5 for LEON3 Nexys A7 board, soft-float"),
         (FreeRTOS10STM32L432NUCLEOL432KC, "FreeRTOS V10 for STM32L432 NUCLEO-L432KC board"),
-        (RTEMS6ZYNQ7000PYNQZ2, "RTEMS version 6 for Zynq-7000 PYNQ-Z2 board")
+        (RTEMS6ZYNQ7000PYNQZ2, "RTEMS version 6 for Zynq-7000 PYNQ-Z2 board"),
+        (RTEMS6RV32IMSPIKE, "RTEMS version 6 for RV32IM on the Spike simulator"),
+        (RTEMS6NOEL32IMARTYA7, "RTEMS version 6 for NOEL-V (RV32IM) Arty A7 board")
     ]
