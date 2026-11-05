@@ -103,7 +103,10 @@ data Dependency = DepGit !GitDependency | DepPath !FilePath
 data AppDeployment = AppDeployment {
     appPlatform :: !Platform,
     appProfile :: !ProjectProfile,
-    appMicrosecondsPerTick :: !(Maybe Integer)
+    appMicrosecondsPerTick :: !(Maybe Integer),
+    -- | The linker script of the application, relative to the root of the
+    -- project, in place of the one of the platform
+    appLinkerScript :: !(Maybe FilePath)
   } deriving (Eq, Show)
 
 data TestEntry = TestEntry {
@@ -113,7 +116,10 @@ data TestEntry = TestEntry {
     testHarnessStackSize :: !(Maybe Integer),
     testMicrosecondsPerTick :: !(Maybe Integer),
     testExtern :: !ExternConfig,
-    testDependencies :: ![Dependency]
+    testDependencies :: ![Dependency],
+    -- | The linker script of the test on each platform that has one, under
+    -- the name of the platform
+    testLinkerScripts :: !(M.Map T.Text FilePath)
   } deriving (Eq, Show)
 
 -- | Parse a manifest. The version of the format is checked first, so that a
@@ -386,11 +392,26 @@ externParser = withObject "extern" $ \o -> do
 
 appParser :: Value -> Parser AppDeployment
 appParser = withObject "app" $ \o -> do
-    onlyFields ["platform", "profile", "microseconds-per-tick"] o
-    AppDeployment
-        <$> explicitParseField (parseJSON >=> platformParser) o "platform"
-        <*> explicitParseField (parseJSON >=> profileParser) o "profile"
+    onlyFields ["platform", "profile", "microseconds-per-tick", "linker-script"] o
+    plt <- explicitParseField (parseJSON >=> platformParser) o "platform"
+    AppDeployment plt
+        <$> explicitParseField (parseJSON >=> profileParser) o "profile"
         <*> explicitParseFieldMaybe tickParser o "microseconds-per-tick"
+        <*> explicitParseFieldMaybe (linkerScriptParser plt) o "linker-script"
+
+-- | A linker script: a path inside the project, on a platform that takes one.
+-- Whether the file exists is a check of the layout.
+linkerScriptParser :: Platform -> Value -> Parser FilePath
+linkerScriptParser plt v = do
+    path <- parseJSON v
+    if not (customLinkerScript plt) then
+        fail $ "the platform " ++ show plt ++ " takes no linker script"
+    else if not (insideFolder path) then
+        fail $ path ++ " is outside the project"
+    else if isHidden path then
+        fail $ path ++ " is a hidden file"
+    else
+        return path
 
 testParser :: T.Text -> Value -> Parser TestEntry
 testParser testName v = do
@@ -401,17 +422,25 @@ testParser testName v = do
         when (KM.member "overrides" o) $
             fail "overrides go at the top level of the manifest and apply to the whole project"
         onlyFields ["platforms", "timeout", "test-log-size", "harness-stack-size",
-            "microseconds-per-tick", "extern", "dependencies"] o
-        TestEntry
-            <$> explicitParseField platformsParser o "platforms"
-            <*> explicitParseField positive o "timeout"
+            "microseconds-per-tick", "extern", "dependencies", "linker-script"] o
+        plts <- explicitParseField platformsParser o "platforms"
+        TestEntry plts
+            <$> explicitParseField positive o "timeout"
             <*> (explicitParseFieldMaybe positive o "test-log-size" .!= defaultTestLogSize)
             <*> explicitParseFieldMaybe positive o "harness-stack-size"
             <*> explicitParseFieldMaybe tickParser o "microseconds-per-tick"
             <*> (explicitParseFieldMaybe externParser o "extern" .!= emptyExternConfig)
-            <*> (explicitParseFieldMaybe (listOf dependencyParser) o "dependencies" .!= [])) v
+            <*> (explicitParseFieldMaybe (listOf dependencyParser) o "dependencies" .!= [])
+            <*> (explicitParseFieldMaybe (scriptsParser plts) o "linker-script" .!= M.empty)) v
 
   where
+
+    -- | One script for each platform that needs one, among those of the test.
+    scriptsParser plts sv = parseJSON sv >>= M.traverseWithKey (\pltName path -> (do
+        plt <- platformParser pltName
+        unless (plt `elem` plts) $
+            fail $ "the test does not run on " ++ show plt
+        linkerScriptParser plt path) <?> Key (K.fromText pltName))
 
     platformsParser pv = do
         platformNames <- parseJSON pv :: Parser [T.Text]
@@ -425,13 +454,22 @@ testParser testName v = do
 checkLayout :: FilePath -> Manifest -> IO [String]
 checkLayout root manifest = do
     appErrors <- checkApp
+    scriptErrors <- checkLinkerScript
     testsErrors <- checkTests
     srcErrors <- checkSources "src"
     testSrcErrors <- concat <$> mapM (\t -> checkSources ("tests" </> T.unpack t </> "src")) (M.keys (manifestTests manifest))
     shadowErrors <- concat <$> mapM (checkShadowing . T.unpack) (M.keys (manifestTests manifest))
-    return (appErrors ++ testsErrors ++ srcErrors ++ testSrcErrors ++ shadowErrors)
+    return (appErrors ++ scriptErrors ++ testsErrors ++ srcErrors ++ testSrcErrors ++ shadowErrors)
 
   where
+
+    checkLinkerScript = do
+        let appScripts = case manifestNature manifest of
+                Application AppDeployment { appLinkerScript = Just script } -> [script]
+                _ -> []
+            scripts = nub (appScripts ++ concatMap (M.elems . testLinkerScripts) (M.elems (manifestTests manifest)))
+        missing <- filterM (fmap not . doesFileExist . (root </>)) scripts
+        return ["termina.yaml: the linker script " ++ script ++ " does not exist" | script <- missing]
 
     -- | A module of a test with the name of a module of the project would
     -- leave one of the two out of the build.
@@ -531,6 +569,7 @@ configFor manifest kind plt prf tick = TerminaConfig {
     recordCapacity = defaultTestLogSize,
     harnessStackSize = Nothing,
     runTimeout = Nothing,
+    linkerScript = Nothing,
     lineDirectives = True
   }
 
@@ -546,7 +585,9 @@ appDeployment manifest =
     case manifestNature manifest of
         Library _ -> Nothing
         Application app ->
-          let config = configFor manifest ApplicationBuild (appPlatform app) (appProfile app) (appMicrosecondsPerTick app)
+          let config = (configFor manifest ApplicationBuild (appPlatform app) (appProfile app) (appMicrosecondsPerTick app)) {
+                  linkerScript = appLinkerScript app
+                }
           in Just Deployment {
             deploymentLabel = "the application",
             deploymentConfig = config,
@@ -605,6 +646,7 @@ testConfig :: Manifest -> T.Text -> TestEntry -> Platform -> ProjectProfile -> T
 testConfig manifest testName entry plt prf =
     (configFor manifest (TestBuild testName) plt prf tick) {
         recordCapacity = testLogSize entry,
+        linkerScript = M.lookup (T.pack (show plt)) (testLinkerScripts entry),
         harnessStackSize = testHarnessStackSize entry,
         runTimeout = Just (testTimeout entry)
     }

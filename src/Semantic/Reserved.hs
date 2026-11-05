@@ -32,6 +32,8 @@ import qualified Semantic.Reserved.FreeRTOS10STM32L432NUCLEOL432KC as FreeRTOS10
 import qualified Semantic.Reserved.POSIXGCC as POSIXGCC
 import qualified Semantic.Reserved.RTEMS5LEON3SFNEXYSA7 as RTEMS5LEON3SFNEXYSA7
 import qualified Semantic.Reserved.RTEMS6ZYNQ7000PYNQZ2 as RTEMS6ZYNQ7000PYNQZ2
+import qualified Semantic.Reserved.RTEMS6RV32IMSPIKE as RTEMS6RV32IMSPIKE
+import qualified Semantic.Reserved.RTEMS6NOEL32IMARTYA7 as RTEMS6NOEL32IMARTYA7
 
 -- | What holds a name, which is what the error message explains.
 data ReservedBy =
@@ -86,6 +88,8 @@ platformNames POSIXGCC = POSIXGCC.reservedNames
 platformNames RTEMS5LEON3SFNEXYSA7 = RTEMS5LEON3SFNEXYSA7.reservedNames
 platformNames FreeRTOS10STM32L432NUCLEOL432KC = FreeRTOS10STM32L432NUCLEOL432KC.reservedNames
 platformNames RTEMS6ZYNQ7000PYNQZ2 = RTEMS6ZYNQ7000PYNQZ2.reservedNames
+platformNames RTEMS6RV32IMSPIKE = RTEMS6RV32IMSPIKE.reservedNames
+platformNames RTEMS6NOEL32IMARTYA7 = RTEMS6NOEL32IMARTYA7.reservedNames
 -- | The platform of the test suite links against no library at all.
 platformNames TestPlatform = S.empty
 
@@ -94,6 +98,8 @@ linkedNames POSIXGCC = POSIXGCC.linkedNames
 linkedNames RTEMS5LEON3SFNEXYSA7 = RTEMS5LEON3SFNEXYSA7.linkedNames
 linkedNames FreeRTOS10STM32L432NUCLEOL432KC = FreeRTOS10STM32L432NUCLEOL432KC.linkedNames
 linkedNames RTEMS6ZYNQ7000PYNQZ2 = RTEMS6ZYNQ7000PYNQZ2.linkedNames
+linkedNames RTEMS6RV32IMSPIKE = RTEMS6RV32IMSPIKE.linkedNames
+linkedNames RTEMS6NOEL32IMARTYA7 = RTEMS6NOEL32IMARTYA7.linkedNames
 linkedNames TestPlatform = S.empty
 
 -- | An underscore followed by an uppercase letter is reserved for any use, at

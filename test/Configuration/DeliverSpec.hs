@@ -74,6 +74,10 @@ spec = describe "termina deliver" $ do
     it "leaves a folder that only shares the beginning of the name" $
       relocatePaths substitutions "/opt/rcc-1.3.2/bin" `shouldBe` "/opt/rcc-1.3.2/bin"
 
+    it "gives a file of the substitutions its path in the deliverable" $
+      relocatePaths (("/home/u/obdh/assets/linker/linkcmds", "ld/linkcmds") : substitutions) "-T/home/u/obdh/assets/linker/linkcmds"
+        `shouldBe` "-Tld/linkcmds"
+
     it "rewrites a path after a comma and an =" $
       relocatePaths substitutions "-Wl,-Map=/home/u/obdh/output/app/bin/x.map" `shouldBe` "-Wl,-Map=bin/x.map"
 

@@ -160,6 +160,9 @@ data TerminaConfig =
     harnessStackSize :: !(Maybe Integer),
     -- | Seconds a test may run, its timeout; nothing in the application
     runTimeout :: !(Maybe Integer),
+    -- | The linker script of the deployment, relative to the root of the
+    -- project, or nothing for the one of the platform
+    linkerScript :: !(Maybe FilePath),
     -- | Whether the generated C carries #line pragmas that point to the .fin.
     -- Without them it is broken to the usual width, the plain C.
     lineDirectives :: !Bool
@@ -192,6 +195,7 @@ defaultConfig projectName plt = TerminaConfig {
     recordCapacity = defaultTestLogSize,
     harnessStackSize = Nothing,
     runTimeout = Nothing,
+    linkerScript = Nothing,
     lineDirectives = False
 }
 

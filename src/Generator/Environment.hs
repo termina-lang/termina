@@ -34,6 +34,14 @@ getPlatformInitialGlobalEnv _ RTEMS6ZYNQ7000PYNQZ2 =
     interruptGlobalEnv RTEMS6ZYNQ7000PYNQZ2 ++
     -- | SystemAPI interface.
     [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime"] [] [])) Internal)]
+getPlatformInitialGlobalEnv _ RTEMS6RV32IMSPIKE =
+    interruptGlobalEnv RTEMS6RV32IMSPIKE ++
+    -- | SystemAPI interface.
+    [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime"] [] [])) Internal)]
+getPlatformInitialGlobalEnv _ RTEMS6NOEL32IMARTYA7 =
+    interruptGlobalEnv RTEMS6NOEL32IMARTYA7 ++
+    -- | SystemAPI interface.
+    [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime"] [] [])) Internal)]
 getPlatformInitialGlobalEnv _ TestPlatform =
     -- An interrupt so the test harness can exercise its connection errors
     -- (e.g. SE-158/193). It is a name-resolution entry only and is not added

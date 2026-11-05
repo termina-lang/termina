@@ -29,7 +29,7 @@ genMakefile params loweredProject externs unitTest =
             MVariable MConditional "TERMINA_OSAL_DIR" [MFragment "/opt/termina/osal"],
             MVariable MSimple "TERMINA_PROFILE"
                 [MFragment (case profile params of { Debug -> "debug"; Release -> "release" })]
-        ]] ++ testFlags ++ bufferSizeFlags ++ [
+        ]] ++ testFlags ++ bufferSizeFlags ++ linkerScriptFlags ++ [
         MakeBlock [
             MInclude True $ "$(TERMINA_OSAL_DIR)" </> "platform" </> "$(PLATFORM)" </> "platform" <.> "mk"
         ],
@@ -115,14 +115,14 @@ genMakefile params loweredProject externs unitTest =
                 MakeCommand False [MFragment "@cd $(TERMINA_PROJECT_DIR) && $(CC) $(CFLAGS) $(TERMINA_EXTERN_CPPFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
             ],
             -- | The SHA-256 of the binary and of each module object without
-            -- their debugging information, which the build writes into
-            -- provenance.json
+            -- their debugging information and the descriptor of a test,
+            -- which the build writes into provenance.json
             MRule ".PHONY" ["stripped-hashes"] [],
             MRule "stripped-hashes" ["$(TARGET)", "$(MODULE_OBJS)"] [
                 MakeCommand False [MFragment "@$(RM) $(TARGET_DIR_NAME)/stripped.sha256"],
                 MakeCommand False [MFragment $ unwords [
                     "@if command -v $(OBJCOPY) >/dev/null 2>&1; then",
-                    "for o in $(TARGET) $(MODULE_OBJS); do $(OBJCOPY) --strip-debug $$o $$o.stripped || exit 1;",
+                    "for o in $(TARGET) $(MODULE_OBJS); do $(OBJCOPY) --strip-debug --remove-section=.termina_test $$o $$o.stripped || exit 1;",
                     "printf '%s %s\\n' $$($(TERMINA_SHA256) < $$o.stripped | cut -c 1-64) $${o#$R/}; $(RM) $$o.stripped; done > $(TARGET_DIR_NAME)/stripped.sha256;",
                     "else echo $(OBJCOPY) not found: the objects are not hashed; fi"]]
             ],
@@ -186,6 +186,12 @@ genMakefile params loweredProject externs unitTest =
                     MVariable MSimple "TERMINA_TEST" [MFragment "1"]
                     : [MVariable MAppend "CFLAGS" [MFragment "-DTERMINA__TEST__CLOCK"] | unitTest]
             | isTestBuild params ]
+
+        -- | The linker script of the project, which platform.mk passes to
+        -- the linker in place of its own
+        linkerScriptFlags = [
+                MakeBlock [MVariable MSimple "TERMINA_LINKER_SCRIPT" [MFunction "abspath" [MFragment ("$R" </> projectRoot </> script)]]]
+            | Just script <- [linkerScript params] ]
 
         deliverableVariables = [
             "R", "TERMINA_OSAL_DIR", "TERMINA_PROJECT_DIR", "CC", "AS", "LD", "OBJCOPY", "NM", "OBJDUMP",
