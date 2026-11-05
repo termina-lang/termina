@@ -2,12 +2,14 @@
 
 module Command.Build (
     buildCmdArgsParser, buildCommand, generateCommand, BuildCmdArgs(..),
-    Selection(..), selectDeployments, nothingSelected, verifyLocalFolders, buildDeployment, announce, runMake,
+    Selection(..), selectDeployments, nothingSelected, warnLocalFolders, refuseLocalFoldersInRelease,
+    localFoldersInRelease, buildDeployment, announce, runMake,
     CheckedDeployment(..), checkDeployment, checkExportedModules
 ) where
 
 import Configuration.Configuration
 import Configuration.Manifest
+import Configuration.Local (localFolderOf)
 import Command.Dependencies (Fetching(..), FetchingCommand(..))
 import Command.Project (Dependencies(..), loadProject)
 import Command.Sources (LoadedProject(..), Sources, buildSources, dependencyModulesOf, localFolders)
@@ -308,6 +310,7 @@ genMonadicHeaderFiles params plt monadicTypes = do
 selectedDeployments :: BuildCmdArgs -> IO (LoadedProject, [Deployment])
 selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile offline) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
+    refuseLocalFoldersInRelease selection mPlatform mProfile
     project <- loadProject (Update (if offline then Offline else Reuse BuildCommand))
     case manifestNature (loadedManifest project) of
         Library _ -> checkExportedModules chatty project
@@ -315,7 +318,7 @@ selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile offlin
     let manifest = loadedManifest project
     deployments <- either dieWithError return $ selectDeployments manifest selection mPlatform mProfile
     when (null deployments) (putStrLn . infoMessage $ nothingSelected manifest selection mPlatform)
-    verifyLocalFolders project deployments
+    warnLocalFolders project deployments
     return (project, deployments)
 
 -- | The test of a deployment, whose main module is in tests/<name>, or
@@ -326,21 +329,43 @@ deploymentTest deployment =
         ["tests", testName] -> Just testName
         _ -> Nothing
 
--- | Stop when a deployment in release sees a local folder. Otherwise, warn once
--- of each local folder that the deployments see.
-verifyLocalFolders :: LoadedProject -> [Deployment] -> IO ()
-verifyLocalFolders project deployments =
-    case [ folder | (deployment, folder) <- seen, profile (deploymentConfig deployment) == Release ] of
-        (folder : _) -> dieWithError $ folder ++ " is a local folder, and a release is built only from tagged dependencies. "
-            ++ "Point it to a tag of its repository."
-        [] -> forM_ (nub (map snd seen)) $ \folder ->
-            putStrLn . warnMessage $ folder ++ " is a local folder, so this build cannot be reproduced from termina.lock."
+-- | Warn once of each local folder that the deployments see, nested ones
+-- included. Those in release stopped before loading.
+warnLocalFolders :: LoadedProject -> [Deployment] -> IO ()
+warnLocalFolders project deployments =
+    forM_ (nub seen) $ \folder ->
+        putStrLn . warnMessage $ folder ++ " is a local folder, so this build cannot be reproduced from termina.lock."
 
   where
 
-    seen = [ (deployment, folder)
+    seen = [ folder
            | deployment <- deployments
            , folder <- localFolders (buildSources project (deploymentTest deployment) (deploymentMainFolder deployment)) ]
+
+-- | The path dependencies that the manifest gives to the deployments in
+-- release. Only the root and the tests declare them: a fetched package with
+-- one is refused, and a local library is reached from one of these.
+localFoldersInRelease :: Manifest -> [Deployment] -> [FilePath]
+localFoldersInRelease manifest deployments =
+    nub [ localFolderOf "." path
+        | deployment <- deployments, profile (deploymentConfig deployment) == Release
+        , DepPath path <- manifestDependencies manifest ++ testDeps deployment ]
+
+  where
+
+    testDeps deployment = maybe [] testDependencies
+        (deploymentTest deployment >>= \t -> M.lookup (T.pack t) (manifestTests manifest))
+
+-- | Stop before termina.lock is reconciled when a deployment in release has a
+-- local folder, so that the lock stays as it was.
+refuseLocalFoldersInRelease :: Selection -> Maybe Platform -> Maybe ProjectProfile -> IO ()
+refuseLocalFoldersInRelease selection mPlatform mProfile = do
+    manifest <- loadManifest projectRoot >>= either dieWithFirstError return
+    case selectDeployments manifest selection mPlatform mProfile of
+        Right deployments | (folder : _) <- localFoldersInRelease manifest deployments ->
+            dieWithError $ folder ++ " is a local folder, and a release is built only from tagged dependencies. "
+                ++ "Point it to a tag of its repository."
+        _ -> return ()
 
 -- | The deployments of a selection. The application of a library gives none,
 -- and so do the tests of a project without tests or of a platform on which no

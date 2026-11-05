@@ -8,7 +8,7 @@ module Command.Test (
     TestCase(..), testCases
 ) where
 
-import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, checkExportedModules, nothingSelected, selectDeployments, verifyLocalFolders)
+import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, checkExportedModules, nothingSelected, selectDeployments, warnLocalFolders, refuseLocalFoldersInRelease)
 import Command.Dependencies (Fetching(..), FetchingCommand(..))
 import Command.Project (Dependencies(..), loadProject)
 import Command.Common (loadMainModule, orderedModules, sourceTexts)
@@ -207,6 +207,7 @@ runTests mName mPlatform mProfile withGdb mServer mXsdb offline mode = do
     loaded <- try (case mode of
         Recorded _ -> (\m -> LoadedProject projectRoot m M.empty M.empty M.empty) <$> (loadManifest projectRoot >>= either dieWithFirstError return)
         _ -> do
+            refuseLocalFoldersInRelease (maybe SelectTests SelectTest mName) mPlatform mProfile
             loadedProject <- loadProject (Update (if offline then Offline else Reuse TestCommand))
             case manifestNature (loadedManifest loadedProject) of
                 Library _ -> checkExportedModules False loadedProject
@@ -219,8 +220,7 @@ runTests mName mPlatform mProfile withGdb mServer mXsdb offline mode = do
     deployments <- either cannotRun return (selectDeployments manifest selection mPlatform mProfile)
     when (null deployments) $
         putStrLn (infoMessage (nothingSelected manifest selection mPlatform)) >> exitSuccess
-    checked <- try (verifyLocalFolders project deployments) :: IO (Either ExitCode ())
-    either (const (exitWith (ExitFailure 2))) return checked
+    warnLocalFolders project deployments
     -- | A port in --gdb is the port of one board
     let platforms = nub (map deploymentPlatform deployments)
         boards = filter (/= POSIXGCC) platforms
