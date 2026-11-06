@@ -170,8 +170,10 @@ Patch versions on either side are interchangeable.
   simulator, and the `rtems6-noel32im-artya7` platform, RTEMS 6 on a NOEL-V
   RV32IM on the Arty A7 board, both with the toolchain of
   `TERMINA_RTEMS6_DIR` (`/opt/rtems/6`) and with the interrupts `irq_1` to
-  `irq_31` of the PLIC. `termina test` does not run the tests on them yet.
-  Requires the matching OSAL.
+  `irq_31` of the PLIC. On Spike, `termina test` and the debug
+  configuration of VS Code load the binary through OpenOCD, which serves
+  GDB on port 3333 and reaches Spike through remote bitbang. `termina test`
+  does not run the tests on the Arty A7 yet. Requires the matching OSAL.
 
 - Deques, which let a task, a handler or a resource keep boxes from one
   activation to the next. A deque is declared in `app.fin` as

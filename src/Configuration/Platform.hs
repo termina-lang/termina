@@ -38,6 +38,9 @@ gdbLaunch RTEMS5LEON3SFNEXYSA7 = Just ["monitor reset", "load"]
 gdbLaunch FreeRTOS10STM32L432NUCLEOL432KC = Just ["monitor reset", "load"]
 -- | The XSDB script of the project resets the PYNQ before the load
 gdbLaunch RTEMS6ZYNQ7000PYNQZ2 = Just ["load"]
+-- | OpenOCD cannot reset Spike, and the load leaves the PC at the entry: the
+-- reset code of Spike, which passes the device tree in a1, has to run first
+gdbLaunch RTEMS6RV32IMSPIKE = Just ["load", "set $pc = 0x1000"]
 gdbLaunch _ = Nothing
 
 -- | The default port of the XSDB command server that prepares a board before

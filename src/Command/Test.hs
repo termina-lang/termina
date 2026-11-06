@@ -266,7 +266,7 @@ targetOf POSIXGCC _ True _ = Target False (UnderGdb "gdb" NativeProcess) (return
 targetOf TestPlatform _ _ _ = error "no test runs on the test platform"
 targetOf plt mScript _ servers@(Servers _ (xsdbHost, mXsdbPort)) =
     case (gdbLaunch plt, xsdbServerPort plt) of
-        -- | Spike needs its OpenOCD, and the NOEL-V its device tree loaded by GRMON before each run
+        -- | The NOEL-V needs its device tree loaded by GRMON before each run
         (Nothing, _) -> notYetTarget plt servers
         (Just commands, Nothing) -> boardTarget plt commands servers
         (Just commands, Just defaultPort) -> (boardTarget plt commands servers) { targetPrepare = prepare (fromMaybe defaultPort mXsdbPort) }
