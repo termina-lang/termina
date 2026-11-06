@@ -24,7 +24,7 @@ jobs:
           # 22.04 so that the binary needs no newer glibc than 2.35
           - os: ubuntu-22.04
             target: x86_64-linux
-          - os: macos-14
+          - os: macos-15
             target: aarch64-macos
     runs-on: ${{ matrix.os }}
     steps:
