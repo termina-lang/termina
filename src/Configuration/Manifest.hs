@@ -22,6 +22,7 @@ module Configuration.Manifest (
     checkLayout,
     Deployment(..),
     appDeployment,
+    appDeploymentIn,
     appConfig,
     defaultTestProfile,
     testDeployment,
@@ -614,11 +615,15 @@ configFor manifest kind plt prf tick = TerminaConfig {
 
 -- | The application, or nothing in a library.
 appDeployment :: Manifest -> Maybe Deployment
-appDeployment manifest =
+appDeployment = appDeploymentIn Nothing
+
+-- | The application in the given profile, or in the one of the manifest.
+appDeploymentIn :: Maybe ProjectProfile -> Manifest -> Maybe Deployment
+appDeploymentIn mProfile manifest =
     case manifestNature manifest of
         Library _ -> Nothing
         Application app ->
-          let config = (configFor manifest ApplicationBuild (appPlatform app) (appProfile app) (appMicrosecondsPerTick app)) {
+          let config = (configFor manifest ApplicationBuild (appPlatform app) (fromMaybe (appProfile app) mProfile) (appMicrosecondsPerTick app)) {
                   linkerScript = appLinkerScript app,
                   xsdbInit = appXsdbInit app
                 }
@@ -817,5 +822,5 @@ newApplicationManifest projectNameStr plt = unlines [
         "",
         "app:",
         "  platform: " ++ show plt,
-        "  profile: release"
+        "  profile: debug"
     ]

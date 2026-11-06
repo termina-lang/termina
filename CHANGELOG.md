@@ -36,8 +36,9 @@ Patch versions on either side are interchangeable.
 - `termina generate` and `termina build` take `--test <name>`, `--tests` and
   `--all`, which select one test, every test, or the application and every
   test, each test on every platform of its list. `--platform` keeps the tests
-  of one platform, and `--profile` chooses the profile of the tests, by
-  default the one of `app` and `debug` in a library.
+  of one platform, and `--profile` chooses the profile of what is built, the
+  application included, by default the one of `app` and `debug` for the
+  tests of a library.
 - `termina new <name> --lib` creates a library, which has no `app/` folder;
   `--app` is the default. A library takes no `--platform`. `--exports
   <prefix>` writes the prefix in the manifest and creates its folder under
@@ -348,6 +349,7 @@ Patch versions on either side are interchangeable.
 - `termina new --vscode` writes a `launch.json` with a single configuration
   of type `termina`, which the Termina extension for VS Code resolves for
   the platform of the project.
+- `termina new` writes `profile: debug` in `app`; it wrote `release`.
 - `config.h` reserves emitter identifier 0 for `system_except` in every
   build, whether the deployment connects it or not, and the other emitters
   take 1 onwards, so an event with identifier 0 always comes from

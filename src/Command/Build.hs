@@ -84,7 +84,7 @@ data BuildCmdArgs =
         (Maybe CmpDiagramParam)
         Selection
         (Maybe Platform) -- ^ Only the tests on this platform
-        (Maybe ProjectProfile) -- ^ Profile of the tests
+        (Maybe ProjectProfile) -- ^ Profile of what is built
         Bool -- ^ Offline: fail instead of fetching when the lock does not match the manifest
     deriving Show
 
@@ -105,7 +105,7 @@ buildCmdArgsParser = BuildCmdArgs
     <*> O.optional (O.option (O.eitherReader readProfile)
           ( O.long "profile"
           <> O.metavar "debug|release"
-          <> O.help "Profile of the tests (default: the one of the application, debug in a library)"))
+          <> O.help "Profile of what is built (default: the one of the application, and debug for the tests of a library)"))
     <*> O.switch (O.long "offline"
         <> O.help "Fail instead of fetching when termina.lock does not match termina.yaml")
 
@@ -374,9 +374,9 @@ selectDeployments :: Manifest -> Selection -> Maybe Platform -> Maybe ProjectPro
 selectDeployments manifest selection mPlatform mProfile =
     case selection of
         SelectApp
-            | isJust mPlatform || isJust mProfile ->
-                Left "--platform and --profile select the platforms and the profile of tests: use them with --test, --tests or --all"
-            | otherwise -> Right (maybe [] pure (appDeployment manifest))
+            | isJust mPlatform ->
+                Left "--platform selects the platform of tests: use it with --test, --tests or --all"
+            | otherwise -> Right (maybe [] pure (appDeploymentIn mProfile manifest))
         SelectTest testName ->
             case M.lookup (T.pack testName) tests of
                 Nothing -> Left $ "the manifest declares no test " ++ testName
@@ -384,7 +384,7 @@ selectDeployments manifest selection mPlatform mProfile =
                     [] -> Left $ "the test " ++ testName ++ " does not run on " ++ maybe "" show mPlatform
                     ds -> Right ds
         SelectTests -> Right (concatMap testOn (M.toList tests))
-        SelectAll -> Right (maybe [] pure (appDeployment manifest) ++ concatMap testOn (M.toList tests))
+        SelectAll -> Right (maybe [] pure (appDeploymentIn mProfile manifest) ++ concatMap testOn (M.toList tests))
 
   where
 
