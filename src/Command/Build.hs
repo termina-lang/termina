@@ -49,6 +49,7 @@ import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
 import EFP.Schedulability.WCEPath.Printer
 import Command.Common
 import Command.Pipeline (CheckedModules(..), checkModules)
+import Analysis.SMTBounds (smtProjectProofs)
 import Command.Provenance (buildInfo, provenanceFields, readHashes, writeProvenanceFile)
 import Command.Extern (ExternGroup, parsedExterns, prepareExtern, verifyLoadedExterns)
 import Configuration.ExternCheck (SectionOwner(..), checkExternModules)
@@ -480,8 +481,8 @@ checkDeployment chatty project deployment = do
     when chatty (putStrLn . debugMessage $ "Ordering project modules")
     orderedDependencies <- orDieWithFailure files (orderedModules parsedProject)
     when chatty (putStrLn . debugMessage $ "Checking project modules")
-    checked <- orDieWithFailure (projectSourceFiles parsedProject)
-      (snd (checkModules config plt (dependencyModulesOf sources) parsedProject orderedDependencies))
+    checkResult <- snd <$> checkModules (smtProjectProofs plt) config plt (dependencyModulesOf sources) parsedProject orderedDependencies
+    checked <- orDieWithFailure (projectSourceFiles parsedProject) checkResult
     return (CheckedDeployment sources parsedProject orderedDependencies checked)
 
 -- | Type check the exported modules of a library and the modules they import.

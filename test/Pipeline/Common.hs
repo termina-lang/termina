@@ -2,6 +2,7 @@ module Pipeline.Common
   ( runFullBuild
   , runFullProjectBuild
   , runChecksReport
+  , runFoldedProject
   , runFullProjectApp
   , runTypedModule
   , runTypedModules
@@ -63,6 +64,8 @@ import Parser.Errors (Error(..), ParsingErrors)
 import Utils.Annotations (QualifiedName, annotateError, Location(Internal))
 
 import Command.Pipeline (CheckedModules(..), checkModules, typeProject)
+import Analysis.SMTBounds (noSMTProofs)
+import Data.Functor.Identity (runIdentity)
 import ControlFlow.Architecture.Types (TerminaProgArch)
 import Utils.Errors (ErrorMessage(errorIdent, toText))
 
@@ -102,6 +105,11 @@ runChecksReport input =
     Right result ->
       TE.decodeUtf8 . BL.toStrict $
         checksReport (checksReports result) (fullPath <$> foldedModules result)
+
+-- | The basic-block modules of a project with the constants folded, which are
+-- those the SMT prover receives.
+runFoldedProject :: [(QualifiedName, String)] -> Either Failure LoweredProject
+runFoldedProject sources = foldedModules <$> runProjectPipeline configParams sources
 
 -- | Drives the same full pipeline as 'runFullProjectBuild' but stops before
 -- per-module source rendering, returning the whole-program architecture and
@@ -145,7 +153,7 @@ runProjectPipeline cfg sources = do
   let files = M.fromList [ (qname, pack src) | (qname, src) <- sources ]
   parsedProject <- M.fromList <$> mapM parseModule sources
   ordered <- orderModules parsedProject
-  checked <- checkedOrFailure files (snd (checkModules cfg TestPlatform S.empty parsedProject ordered))
+  checked <- checkedOrFailure files (snd (runIdentity (checkModules noSMTProofs cfg TestPlatform S.empty parsedProject ordered)))
   pure (PipelineResult (checkedLowered checked) ordered (checkedArchitecture checked)
     (checkedElaborated checked) (checkedReports checked))
 
@@ -156,7 +164,7 @@ runTypedModules sources = either (\f -> ([], Just (code f))) id $ do
   let files = M.fromList [ (qname, pack src) | (qname, src) <- sources ]
   parsedProject <- M.fromList <$> mapM parseModule sources
   ordered <- orderModules parsedProject
-  let (typedProject, result) = checkModules configParams TestPlatform S.empty parsedProject ordered
+  let (typedProject, result) = runIdentity (checkModules noSMTProofs configParams TestPlatform S.empty parsedProject ordered)
   pure (M.keys typedProject, either (Just . code) (const Nothing) (checkedOrFailure files result))
 
   where

@@ -41,11 +41,13 @@ data CheckedModules = CheckedModules {
 
 -- | Check the modules of a deployment, given in the order in which they are
 -- type checked. It gives the modules type checked, all of them or those
--- before the first type error, and the result of the checks.
-checkModules :: TerminaConfig -> Platform -> S.Set QualifiedName -> ParsedProject -> [QualifiedName]
-  -> (TypedProject, Either CheckFailure CheckedModules)
-checkModules config plt deps parsedProject orderedModules =
-    (typedProject, maybe (checkTyped typedProject) Left typeFailure)
+-- before the first type error, and the result of the checks. The SMT prover
+-- runs on the folded modules, after the value analysis.
+checkModules :: Monad m => (LoweredProject -> m ProjectProofs)
+  -> TerminaConfig -> Platform -> S.Set QualifiedName -> ParsedProject -> [QualifiedName]
+  -> m (TypedProject, Either CheckFailure CheckedModules)
+checkModules smtProver config plt deps parsedProject orderedModules =
+    (,) typedProject <$> maybe checkTyped (return . Left) typeFailure
 
   where
 
@@ -53,16 +55,24 @@ checkModules config plt deps parsedProject orderedModules =
 
     (typedProject, typeFailure) = typeProject deps initialEnv parsedProject orderedModules
 
-    checkTyped typed = do
-        rawLoweredProject <- lowerModules typed
+    checkTyped = case beforeSMT of
+        Left failure -> return (Left failure)
+        Right (loweredProject, foldProofs, valueProofs) ->
+            afterSMT loweredProject foldProofs valueProofs <$> smtProver loweredProject
+
+    beforeSMT = do
+        rawLoweredProject <- lowerModules typedProject
         maybe (Right ()) Left (loweredChecks rawLoweredProject)
         (loweredProject, constEnvs, foldProofs) <- foldProject config plt rawLoweredProject orderedModules
         valueProofs <- analyseValues plt constEnvs loweredProject orderedModules
-        let (elaboratedProject, checksReports) = elaborateProject [foldProofs, valueProofs] loweredProject
+        return (loweredProject, foldProofs, valueProofs)
+
+    afterSMT loweredProject foldProofs valueProofs smtProofs = do
+        let (elaboratedProject, checksReports) = elaborateProject [foldProofs, smtProofs, valueProofs] loweredProject
         sideEffectCheck plt elaboratedProject
         programArchitecture <- genProjectArchitecture (getPlatformInitialProgram config plt) loweredProject orderedModules
         architectureCheck orderedModules programArchitecture
-        return (CheckedModules (monadicTypesOf typed) loweredProject elaboratedProject checksReports programArchitecture)
+        return (CheckedModules (monadicTypesOf typedProject) loweredProject elaboratedProject checksReports programArchitecture)
 
 -- | Obtain the basic-block AST of the modules.
 lowerModules :: TypedProject -> Either CheckFailure LoweredProject

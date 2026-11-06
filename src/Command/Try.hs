@@ -17,6 +17,7 @@ import Generator.LanguageC.Printer (runCPrinter)
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Command.Pipeline (foldProject, analyseValues)
+import Analysis.SMTBounds (smtProjectProofs)
 import Core.AST
 import Configuration.Configuration 
 import Configuration.Platform
@@ -93,7 +94,8 @@ elaborateSingleModule bbModule = do
         files = projectSourceFiles project
     (foldedProject, constEnvs, constProofs) <- orDieWithFailure files (foldProject config TestPlatform project [qname])
     valueProofs <- orDieWithFailure files (analyseValues TestPlatform constEnvs foldedProject [qname])
-    let (elaboratedProject, _) = elaborateProject [constProofs, valueProofs] foldedProject
+    smtProofs <- smtProjectProofs TestPlatform foldedProject
+    let (elaboratedProject, _) = elaborateProject [constProofs, smtProofs, valueProofs] foldedProject
     orDieWithFailure files (maybe (Right ()) (Left . checkFailure) (sideEffectCheckModules TestPlatform elaboratedProject))
     return $ elaboratedProject M.! qname
 

@@ -6,6 +6,8 @@ module LSP.Check (
 
 import Command.Common (libraryPlatforms, loadExportedModules, loadMainModule, orderedModules, sourceTexts, typeLibrary)
 import Command.Pipeline (checkModules)
+import Analysis.SMTBounds (noSMTProofs)
+import Data.Functor.Identity (runIdentity)
 import Command.Sources (LoadedProject(..), buildSources, dependencyModulesOf, readProject, withTexts)
 import Command.Types (ParsedProject, TypedProject, SemanticData(typedAST))
 import Command.Utils (CheckFailure(..), findProjectRoot, loadManifest)
@@ -82,8 +84,9 @@ checkApplication project deployment = do
     case loadedMain >>= \(_, parsedProject) -> (,) parsedProject <$> orderedModules parsedProject of
         Left failure -> publishDiagnostics (failureDiagnosticsIn mainFile files failure)
         Right (parsedProject, order) -> do
-            let (typedProject, result) =
-                    checkModules (deploymentConfig deployment) (deploymentPlatform deployment) (dependencyModulesOf sources) parsedProject order
+            -- | The SMT prover does not run in the editor
+            let (typedProject, result) = runIdentity $
+                    checkModules noSMTProofs (deploymentConfig deployment) (deploymentPlatform deployment) (dependencyModulesOf sources) parsedProject order
             modify (\s -> s { project_modules = keepIndexes (project_modules s) (storedModules parsedProject typedProject) })
             publishDiagnostics (either (failureDiagnosticsIn mainFile files) (const M.empty) result)
 
