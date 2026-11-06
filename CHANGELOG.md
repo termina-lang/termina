@@ -397,9 +397,8 @@ Patch versions on either side are interchangeable.
 - `termina build` runs `make` after generating, and the application is
   generated into `output/app/` instead of `output/`. A test goes into
   `output/tests/<name>/<platform>/`, and its binary takes the name of the test.
-  The VS Code configuration of `termina new` runs `termina build` and debugs
-  `output/app/bin/<project>`, and its `.gitignore` leaves out the whole
-  `output/` folder, which is generated again from the project.
+  The `.gitignore` of `termina new` leaves out the whole `output/` folder,
+  which is generated again from the project.
 - The emitters `system_init` and `system_except`, the resource `system_entry`
   and every interrupt of the platform exist in every program, and the ones the
   application does not connect are dropped before the architecture is
@@ -553,6 +552,12 @@ Patch versions on either side are interchangeable.
   is an error.
 - An exported module that does not parse is reported with the column and the
   source line of the error, and a file that is not UTF-8 with its path.
+- `termina <command> --help` did not list the options of the command, and now
+  does.
+- `termina new` created the repository on the branch that `init.defaultBranch`
+  of git gave, which is `master` in the image. It now runs `git init -b main`.
+- `termina new` accepted an empty name and a name with letters outside ASCII.
+  The name of a project takes only ASCII letters, digits, `_` and `-`.
 
 ## [0.6.0] - 2026-10-15
 
