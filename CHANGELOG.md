@@ -13,6 +13,8 @@ Patch versions on either side are interchangeable.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-06
+
 ### Added
 
 - Native binaries: each release carries a tarball for x86_64 Linux and one
@@ -70,9 +72,9 @@ Patch versions on either side are interchangeable.
   `#line` pragmas do, so a debugger run from the folder of the project finds
   the C and the `.fin` wherever the project is, and the same project gives
   the same binary in any folder.
-- The modules of a test itself are built with `-fno-optimize-sibling-calls`,
-  which the Makefile of the platform in the OSAL sets, so the return address
-  of a check is the one of its call.
+- Every module, of the application and of the tests, is built with
+  `-fno-optimize-sibling-calls`, which the OSAL sets in both profiles, so the
+  return address of a check is the one of its call.
 - A unit test writes its descriptor, `test.json`, in the folder of the
   deployment: its cases with their numbers, every check with its line and
   its text, the tasks and the emitters by identifier, and a stamp, the first
@@ -398,7 +400,8 @@ Patch versions on either side are interchangeable.
   generated into `output/app/` instead of `output/`. A test goes into
   `output/tests/<name>/<platform>/`, and its binary takes the name of the test.
   The `.gitignore` of `termina new` leaves out the whole `output/` folder,
-  which is generated again from the project.
+  which is generated again from the project, and `.termina/`, where the user
+  leaves the clones of private dependencies that `termina add` takes.
 - The emitters `system_init` and `system_except`, the resource `system_entry`
   and every interrupt of the platform exist in every program, and the ones the
   application does not connect are dropped before the architecture is
@@ -541,6 +544,11 @@ Patch versions on either side are interchangeable.
   script, now rebuilds what it affects.
 - A constant cast from a real, such as `const N : u32 = F as u32`, stopped
   the transpiler with an internal error. The cast is left to the C compiler.
+- The constant folding checks a constant index into an array reached through
+  a reference or at a fixed location, and rejects a negative constant index
+  or shift amount.
+- `termina sched` loads the dependencies of the project, as `termina build`
+  does.
 - The language server reads a file again from disk when the editor saves or
   closes it, gives the type of a field access on a hover, and keeps the index
   of a module while it has a type error. Without a `termina.yaml`, it tells
