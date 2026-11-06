@@ -30,6 +30,22 @@ usizeWidth RTEMS6RV32IMSPIKE               = 32
 usizeWidth RTEMS6NOEL32IMARTYA7            = 32
 usizeWidth TestPlatform                    = 32
 
+-- | The commands that load a binary into a board after GDB connects to its
+-- server, or nothing on a platform whose runs termina does not drive yet.
+-- The runner of termina test and termina platforms --json give them.
+gdbLaunch :: Platform -> Maybe [String]
+gdbLaunch RTEMS5LEON3SFNEXYSA7 = Just ["monitor reset", "load"]
+gdbLaunch FreeRTOS10STM32L432NUCLEOL432KC = Just ["monitor reset", "load"]
+-- | The XSDB script of the project resets the PYNQ before the load
+gdbLaunch RTEMS6ZYNQ7000PYNQZ2 = Just ["load"]
+gdbLaunch _ = Nothing
+
+-- | The default port of the XSDB command server that prepares a board before
+-- each load, on the platforms prepared through XSDB
+xsdbServerPort :: Platform -> Maybe Int
+xsdbServerPort RTEMS6ZYNQ7000PYNQZ2 = Just 3122
+xsdbServerPort _ = Nothing
+
 -- | The default port of the GDB server of a board, which the debug
 -- configurations of termina new and the runner of termina test use. Spike has
 -- none of its own: OpenOCD reaches it through remote bitbang and serves GDB.

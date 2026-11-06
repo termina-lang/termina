@@ -17,9 +17,10 @@ import System.Directory
 import System.FilePath
 import Test.Hspec
 
-project, app :: String
+project, app, pynqApp :: String
 project = "project:\n  name: test\n  version: 0.1.0\n  manifest-version: 1\n"
 app = "app:\n  platform: rtems5-leon3sf-nexysa7\n  profile: release\n"
+pynqApp = "app:\n  platform: rtems6-zynq7000-pynqz2\n  profile: release\n"
 
 parsed :: String -> Either String Manifest
 parsed = either (Left . show) parseManifest . decodeEither' . BS.pack
@@ -50,11 +51,11 @@ spec = describe "Manifest" $ do
 
     it "reads an application" $
       fmap manifestNature (parsed (project ++ app))
-        `shouldBe` Right (Application (AppDeployment RTEMS5LEON3SFNEXYSA7 Release Nothing Nothing))
+        `shouldBe` Right (Application (AppDeployment RTEMS5LEON3SFNEXYSA7 Release Nothing Nothing Nothing))
 
     it "reads the linker script of an application" $
       fmap manifestNature (parsed (project ++ app ++ "  linker-script: ld/linkcmds\n"))
-        `shouldBe` Right (Application (AppDeployment RTEMS5LEON3SFNEXYSA7 Release Nothing (Just "ld/linkcmds")))
+        `shouldBe` Right (Application (AppDeployment RTEMS5LEON3SFNEXYSA7 Release Nothing (Just "ld/linkcmds") Nothing))
 
     it "rejects a linker script on a platform that takes none" $
       (project ++ "app:\n  platform: posix-gcc\n  profile: release\n  linker-script: ld/linkcmds\n")
@@ -122,7 +123,7 @@ spec = describe "Manifest" $ do
     it "reads the entry of a test" $
       fmap (M.toList . manifestTests)
         (parsed (project ++ app ++ "tests:\n  hk:\n    platforms: [posix-gcc, rtems5-leon3sf-nexysa7]\n    timeout: 10\n"))
-        `shouldBe` Right [(T.pack "hk", TestEntry [POSIXGCC, RTEMS5LEON3SFNEXYSA7] 10 defaultTestLogSize Nothing Nothing emptyExternConfig [] M.empty)]
+        `shouldBe` Right [(T.pack "hk", TestEntry [POSIXGCC, RTEMS5LEON3SFNEXYSA7] 10 defaultTestLogSize Nothing Nothing emptyExternConfig [] M.empty M.empty)]
 
     it "reads the linker script of a test on one of its platforms" $
       fmap (M.map testLinkerScripts . manifestTests)
@@ -140,7 +141,34 @@ spec = describe "Manifest" $ do
          ++ "    linker-script:\n      posix-gcc: ld/linkcmds\n")
         `failsWith` "tests.hk.linker-script.posix-gcc: the platform posix-gcc takes no linker script"
 
+    it "reads the XSDB script of an application on the PYNQ" $
+      fmap manifestNature (parsed (project ++ pynqApp ++ "  xsdb-init: assets/xsdb/init.tcl\n"))
+        `shouldBe` Right (Application (AppDeployment RTEMS6ZYNQ7000PYNQZ2 Release Nothing Nothing (Just "assets/xsdb/init.tcl")))
+
+    it "rejects an XSDB script on a platform not prepared through XSDB" $
+      (project ++ app ++ "  xsdb-init: assets/xsdb/init.tcl\n")
+        `failsWith` "app.xsdb-init: the platform rtems5-leon3sf-nexysa7 is not prepared through XSDB"
+
+    it "rejects the XSDB script of a test on a platform it does not run on" $
+      (project ++ app ++ "tests:\n  hk:\n    platforms: [posix-gcc]\n    timeout: 10\n"
+         ++ "    xsdb-init:\n      rtems6-zynq7000-pynqz2: assets/xsdb/init.tcl\n")
+        `failsWith` "tests.hk.xsdb-init.rtems6-zynq7000-pynqz2: the test does not run on rtems6-zynq7000-pynqz2"
+
   describe "deployments" $ do
+
+    let withXsdb = project ++ pynqApp ++ "  xsdb-init: assets/xsdb/init.tcl\n"
+          ++ "tests:\n  hk:\n    platforms: [posix-gcc, rtems6-zynq7000-pynqz2]\n    timeout: 10\n"
+          ++ "  own:\n    platforms: [rtems6-zynq7000-pynqz2]\n    timeout: 10\n"
+          ++ "    xsdb-init:\n      rtems6-zynq7000-pynqz2: assets/xsdb/other.tcl\n"
+        xsdbOf m t plt = xsdbInit (testConfig m (T.pack t) (manifestTests m M.! T.pack t) plt Debug)
+
+    it "gives a test on the platform of the application its XSDB script" $
+      fmap (\m -> (xsdbOf m "hk" RTEMS6ZYNQ7000PYNQZ2, xsdbOf m "hk" POSIXGCC)) (parsed withXsdb)
+        `shouldBe` Right (Just "assets/xsdb/init.tcl", Nothing)
+
+    it "keeps the XSDB script of a test that has its own" $
+      fmap (\m -> xsdbOf m "own" RTEMS6ZYNQ7000PYNQZ2) (parsed withXsdb)
+        `shouldBe` Right (Just "assets/xsdb/other.tcl")
 
     let withTick = project ++ "app:\n  platform: rtems5-leon3sf-nexysa7\n  profile: release\n  microseconds-per-tick: 1000\n"
           ++ "tests:\n  hk:\n    platforms: [posix-gcc]\n    timeout: 10\n"

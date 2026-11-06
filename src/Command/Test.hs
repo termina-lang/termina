@@ -15,7 +15,7 @@ import Command.Common (loadMainModule, orderedModules, sourceTexts)
 import Command.Provenance (buildInfo)
 import Command.Sources (LoadedProject(..), buildSources, readProject)
 import Configuration.Configuration
-import Configuration.Platform (Platform(..), callSite, checkPlatform, gdbServerPort)
+import Configuration.Platform (Platform(..), callSite, checkPlatform, gdbLaunch, xsdbServerPort)
 import Runner.Analysis (TestResult(TestResult), Run(..), RunEnd(..), AddressKind(..), analyse, addressesOf, renderReport, exitCodeOf)
 import Runner.Descriptor (Descriptor(..), DescriptorCase, Symbols(..), readDescriptor)
 import qualified Runner.Descriptor as D
@@ -24,6 +24,7 @@ import Runner.Posix (PosixRun(..), runPosix)
 import Runner.Record (Header(..), Layout, decodeHeader, decodeRecords, headerSize, platformLayout, relocate)
 import Runner.Results (Evidence(..), readProvenance, resultsJson, renderResults, renderJUnit)
 import Runner.Symbols (locateAddresses, stampAddress)
+import Runner.Servers (Server(..), readServer, gdbHost, gdbAddress)
 import Runner.Xsdb (prepareBoard)
 import qualified Runner.Symbols as S
 
@@ -31,12 +32,10 @@ import Control.Exception (IOException, try)
 import Data.Bits (testBit)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
-import Data.Char (isDigit)
 import Data.List (intercalate, nub)
 import Data.Maybe (fromMaybe, isJust)
 import Numeric (showHex)
 import System.Directory (createDirectoryIfMissing, doesFileExist, findExecutable)
-import System.Environment (lookupEnv)
 import System.Info (os)
 import System.Process (readProcessWithExitCode)
 import System.IO (hPutStrLn, stderr)
@@ -107,7 +106,7 @@ testCmdArgsParser = TestCmdArgs
     <*> O.optional (O.option (O.eitherReader (readServer "GDB server"))
           ( O.long "gdb"
           <> O.metavar "HOST[:PORT]"
-          <> O.help "The GDB server of the board (default: localhost, or host.docker.internal in the container, at the port of the platform)"))
+          <> O.help "The host of the GDB servers of the boards, each at the port of its platform, or the host and the port of the server of a single board (default: localhost, or host.docker.internal in the container)"))
     <*> O.optional (O.option (O.eitherReader (readServer "XSDB server"))
           ( O.long "xsdb"
           <> O.metavar "HOST[:PORT]"
@@ -127,21 +126,6 @@ testCmdArgsParser = TestCmdArgs
             "debug" -> Right Debug
             "release" -> Right Release
             other -> Left $ "Unknown profile: " ++ other ++ " (use debug or release)"
-
-    -- | A host, or a host and a port after the last colon
-    readServer :: String -> String -> Either String Server
-    readServer kind text =
-        let (port, rest) = break (== ':') (reverse text) in
-        case rest of
-            ':' : host ->
-                if not (null port) && all isDigit port && not (null host)
-                    then Right (Server (reverse host) (Just (read (reverse port))))
-                    else Left ("the " ++ kind ++ " " ++ text ++ " is not HOST or HOST:PORT")
-            _ -> if null text then Left ("the " ++ kind ++ " is empty") else Right (Server text Nothing)
-
--- | The host of a server of a board, and its port when it is not the one of the platform
-data Server = Server String (Maybe Int)
-  deriving (Eq, Show)
 
 -- | A case of a test, named by its test instance
 data TestCase = TestCase {
@@ -221,11 +205,13 @@ runTests mName mPlatform mProfile withGdb mServer mXsdb offline mode = do
     when (null deployments) $
         putStrLn (infoMessage (nothingSelected manifest selection mPlatform)) >> exitSuccess
     warnLocalFolders project deployments
-    -- | A port in --gdb is the port of one board
+    -- | The host of --gdb is the one of every board, and a port the port of one
     let platforms = nub (map deploymentPlatform deployments)
         boards = filter (/= POSIXGCC) platforms
-    when (mServer /= Nothing && length boards /= 1) $
-        cannotRun "--gdb can only be used when the tests run on a single board. Choose one with --platform"
+    when (mServer /= Nothing && null boards) $
+        cannotRun "--gdb is for the boards, and no test of the selection runs on one"
+    when (maybe False (\(Server _ port) -> isJust port) mServer && length boards > 1) $
+        cannotRun "A port in --gdb is the port of a single board, and the tests run on several. Choose one with --platform, or give only the host"
     when (mXsdb /= Nothing && RTEMS6ZYNQ7000PYNQZ2 `notElem` platforms) $
         cannotRun ("--xsdb is for " ++ show RTEMS6ZYNQ7000PYNQZ2 ++ ", and no test of the selection runs on it")
     when (withGdb && POSIXGCC `notElem` platforms) $
@@ -245,7 +231,7 @@ runTests mName mPlatform mProfile withGdb mServer mXsdb offline mode = do
                 Left _ -> do
                     let config = deploymentConfig deployment
                     createDirectoryIfMissing True (outputFolder config)
-                    evidence <- evidenceOf config mode Nothing (targetLauncher (targetOf (deploymentPlatform deployment) withGdb servers))
+                    evidence <- evidenceOf config mode Nothing (targetLauncher (targetOf (deploymentPlatform deployment) (xsdbInit config) withGdb servers))
                     finish config evidence Nothing M.empty (invalid config "it does not build")
                 Right _ -> runDeployment withGdb servers mode deployment
     let worst = maximum (0 : codes)
@@ -255,28 +241,9 @@ runTests mName mPlatform mProfile withGdb mServer mXsdb offline mode = do
 labelOf :: TerminaConfig -> String
 labelOf config = T.unpack (name config) ++ " (" ++ T.unpack (platform config) ++ ")"
 
--- | The host of the GDB servers: the one of --gdb, the one of
--- TERMINA_GDB_HOST, the host of the container, or the machine itself
-gdbHost :: Maybe Server -> IO String
-gdbHost mServer =
-    case mServer of
-        Just (Server host _) -> return host
-        Nothing -> do
-            fromEnvironment <- lookupEnv "TERMINA_GDB_HOST"
-            marked <- lookupEnv "TERMINA_CONTAINER"
-            docker <- doesFileExist "/.dockerenv"
-            return $ case fromEnvironment of
-                Just host -> host
-                Nothing -> if marked /= Nothing || docker then "host.docker.internal" else "localhost"
-
 -- | The host and the port of the GDB server of a board and of the XSDB server
 -- of the PYNQ, each port when it is not the one of the platform
 data Servers = Servers (String, Maybe Int) (String, Maybe Int)
-
--- | The script of the project that resets the PYNQ, initializes its PS and
--- loads its bitstream, which the XSDB server sources before each run
-xsdbScript :: FilePath
-xsdbScript = "assets" </> "xsdb" </> "init" <.> "tcl"
 
 -- | How the binary of a test is launched on a platform.
 data Target = Target {
@@ -288,42 +255,34 @@ data Target = Target {
     targetPrepare :: IO (Either String ())
   }
 
--- | The target of a platform. On posix-gcc, the binary runs under gdb when
--- asked.
-targetOf :: Platform -> Bool -> Servers -> Target
-targetOf POSIXGCC False _ = Target False AsProcess (return (Right ()))
-targetOf POSIXGCC True _ = Target False (UnderGdb "gdb" NativeProcess) (return (Right ()))
-targetOf RTEMS5LEON3SFNEXYSA7 _ servers = boardTarget RTEMS5LEON3SFNEXYSA7 ["monitor reset", "load"] servers
-targetOf FreeRTOS10STM32L432NUCLEOL432KC _ servers = boardTarget FreeRTOS10STM32L432NUCLEOL432KC ["monitor reset", "load"] servers
--- | The PYNQ is prepared before each run by its XSDB server, which sources the
--- script of the project. The script resets the board, initializes its PS and
--- loads its bitstream. The XSDB server listens on port 3122, or on the one of
--- --xsdb.
-targetOf RTEMS6ZYNQ7000PYNQZ2 _ (Servers gdb (xsdbHost, mXsdbPort)) =
-    Target True (UnderGdb "gdb-multiarch" (RemoteServer (gdbAddress RTEMS6ZYNQ7000PYNQZ2 gdb) ["load"])) prepare
+-- | The target of a platform, with the XSDB script of the deployment. On
+-- posix-gcc, the binary runs under gdb when asked. A board is loaded with the
+-- commands of gdbLaunch, and one prepared through XSDB is first prepared by
+-- its XSDB server, which sources the script of the manifest: on the PYNQ it
+-- resets the board, initializes its PS and loads its bitstream.
+targetOf :: Platform -> Maybe FilePath -> Bool -> Servers -> Target
+targetOf POSIXGCC _ False _ = Target False AsProcess (return (Right ()))
+targetOf POSIXGCC _ True _ = Target False (UnderGdb "gdb" NativeProcess) (return (Right ()))
+targetOf TestPlatform _ _ _ = error "no test runs on the test platform"
+targetOf plt mScript _ servers@(Servers _ (xsdbHost, mXsdbPort)) =
+    case (gdbLaunch plt, xsdbServerPort plt) of
+        -- | Spike needs its OpenOCD, and the NOEL-V its device tree loaded by GRMON before each run
+        (Nothing, _) -> notYetTarget plt servers
+        (Just commands, Nothing) -> boardTarget plt commands servers
+        (Just commands, Just defaultPort) -> (boardTarget plt commands servers) { targetPrepare = prepare (fromMaybe defaultPort mXsdbPort) }
 
   where
 
-    port = fromMaybe 3122 mXsdbPort
+    prepare port = case mScript of
+        Nothing -> return (Left ("the " ++ show plt ++ " is prepared before each run with an XSDB script, "
+            ++ "and termina.yaml gives none: add xsdb-init to app, or to the test for " ++ show plt))
+        Just script -> do
+            done <- prepareBoard xsdbHost port script
+            return (either (Left . notPrepared port) Right done)
 
-    prepare = do
-        hasScript <- doesFileExist xsdbScript
-        if not hasScript
-            then return (Left ("the " ++ show RTEMS6ZYNQ7000PYNQZ2 ++ " is prepared before each run with "
-                ++ xsdbScript ++ ", which resets the board, initializes its PS and loads its bitstream, and the project has none"))
-            else do
-                done <- prepareBoard xsdbHost port xsdbScript
-                return (either (Left . notPrepared) Right done)
-
-    notPrepared err = "the XSDB server at " ++ xsdbHost ++ ":" ++ show port ++ " did not prepare the board: "
+    notPrepared port err = "the XSDB server at " ++ xsdbHost ++ ":" ++ show port ++ " did not prepare the board: "
         ++ err ++ "; it is started from the root of the project with xsdb -eval \"xsdbserver start -port "
         ++ show port ++ "; vwait forever\""
-
--- | The runner does not drive these yet: Spike needs its OpenOCD, and the
--- NOEL-V its device tree loaded by GRMON before each run.
-targetOf RTEMS6RV32IMSPIKE _ servers = notYetTarget RTEMS6RV32IMSPIKE servers
-targetOf RTEMS6NOEL32IMARTYA7 _ servers = notYetTarget RTEMS6NOEL32IMARTYA7 servers
-targetOf TestPlatform _ _ = error "no test runs on the test platform"
 
 -- | A board on which no test runs yet: every run stops before loading.
 notYetTarget :: Platform -> Servers -> Target
@@ -336,11 +295,6 @@ notYetTarget plt servers = (boardTarget plt ["load"] servers) {
 boardTarget :: Platform -> [String] -> Servers -> Target
 boardTarget plt commands (Servers gdb _) =
     Target True (UnderGdb "gdb-multiarch" (RemoteServer (gdbAddress plt gdb) commands)) (return (Right ()))
-
--- | The address of the GDB server of a board: its host, and the port given or
--- the one of the platform.
-gdbAddress :: Platform -> (String, Maybe Int) -> String
-gdbAddress plt (host, mPort) = host ++ ":" ++ maybe "" show (maybe (gdbServerPort plt) Just mPort)
 
 invalid :: TerminaConfig -> String -> TestResult
 invalid config reason = TestResult (labelOf config) (Just reason) [] Nothing
@@ -361,7 +315,7 @@ runDeployment withGdb servers mode deployment = do
         plt = deploymentPlatform deployment
         folder = outputFolder config
         binary = folder </> "bin" </> T.unpack (name config)
-        target = targetOf plt withGdb servers
+        target = targetOf plt (xsdbInit config) withGdb servers
         -- | The debugger that runs the test, which a record does not need
         debugger = case (targetLauncher target, mode) of
             (_, Recorded _) -> Nothing
@@ -570,17 +524,27 @@ listTests json = do
     loaded <- try (do
         manifest <- loadManifest projectRoot >>= either dieWithFirstError return
         project <- readProject projectRoot manifest >>= either dieWithFirstError return
-        forM (M.toList (manifestTests manifest)) $ \(testName, entry) -> do
+        tests <- forM (M.toList (manifestTests manifest)) $ \(testName, entry) -> do
           cases <- loadTestCases project (T.unpack testName)
-          return (testName, entry, cases)) :: IO (Either ExitCode [(T.Text, TestEntry, [TestCase])])
-    listed <- either (const (exitWith (ExitFailure 2))) return loaded
+          return (testName, entry, cases)
+        return (manifest, tests)) :: IO (Either ExitCode (Manifest, [(T.Text, TestEntry, [TestCase])]))
+    (manifest, listed) <- either (const (exitWith (ExitFailure 2))) return loaded
     if json
-      then BLC.putStrLn $ encodePretty' defConfig { confCompare = keyOrder keys } (object [
+      then BLC.putStrLn $ encodePretty' defConfig { confCompare = keyOrder keys } (object (
+        -- | The application, which a debugging session of VS Code loads as a test
+        [ "app" .= object [
+              "name" .= projectName (manifestProject manifest),
+              "platform" .= show (appPlatform app),
+              "xsdb-init" .= appXsdbInit app ]
+        | Application app <- [manifestNature manifest] ] ++ [
           "tests" .= [ object [
               "name" .= testName,
               "folder" .= ("tests" </> T.unpack testName),
               "level" .= level cases,
               "platforms" .= map show (testPlatforms entry),
+              -- | The XSDB script of each platform that has one, the one of the application included
+              "xsdb-init" .= M.fromList [ (show plt, script)
+                  | plt <- testPlatforms entry, Just script <- [testXsdbInitOn manifest entry plt] ],
               "cases" .= [ object [
                   "id" .= caseId c,
                   "instance" .= caseInstance c,
@@ -589,7 +553,7 @@ listTests json = do
                   "line" .= caseLine c
                 ] | c <- cases ]
             ] | (testName, entry, cases) <- listed ]
-        ])
+        ]))
       else forM_ listed $ \(testName, entry, cases) -> do
         putStrLn $ T.unpack testName ++ " (" ++ level cases ++ ") on "
           ++ joinWith ", " (map show (testPlatforms entry))
@@ -597,7 +561,7 @@ listTests json = do
 
   where
 
-    keys = ["tests", "name", "folder", "level", "platforms", "cases", "id", "instance", "case", "file", "line"]
+    keys = ["app", "tests", "name", "folder", "level", "platform", "platforms", "xsdb-init", "cases", "id", "instance", "case", "file", "line"]
 
     caseId c = caseInstance c ++ "." ++ caseName c
 

@@ -26,6 +26,7 @@ module Configuration.Manifest (
     defaultTestProfile,
     testDeployment,
     testConfig,
+    testXsdbInitOn,
     newApplicationManifest,
     newLibraryManifest,
     defaultTestPlatforms,
@@ -43,7 +44,7 @@ import qualified Data.ByteString as BS
 import Data.Char (isAsciiLower, isDigit)
 import Data.List (intercalate, isPrefixOf, nub, sort, stripPrefix, (\\))
 import qualified Data.Map.Strict as M
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isNothing)
 import qualified Data.Text as T
 import Data.Yaml
 import System.Directory
@@ -106,7 +107,10 @@ data AppDeployment = AppDeployment {
     appMicrosecondsPerTick :: !(Maybe Integer),
     -- | The linker script of the application, relative to the root of the
     -- project, in place of the one of the platform
-    appLinkerScript :: !(Maybe FilePath)
+    appLinkerScript :: !(Maybe FilePath),
+    -- | The XSDB script that prepares the board before each load, relative to
+    -- the root of the project, which the tests on the same platform inherit
+    appXsdbInit :: !(Maybe FilePath)
   } deriving (Eq, Show)
 
 data TestEntry = TestEntry {
@@ -119,7 +123,10 @@ data TestEntry = TestEntry {
     testDependencies :: ![Dependency],
     -- | The linker script of the test on each platform that has one, under
     -- the name of the platform
-    testLinkerScripts :: !(M.Map T.Text FilePath)
+    testLinkerScripts :: !(M.Map T.Text FilePath),
+    -- | The XSDB script of the test on each platform prepared through XSDB,
+    -- under the name of the platform
+    testXsdbInits :: !(M.Map T.Text FilePath)
   } deriving (Eq, Show)
 
 -- | Parse a manifest. The version of the format is checked first, so that a
@@ -392,12 +399,27 @@ externParser = withObject "extern" $ \o -> do
 
 appParser :: Value -> Parser AppDeployment
 appParser = withObject "app" $ \o -> do
-    onlyFields ["platform", "profile", "microseconds-per-tick", "linker-script"] o
+    onlyFields ["platform", "profile", "microseconds-per-tick", "linker-script", "xsdb-init"] o
     plt <- explicitParseField (parseJSON >=> platformParser) o "platform"
     AppDeployment plt
         <$> explicitParseField (parseJSON >=> profileParser) o "profile"
         <*> explicitParseFieldMaybe tickParser o "microseconds-per-tick"
         <*> explicitParseFieldMaybe (linkerScriptParser plt) o "linker-script"
+        <*> explicitParseFieldMaybe (xsdbInitParser plt) o "xsdb-init"
+
+-- | An XSDB script: a path inside the project, on a platform prepared through
+-- XSDB. Whether the file exists is a check of the layout.
+xsdbInitParser :: Platform -> Value -> Parser FilePath
+xsdbInitParser plt v = do
+    path <- parseJSON v
+    if isNothing (xsdbServerPort plt) then
+        fail $ "the platform " ++ show plt ++ " is not prepared through XSDB"
+    else if not (insideFolder path) then
+        fail $ path ++ " is outside the project"
+    else if isHidden path then
+        fail $ path ++ " is a hidden file"
+    else
+        return path
 
 -- | A linker script: a path inside the project, on a platform that takes one.
 -- Whether the file exists is a check of the layout.
@@ -422,7 +444,7 @@ testParser testName v = do
         when (KM.member "overrides" o) $
             fail "overrides go at the top level of the manifest and apply to the whole project"
         onlyFields ["platforms", "timeout", "test-log-size", "harness-stack-size",
-            "microseconds-per-tick", "extern", "dependencies", "linker-script"] o
+            "microseconds-per-tick", "extern", "dependencies", "linker-script", "xsdb-init"] o
         plts <- explicitParseField platformsParser o "platforms"
         TestEntry plts
             <$> explicitParseField positive o "timeout"
@@ -431,16 +453,17 @@ testParser testName v = do
             <*> explicitParseFieldMaybe tickParser o "microseconds-per-tick"
             <*> (explicitParseFieldMaybe externParser o "extern" .!= emptyExternConfig)
             <*> (explicitParseFieldMaybe (listOf dependencyParser) o "dependencies" .!= [])
-            <*> (explicitParseFieldMaybe (scriptsParser plts) o "linker-script" .!= M.empty)) v
+            <*> (explicitParseFieldMaybe (perPlatform linkerScriptParser plts) o "linker-script" .!= M.empty)
+            <*> (explicitParseFieldMaybe (perPlatform xsdbInitParser plts) o "xsdb-init" .!= M.empty)) v
 
   where
 
-    -- | One script for each platform that needs one, among those of the test.
-    scriptsParser plts sv = parseJSON sv >>= M.traverseWithKey (\pltName path -> (do
+    -- | One file for each platform that needs one, among those of the test.
+    perPlatform fileParser plts sv = parseJSON sv >>= M.traverseWithKey (\pltName path -> (do
         plt <- platformParser pltName
         unless (plt `elem` plts) $
             fail $ "the test does not run on " ++ show plt
-        linkerScriptParser plt path) <?> Key (K.fromText pltName))
+        fileParser plt path) <?> Key (K.fromText pltName))
 
     platformsParser pv = do
         platformNames <- parseJSON pv :: Parser [T.Text]
@@ -455,13 +478,22 @@ checkLayout :: FilePath -> Manifest -> IO [String]
 checkLayout root manifest = do
     appErrors <- checkApp
     scriptErrors <- checkLinkerScript
+    xsdbErrors <- checkXsdbInit
     testsErrors <- checkTests
     srcErrors <- checkSources "src"
     testSrcErrors <- concat <$> mapM (\t -> checkSources ("tests" </> T.unpack t </> "src")) (M.keys (manifestTests manifest))
     shadowErrors <- concat <$> mapM (checkShadowing . T.unpack) (M.keys (manifestTests manifest))
-    return (appErrors ++ scriptErrors ++ testsErrors ++ srcErrors ++ testSrcErrors ++ shadowErrors)
+    return (appErrors ++ scriptErrors ++ xsdbErrors ++ testsErrors ++ srcErrors ++ testSrcErrors ++ shadowErrors)
 
   where
+
+    checkXsdbInit = do
+        let appScripts = case manifestNature manifest of
+                Application AppDeployment { appXsdbInit = Just script } -> [script]
+                _ -> []
+            scripts = nub (appScripts ++ concatMap (M.elems . testXsdbInits) (M.elems (manifestTests manifest)))
+        missing <- filterM (fmap not . doesFileExist . (root </>)) scripts
+        return ["termina.yaml: the XSDB script " ++ script ++ " does not exist" | script <- missing]
 
     checkLinkerScript = do
         let appScripts = case manifestNature manifest of
@@ -570,6 +602,7 @@ configFor manifest kind plt prf tick = TerminaConfig {
     harnessStackSize = Nothing,
     runTimeout = Nothing,
     linkerScript = Nothing,
+    xsdbInit = Nothing,
     lineDirectives = True
   }
 
@@ -586,7 +619,8 @@ appDeployment manifest =
         Library _ -> Nothing
         Application app ->
           let config = (configFor manifest ApplicationBuild (appPlatform app) (appProfile app) (appMicrosecondsPerTick app)) {
-                  linkerScript = appLinkerScript app
+                  linkerScript = appLinkerScript app,
+                  xsdbInit = appXsdbInit app
                 }
           in Just Deployment {
             deploymentLabel = "the application",
@@ -640,6 +674,15 @@ testDeployment manifest testName entry plt prf = Deployment {
 
     testFolder = "tests" </> T.unpack testName
 
+-- | The XSDB script of a test on a platform: its own, or the one of the
+-- application when the test runs on the platform of the application
+testXsdbInitOn :: Manifest -> TestEntry -> Platform -> Maybe FilePath
+testXsdbInitOn manifest entry plt =
+    case (M.lookup (T.pack (show plt)) (testXsdbInits entry), manifestNature manifest) of
+        (Just script, _) -> Just script
+        (Nothing, Application app) | appPlatform app == plt -> appXsdbInit app
+        _ -> Nothing
+
 -- | The configuration of a test on one of its platforms, built with the given
 -- profile. A test without its own tick takes the one of the application.
 testConfig :: Manifest -> T.Text -> TestEntry -> Platform -> ProjectProfile -> TerminaConfig
@@ -647,6 +690,7 @@ testConfig manifest testName entry plt prf =
     (configFor manifest (TestBuild testName) plt prf tick) {
         recordCapacity = testLogSize entry,
         linkerScript = M.lookup (T.pack (show plt)) (testLinkerScripts entry),
+        xsdbInit = testXsdbInitOn manifest entry plt,
         harnessStackSize = testHarnessStackSize entry,
         runTimeout = Just (testTimeout entry)
     }

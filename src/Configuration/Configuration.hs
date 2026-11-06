@@ -163,6 +163,9 @@ data TerminaConfig =
     -- | The linker script of the deployment, relative to the root of the
     -- project, or nothing for the one of the platform
     linkerScript :: !(Maybe FilePath),
+    -- | The XSDB script that prepares the board before each load, relative to
+    -- the root of the project, on a platform prepared through XSDB
+    xsdbInit :: !(Maybe FilePath),
     -- | Whether the generated C carries #line pragmas that point to the .fin.
     -- Without them it is broken to the usual width, the plain C.
     lineDirectives :: !Bool
@@ -196,6 +199,7 @@ defaultConfig projectName plt = TerminaConfig {
     harnessStackSize = Nothing,
     runTimeout = Nothing,
     linkerScript = Nothing,
+    xsdbInit = Nothing,
     lineDirectives = False
 }
 

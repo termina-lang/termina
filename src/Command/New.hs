@@ -136,66 +136,18 @@ devcontainerContent project = unlines [
         "}"
     ]
 
--- | Default address of the GDB server of a target platform, outside the
--- container: GRMON for the LEON3 board, the ST-LINK_gdbserver of STM32CubeCLT
--- for the Nucleo board, and hw_server, whose first core listens on port 3000,
--- for the PYNQ-Z2 board.
-gdbServerAddress :: Platform -> Maybe String
-gdbServerAddress plt = (\port -> "host.docker.internal:" ++ show port) <$> gdbServerPort plt
-
--- | The debugger runs from the root of the project: the @#line@ directives of
--- the generated C name the Termina modules relative to it.
-launchContent :: String -> FilePath -> Platform -> String
-launchContent project output plt =
-    case gdbServerAddress plt of
-        Nothing -> unlines [
-                "{",
-                "    \"version\": \"0.2.0\",",
-                "    \"configurations\": [",
-                "        {",
-                "            \"name\": \"Debug (" ++ show plt ++ ")\",",
-                "            \"type\": \"cppdbg\",",
-                "            \"request\": \"launch\",",
-                "            \"program\": \"${workspaceFolder}/" ++ output ++ "/bin/" ++ project ++ "\",",
-                "            \"cwd\": \"${workspaceFolder}\",",
-                "            \"MIMode\": \"gdb\",",
-                "            \"preLaunchTask\": \"termina: build\",",
-                "            \"setupCommands\": [",
-                "                { \"text\": \"set startup-with-shell off\" }",
-                "            ]",
-                "        }",
-                "    ]",
-                "}"
-            ]
-        Just address -> unlines [
-                "{",
-                "    \"version\": \"0.2.0\",",
-                "    \"configurations\": [",
-                "        {",
-                "            \"name\": \"Debug (" ++ show plt ++ ")\",",
-                "            \"type\": \"cppdbg\",",
-                "            \"request\": \"launch\",",
-                "            \"program\": \"${workspaceFolder}/" ++ output ++ "/bin/" ++ project ++ "\",",
-                "            \"cwd\": \"${workspaceFolder}\",",
-                "            \"MIMode\": \"gdb\",",
-                "            \"miDebuggerPath\": \"gdb-multiarch\",",
-                "            \"miDebuggerServerAddress\": \"${input:gdbServer}\",",
-                "            \"postRemoteConnectCommands\": [",
-                "                { \"text\": \"load\" }",
-                "            ],",
-                "            \"preLaunchTask\": \"termina: build\"",
-                "        }",
-                "    ],",
-                "    \"inputs\": [",
-                "        {",
-                "            \"id\": \"gdbServer\",",
-                "            \"type\": \"promptString\",",
-                "            \"description\": \"GDB server of the board or the simulator (host:port)\",",
-                "            \"default\": \"" ++ address ++ "\"",
-                "        }",
-                "    ]",
-                "}"
-            ]
+-- | The extension of VS Code builds the application, asks termina platforms
+-- how to load its board and starts the session, so the configuration names
+-- nothing else.
+launchContent :: String
+launchContent = unlines [
+        "{",
+        "    \"version\": \"0.2.0\",",
+        "    \"configurations\": [",
+        "        { \"name\": \"Debug\", \"type\": \"termina\", \"request\": \"launch\" }",
+        "    ]",
+        "}"
+    ]
 
 tasksContent :: String -> String
 tasksContent buildCommandLine = unlines [
@@ -292,7 +244,7 @@ newCommand (NewProject project mPltName kind mExports vcs vscode chatty) = do
         createDirectory (project </> ".vscode")
         case kind of
             NewApp -> do
-                writeFile (project </> ".vscode" </> "launch.json") (launchContent project (outputFolder config </> "app") plt)
+                writeFile (project </> ".vscode" </> "launch.json") launchContent
                 writeFile (project </> ".vscode" </> "tasks.json") (tasksContent "termina build")
             NewLib ->
                 writeFile (project </> ".vscode" </> "tasks.json") (tasksContent "termina build --tests")

@@ -15,6 +15,7 @@ import Command.Try
 import Command.LSP
 import Command.Sched
 import Command.Doctor
+import Command.Platforms
 import Command.Clean
 import Command.Utils (enterProject)
 import System.IO (BufferMode(LineBuffering), hSetBuffering, stdout)
@@ -33,6 +34,7 @@ data Command =
     | Update UpdateCmdArgs
     | Verify VerifyCmdArgs
     | Doctor DoctorCmdArgs
+    | Platforms PlatformsCmdArgs
     | Clean CleanCmdArgs
     deriving Show
 
@@ -59,6 +61,10 @@ verifyCommandParser = Verify
 doctorCommandParser :: Parser Command
 doctorCommandParser = Doctor
     <$> doctorCmdArgsParser
+
+platformsCommandParser :: Parser Command
+platformsCommandParser = Platforms
+    <$> platformsCmdArgsParser
 
 cleanCommandParser :: Parser Command
 cleanCommandParser = Clean
@@ -107,6 +113,7 @@ commandParser = subparser
  <> withHelp "lsp" lspCommandParser "Start language server"
  <> withHelp "sched" schedCommandParser "Generate scheduling models"
  <> withHelp "doctor" doctorCommandParser "Report the OSAL, the tools and the toolchain of each platform found"
+ <> withHelp "platforms" platformsCommandParser "List the supported platforms, and how GDB loads the boards"
  <> withHelp "clean" cleanCommandParser "Remove output/ and .termina/ of the project"
   )
 
@@ -144,4 +151,5 @@ main = do
         Update cmdargs -> enterProject >> updateCommand cmdargs
         Verify cmdargs -> enterProject >> verifyCommand cmdargs
         Doctor cmdargs -> doctorCommand cmdargs
+        Platforms cmdargs -> platformsCommand cmdargs
         Clean cmdargs -> enterProject >> cleanCommand cmdargs

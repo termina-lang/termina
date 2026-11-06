@@ -91,13 +91,26 @@ Patch versions on either side are interchangeable.
   `hw_server` on the PYNQ-Z2), with `gdb-multiarch` and the `addr2line` and
   `nm` of the toolchain: it loads the binary, selects the case, stops at the end of the
   run or at an exception, with its backtrace, and dumps the record from the
-  RAM of the board. `--gdb <host>[:<port>]` gives the server of one board.
+  RAM of the board. `--gdb <host>` gives the host of the GDB servers of
+  every board, and `--gdb <host>:<port>` the server of one board, when the
+  selection runs on a single board. Without `--gdb` the host is
+  `host.docker.internal` inside a container and `localhost` outside.
   `results.json` gives the version of the GDB that ran the test.
   Before each run on the PYNQ-Z2, an XSDB server, given by
   `--xsdb <host>[:<port>]`, resets the board and loads its bitstream with
-  `assets/xsdb/init.tcl` of the project. On `posix-gcc`, `--with-gdb` runs
+  the script of `xsdb-init`. On `posix-gcc`, `--with-gdb` runs
   the binary under the native `gdb`. The timeout counts from
   `termina__test__init`, so the load does not count.
+- `xsdb-init` in the manifest, the Tcl script that the XSDB server runs
+  before each run on the PYNQ-Z2. Under `app` it is a path, and a test
+  takes a map from platform to path, as `linker-script`; a test on the
+  platform of the application inherits the one of `app`. The platform must
+  be one with an XSDB server, and the file must exist in the project.
+- `termina platforms [--json] [--gdb <host>] [--xsdb <host>[:<port>]]`
+  lists the supported platforms and, for each board, the address of its GDB
+  server and the commands that GDB runs to load it, and the address of the
+  XSDB server on the PYNQ-Z2. `termina test --list --json` gives the
+  application and, for each test, its `xsdb-init` per platform.
 - Concurrent tests: a `test.fin` without `test` instances runs its tasks, its
   timers and its interrupts as the application does, and ends when the
   system comes to rest after `finish()` of `test_scenario`. The test is built
@@ -332,6 +345,9 @@ Patch versions on either side are interchangeable.
 
 ### Changed
 
+- `termina new --vscode` writes a `launch.json` with a single configuration
+  of type `termina`, which the Termina extension for VS Code resolves for
+  the platform of the project.
 - `config.h` reserves emitter identifier 0 for `system_except` in every
   build, whether the deployment connects it or not, and the other emitters
   take 1 onwards, so an event with identifier 0 always comes from
