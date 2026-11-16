@@ -44,7 +44,11 @@ appModule = T.unlines
   , ""
   , "handler init : CInit = { count = 0, init_ev <- system_init };" ]
 
--- | An application in app/ and a library in lib/, which the application
+-- | The deployment of the test of the library.
+testModule :: T.Text
+testModule = "import half_test.cases;\n\ntest half_tests : CHalfTests = {\n    chk <-> test_checks\n};\n"
+
+-- | An application in app/ and a library in lib/ with a test, which the application
 -- declares as a local folder.
 project :: [(FilePath, T.Text)]
 project =
@@ -56,8 +60,21 @@ project =
   , ("app/app/app.fin", appModule)
   , ("lib/termina.yaml", T.unlines
       [ "project:", "  name: lib", "  version: 0.1.0", "  manifest-version: 1"
-      , "exports: [lib]" ])
+      , "exports: [lib]"
+      , "tests:", "  half:", "    platforms: [posix-gcc]", "    timeout: 30" ])
   , ("lib/src/lib/half.fin", "function half(x : u32) -> u32 {\n    return x / 2;\n}\n")
+  , ("lib/tests/half/test.fin", testModule)
+  , ("lib/tests/half/src/half_test/cases.fin", T.unlines
+      [ "import lib.half;"
+      , ""
+      , "test class CHalfTests {"
+      , "    chk : access TestChecks;"
+      , ""
+      , "    case half_of_four(&mut self) {"
+      , "        self->chk.check(half(4) == 2);"
+      , "        return;"
+      , "    }"
+      , "};" ])
   , ("loose/main.fin", "import util.twice;\n\nfunction four() -> u32 {\n    return twice(2);\n}\n") ]
 
 -- | Run a session against a server on the application of the project.
@@ -214,3 +231,19 @@ spec = describe "language server" $ do
         InL (Definition (InL location)) ->
           uriToFilePath (location ^. L.uri) `shouldBe` Just (base </> "lib" </> "src" </> "lib" </> "half.fin")
         other -> expectationFailure ("no single definition: " ++ show other)
+
+  it "goes to the definition of the test class of an open test of a library" $
+    withServerIn "lib" $ \base -> do
+      deployment <- openDoc "tests/half/test.fin" "termina"
+      definitions <- getDefinitions deployment (positionOf "CHalfTests" testModule)
+      liftIO $ case definitions of
+        InL (Definition (InL location)) ->
+          uriToFilePath (location ^. L.uri) `shouldBe` Just (base </> "lib" </> "tests" </> "half" </> "src" </> "half_test" </> "cases.fin")
+        other -> expectationFailure ("no single definition: " ++ show other)
+
+  it "marks a type error in a module of an open test" $
+    withServerIn "lib" $ \_ -> do
+      cases <- openDoc "tests/half/src/half_test/cases.fin" "termina"
+      changeDoc cases [replaceAll "import lib.half;\n\ntest class CHalfTests {\n    chk : access TestChecks;\n\n    case half_of_four(&mut self) {\n        self->chk.check(half(true) == 2);\n        return;\n    }\n};\n"]
+      codes <- errorCodesOf cases
+      liftIO (codes `shouldBe` ["SE-037"])

@@ -20,7 +20,8 @@ import Utils.Annotations (Location(Position))
 
 import Control.Exception (IOException, try)
 import Control.Lens ((^.))
-import Control.Monad (forM_)
+import Control.Monad (forM_, unless)
+import Data.List (isPrefixOf)
 import Control.Monad.State
 import qualified Data.ByteString as BS
 import qualified Data.Map.Strict as M
@@ -60,50 +61,95 @@ loadProjectAt root = do
                 Right project -> modify (\s -> s { loaded = Just project })
 
 -- | Check the project with the text of the files open in the editor: the
--- application, or the exported modules of a library. The modules of the check
--- replace those of the state, and its error, if there is one, is published in
--- the file where it is. A module that cannot be loaded leaves the modules of
--- the state as they were.
+-- application, or the exported modules of a library, and each test with a file
+-- open in the editor. The modules of the checks replace those of the state, and
+-- their errors, if there are any, are published in the files where they are. A
+-- check whose modules cannot be loaded leaves the modules of the state that it
+-- does not give.
 checkProject :: HandlerM ()
 checkProject = do
     mProject <- gets loaded
     texts <- editorTexts
-    forM_ (withTexts texts <$> mProject) $ \project ->
-        maybe (checkLibrary project) (checkApplication project) (appDeployment (loadedManifest project))
+    forM_ (withTexts texts <$> mProject) $ \project -> do
+        let manifest = loadedManifest project
+        base <- liftIO (maybe (checkLibrary project) (checkApplication project Nothing) (appDeployment manifest))
+        tests <- liftIO (mapM (\(name, deployment) -> checkApplication project (Just name) deployment)
+                             (openTests project (M.keys texts)))
+        let results = base : tests
+            checked = M.unions [ modules | Checked modules _ <- results ]
+            failed = or [ True | Unloaded _ <- results ]
+        unless (null [ () | Checked _ _ <- results ]) $
+            modify (\s -> s { project_modules =
+                let fresh = keepIndexes (project_modules s) checked
+                in if failed then M.union fresh (project_modules s) else fresh })
+        publishDiagnostics (M.unionsWith merged (map diagnosticsOf results))
 
--- | Check the application of a project as the build does.
-checkApplication :: LoadedProject -> Deployment -> HandlerM ()
-checkApplication project deployment = do
-    let mainFolder = normalise (loadedRoot project </> deploymentMainFolder deployment)
-        mainFile = mainFolder </> deploymentMainModule deployment <.> "fin"
-        sources = buildSources project Nothing mainFolder
-        files = sourceTexts sources
-    loadedMain <- liftIO (loadMainModule sources mainFolder (deploymentMainModule deployment))
-    case loadedMain >>= \(_, parsedProject) -> (,) parsedProject <$> orderedModules parsedProject of
-        Left failure -> publishDiagnostics (failureDiagnosticsIn mainFile files failure)
-        Right (parsedProject, order) -> do
+  where
+
+    merged first second = first ++ filter (`notElem` first) second
+
+-- | The result of the check of a deployment: the modules that it has loaded,
+-- with their errors, or the errors of the load.
+data CheckResult =
+    Checked (M.Map FilePath TerminaStoredModule) (M.Map FilePath [LSP.Diagnostic])
+    | Unloaded (M.Map FilePath [LSP.Diagnostic])
+
+-- | The errors of a check, by file.
+diagnosticsOf :: CheckResult -> M.Map FilePath [LSP.Diagnostic]
+diagnosticsOf (Checked _ diags) = diags
+diagnosticsOf (Unloaded diags) = diags
+
+-- | The tests with a file open in the editor, each on its first platform and
+-- with the profile with which termina test builds it.
+openTests :: LoadedProject -> [FilePath] -> [(String, Deployment)]
+openTests project files =
+    [ (T.unpack name, testDeployment manifest name entry plt (defaultTestProfile manifest))
+    | (name, entry) <- M.toList (manifestTests manifest)
+    , plt : _ <- [testPlatforms entry]
+    , let folder = addTrailingPathSeparator (normalise (loadedRoot project </> "tests" </> T.unpack name))
+    , any (folder `isPrefixOf`) files ]
+
+  where
+
+    manifest = loadedManifest project
+
+-- | Check the application of a project, or one of its tests, as the build does.
+checkApplication :: LoadedProject -> Maybe String -> Deployment -> IO CheckResult
+checkApplication project mTest deployment = do
+    loadedMain <- loadMainModule sources mainFolder (deploymentMainModule deployment)
+    return $ case loadedMain >>= \(_, parsedProject) -> (,) parsedProject <$> orderedModules parsedProject of
+        Left failure -> Unloaded (failureDiagnosticsIn mainFile files failure)
+        Right (parsedProject, order) ->
             let (typedProject, result) =
                     checkModules (deploymentConfig deployment) (deploymentPlatform deployment) (dependencyModulesOf sources) parsedProject order
-            modify (\s -> s { project_modules = keepIndexes (project_modules s) (storedModules parsedProject typedProject) })
-            publishDiagnostics (either (failureDiagnosticsIn mainFile files) (const M.empty) result)
+            in Checked (storedModules parsedProject typedProject) (either (failureDiagnosticsIn mainFile files) (const M.empty) result)
+
+  where
+
+    mainFolder = normalise (loadedRoot project </> deploymentMainFolder deployment)
+    mainFile = mainFolder </> deploymentMainModule deployment <.> "fin"
+    sources = buildSources project mTest mainFolder
+    files = sourceTexts sources
 
 -- | Type check the exported modules of a library on the first platform on
 -- which the build checks them.
-checkLibrary :: LoadedProject -> HandlerM ()
+checkLibrary :: LoadedProject -> IO CheckResult
 checkLibrary project = do
-    let manifest = loadedManifest project
-        root = loadedRoot project
-        manifestFile = root </> "termina.yaml"
-        sources = buildSources project Nothing (normalise (root </> "src"))
-        files = sourceTexts sources
-    loadedLibrary <- liftIO (loadExportedModules project)
-    case (loadedLibrary, libraryPlatforms manifest) of
-        (Left failure, _) -> publishDiagnostics (failureDiagnosticsIn manifestFile files failure)
-        (Right _, []) -> return ()
-        (Right (parsedProject, order), plt : _) -> do
+    loadedLibrary <- loadExportedModules project
+    return $ case (loadedLibrary, libraryPlatforms manifest) of
+        (Left failure, _) -> Unloaded (failureDiagnosticsIn manifestFile files failure)
+        (Right _, []) -> Unloaded M.empty
+        (Right (parsedProject, order), plt : _) ->
             let (typedProject, failure) = typeLibrary manifest plt (dependencyModulesOf sources) parsedProject order
-            modify (\s -> s { project_modules = keepIndexes (project_modules s) (storedModules parsedProject typedProject) })
-            publishDiagnostics (maybe M.empty (failureDiagnosticsIn manifestFile files) failure)
+            in Checked (storedModules parsedProject typedProject) (maybe M.empty (failureDiagnosticsIn manifestFile files) failure)
+
+  where
+
+    manifest = loadedManifest project
+    root = loadedRoot project
+    manifestFile = root </> "termina.yaml"
+    sources = buildSources project Nothing (normalise (root </> "src"))
+    files = sourceTexts sources
 
 -- | Read again from disk a file that the editor has saved or closed, so that
 -- the project keeps its text once the editor no longer holds it. A file that
