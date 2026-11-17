@@ -246,7 +246,7 @@ titles =
   , ("SE-202", "task class defines a method")
   , ("SE-203", "handler class defines a method")
   , ("SE-204", "resource class defines a viewer")
-  , ("SE-205", "unprotected resource with regular fields")
+  , ("SE-205", "invalid unprotected resource")
   , ("SE-206", "mutable member function in task class")
   , ("SE-207", "mutable member function in handler class")
   , ("SE-208", "binary operation expected result type not integer")

@@ -6,6 +6,7 @@ import Test.Hspec
 import Semantic.Errors
 import Semantic.Common
 import Semantic.Modifiers (Declaration(..))
+import Core.AST (AccessKind(..))
 
 -- | A task class, a channel for it and a task with the given modifiers.
 task :: String -> String
@@ -35,6 +36,66 @@ resource mods =
     mods ++
     "resource foo : FooRes;\n"
 
+-- | An unprotected resource with a regular field that every procedure
+-- reads through &self.
+readOnlyResource :: String
+readOnlyResource =
+    "interface IFoo {\n" ++
+    "    procedure get(&self, r : &mut u32);\n" ++
+    "};\n" ++
+    "resource class FooRes provides IFoo {\n" ++
+    "    value : u32;\n" ++
+    "    procedure get(&self, r : &mut u32) {\n" ++
+    "        *r = self->value;\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "};\n" ++
+    "#[unprotected]\n" ++
+    "resource foo : FooRes = { value = 7 };\n"
+
+-- | An unprotected resource with a regular field, a procedure with &self and
+-- a procedure with &mut self.
+mutableProcedureResource :: String
+mutableProcedureResource =
+    "interface IFoo {\n" ++
+    "    procedure get(&self, r : &mut u32);\n" ++
+    "    procedure set(&mut self, v : u32);\n" ++
+    "};\n" ++
+    "resource class FooRes provides IFoo {\n" ++
+    "    value : u32;\n" ++
+    "    procedure get(&self, r : &mut u32) {\n" ++
+    "        *r = self->value;\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "    procedure set(&mut self, v : u32) {\n" ++
+    "        self->value = v;\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "};\n" ++
+    "#[unprotected]\n" ++
+    "resource foo : FooRes = { value = 7 };\n"
+
+-- | An unprotected resource with a regular field, a procedure with &self and
+-- a method with &priv self.
+privateMethodResource :: String
+privateMethodResource =
+    "interface IFoo {\n" ++
+    "    procedure get(&self, r : &mut u32);\n" ++
+    "};\n" ++
+    "resource class FooRes provides IFoo {\n" ++
+    "    value : u32;\n" ++
+    "    method reset(&priv self) {\n" ++
+    "        self->value = 0;\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "    procedure get(&self, r : &mut u32) {\n" ++
+    "        *r = self->value;\n" ++
+    "        return;\n" ++
+    "    }\n" ++
+    "};\n" ++
+    "#[unprotected]\n" ++
+    "resource foo : FooRes = { value = 7 };\n"
+
 -- | A struct with the given modifiers.
 struct :: String -> String
 struct mods =
@@ -52,6 +113,19 @@ spec = describe "Semantic: modifiers" $ do
 
   it "accepts unprotected on a resource" $
     runNegativeTestTypeCheck (resource "#[unprotected]\n") `shouldSatisfy` null
+
+  it "accepts unprotected on a resource whose fields are only read" $
+    runNegativeTestTypeCheck readOnlyResource `shouldSatisfy` null
+
+  it "rejects unprotected on a resource with a field and a procedure with &mut self" $
+    runNegativeTestTypeCheck mutableProcedureResource `shouldSatisfy` \case
+      Just (EInvalidUnprotectedResource "foo" ("FooRes", _) "value" (WritingProcedure "set" Mutable)) -> True
+      _ -> False
+
+  it "rejects unprotected on a resource with a field and a method with &priv self" $
+    runNegativeTestTypeCheck privateMethodResource `shouldSatisfy` \case
+      Just (EInvalidUnprotectedResource "foo" ("FooRes", _) "value" (WritingMethod "reset" Private)) -> True
+      _ -> False
 
   it "accepts packed on a struct" $
     runNegativeTestTypeCheck (struct "#[packed]\n") `shouldSatisfy` null

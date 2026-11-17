@@ -264,7 +264,7 @@ data Error
   | ETaskClassMethod (Identifier, Location) Identifier -- ^ Task class defines a method
   | EHandlerClassMethod (Identifier, Location) Identifier -- ^ Handler class defines a method
   | EResourceClassViewer (Identifier, Location) Identifier -- ^ Resource class defines a viewer
-  | EUnprotectedResourceWithRegularFields (Identifier, Location) -- ^ Unprotected resource with regular fields
+  | EInvalidUnprotectedResource Identifier (Identifier, Location) Identifier WritingMember -- ^ Unprotected resource whose class has a regular field and a member function that can write it
   | EMemberFunctionWithMutableSelfInTaskClass Identifier -- ^ Member function with mutable self reference in task class
   | EMemberFunctionWithMutableSelfInHandlerClass Identifier -- ^ Member function with mutable self reference in handler class
   | ECharLiteralOutOfRange Char -- ^ Character literal whose code point is outside the 7-bit ASCII range (SE-211)
@@ -303,6 +303,12 @@ data HandlerOnlyBecause =
     -- the system reboots once its action has run, so attending it would need a
     -- task that is never going to run.
     | ReportsOnTheFatalPath
+    deriving Show
+
+-- | Kind of a member function of a resource class that can write its fields.
+data WritingMember =
+    WritingProcedure Identifier AccessKind
+    | WritingMethod Identifier AccessKind
     deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -998,10 +1004,21 @@ instance Diagnosable Error where
         relatedTo clsPos "the class is defined here" $
         diagnostic "SE-204" "resource class defines a viewer"
             ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the viewer \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Resource classes cannot define viewers.")
-    describe (EUnprotectedResourceWithRegularFields (clsId, prevPos)) =
+    describe (EInvalidUnprotectedResource resId (clsId, prevPos) field member) =
+        let (memberKind, memberId, ak) = case member of
+              WritingProcedure ident accessKind -> ("procedure", ident, accessKind)
+              WritingMethod ident accessKind -> ("method", ident, accessKind)
+            selfRef = case ak of
+              Mutable -> "&mut self"
+              Private -> "&priv self"
+              Immutable -> "&self"
+        in
         relatedTo prevPos "the resource class is defined here" $
-        diagnostic "SE-205" "unprotected resource with regular fields"
-            ("Resource class \x1b[31m" <> T.pack clsId <> "\x1b[0m defines regular fields but the resource is defined as unprotected.\n" <> "Unprotected resources cannot define regular fields.\n")
+        diagnostic "SE-205" "invalid unprotected resource"
+            ("The resource \x1b[31m" <> T.pack resId <> "\x1b[0m is defined as unprotected, but its class \x1b[31m" <> T.pack clsId
+                <> "\x1b[0m defines the field \x1b[31m" <> T.pack field <> "\x1b[0m and its " <> memberKind <> " \x1b[31m" <> T.pack memberId
+                <> "\x1b[0m takes " <> selfRef <> ".\n"
+                <> "A resource can be defined as unprotected only if its class has no regular fields or every procedure and method of its class takes &self.\n")
     describe (EMemberFunctionWithMutableSelfInTaskClass ident) =
         diagnostic "SE-206" "mutable member function in task class"
             ("Member function \x1b[31m" <> T.pack ident <> "\x1b[0m defines a mutable self reference. " <> "Member functions in task classes cannot define mutable self references\n" <> "Only immutable or private self references are allowed.")

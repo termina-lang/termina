@@ -80,14 +80,21 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
           -- If it has not, we need to check that the type has actually NO fields
           Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
       tyMods <- typeModifiers anns ResourceDeclaration typeGlobalObject mods
-      -- Check if the resource is unprotected, and if it is, check that it has no regular fields
-      when (isUnprotected tyMods) $ 
+      -- A resource can be unprotected only if its class has no regular fields
+      -- or every procedure and method of its class takes &self, so that the
+      -- fields are only set by the initializer
+      when (isUnprotected tyMods) $
           getGlobalTypeDef anns clsId >>= \case{
               LocatedElement (Class _clsKind _ident members _provides _mods) clsLoc ->
-                let fields = [fld | ClassField fld@(FieldDefinition _ fty _) <- members, (not . portTy) fty] in
-                unless (null fields) $ throwError $ annotateError anns (EUnprotectedResourceWithRegularFields (clsId, clsLoc));
+                let fields = [fieldIdentifier fld | ClassField fld@(FieldDefinition _ fty _) <- members, (not . portTy) fty]
+                    writers = [WritingProcedure member ak | ClassProcedure ak member _ _ _ <- members, ak /= Immutable]
+                      ++ [WritingMethod member ak | ClassMethod ak member _ _ _ _ <- members, ak /= Immutable] in
+                case (fields, writers) of {
+                  (field : _, writer : _) -> throwError $ annotateError anns (EInvalidUnprotectedResource ident (clsId, clsLoc) field writer);
+                  _ -> return ()
+                };
               _ -> throwError $ annotateError Internal EExpectedClassType;
-            } 
+            }
       return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     -- | Memory pools 
     TPool {} -> do
