@@ -418,7 +418,7 @@ parameterParser = do
   identifier <- objectIdentifierParser
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser
-  Parameter identifier typeSpecifier . Position current startPos <$> getPosition
+  Parameter identifier typeSpecifier . located current startPos <$> getPosition
 
 -- | TerminaParser for a field value assignments expression
 -- This expression is used to create annonymous structures to serve as right
@@ -431,7 +431,7 @@ structInitializerParser = do
     startpos <- getPosition
     assignments <- braces (sepBy (wspcs *> fieldAssignmentParser <* wspcs) comma)
     typeSpecifier <- optionMaybe (reservedOp ":" >> typeSpecifierParser)
-    StructInitializer assignments typeSpecifier . Position current startpos <$> getPosition
+    StructInitializer assignments typeSpecifier . located current startpos <$> getPosition
     where
 
       fieldAssignmentParser :: TerminaParser (FieldAssignment ParserAnn)
@@ -446,7 +446,7 @@ structInitializerParser = do
         identifier <- identifierParser
         _ <- reservedOp "="
         expr <- expressionParser
-        FieldValueAssignment identifier expr . Position current startPos <$> getPosition
+        FieldValueAssignment identifier expr . located current startPos <$> getPosition
 
       fieldAddressParser :: TerminaParser (FieldAssignment ParserAnn)
       fieldAddressParser = do
@@ -455,7 +455,7 @@ structInitializerParser = do
         identifier <- identifierParser
         _ <- reservedOp "@"
         addr <- expressionParser
-        FieldAddressAssignment identifier addr . Position current startPos <$> getPosition
+        FieldAddressAssignment identifier addr . located current startPos <$> getPosition
 
       fieldAccessPortConnectionParser :: TerminaParser (FieldAssignment ParserAnn)
       fieldAccessPortConnectionParser = do
@@ -464,7 +464,7 @@ structInitializerParser = do
         identifier <- identifierParser
         _ <- reservedOp "<->"
         port <- identifierParser
-        FieldPortConnection AccessPortConnection identifier port . Position current startPos <$> getPosition
+        FieldPortConnection AccessPortConnection identifier port . located current startPos <$> getPosition
 
       fieldInboundPortConnectionParser :: TerminaParser (FieldAssignment ParserAnn)
       fieldInboundPortConnectionParser = do
@@ -473,7 +473,7 @@ structInitializerParser = do
         identifier <- identifierParser
         _ <- reservedOp "<-"
         port <- identifierParser
-        FieldPortConnection InboundPortConnection identifier port . Position current startPos <$> getPosition
+        FieldPortConnection InboundPortConnection identifier port . located current startPos <$> getPosition
 
       fieldOutboundPortConnectionParser :: TerminaParser (FieldAssignment ParserAnn)
       fieldOutboundPortConnectionParser = do
@@ -482,7 +482,7 @@ structInitializerParser = do
         identifier <- identifierParser
         _ <- reservedOp "->"
         port <- identifierParser
-        FieldPortConnection OutboundPortConnection identifier port . Position current startPos <$> getPosition
+        FieldPortConnection OutboundPortConnection identifier port . located current startPos <$> getPosition
 
 -- | Parser for an element modifier
 -- A modifier is of the form:
@@ -572,13 +572,13 @@ expressionParser' = buildPrattParser -- New parser
     binaryInfix s f = Ex.Infix (do
           current <- getState
           _ <- reservedOp s
-          return $ \l r -> BinOp f l r (Position current (getStartPosition (getAnnotation l)) (getEndPosition (getAnnotation r))))
+          return $ \l r -> BinOp f l r (located current (getStartPosition (getAnnotation l)) (getEndPosition (getAnnotation r))))
     castingPostfix = Ex.Postfix (do
           current <- getState
           _ <- reserved "as"
           typeSpecificer <- typeSpecifierParser
           endPos <- getPosition
-          return $ \parent -> Casting parent typeSpecificer (Position current (getStartPosition (getAnnotation parent)) endPos))
+          return $ \parent -> Casting parent typeSpecificer (located current (getStartPosition (getAnnotation parent)) endPos))
 
 functionCallParser :: TerminaParser (Expression ParserAnn)
 functionCallParser = do
@@ -586,7 +586,7 @@ functionCallParser = do
   startPos <- getPosition
   ident <- identifierParser
   params <- parens (sepBy (try expressionParser) comma)
-  FunctionCall ident params . Position current startPos <$> getPosition
+  FunctionCall ident params . located current startPos <$> getPosition
 
 builtinVariantExprParser :: TerminaParser (Expression ParserAnn)
 builtinVariantExprParser =
@@ -594,36 +594,36 @@ builtinVariantExprParser =
     current <- getState
     startPos <- getPosition
     _ <- reserved "None"
-    MonadicVariantInitializer None . Position current startPos <$> getPosition) <|>
+    MonadicVariantInitializer None . located current startPos <$> getPosition) <|>
   (do
     current <- getState
     startPos <- getPosition
     _ <- reserved "Some"
     someExpr <- parens expressionParser
-    MonadicVariantInitializer (Some someExpr) . Position current startPos <$> getPosition) <|>
+    MonadicVariantInitializer (Some someExpr) . located current startPos <$> getPosition) <|>
   (do
     current <- getState
     startPos <- getPosition
     _ <- reserved "Ok"
     okExpr <- parens expressionParser
-    MonadicVariantInitializer (Ok okExpr) . Position current startPos <$> getPosition) <|>
+    MonadicVariantInitializer (Ok okExpr) . located current startPos <$> getPosition) <|>
   (do
     current <- getState
     startPos <- getPosition
     _ <- reserved "Error"
     errorExpr <- parens expressionParser
-    MonadicVariantInitializer (Error errorExpr) . Position current startPos <$> getPosition) <|>
+    MonadicVariantInitializer (Error errorExpr) . located current startPos <$> getPosition) <|>
   (do
     current <- getState
     startPos <- getPosition
     _ <- reserved "Success"
-    MonadicVariantInitializer Success . Position current startPos <$> getPosition) <|>
+    MonadicVariantInitializer Success . located current startPos <$> getPosition) <|>
   (do
     current <- getState
     startPos <- getPosition
     _ <- reserved "Failure"
     failureExpr <- parens expressionParser
-    MonadicVariantInitializer (Failure failureExpr) . Position current startPos <$> getPosition)
+    MonadicVariantInitializer (Failure failureExpr) . located current startPos <$> getPosition)
 
 enumVariantExprParser :: TerminaParser (Expression ParserAnn)
 enumVariantExprParser = do
@@ -634,7 +634,7 @@ enumVariantExprParser = do
   variant <- identifierParser
   parameterList <-
     option [] (parens (sepBy (try expressionParser) comma))
-  EnumVariantInitializer enum variant parameterList . Position current startPos <$> getPosition
+  EnumVariantInitializer enum variant parameterList . located current startPos <$> getPosition
 
 isEnumVariantExprParser :: TerminaParser (Expression ParserAnn)
 isEnumVariantExprParser = do
@@ -645,7 +645,7 @@ isEnumVariantExprParser = do
   enum <- identifierParser
   _ <- reservedOp "::"
   variant <- identifierParser
-  IsEnumVariantExpression object enum variant . Position current startPos <$> getPosition
+  IsEnumVariantExpression object enum variant . located current startPos <$> getPosition
 
 isMonadicVariantExprParser :: TerminaParser (Expression ParserAnn)
 isMonadicVariantExprParser =
@@ -655,42 +655,42 @@ isMonadicVariantExprParser =
     object <- objectParser
     _ <- reserved "is"
     _ <- reserved "None"
-    IsMonadicVariantExpression object NoneLabel . Position current startPos <$> getPosition) <|>
+    IsMonadicVariantExpression object NoneLabel . located current startPos <$> getPosition) <|>
   try (do
     current <- getState
     startPos <- getPosition
     object <- objectParser
     _ <- reserved "is"
     _ <- reserved "Some"
-    IsMonadicVariantExpression object SomeLabel . Position current startPos <$> getPosition) <|>
+    IsMonadicVariantExpression object SomeLabel . located current startPos <$> getPosition) <|>
   try (do
     current <- getState
     startPos <- getPosition
     object <- objectParser
     _ <- reserved "is"
     _ <- reserved "Ok"
-    IsMonadicVariantExpression object OkLabel . Position current startPos <$> getPosition) <|>
+    IsMonadicVariantExpression object OkLabel . located current startPos <$> getPosition) <|>
   try (do
     current <- getState
     startPos <- getPosition
     object <- objectParser
     _ <- reserved "is"
     _ <- reserved "Error"
-    IsMonadicVariantExpression object ErrorLabel . Position current startPos <$> getPosition) <|>
+    IsMonadicVariantExpression object ErrorLabel . located current startPos <$> getPosition) <|>
   try (do
     current <- getState
     startPos <- getPosition
     object <- objectParser
     _ <- reserved "is"
     _ <- reserved "Success"
-    IsMonadicVariantExpression object SuccessLabel . Position current startPos <$> getPosition) <|>
+    IsMonadicVariantExpression object SuccessLabel . located current startPos <$> getPosition) <|>
   (do
     current <- getState
     startPos <- getPosition
     object <- objectParser
     _ <- reserved "is"
     _ <- reserved "Failure"
-    IsMonadicVariantExpression object FailureLabel . Position current startPos <$> getPosition)
+    IsMonadicVariantExpression object FailureLabel . located current startPos <$> getPosition)
 
 expressionParser :: TerminaParser (Expression ParserAnn)
 expressionParser = try builtinVariantExprParser
@@ -710,7 +710,7 @@ mutableReferenceExprParser = do
   startPos <- getPosition
   _ <- reservedOp "&mut"
   object <- objectParser
-  ReferenceExpression Mutable object . Position current startPos <$> getPosition
+  ReferenceExpression Mutable object . located current startPos <$> getPosition
 
 referenceExprParser :: TerminaParser (Expression ParserAnn)
 referenceExprParser = do
@@ -718,7 +718,7 @@ referenceExprParser = do
   startPos <- getPosition
   _ <- reservedOp "&"
   object <- objectParser
-  ReferenceExpression Immutable object . Position current startPos <$> getPosition
+  ReferenceExpression Immutable object . located current startPos <$> getPosition
 
 expressionTermParser :: TerminaParser (Expression ParserAnn)
 expressionTermParser = try isEnumVariantExprParser
@@ -742,7 +742,7 @@ objectTermParser = (do
     current <- getState
     startPos <- getPosition
     ident <- objectIdentifierParser
-    return $ Variable ident (Position current startPos (incSourceColumn startPos (length ident))))
+    return $ Variable ident (located current startPos (incSourceColumn startPos (length ident))))
   <|> parensObjectParser
 
 -- Expression parser
@@ -796,12 +796,12 @@ objectParser = objectParser' objectTermParser
             up <- expressionParser
             _ <- reservedOp "]"
             endPos <- getPosition
-            return $ \parent ->  ArraySlice parent low up (Position current (getStartPosition (getAnnotation parent)) endPos)
+            return $ \parent ->  ArraySlice parent low up (located current (getStartPosition (getAnnotation parent)) endPos)
           ) <|> (do
             current <- getState
             index <- brackets expressionParser
             endPos <- getPosition
-            return $ \parent ->  ArrayIndexExpression parent index (Position current (getStartPosition (getAnnotation parent)) endPos)
+            return $ \parent ->  ArrayIndexExpression parent index (located current (getStartPosition (getAnnotation parent)) endPos)
           ))
     dereferenceMemberAccessPostfix
       = Ex.Postfix (do
@@ -809,20 +809,20 @@ objectParser = objectParser' objectTermParser
         _ <- reservedOp "->"
         member <- identifierParser
         endPos <- getPosition
-        return $ \parent -> DereferenceMemberAccess parent member (Position current (getStartPosition (getAnnotation parent)) endPos))
+        return $ \parent -> DereferenceMemberAccess parent member (located current (getStartPosition (getAnnotation parent)) endPos))
     memberAccessPostfix
       = Ex.Postfix (do
         current <- getState
         _ <- reservedOp "."
         member <- identifierParser
         endPos <- getPosition
-        return $ \parent ->  MemberAccess parent member (Position current (getStartPosition (getAnnotation parent)) endPos))
+        return $ \parent ->  MemberAccess parent member (located current (getStartPosition (getAnnotation parent)) endPos))
     dereferencePrefix
       = Ex.Prefix (do
         current <- getState
         startPos <- getPosition
         _ <- reservedOp "*"
-        return $ \child -> Dereference child (Position current startPos (getEndPosition (getAnnotation child))))
+        return $ \child -> Dereference child (located current startPos (getEndPosition (getAnnotation child))))
 ----------------------------------------
 
 accessObjectParser :: TerminaParser (Expression ParserAnn)
@@ -843,14 +843,14 @@ accessObjectParser =
             _ <- reservedOp "]"
             endPos <- getPosition
             return $ \parent -> case parent of
-              AccessObject obj -> AccessObject (ArraySlice obj low up (Position current (getStartPosition (getAnnotation parent)) endPos))
+              AccessObject obj -> AccessObject (ArraySlice obj low up (located current (getStartPosition (getAnnotation parent)) endPos))
               _ -> error "Unexpected member access to a non object"
           ) <|> (do
             current <- getState
             index <- brackets expressionParser
             endPos <- getPosition
             return $ \parent -> case parent of
-              AccessObject obj -> AccessObject (ArrayIndexExpression obj index (Position current (getStartPosition (getAnnotation parent)) endPos))
+              AccessObject obj -> AccessObject (ArrayIndexExpression obj index (located current (getStartPosition (getAnnotation parent)) endPos))
               _ -> error "Unexpected member access to a non object"
           ))
     dereferenceMemberAccessPostfix
@@ -863,7 +863,7 @@ accessObjectParser =
       return (\parent -> case parent of
         AccessObject obj ->
           let startPos = getStartPosition (getAnnotation parent) in
-          maybe (AccessObject (DereferenceMemberAccess obj member (Position current startPos endPos))) (flip (DerefMemberFunctionCall obj member) (Position current startPos endPos)) params
+          maybe (AccessObject (DereferenceMemberAccess obj member (located current startPos endPos))) (flip (DerefMemberFunctionCall obj member) (located current startPos endPos)) params
         _ -> error "Unexpected member access to a non object"))
     memberAccessPostfix
       = Ex.Postfix (do
@@ -875,7 +875,7 @@ accessObjectParser =
       return (\parent -> case parent of
         AccessObject obj ->
           let startPos = getStartPosition (getAnnotation parent) in
-          maybe (AccessObject (MemberAccess obj member (Position current startPos endPos))) (flip (MemberFunctionCall obj member) (Position current startPos endPos)) params
+          maybe (AccessObject (MemberAccess obj member (located current startPos endPos))) (flip (MemberFunctionCall obj member) (located current startPos endPos)) params
         _ -> error "Unexpected member access to a non object"))
     dereferencePrefix
       = Ex.Prefix (do
@@ -885,7 +885,7 @@ accessObjectParser =
       return (\child -> case child of
         AccessObject obj ->
           let endPos = getStartPosition (getAnnotation child) in
-          AccessObject (Dereference obj (Position current startPos endPos))
+          AccessObject (Dereference obj (located current startPos endPos))
         _ -> error "Unexpected member access to a non object"))
 
 arrayInitializerParser :: TerminaParser (Expression ParserAnn)
@@ -897,21 +897,21 @@ arrayInitializerParser = do
   _ <- semi
   size <- expressionParser
   _ <- reservedOp "]"
-  ArrayInitializer value size . Position current startPos <$> getPosition
+  ArrayInitializer value size . located current startPos <$> getPosition
 
 stringInitializerParser :: TerminaParser (Expression ParserAnn)
 stringInitializerParser = do
   current <- getState
   startPos <- getPosition
   value <- stringLit
-  StringInitializer value . Position current startPos <$> getPosition
+  StringInitializer value . located current startPos <$> getPosition
 
 arrayExprListInitializerParser :: TerminaParser (Expression ParserAnn)
 arrayExprListInitializerParser = do
   current <- getState
   startPos <- getPosition
   exprs <- braces (sepBy expressionParser comma)
-  ArrayExprListInitializer exprs . Position current startPos <$> getPosition
+  ArrayExprListInitializer exprs . located current startPos <$> getPosition
 
 -- -- Task Definition
 
@@ -920,7 +920,7 @@ blockParser = do
   current <- getState
   blkStartPos <- getPosition
   compound <- braces $ many blockItemParser
-  Block compound . Position current blkStartPos <$> getPosition
+  Block compound . located current blkStartPos <$> getPosition
 
 returnStmtParser :: TerminaParser (Statement ParserAnn)
 returnStmtParser = do
@@ -930,7 +930,7 @@ returnStmtParser = do
   ret <- optionMaybe expressionParser
   endPos <- getPosition
   _ <- semi
-  return $ ReturnStmt ret (Position current startPos endPos)
+  return $ ReturnStmt ret (located current startPos endPos)
 
 continueStmtParser :: TerminaParser (Statement ParserAnn)
 continueStmtParser = do
@@ -940,7 +940,7 @@ continueStmtParser = do
   ret <- expressionParser
   endPos <- getPosition
   _ <- semi
-  return $ ContinueStmt ret (Position current startPos endPos)
+  return $ ContinueStmt ret (located current startPos endPos)
 
 rebootStmtParser :: TerminaParser (Statement ParserAnn)
 rebootStmtParser = do
@@ -949,7 +949,7 @@ rebootStmtParser = do
   _ <- reserved "reboot"
   endPos <- getPosition
   _ <- semi
-  return $ RebootStmt (Position current startPos endPos)
+  return $ RebootStmt (located current startPos endPos)
 
 functionParser :: TerminaParser (AnnASTElement ParserAnn)
 functionParser = do
@@ -963,7 +963,7 @@ functionParser = do
     reservedOp "->"
     typeSpecifierParser)
   blockRet <- blockParser
-  Function name params typeSpec blockRet modifiers . Position current startPos <$> getPosition
+  Function name params typeSpec blockRet modifiers . located current startPos <$> getPosition
 
 -- | Declaration of a function implemented in C:
 -- @extern function name(params) -> ty;@ or
@@ -985,7 +985,7 @@ externFunctionParser = do
     typeSpecifierParser)
   endPos <- getPosition
   _ <- semi
-  return $ ExternFunction name params typeSpec returnMode modifiers (Position current startPos endPos)
+  return $ ExternFunction name params typeSpec returnMode modifiers (located current startPos endPos)
 
 constLiteralParser :: TerminaParser (Const ParserAnn)
 constLiteralParser = try parseLitFloat <|> parseLitInteger <|> parseLitBool <|> parseLitChar <|> parseLitNull
@@ -1009,7 +1009,7 @@ constantParser = do
   current <- getState
   startPos <- getPosition
   literal <- constLiteralParser
-  Constant literal . Position current startPos <$> getPosition
+  Constant literal . located current startPos <$> getPosition
 
 integerParser :: TerminaParser TInteger
 integerParser = try hexParser <|> decParser
@@ -1029,7 +1029,7 @@ mutableObjDeclarationParser = do
   initializer <- optionMaybe (reservedOp "=" *> expressionParser)
   endPos <- getPosition
   _ <- semi
-  return $ Declaration name Mutable ty initializer (Position current startPos endPos)
+  return $ Declaration name Mutable ty initializer (located current startPos endPos)
 
 immutableObjDeclarationParser :: TerminaParser (Statement ParserAnn)
 immutableObjDeclarationParser = do
@@ -1043,7 +1043,7 @@ immutableObjDeclarationParser = do
   initializer <-  expressionParser
   endPos <- getPosition
   _ <- semi
-  return $ Declaration name Immutable ty (Just initializer) (Position current startPos endPos)
+  return $ Declaration name Immutable ty (Just initializer) (located current startPos endPos)
 
 singleExprStmtParser :: TerminaParser (Statement ParserAnn)
 singleExprStmtParser = do
@@ -1052,7 +1052,7 @@ singleExprStmtParser = do
   expression <- expressionParser
   endPos <- getPosition
   _ <- semi
-  return $ SingleExpStmt expression (Position current startPos endPos)
+  return $ SingleExpStmt expression (located current startPos endPos)
 
 -- | A statement of a block, with its documentation comments before it and
 -- after it, if any.
@@ -1081,7 +1081,7 @@ assignmentStmtPaser = do
   rval <- expressionParser
   endPos <- getPosition
   _ <- semi
-  return $ AssignmentStmt lval rval (Position current startPos endPos)
+  return $ AssignmentStmt lval rval (located current startPos endPos)
 
 -- | A variable a match case binds, which carries its own position so that a use
 -- of it inside the body can be traced back to where the case declares it.
@@ -1091,7 +1091,7 @@ boundVarParser = do
   startPos <- getPosition
   ident <- objectIdentifierParser
   endPos <- getPosition
-  return (ident, Position current startPos endPos)
+  return (ident, located current startPos endPos)
 
 matchCaseParser :: TerminaParser (MatchCase ParserAnn)
 matchCaseParser = do
@@ -1102,7 +1102,7 @@ matchCaseParser = do
   args <- try (parens (sepBy boundVarParser comma)) <|> return []
   reservedOp "=>"
   caseBlk <- blockParser
-  MatchCase caseId args caseBlk . Position current startPos <$> getPosition
+  MatchCase caseId args caseBlk . located current startPos <$> getPosition
 
 defaultCaseParser :: TerminaParser (DefaultCase ParserAnn)
 defaultCaseParser = do
@@ -1112,7 +1112,7 @@ defaultCaseParser = do
   reserved "_"
   reservedOp "=>"
   caseBlk <- blockParser
-  DefaultCase caseBlk . Position current startPos <$> getPosition
+  DefaultCase caseBlk . located current startPos <$> getPosition
 
 -- lookAhead parser that checks for "case _"
 isDefaultCase :: TerminaParser ()
@@ -1155,7 +1155,7 @@ matchStmtParser = do
       c <- documented matchCaseParser
       (cs, dc) <- parseCases [c]
       return (cs, dc))
-  MatchStmt matchExpression cases defaultCase . Position current startPos <$> getPosition
+  MatchStmt matchExpression cases defaultCase . located current startPos <$> getPosition
 
 elseIfParser :: TerminaParser (CondElseIf ParserAnn)
 elseIfParser = do
@@ -1165,7 +1165,7 @@ elseIfParser = do
   _ <- reserved "if"
   expression <- expressionParser
   elseIfBlk <- blockParser
-  CondElseIf expression elseIfBlk . Position current startPos <$> getPosition
+  CondElseIf expression elseIfBlk . located current startPos <$> getPosition
 
 ifElseIfStmtParser :: TerminaParser (Statement ParserAnn)
 ifElseIfStmtParser = do
@@ -1176,8 +1176,8 @@ ifElseIfStmtParser = do
   ifBlkStartPos <- getPosition
   ifCompound <- braces $ many blockItemParser
   ifBlkEndPos <- getPosition
-  let ifBlk = Block ifCompound (Position current ifBlkStartPos ifBlkEndPos)
-  let condIf = CondIf expression ifBlk (Position current startPos ifBlkEndPos)
+  let ifBlk = Block ifCompound (located current ifBlkStartPos ifBlkEndPos)
+  let condIf = CondIf expression ifBlk (located current startPos ifBlkEndPos)
   -- A documentation comment after the block belongs to the branch that follows,
   -- if any, and otherwise to the next statement.
   elseIfs <- many $ try (optional (docComment DocBefore) *> elseIfParser)
@@ -1186,8 +1186,8 @@ ifElseIfStmtParser = do
     elseBlkStartPos <- getPosition
     _ <- reserved "else"
     elseBlk <- blockParser
-    CondElse elseBlk . Position current elseBlkStartPos <$> getPosition)
-  IfElseStmt condIf elseIfs mCondElse . Position current startPos <$> getPosition
+    CondElse elseBlk . located current elseBlkStartPos <$> getPosition)
+  IfElseStmt condIf elseIfs mCondElse . located current startPos <$> getPosition
 
 forLoopStmtParser :: TerminaParser (Statement ParserAnn)
 forLoopStmtParser = do
@@ -1205,7 +1205,7 @@ forLoopStmtParser = do
     reserved "while"
     expressionParser)
   forBlk <- blockParser
-  ForLoopStmt identifier ty start end breakCondition forBlk . Position current startPos <$> getPosition
+  ForLoopStmt identifier ty start end breakCondition forBlk . located current startPos <$> getPosition
 
 taskDeclParser :: TerminaParser (Global ParserAnn)
 taskDeclParser = do
@@ -1221,7 +1221,7 @@ taskDeclParser = do
     expressionParser)
   endPos <- getPosition
   _ <- semi
-  return $ Task identifier typeSpecifier initializer modifiers (Position current startPos endPos)
+  return $ Task identifier typeSpecifier initializer modifiers (located current startPos endPos)
 
 emitterDeclParser :: TerminaParser (Global ParserAnn)
 emitterDeclParser = do
@@ -1237,7 +1237,7 @@ emitterDeclParser = do
     expressionParser)
   endPos <- getPosition
   _ <- semi
-  return $ Emitter identifier typeSpecifier initializer modifiers (Position current startPos endPos)
+  return $ Emitter identifier typeSpecifier initializer modifiers (located current startPos endPos)
 
 channelDeclParser :: TerminaParser (Global ParserAnn)
 channelDeclParser = do
@@ -1253,7 +1253,7 @@ channelDeclParser = do
     expressionParser)
   endPos <- getPosition
   _ <- semi
-  return $ Channel identifier typeSpecifier initializer modifiers (Position current startPos endPos)
+  return $ Channel identifier typeSpecifier initializer modifiers (located current startPos endPos)
 
 resourceDeclParser :: TerminaParser (Global ParserAnn)
 resourceDeclParser = do
@@ -1269,7 +1269,7 @@ resourceDeclParser = do
     expressionParser)
   endPos <- getPosition
   _ <- semi
-  return $ Resource identifier typeSpecifier initializer modifiers (Position current startPos endPos)
+  return $ Resource identifier typeSpecifier initializer modifiers (located current startPos endPos)
 
 handlerDeclParser :: TerminaParser (Global ParserAnn)
 handlerDeclParser = do
@@ -1285,7 +1285,7 @@ handlerDeclParser = do
     expressionParser)
   endPos <- getPosition
   _ <- semi
-  return $ Handler identifier typeSpecifier initializer modifiers (Position current startPos endPos)
+  return $ Handler identifier typeSpecifier initializer modifiers (located current startPos endPos)
 
 testDeclParser :: TerminaParser (Global ParserAnn)
 testDeclParser = do
@@ -1301,7 +1301,7 @@ testDeclParser = do
     expressionParser)
   endPos <- getPosition
   _ <- semi
-  return $ Test identifier typeSpecifier initializer modifiers (Position current startPos endPos)
+  return $ Test identifier typeSpecifier initializer modifiers (located current startPos endPos)
 
 constExprDeclParser :: TerminaParser (Global ParserAnn)
 constExprDeclParser = do
@@ -1316,7 +1316,7 @@ constExprDeclParser = do
   initializer <- expressionParser
   endPos <- getPosition
   _ <- semi
-  return $ ConstExpr identifier typeSpecifier initializer modifiers (Position current startPos endPos)
+  return $ ConstExpr identifier typeSpecifier initializer modifiers (located current startPos endPos)
 
 constDeclParser :: TerminaParser (Global ParserAnn)
 constDeclParser = do
@@ -1331,7 +1331,7 @@ constDeclParser = do
   initializer <- expressionParser
   endPos <- getPosition
   _ <- semi
-  return $ Const identifier typeSpecifier initializer modifiers (Position current startPos endPos)
+  return $ Const identifier typeSpecifier initializer modifiers (located current startPos endPos)
 
 globalDeclParser :: TerminaParser (AnnASTElement  ParserAnn)
 globalDeclParser = do
@@ -1357,7 +1357,7 @@ fieldDefinitionParser = do
   typeSpecifier <- typeSpecifierParser
   endPos <- getPosition
   _ <- semi
-  return $ FieldDefinition identifier typeSpecifier (Position current startPos endPos)
+  return $ FieldDefinition identifier typeSpecifier (located current startPos endPos)
 
 structDefinitionParser :: TerminaParser (AnnASTElement ParserAnn)
 structDefinitionParser = do
@@ -1369,7 +1369,7 @@ structDefinitionParser = do
   fields <- braces (many1 $ documented (try fieldDefinitionParser) <* docAfter)
   endPos <- getPosition
   _ <- semi
-  return $ TypeDefinition (Struct identifier fields modifiers) (Position current startPos endPos)
+  return $ TypeDefinition (Struct identifier fields modifiers) (located current startPos endPos)
 
 classFieldDefinitionParser :: TerminaParser (ClassMember ParserAnn)
 classFieldDefinitionParser = do
@@ -1380,7 +1380,7 @@ classFieldDefinitionParser = do
   typeSpecifier <- typeSpecifierParser
   endPos <- getPosition
   _ <- semi
-  return $ ClassField (FieldDefinition identifier typeSpecifier (Position current startPos endPos))
+  return $ ClassField (FieldDefinition identifier typeSpecifier (located current startPos endPos))
 
 selfAccessKindParser :: TerminaParser AccessKind
 selfAccessKindParser =
@@ -1402,7 +1402,7 @@ classMethodParser = do
       return (ak, params)
   typeSpec <- optionMaybe (reservedOp "->" >> typeSpecifierParser)
   blockRet <- blockParser
-  ClassMethod ak name params typeSpec blockRet . Position current startPos <$> getPosition
+  ClassMethod ak name params typeSpec blockRet . located current startPos <$> getPosition
 
 classActionParser :: TerminaParser (ClassMember ParserAnn)
 classActionParser = do
@@ -1416,7 +1416,7 @@ classActionParser = do
       param <- optionMaybe (comma >> parameterParser)
       return (ak, param)
   blockRet <- blockParser
-  ClassAction ak name param blockRet . Position current startPos <$> getPosition
+  ClassAction ak name param blockRet . located current startPos <$> getPosition
 
 -- | A case of a test class. The access to self and the parameters are
 -- parsed as in a method, and the type checker rejects a case with
@@ -1433,7 +1433,7 @@ classCaseParser = do
       params <- option [] (comma >> sepBy parameterParser comma)
       return (ak, params)
   blockRet <- blockParser
-  ClassCase ak name params blockRet . Position current startPos <$> getPosition
+  ClassCase ak name params blockRet . located current startPos <$> getPosition
 
 classProcedureParser :: TerminaParser (ClassMember ParserAnn)
 classProcedureParser = do
@@ -1447,7 +1447,7 @@ classProcedureParser = do
       params <- option [] (comma >> sepBy parameterParser comma)
       return (ak, params)
   blockRet <- blockParser
-  ClassProcedure ak name params blockRet . Position current startPos <$> getPosition
+  ClassProcedure ak name params blockRet . located current startPos <$> getPosition
 
 interfaceProcedureParser :: TerminaParser (InterfaceMember ParserAnn)
 interfaceProcedureParser = do
@@ -1463,7 +1463,7 @@ interfaceProcedureParser = do
   _ <- semi
   -- | TODO: See if we allow modifiers in interface procedures to be set
   -- by the programmers
-  InterfaceProcedure ak name params [] . Position current startPos <$> getPosition
+  InterfaceProcedure ak name params [] . located current startPos <$> getPosition
 
 classViewerParser :: TerminaParser (ClassMember ParserAnn)
 classViewerParser = do
@@ -1474,7 +1474,7 @@ classViewerParser = do
   params <- parens viewerParamsParser
   typeSpec <- optionMaybe (reservedOp "->" >>  typeSpecifierParser)
   blockRet <- blockParser
-  ClassViewer name params typeSpec blockRet . Position current startPos <$> getPosition
+  ClassViewer name params typeSpec blockRet . located current startPos <$> getPosition
   where
     viewerParamsParser :: TerminaParser [Parameter ParserAnn]
     viewerParamsParser =
@@ -1491,7 +1491,7 @@ interfaceDefinitionParser = do
   procedures <- braces (many1 (documented interfaceProcedureParser))
   endPos <- getPosition
   _ <- semi
-  return $ TypeDefinition (Interface RegularInterface identifier extends procedures modifiers) (Position current startPos endPos)
+  return $ TypeDefinition (Interface RegularInterface identifier extends procedures modifiers) (located current startPos endPos)
 
 classDefinitionParser :: TerminaParser (AnnASTElement ParserAnn)
 classDefinitionParser = do
@@ -1511,7 +1511,7 @@ classDefinitionParser = do
       <|> (classFieldDefinitionParser <* docAfter)))
   endPos <- getPosition
   _ <- semi
-  return $ TypeDefinition (Class classKind identifier fields provides modifiers) (Position current startPos endPos)
+  return $ TypeDefinition (Class classKind identifier fields provides modifiers) (located current startPos endPos)
   where
     classKindParser :: TerminaParser ClassKind
     classKindParser =
@@ -1547,7 +1547,7 @@ enumDefinitionParser = do
   variants <- braces variantListParser
   endPos <- getPosition
   _ <- semi
-  return $ TypeDefinition (Enum identifier variants modifiers) (Position current startPos endPos)
+  return $ TypeDefinition (Enum identifier variants modifiers) (located current startPos endPos)
 
 -- | Top Level parser. Of the declarations, only a global one takes a
 -- documentation comment after it.
@@ -1582,7 +1582,7 @@ moduleImportParser = do
   ident <- moduleIdentifierParser
   endPos <- getPosition
   _ <- semi
-  return $ ModuleImport ident (Position current startPos endPos)
+  return $ ModuleImport ident (located current startPos endPos)
 
 contents :: TerminaParser a -> TerminaParser a
 contents p = wspcs *> p <* eof
@@ -1597,11 +1597,13 @@ parseTerminaModule :: QualifiedName -> FilePath -> String -> Either ParseError (
 parseTerminaModule qname file src =
   case runParser terminaModuleParser qname file src of
     Left err -> Left (PE.setErrorPos (toCharacter (errorPos err)) err)
-    Right ast -> Right (fmap characterLocation ast)
+    Right ast -> Right (fmap characterAnn ast)
 
   where
 
     toCharacter = characterColumn src
+    characterAnn (ParserAnn loc doc) =
+      ParserAnn (characterLocation loc) (fmap (\d -> d { docLocation = characterLocation (docLocation d) }) doc)
     characterLocation (Position q start end) = Position q (toCharacter start) (toCharacter end)
     characterLocation loc = loc
 
@@ -1624,9 +1626,11 @@ characterColumn src
     advance column _ = column + 1
 
 getStartPosition :: ParserAnn -> SourcePos
-getStartPosition (Position _ startPos _) = startPos
-getStartPosition _ = error "Internal error: expected Position annotation (this should not happen)"
+getStartPosition ann = case parsedLocation ann of
+  Position _ startPos _ -> startPos
+  _ -> error "Internal error: expected Position annotation (this should not happen)"
 
 getEndPosition :: ParserAnn -> SourcePos
-getEndPosition (Position _ _ endPos) = endPos
-getEndPosition _ = error "Internal error: expected Position annotation (this should not happen)"
+getEndPosition ann = case parsedLocation ann of
+  Position _ _ endPos -> endPos
+  _ -> error "Internal error: expected Position annotation (this should not happen)"

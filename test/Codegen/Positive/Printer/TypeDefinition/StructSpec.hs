@@ -4,6 +4,7 @@ import Test.Hspec
 import Semantic.AST
 import Data.Text
 import Semantic.Types
+import Parser.Types (undocumented)
 import Utils.Annotations
 import Generator.Monadic
 
@@ -21,7 +22,7 @@ structWithOneField :: AnnASTElement SemanticAnn
 structWithOneField = TypeDefinition 
   (Struct "id0" [
     FieldDefinition "field0" TUInt8 (buildExpAnn Internal TUInt8)
-  ] []) (buildTypeAnn Internal)
+  ] []) (buildTypeAnn (undocumented Internal))
 
 {- | Struct type with two fields.
 In Termina's concrete sytax:
@@ -35,7 +36,7 @@ structWithTwoFields = TypeDefinition
   (Struct "id0" [
     FieldDefinition "field0" TUInt8 (buildExpAnn Internal TUInt8),
     FieldDefinition "field1" TUInt16 (buildExpAnn Internal TUInt16)
-  ] []) (buildTypeAnn Internal)
+  ] []) (buildTypeAnn (undocumented Internal))
 
 {- | Packed Struct type.
 In Termina's concrete sytax:
@@ -53,7 +54,7 @@ packedStruct = TypeDefinition
     FieldDefinition "field1" TUInt16 (buildExpAnn Internal TUInt16),
     FieldDefinition "field2" (TArray TUInt32 (buildConstExprTUSize 10)) 
       (buildExpAnn Internal (TArray TUInt32 (buildConstExprTUSize 10)))
-  ] [Modifier "packed" Nothing]) (buildTypeAnn Internal)
+  ] [Modifier "packed" Nothing]) (buildTypeAnn (undocumented Internal))
 
 spec :: Spec
 spec = do

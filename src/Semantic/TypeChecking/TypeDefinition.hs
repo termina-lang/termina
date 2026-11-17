@@ -41,28 +41,28 @@ import qualified Data.List as L
 typeProcedureParameter :: Location -> Parameter ParserAnn -> SemanticMonad (SAST.Parameter SemanticAnn)
 typeProcedureParameter loc (Parameter ident ts pann) = do
   ty <- typeTypeSpecifier loc typeRHSObject ts
-  let procParam = SAST.Parameter ident ty (buildExpAnn pann ty)
+  let procParam = SAST.Parameter ident ty (buildExpAnn (getLocation pann) ty)
   checkProcedureParameterType loc procParam
   return procParam
 
 typeViewerParameter :: Location -> Parameter ParserAnn -> SemanticMonad (SAST.Parameter SemanticAnn)
 typeViewerParameter loc (Parameter ident ts pann) = do
   ty <- typeTypeSpecifier loc typeRHSObject ts
-  let param = SAST.Parameter ident ty (buildExpAnn pann ty)
+  let param = SAST.Parameter ident ty (buildExpAnn (getLocation pann) ty)
   checkViewerParameterType loc param
   return param
 
 typeParameter :: Location -> Parameter ParserAnn -> SemanticMonad (SAST.Parameter SemanticAnn)
 typeParameter loc (Parameter ident ts pann) = do
   ty <- typeTypeSpecifier loc typeRHSObject ts
-  let param = SAST.Parameter ident ty (buildExpAnn pann ty)
+  let param = SAST.Parameter ident ty (buildExpAnn (getLocation pann) ty)
   checkParameterType loc param
   return param
 
 typeActionParameter :: Location -> Parameter ParserAnn -> SemanticMonad (SAST.Parameter SemanticAnn)
 typeActionParameter loc (Parameter ident ts pann) = do
   ty <- typeTypeSpecifier loc typeRHSObject ts
-  let param = SAST.Parameter ident ty (buildExpAnn pann ty)
+  let param = SAST.Parameter ident ty (buildExpAnn (getLocation pann) ty)
   checkActionParameterType loc param
   return param
 
@@ -71,13 +71,13 @@ typeClassFieldDefinition ::
   -> ClassMember ParserAnn
   -> SemanticMonad (SAST.ClassMember SemanticAnn)
 typeClassFieldDefinition fldDependencies (ClassField (FieldDefinition fs_id fs_ts annCF)) = do
-  fs_ty <- typeTypeSpecifier annCF typeGlobalObject fs_ts
-  checkTerminaType annCF fs_ty
-  classFieldTyorFail annCF fs_ty
+  fs_ty <- typeTypeSpecifier (getLocation annCF) typeGlobalObject fs_ts
+  checkTerminaType (getLocation annCF) fs_ty
+  classFieldTyorFail (getLocation annCF) fs_ty
   let fieldDef = SAST.FieldDefinition fs_id fs_ty
   case fs_ty of
     TAccessPort (TInterface _ iface) -> do
-      procedures <- collectInterfaceProcedures annCF iface
+      procedures <- collectInterfaceProcedures (getLocation annCF) iface
       let usedProcedures = M.filterWithKey (\k _ -> S.member k fldDependencies) procedures
       return $ SAST.ClassField (fieldDef (buildAccessPortFieldAnn annCF usedProcedures))
     _ -> return $ SAST.ClassField (fieldDef (buildFieldAnn annCF))
@@ -131,15 +131,15 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
 
   where
 
-    typeInterfaceProcedure :: InterfaceMember Location -> SemanticMonad (SAST.InterfaceMember SemanticAnn)
+    typeInterfaceProcedure :: InterfaceMember ParserAnn -> SemanticMonad (SAST.InterfaceMember SemanticAnn)
     typeInterfaceProcedure (InterfaceProcedure ak procId ps_ts mds_ts' annIP) = do
       ps_ty <- localScope $ do
           forM ps_ts (\param@(Parameter paramId _ pann) -> do
-            typedParam <- typeProcedureParameter annIP param
-            insertLocalImmutObj pann paramId (paramType typedParam)
+            typedParam <- typeProcedureParameter (getLocation annIP) param
+            insertLocalImmutObj (getLocation pann) paramId (paramType typedParam)
             return typedParam)
       mds_ty' <- typeModifiers ann ProcedureDeclaration typeGlobalObject mds_ts'
-      return $ InterfaceProcedure ak procId ps_ty mds_ty' (buildExpAnn annIP TUnit)
+      return $ InterfaceProcedure ak procId ps_ty mds_ty' (buildExpAnn (getLocation annIP) TUnit)
     
     -- | Checks that the procedures incorporated from the extended interfaces
     -- are not duplicated
@@ -160,7 +160,7 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
           let prevProcedueresMap = prevProcedures M.! prevIface
           case M.lookup procId prevProcedueresMap of
             Nothing -> return ()
-            Just _ -> throwError $ annotateError procAnn (EInterfaceProcedurePreviouslyExtended procId prevIface)
+            Just _ -> throwError $ annotateError (getLocation procAnn) (EInterfaceProcedurePreviouslyExtended procId prevIface)
 
       where
 
@@ -262,7 +262,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
     let dependenciesMap =
           foldr selfDepClass M.empty elements
     let dependencies = fmap (
-          M.foldrWithKey (\k v acc -> SelfDep k (getAnnotation v) : acc)
+          M.foldrWithKey (\k v acc -> SelfDep k (getLocation (getAnnotation v)) : acc)
           []) dependenciesMap
     let fldDependenciesMap = foldr fieldDepClass M.empty elements
 
@@ -278,7 +278,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
     unless (kind == TestClass) $
       case cases of
         (ClassCase _ caseId _ _ caseAnn) : _ ->
-          throwError $ annotateError caseAnn (ECaseOutsideTestClass (ident, ann) caseId)
+          throwError $ annotateError (getLocation caseAnn) (ECaseOutsideTestClass (ident, ann) caseId)
         _ -> return ()
     -- | Only a test class reaches the clock and the components of a unit test
     unless (kind == TestClass) $
@@ -298,8 +298,8 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
             Left (ENotFound (SelfDep dep _) parentId) -> do
               let parentDepsMap = fromJust $ M.lookup parentId dependenciesMap
               case fromJust $ M.lookup dep parentDepsMap of
-                (MemberFunctionCall _obj mident _args cann) -> throwError (annotateError cann (EMemberAccessNotFunction mident))
-                (DerefMemberFunctionCall _obj mident _args cann) -> throwError (annotateError cann (EMemberAccessNotFunction mident))
+                (MemberFunctionCall _obj mident _args cann) -> throwError (annotateError (getLocation cann) (EMemberAccessNotFunction mident))
+                (DerefMemberFunctionCall _obj mident _args cann) -> throwError (annotateError (getLocation cann) (EMemberAccessNotFunction mident))
                 _ -> error "Internal TopSort Error. This should not happen"
             -- Get the proper order of inclusion and get their definitions from names.
             Right order ->
@@ -328,55 +328,55 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
             ClassProcedure ak mIdent ps_ts blk mann -> do
               -- We have checked the validity of the parameters when sorting the class members.
               (ps_ty, typed_bret) <- localScope $ do
-                  insertLocalImmutObj mann "self" (TReference ak (TGlobal kind ident))
+                  insertLocalImmutObj (getLocation mann) "self" (TReference ak (TGlobal kind ident))
                   ps_ty <- forM ps_ts (\param@(Parameter paramId _ pann) -> do
-                      typedParam <- typeProcedureParameter mann param
-                      insertLocalImmutObj pann paramId (paramType typedParam)
+                      typedParam <- typeProcedureParameter (getLocation mann) param
+                      insertLocalImmutObj (getLocation pann) paramId (paramType typedParam)
                       return typedParam)
                   typed_bret <- typeBlock Nothing blk
                   return (ps_ty, typed_bret)
-              let newPrc = SAST.ClassProcedure ak mIdent ps_ty typed_bret (buildExpAnn mann TUnit)
+              let newPrc = SAST.ClassProcedure ak mIdent ps_ty typed_bret (buildExpAnn (getLocation mann) TUnit)
               return (newPrc : prevMembers)
             ClassMethod ak mIdent ps_ts mts mbody mann -> do
-              mty <- mapM (typeTypeSpecifier mann typeGlobalObject >=>
-                  (\ty -> checkReturnType mann ty >> return ty)) mts
+              mty <- mapM (typeTypeSpecifier (getLocation mann) typeGlobalObject >=>
+                  (\ty -> checkReturnType (getLocation mann) ty >> return ty)) mts
               (ps_ty, typed_bret) <- localScope $ do 
-                  insertLocalImmutObj mann "self" (TReference ak (TGlobal kind ident))
+                  insertLocalImmutObj (getLocation mann) "self" (TReference ak (TGlobal kind ident))
                   ps_ty <- forM ps_ts (\param@(Parameter paramId _ pann) -> do
-                      typedParam <- typeParameter mann param
-                      insertLocalImmutObj pann paramId (paramType typedParam)
+                      typedParam <- typeParameter (getLocation mann) param
+                      insertLocalImmutObj (getLocation pann) paramId (paramType typedParam)
                       return typedParam)
                   typed_bret <- typeBlock mty mbody
                   return (ps_ty, typed_bret)
-              let newMth = SAST.ClassMethod ak mIdent ps_ty mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
+              let newMth = SAST.ClassMethod ak mIdent ps_ty mty typed_bret (buildExpAnn (getLocation mann) (fromMaybe TUnit mty))
               return (newMth : prevMembers)
             ClassViewer mIdent ps_ts mts mbody mann -> do
-              mty <- mapM (typeTypeSpecifier mann typeGlobalObject >=>
-                  (\ty -> checkReturnType mann ty >> return ty)) mts
+              mty <- mapM (typeTypeSpecifier (getLocation mann) typeGlobalObject >=>
+                  (\ty -> checkReturnType (getLocation mann) ty >> return ty)) mts
               (ps_ty, typed_bret) <- localScope $ do
-                  insertLocalImmutObj mann "self" (TReference Immutable (TGlobal kind ident))
+                  insertLocalImmutObj (getLocation mann) "self" (TReference Immutable (TGlobal kind ident))
                   ps_ty <- forM ps_ts (\param@(Parameter paramId _ pann) -> do
-                      typedParam <- typeViewerParameter mann param
-                      insertLocalImmutObj pann paramId (paramType typedParam)
+                      typedParam <- typeViewerParameter (getLocation mann) param
+                      insertLocalImmutObj (getLocation pann) paramId (paramType typedParam)
                       return typedParam)
                   typed_bret <- typeBlock mty mbody
                   return (ps_ty, typed_bret)
-              let newVw = SAST.ClassViewer mIdent ps_ty mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
+              let newVw = SAST.ClassViewer mIdent ps_ty mty typed_bret (buildExpAnn (getLocation mann) (fromMaybe TUnit mty))
               return (newVw : prevMembers)
             ClassAction ak mIdent param mbody mann -> do
-              param_ty <- mapM (typeActionParameter mann) param
+              param_ty <- mapM (typeActionParameter (getLocation mann)) param
               typed_bret <- localScope $ do
-                  insertLocalImmutObj mann "self" (TReference ak (TGlobal kind ident))
+                  insertLocalImmutObj (getLocation mann) "self" (TReference ak (TGlobal kind ident))
                   mapM_ (\p_ty -> insertLocalImmutObj (getLocation (paramAnnotation p_ty)) (paramIdentifier p_ty) (paramType p_ty)) param_ty
                   typeBlock Nothing mbody
-              let newAct = SAST.ClassAction ak mIdent param_ty typed_bret (buildExpAnn mann TUnit)
+              let newAct = SAST.ClassAction ak mIdent param_ty typed_bret (buildExpAnn (getLocation mann) TUnit)
               return (newAct : prevMembers)
             -- | A case has no parameters, which checkClassKind has checked
             ClassCase ak cIdent _ps_ts cbody cann -> do
               typed_bret <- localScope $ do
-                  insertLocalImmutObj cann "self" (TReference ak (TGlobal kind ident))
+                  insertLocalImmutObj (getLocation cann) "self" (TReference ak (TGlobal kind ident))
                   typeBlock Nothing cbody
-              let newCase = SAST.ClassCase ak cIdent [] typed_bret (buildExpAnn cann TUnit)
+              let newCase = SAST.ClassCase ak cIdent [] typed_bret (buildExpAnn (getLocation cann) TUnit)
               return (newCase : prevMembers)
         ) [] topSortOrder
     -- Check that the sink and in ports are well defined, i.e., that the actions
@@ -432,13 +432,13 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
 ----------------------------------------
 -- Field definition helpers.
 typeFieldDefinition :: FieldDefinition ParserAnn -> SemanticMonad (SAST.FieldDefinition SemanticAnn)
-typeFieldDefinition (FieldDefinition ident ts loc) = do
+typeFieldDefinition (FieldDefinition ident ts ann) = do
   -- First we check its type is well-defined
-  ty <- typeTypeSpecifier loc typeGlobalObject ts
-  checkTerminaType loc ty
+  ty <- typeTypeSpecifier (getLocation ann) typeGlobalObject ts
+  checkTerminaType (getLocation ann) ty
   -- and that it is simply (see simple types).
-  structFieldTyOrFail loc ty
-  return $ SAST.FieldDefinition ident ty (buildFieldAnn loc)
+  structFieldTyOrFail (getLocation ann) ty
+  return $ SAST.FieldDefinition ident ty (buildFieldAnn ann)
 
 -- Enum Variant definition helpers.
 typeEnumVariant :: Location -> EnumVariant ParserAnn -> SemanticMonad (SAST.EnumVariant SemanticAnn)
@@ -484,12 +484,12 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts, _methods, viewers, _cas
   case acts of
     [] -> return ()
     (ClassAction _ actionId _ _ ann):_  ->
-        throwError $ annotateError ann (EResourceClassAction (clsId, anns) actionId)
+        throwError $ annotateError (getLocation ann) (EResourceClassAction (clsId, anns) actionId)
     _ -> throwError (annotateError Internal EMalformedClassTyping)
   case viewers of
     [] -> return ()
     (ClassViewer viewerId _ _ _ ann):_  ->
-        throwError $ annotateError ann (EResourceClassViewer (clsId, anns) viewerId)
+        throwError $ annotateError (getLocation ann) (EResourceClassViewer (clsId, anns) viewerId)
     _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- Check that the resource class does not define any in and out ports
   mapM_ (
@@ -517,19 +517,19 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts, _methods, viewers, _cas
 
     checkSortedProcedures :: [(SAST.InterfaceMember SemanticAnn, Identifier)] -> [ClassMember ParserAnn] -> SemanticMonad ()
     checkSortedProcedures [] [] = return ()
-    checkSortedProcedures [] ((ClassProcedure _ prcId _ _ ann):_) = throwError $ annotateError ann (EProcedureNotFromProvidedInterfaces (clsId, anns) prcId)
+    checkSortedProcedures [] ((ClassProcedure _ prcId _ _ ann):_) = throwError $ annotateError (getLocation ann) (EProcedureNotFromProvidedInterfaces (clsId, anns) prcId)
     checkSortedProcedures ((InterfaceProcedure _ procId _ _ _, ifaceId) : _) [] = throwError $ annotateError anns (EMissingProcedure ifaceId procId)
     checkSortedProcedures ((InterfaceProcedure ak prcId ps _ (SemanticAnn _ loc), ifaceId) : ds) ((ClassProcedure ak' prcId' ps' _ ann):as) =
       unless (prcId == prcId') (throwError $ annotateError anns (EMissingProcedure ifaceId prcId)) >> do
-      unless (ak == ak') (throwError $ annotateError ann (EProcedureSelfAccessKindMismatch (ifaceId, prcId, ak, loc) ak'))
+      unless (ak == ak') (throwError $ annotateError (getLocation ann) (EProcedureSelfAccessKindMismatch (ifaceId, prcId, ak, loc) ak'))
       let psLen = length ps
           psLen' = length ps'
-      when (psLen < psLen') (throwError $ annotateError ann (EProcedureExtraParams (ifaceId, prcId, map paramType ps, loc) (fromIntegral psLen')))
-      when (psLen > psLen') (throwError $ annotateError ann (EProcedureMissingParams (ifaceId, prcId, map paramType ps, loc) (fromIntegral psLen')))
+      when (psLen < psLen') (throwError $ annotateError (getLocation ann) (EProcedureExtraParams (ifaceId, prcId, map paramType ps, loc) (fromIntegral psLen')))
+      when (psLen > psLen') (throwError $ annotateError (getLocation ann) (EProcedureMissingParams (ifaceId, prcId, map paramType ps, loc) (fromIntegral psLen')))
       localScope $ zipWithM_ (\p@(Parameter _ ty _) (Parameter pId ts pann) -> do
           ty' <- typeTypeSpecifier loc typeRHSObject ts
-          unless (sameTy ty ty') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, paramType p, loc) ty'))
-          insertLocalImmutObj pann pId ty'
+          unless (sameTy ty ty') (throwError $ annotateError (getLocation ann) (EProcedureParamTypeMismatch (ifaceId, prcId, paramType p, loc) ty'))
+          insertLocalImmutObj (getLocation pann) pId ty'
         ) ps ps'
       checkSortedProcedures ds as
     checkSortedProcedures _ _ = throwError (annotateError Internal EMalformedClassTyping)
@@ -597,17 +597,17 @@ checkClassKind anns clsId TaskClass (_fs, prcs, acts, methods, _viewers, _cases)
   case prcs of
     [] -> return ()
     (ClassProcedure _ procId _ _ ann):_  ->
-        throwError $ annotateError ann (ETaskClassProcedure (clsId, anns) procId)
+        throwError $ annotateError (getLocation ann) (ETaskClassProcedure (clsId, anns) procId)
     _ -> throwError (annotateError Internal EMalformedClassTyping)
   case methods of
     [] -> return ()
     (ClassMethod _ methodId _ _ _ ann):_  ->
-        throwError $ annotateError ann (ETaskClassMethod (clsId, anns) methodId)
+        throwError $ annotateError (getLocation ann) (ETaskClassMethod (clsId, anns) methodId)
     _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- A task must implement at least one action
   when (null acts) (throwError $ annotateError anns (ETaskClassNoActions clsId))
   mapM_ (\case {
-    ClassAction ak ident _ _ ann -> checkMemberFunctionAccessKind ann TaskClass ak ident;
+    ClassAction ak ident _ _ ann -> checkMemberFunctionAccessKind (getLocation ann) TaskClass ak ident;
     _ -> return ();
   }) acts
 checkClassKind anns clsId HandlerClass (fs, prcs, acts, methods, _viewers, _cases) provides = do
@@ -617,24 +617,24 @@ checkClassKind anns clsId HandlerClass (fs, prcs, acts, methods, _viewers, _case
   case prcs of
     [] -> return ()
     (ClassProcedure _ procId _ _ ann):_  ->
-        throwError $ annotateError ann (EHandlerClassProcedure (clsId, anns) procId)
+        throwError $ annotateError (getLocation ann) (EHandlerClassProcedure (clsId, anns) procId)
     _ -> throwError (annotateError Internal EMalformedClassTyping)
   case methods of
     [] -> return ()
     (ClassMethod _ methodId _ _ _ ann):_  ->
-        throwError $ annotateError ann (EHandlerClassMethod (clsId, anns) methodId)
+        throwError $ annotateError (getLocation ann) (EHandlerClassMethod (clsId, anns) methodId)
     _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- A handler must implement only one action
   case acts of
     [] -> throwError $ annotateError anns (EHandlerClassNoAction clsId)
     [ClassAction _ _actionId _ _ _ann] -> return ()
     ClassAction _ _ _ _ prevActAnn : ClassAction _ _ _ _ otherActAnn : _  ->
-        throwError $ annotateError otherActAnn (EHandlerClassMultipleActions clsId prevActAnn)
+        throwError $ annotateError (getLocation otherActAnn) (EHandlerClassMultipleActions clsId (getLocation prevActAnn))
     _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- A handler must have one single sink port and cannot define any in ports
   checkHandlerPorts Nothing fs
   mapM_ (\case {
-    ClassAction ak ident _ _ ann -> checkMemberFunctionAccessKind ann HandlerClass ak ident;
+    ClassAction ak ident _ _ ann -> checkMemberFunctionAccessKind (getLocation ann) HandlerClass ak ident;
     _ -> return ();
   }) acts
 
@@ -672,15 +672,15 @@ checkClassKind anns clsId TestClass (fs, prcs, acts, _methods, viewers, cases) p
     }) fs
   case acts of
     (ClassAction _ actionId _ _ ann):_ ->
-        throwError $ annotateError ann (ETestClassMember (clsId, anns) actionId)
+        throwError $ annotateError (getLocation ann) (ETestClassMember (clsId, anns) actionId)
     _ -> return ()
   case prcs of
     (ClassProcedure _ procId _ _ ann):_ ->
-        throwError $ annotateError ann (ETestClassMember (clsId, anns) procId)
+        throwError $ annotateError (getLocation ann) (ETestClassMember (clsId, anns) procId)
     _ -> return ()
   case viewers of
     (ClassViewer viewerId _ _ _ ann):_ ->
-        throwError $ annotateError ann (ETestClassMember (clsId, anns) viewerId)
+        throwError $ annotateError (getLocation ann) (ETestClassMember (clsId, anns) viewerId)
     _ -> return ()
   when (null cases) (throwError $ annotateError anns (ETestClassNoCases clsId))
   -- | A case takes self and nothing else
@@ -690,7 +690,7 @@ checkClassKind anns clsId TestClass (fs, prcs, acts, _methods, viewers, cases) p
 
     checkCase :: ClassMember ParserAnn -> SemanticMonad ()
     checkCase (ClassCase _ak caseId ps _ ann) =
-      unless (null ps) (throwError $ annotateError ann (ECaseParameters caseId))
+      unless (null ps) (throwError $ annotateError (getLocation ann) (ECaseParameters caseId))
     checkCase _ = throwError (annotateError Internal EMalformedClassTyping)
 
 checkClassKind _anns _clsId _kind _members _provides = return ()

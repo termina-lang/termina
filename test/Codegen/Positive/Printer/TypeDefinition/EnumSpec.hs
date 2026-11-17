@@ -4,6 +4,7 @@ import Test.Hspec
 import Semantic.AST
 import Data.Text
 import Semantic.Types
+import Parser.Types (undocumented)
 import Utils.Annotations
 import Generator.Monadic
 
@@ -15,20 +16,20 @@ enumWithOneRegularField :: AnnASTElement SemanticAnn
 enumWithOneRegularField = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" []
-  ] []) (buildTypeAnn Internal)
+  ] []) (buildTypeAnn (undocumented Internal))
 
 enumWithTwoRegularFields :: AnnASTElement SemanticAnn
 enumWithTwoRegularFields = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" [],
     EnumVariant "variant1" []
-  ] []) (buildTypeAnn Internal)
+  ] []) (buildTypeAnn (undocumented Internal))
 
 enumWithOneParameterizedField :: AnnASTElement SemanticAnn
 enumWithOneParameterizedField = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" [TUInt32]
-  ] []) (buildTypeAnn Internal)
+  ] []) (buildTypeAnn (undocumented Internal))
 
 enumWithMultipleParameterizedFields :: AnnASTElement SemanticAnn
 enumWithMultipleParameterizedFields = TypeDefinition
@@ -37,7 +38,7 @@ enumWithMultipleParameterizedFields = TypeDefinition
     EnumVariant "variant1" [],
     EnumVariant "variant2" [TUInt64, TEnum "id1", TChar],
     EnumVariant "variant3" [TInt8, TArray (TArray TChar (buildConstExprTUSize 20)) (buildConstExprTUSize 35)]
-  ] []) (buildTypeAnn Internal)
+  ] []) (buildTypeAnn (undocumented Internal))
 
 spec :: Spec
 spec = do

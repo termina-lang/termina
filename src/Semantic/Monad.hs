@@ -23,7 +23,6 @@ import Core.Utils
 import Control.Monad
 import Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
-import qualified Parser.Types as Parser
 import Utils.Monad
 
 import Control.Monad.State
@@ -320,7 +319,7 @@ getIntConst _ = throwError $ annotateError Internal EExpectedIntConstant
 
 catchMismatch :: 
   -- | Location of the error
-  Parser.ParserAnn 
+  Location
   -- | Function to create the error
   -> (TerminaType SemanticAnn -> Error) 
   -- | Action to execute
@@ -346,7 +345,7 @@ enumParamTyOrFail pann ty = unless (fieldTy ty) (throwError (annotateError pann 
 
 catchExpectedCopy ::
   -- | Location of the error
-  Parser.ParserAnn
+  Location
   -- | Function to create the error
   -> (TerminaType SemanticAnn -> Error)
   -- | Action to execute
@@ -359,7 +358,7 @@ catchExpectedCopy ann ferror action = catchError action (\err -> case getError e
 
 catchExpectedNum ::
   -- | Location of the error
-  Parser.ParserAnn
+  Location
   -- | Function to create the error
   -> (TerminaType SemanticAnn -> Error)
   -- | Action to execute

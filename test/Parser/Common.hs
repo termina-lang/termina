@@ -24,7 +24,7 @@ import Core.AST (TerminaModule'(..), ModuleImport'(..))
 import Modules.Modules (ModuleDependency(..))
 import Modules.Utils (buildModuleName)
 import Command.Utils (sortProjectDepsOrLoop)
-import Utils.Annotations (annotateError, Location(Internal), QualifiedName)
+import Utils.Annotations (annotateError, Location(Internal), Located(..), QualifiedName)
 import Utils.Errors (ErrorMessage(errorIdent))
 
 import Text.Parsec (runParser, eof, ParseError)
@@ -69,7 +69,7 @@ parserStageError sources =
         Left err -> Left (annotateError Internal (parseError err))
         Right (Termina imports _) -> (qname,) <$> mapM toDep imports
     toDep (ModuleImport ident ann) =
-      (`ModuleDependency` ann) <$> buildModuleName ann ident
+      (`ModuleDependency` getLocation ann) <$> buildModuleName (getLocation ann) ident
 
 -- | The 'errorIdent' (@"PE-NNN"@) of the first parser-stage error.
 parserStageErrorCode :: [(QualifiedName, String)] -> Maybe Text

@@ -59,7 +59,7 @@ import Command.Utils (CheckFailure(..), sortProjectDepsOrLoop)
 import Modules.Modules (TerminaModuleData(..), ModuleDependency(..))
 import Modules.Utils (buildModuleName)
 import Parser.Errors (Error(..), ParsingErrors, parseError)
-import Utils.Annotations (QualifiedName, annotateError, Location(Internal))
+import Utils.Annotations (QualifiedName, annotateError, Location(Internal), Located(..))
 
 import Command.Pipeline (CheckedModules(..), checkModules, typeProject)
 import ControlFlow.Architecture.Types (TerminaProgArch)
@@ -323,7 +323,8 @@ parseModule (qname, src) =
 
   where
 
-    toDep (ModuleImport ident ann) =
+    toDep (ModuleImport ident parsedAnn) =
+      let ann = getLocation parsedAnn in
       case buildModuleName ann ident of
         Left perr ->
           let text = pack $ "Import error in " ++ qname ++ ": " ++ show perr

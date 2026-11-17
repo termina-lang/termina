@@ -61,7 +61,8 @@ loadTerminaModule sources root filePath = do
     seen = maybe [root] folderSees (find ((== root) . folderPath) sources)
 
     -- | An import, looked up in the folders that the folder of the module sees.
-    importOf (ModuleImport modName ann) =
+    importOf (ModuleImport modName parsedAnn) =
+      let ann = getLocation parsedAnn in
       case buildModuleName ann modName of
         Left err -> Left (checkFailure err)
         Right qname ->

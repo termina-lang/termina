@@ -59,16 +59,19 @@ getEntry = element
 -- the name of a constexpr would lose every read of it, because the type checker
 -- substitutes the folded value before it looks the name up among the local
 -- objects.
-declaredNames :: [AnnASTElement' ty expr blk Location] -> DeclaredEnv
+declaredNames :: Located a => [AnnASTElement' ty expr blk a] -> DeclaredEnv
 declaredNames = foldr addName M.empty
 
   where
 
-    addName :: AnnASTElement' ty expr blk Location -> DeclaredEnv -> DeclaredEnv
-    addName element'@(Function ident _ _ _ _ _) = M.insert ident (getAnnotation element')
-    addName element'@(ExternFunction ident _ _ _ _ _) = M.insert ident (getAnnotation element')
-    addName element'@(GlobalDeclaration glb) = M.insert (getGlobalIdentifier glb) (getAnnotation element')
-    addName element'@(TypeDefinition tydef _) = M.insert (getTypeIdentifier tydef) (getAnnotation element')
+    addName :: Located a => AnnASTElement' ty expr blk a -> DeclaredEnv -> DeclaredEnv
+    addName element'@(Function ident _ _ _ _ _) = M.insert ident (locationOf element')
+    addName element'@(ExternFunction ident _ _ _ _ _) = M.insert ident (locationOf element')
+    addName element'@(GlobalDeclaration glb) = M.insert (getGlobalIdentifier glb) (locationOf element')
+    addName element'@(TypeDefinition tydef _) = M.insert (getTypeIdentifier tydef) (locationOf element')
+
+    locationOf :: Located a => AnnASTElement' ty expr blk a -> Location
+    locationOf = getLocation . getAnnotation
 
 -- | A parameter of one of the interfaces the environment declares by hand,
 -- which no source file writes and which therefore has no position.

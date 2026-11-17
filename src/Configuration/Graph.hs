@@ -16,6 +16,7 @@ import Configuration.Local (localFolderOf)
 import Configuration.Lock (normalizeUrl)
 import Configuration.Manifest
 import Configuration.Namespace (locationLine, dottedName)
+import Utils.Annotations (Located(..))
 import Configuration.Package
 import Configuration.Parsed (parsedTree)
 import Configuration.Prefix
@@ -52,7 +53,7 @@ checkGraph root packages = overlapErrors ++ concatMap importErrors packages
         , not (r1 && r2), overlaps p1 p2 ]
 
     importErrors pkg =
-        [ shownAs pkg ++ "/" ++ path ++ ":" ++ show (locationLine ann) ++ ": the exported module "
+        [ shownAs pkg ++ "/" ++ path ++ ":" ++ show (locationLine (getLocation ann)) ++ ": the exported module "
             ++ dottedName segments ++ " imports " ++ dottedName imported ++ ", which is neither exported by "
             ++ nameOf m ++ " nor by a dependency it declares"
         | FetchedFile path _ _ <- packageFiles pkg

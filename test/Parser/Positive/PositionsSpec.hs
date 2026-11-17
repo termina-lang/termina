@@ -4,6 +4,7 @@ module Parser.Positive.PositionsSpec (spec) where
 
 import Parser.AST
 import Parser.Parsing (parseTerminaModule, characterColumn)
+import Parser.Types (ParserAnn(..))
 import Utils.Annotations (Location(..))
 import Text.Parsec (errorPos, sourceLine, sourceColumn)
 import Text.Parsec.Pos (newPos)
@@ -15,7 +16,7 @@ import Test.Hspec
 returnAt :: [String] -> Maybe ((Int, Int), (Int, Int))
 returnAt src =
   case parseTerminaModule "test" "test" (unlines src) of
-    Right (Termina _ [Function _ _ _ (Block [ReturnStmt _ (Position _ start end)] _) _ _]) ->
+    Right (Termina _ [Function _ _ _ (Block [ReturnStmt _ (ParserAnn (Position _ start end) _)] _) _ _]) ->
       Just ((sourceLine start, sourceColumn start), (sourceLine end, sourceColumn end))
     _ -> Nothing
 

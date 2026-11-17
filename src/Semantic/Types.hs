@@ -6,6 +6,7 @@ module Semantic.Types where
 import Semantic.AST
 import Core.Utils
 import Utils.Annotations
+import Parser.Types (ParserAnn)
 import Data.Maybe
 import qualified Data.Map.Strict as M
 
@@ -195,11 +196,14 @@ getMatchCaseTypes _                           = Nothing
 isResultFromApp :: SemanticElems a -> Bool
 isResultFromApp = isJust . getArgumentsType
 
-buildFieldAnn :: Location -> SemanticAnn
-buildFieldAnn = SemanticAnn (FTy SimpleField)
+-- The annotations of the elements that take a documentation comment are built
+-- from the whole annotation of the parser.
 
-buildAccessPortFieldAnn :: Location -> M.Map Identifier (InterfaceMember SemanticAnn) -> SemanticAnn
-buildAccessPortFieldAnn = flip $ SemanticAnn . FTy . AccessPortField
+buildFieldAnn :: ParserAnn -> SemanticAnn
+buildFieldAnn = SemanticAnn (FTy SimpleField) . getLocation
+
+buildAccessPortFieldAnn :: ParserAnn -> M.Map Identifier (InterfaceMember SemanticAnn) -> SemanticAnn
+buildAccessPortFieldAnn ann procs = SemanticAnn (FTy (AccessPortField procs)) (getLocation ann)
 
 buildExpAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
 buildExpAnn = flip $ SemanticAnn . ETy . SimpleType
@@ -214,20 +218,20 @@ buildExpAnnApp :: Location -> [Parameter SemanticAnn] -> TerminaType SemanticAnn
 buildExpAnnApp loc params rty = SemanticAnn (ETy (AppType params rty)) loc
 
 -- | Build annotations for global objects (tasks, handlers, resources, channels or emitters)
-buildGlobalAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
-buildGlobalAnn = flip $ SemanticAnn . GTy 
+buildGlobalAnn :: ParserAnn -> TerminaType SemanticAnn -> SemanticAnn
+buildGlobalAnn ann ty = SemanticAnn (GTy ty) (getLocation ann)
 
-buildTypeAnn :: Location -> SemanticAnn
-buildTypeAnn = SemanticAnn TTy
+buildTypeAnn :: ParserAnn -> SemanticAnn
+buildTypeAnn = SemanticAnn TTy . getLocation
 
-buildStmtAnn :: Location -> SemanticAnn
-buildStmtAnn = SemanticAnn (STy SimpleStmtType)
+buildStmtAnn :: ParserAnn -> SemanticAnn
+buildStmtAnn = SemanticAnn (STy SimpleStmtType) . getLocation
 
-buildNoReturnCallStmtAnn :: Location -> SemanticAnn
-buildNoReturnCallStmtAnn = SemanticAnn (STy NoReturnCallStmtType)
+buildNoReturnCallStmtAnn :: ParserAnn -> SemanticAnn
+buildNoReturnCallStmtAnn = SemanticAnn (STy NoReturnCallStmtType) . getLocation
 
-buildStmtMatchCaseAnn :: Location -> [TerminaType SemanticAnn] -> SemanticAnn
-buildStmtMatchCaseAnn loc ts = SemanticAnn (STy (MatchCaseStmtType ts)) loc
+buildStmtMatchCaseAnn :: ParserAnn -> [TerminaType SemanticAnn] -> SemanticAnn
+buildStmtMatchCaseAnn ann ts = SemanticAnn (STy (MatchCaseStmtType ts)) (getLocation ann)
 
 buildOutPortConnAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
 buildOutPortConnAnn loc ts = SemanticAnn (STy (PortConnection (OutPConnTy ts))) loc

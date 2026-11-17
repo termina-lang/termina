@@ -45,41 +45,41 @@ typeElement :: AnnASTElement ParserAnn
 typeElement (Function ident ps_ts mts bret mds_ts anns) = do
   ----------------------------------------
   -- Check the return type 
-  mty <- mapM (typeTypeSpecifier anns typeGlobalObject >=>
-      (\ty -> checkReturnType anns ty >> return ty)) mts
+  mty <- mapM (typeTypeSpecifier (getLocation anns) typeGlobalObject >=>
+      (\ty -> checkReturnType (getLocation anns) ty >> return ty)) mts
   (ps_ty, typedBret) <- localScope $ do
       ps_ty <- forM ps_ts (\param@(Parameter paramId _ pann) -> do
-          typedParam <- typeParameter anns param
-          insertLocalImmutObj pann paramId (paramType typedParam)
+          typedParam <- typeParameter (getLocation anns) param
+          insertLocalImmutObj (getLocation pann) paramId (paramType typedParam)
           return typedParam)
       typedBret <- typeBlock mty bret
       return (ps_ty, typedBret)
-  mds_ty <- typeModifiers anns FunctionDeclaration typeGlobalObject mds_ts
+  mds_ty <- typeModifiers (getLocation anns) FunctionDeclaration typeGlobalObject mds_ts
   let functionSeman = FunctionSeman ps_ty (fromMaybe TUnit mty) Returns
-  return (Function ident ps_ty mty typedBret mds_ty (SemanticAnn (FnTy functionSeman) anns), LocatedElement (GFun functionSeman) anns)
+  return (Function ident ps_ty mty typedBret mds_ty (SemanticAnn (FnTy functionSeman) (getLocation anns)), LocatedElement (GFun functionSeman) (getLocation anns))
 typeElement (ExternFunction ident ps_ts mts mode mds_ts anns) = do
   -- A function that never comes back to the caller has nothing to return
   when (mode == NoReturn && isJust mts) $
-    throwError $ annotateError anns (ENoReturnFunctionReturnType ident)
+    throwError $ annotateError (getLocation anns) (ENoReturnFunctionReturnType ident)
   -- Check the return type and the parameters with the rules of a function
-  mty <- mapM (typeTypeSpecifier anns typeGlobalObject >=>
-      (\ty -> checkReturnType anns ty >> return ty)) mts
+  mty <- mapM (typeTypeSpecifier (getLocation anns) typeGlobalObject >=>
+      (\ty -> checkReturnType (getLocation anns) ty >> return ty)) mts
   ps_ty <- localScope $ forM ps_ts (\param@(Parameter paramId _ pann) -> do
-      typedParam <- typeParameter anns param
-      insertLocalImmutObj pann paramId (paramType typedParam)
+      typedParam <- typeParameter (getLocation anns) param
+      insertLocalImmutObj (getLocation pann) paramId (paramType typedParam)
       return typedParam)
-  mds_ty <- typeModifiers anns ExternFunctionDeclaration typeGlobalObject mds_ts
+  mds_ty <- typeModifiers (getLocation anns) ExternFunctionDeclaration typeGlobalObject mds_ts
   let functionSeman = FunctionSeman ps_ty (fromMaybe TUnit mty) mode
-  return (ExternFunction ident ps_ty mty mode mds_ty (SemanticAnn (FnTy functionSeman) anns), LocatedElement (GFun functionSeman) anns)
+  return (ExternFunction ident ps_ty mty mode mds_ty (SemanticAnn (FnTy functionSeman) (getLocation anns)), LocatedElement (GFun functionSeman) (getLocation anns))
 typeElement (GlobalDeclaration gbl) = first GlobalDeclaration <$> typeGlobal gbl
 typeElement (TypeDefinition tydef ann) = do
-  typed_tydef <- typeTypeDefinition ann tydef
+  typed_tydef <- typeTypeDefinition (getLocation ann) tydef
   case typed_tydef of
-    Struct {} -> return (TypeDefinition typed_tydef (buildTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
-    Enum {} -> return (TypeDefinition typed_tydef (buildTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
-    (Class _clsKind _ _ _ _) -> return (TypeDefinition typed_tydef (buildTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
+    Struct {} -> return (TypeDefinition typed_tydef (buildTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) (getLocation ann))
+    Enum {} -> return (TypeDefinition typed_tydef (buildTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) (getLocation ann))
+    (Class _clsKind _ _ _ _) -> return (TypeDefinition typed_tydef (buildTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) (getLocation ann))
     (Interface {}) -> do
-      return (TypeDefinition typed_tydef (buildTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
+      return (TypeDefinition typed_tydef (buildTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) (getLocation ann))
 
 semanticTypeDef :: SAST.TypeDef SemanticAnn -> SemanTypeDef SemanticAnn
 semanticTypeDef (Struct i f m)  = Struct i f m
