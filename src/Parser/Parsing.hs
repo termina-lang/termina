@@ -22,6 +22,7 @@ import Text.Parsec.Expr
 import qualified Data.List as L
 import Control.Monad
 import Data.Char
+import Data.Maybe (isJust)
 import qualified Data.IntMap.Strict as IM
 import Utils.Annotations
 import Parser.Types
@@ -90,9 +91,11 @@ lexer = Tok.makeTokenParser langDef
              ["termina", "option", "config"]
 
     langDef =
-      Lang.emptyDef{ Tok.commentStart = "/*"
-                   , Tok.commentEnd = "*/"
-                   , Tok.commentLine = "//"
+      -- Comments are skipped by wspcs, which stops before a documentation
+      -- comment, so the token parser of Parsec only skips white space.
+      Lang.emptyDef{ Tok.commentStart = ""
+                   , Tok.commentEnd = ""
+                   , Tok.commentLine = ""
                    , Tok.nestedComments = False
                    -- | Here we define that identifiers being with a letter
                    , Tok.identStart = letter
@@ -144,48 +147,154 @@ lexer = Tok.makeTokenParser langDef
                    , Tok.caseSensitive = True
                    }
 
+-- Comments
+
+-- | The documentation comment that a text starts with, if any, with the length
+-- of its opening delimiter. "////", "/***" and "/**/" open ordinary comments.
+docOpener :: String -> Maybe (DocPlacement, DocForm, Int)
+docOpener input = case input of
+  '/':'/':'/':'<':_ -> Just (DocAfter, LineDoc, 4)
+  '/':'/':'/':c:_ | c /= '/' -> Just (DocBefore, LineDoc, 3)
+  "///" -> Just (DocBefore, LineDoc, 3)
+  '/':'/':'!':_ -> Just (DocModule, LineDoc, 3)
+  '/':'*':'*':'<':_ -> Just (DocAfter, BlockDoc, 4)
+  '/':'*':'*':c:_ | c /= '*' && c /= '/' -> Just (DocBefore, BlockDoc, 3)
+  '/':'*':'!':_ -> Just (DocModule, BlockDoc, 3)
+  _ -> Nothing
+
+-- | Skips white space and ordinary comments, and stops before a documentation
+-- comment.
+wspcs :: TerminaParser ()
+wspcs = skipMany (skipMany1 space <|> ordinaryComment)
+
+-- | A line or block comment that is not a documentation comment. The input is
+-- looked at before any character is consumed, so a failure leaves no error
+-- inside a delimiter.
+ordinaryComment :: TerminaParser ()
+ordinaryComment = do
+  input <- getInput
+  case input of
+    _ | isJust (docOpener input) -> parserZero
+    '/':'/':_ -> string "//" *> skipMany (satisfy (/= '\n'))
+    '/':'*':_ -> string "/*" *> void (manyTill anyChar (try (string "*/")))
+    _ -> parserZero
+
+-- | A documentation comment and the white space after it. A run of line
+-- comments, or a single block comment, is one comment. The text is returned
+-- without the delimiters.
+docComment :: DocPlacement -> TerminaParser String
+docComment placement = (blockDoc <|> (unlines <$> lineDocs)) <* wspcs
+  where
+    -- A comment after an element is a single line: another one on the next
+    -- line is not on the line of the element.
+    lineDocs
+      | placement == DocAfter = (: []) <$> lineDoc
+      | otherwise = many1 lineDoc
+    opener form = do
+      input <- getInput
+      case docOpener input of
+        Just (placement', form', len) | placement' == placement && form' == form ->
+          void (count len anyChar)
+        _ -> parserZero
+    lineDoc = opener LineDoc *> skipMany (oneOf " \t") *> many (satisfy (/= '\n')) <* wspcs
+    blockDoc = opener BlockDoc *> manyTill anyChar (try (string "*/"))
+
+-- | Fails without consuming input where a documentation comment starts. Every
+-- token begins with it, so that a parse error at a comment that the grammar
+-- does not take there carries 'misplacedDocComment'.
+noDocComment :: TerminaParser ()
+noDocComment = do
+  input <- getInput
+  case docOpener input of
+    Just (placement, _, _) -> fail (misplacedDocComment placement)
+    Nothing -> return ()
+
+-- | An element with its documentation comment before it, if any. A comment
+-- that no element follows is reported at its own position.
+documented :: TerminaParser a -> TerminaParser a
+documented p = do
+  pos <- getPosition
+  doc <- optionMaybe (docComment DocBefore)
+  case doc of
+    Nothing -> p
+    Just _ -> p <|> failAt pos (misplacedDocComment DocBefore)
+
+-- | The message of a documentation comment where the grammar takes none. Each
+-- placement has its own, which the error of the parse keeps.
+misplacedDocComment :: DocPlacement -> String
+misplacedDocComment DocBefore = "Misplaced documentation comment before an element."
+misplacedDocComment DocAfter = "Misplaced documentation comment after an element."
+misplacedDocComment DocModule = "Misplaced documentation comment of the module."
+
+-- | The documentation comment after an element on the same line, if any.
+docAfter :: TerminaParser (Maybe String)
+docAfter = optionMaybe (docComment DocAfter)
+
 -- Lexemes
 
-wspcs :: TerminaParser ()
-wspcs = Tok.whiteSpace lexer
+-- | A token followed by white space and ordinary comments. The token parser of
+-- Parsec only skips white space after a token, since comments are not defined
+-- in langDef. A token never spans two lines, so the line where it starts is
+-- the line that a documentation comment after it has to be on.
+lexeme :: TerminaParser a -> TerminaParser a
+lexeme p = do
+  noDocComment
+  line <- sourceLine <$> getPosition
+  x <- p
+  wspcs
+  docAfterOnLine line
+  return x
+
+-- | Fails at a documentation comment after an element that is not on the line
+-- of the token before it.
+docAfterOnLine :: Line -> TerminaParser ()
+docAfterOnLine line = do
+  input <- getInput
+  pos <- getPosition
+  case docOpener input of
+    Just (DocAfter, _, _) | sourceLine pos /= line -> failAt pos (misplacedDocComment DocAfter)
+    _ -> return ()
+
+symbol :: String -> TerminaParser String
+symbol = lexeme . Tok.symbol lexer
 
 braces :: TerminaParser a -> TerminaParser a
-braces = Tok.braces lexer
+braces = between (symbol "{") (symbol "}")
 
 brackets :: TerminaParser a -> TerminaParser a
-brackets = Tok.brackets lexer
+brackets = between (symbol "[") (symbol "]")
 
 parens :: TerminaParser a -> TerminaParser a
-parens = Tok.parens lexer
+parens = between (symbol "(") (symbol ")")
 
 angles :: TerminaParser a -> TerminaParser a
-angles = Tok.angles lexer
+angles = between (symbol "<") (symbol ">")
 
 comma :: TerminaParser String
-comma = Tok.comma lexer
+comma = symbol ","
 
 semi :: TerminaParser String
-semi = Tok.semi lexer
+semi = symbol ";"
 
 dot :: TerminaParser String
-dot = Tok.dot lexer
+dot = symbol "."
 
 stringLit :: TerminaParser String
-stringLit = Tok.stringLiteral lexer
+stringLit = lexeme (Tok.stringLiteral lexer)
 
 charLit :: TerminaParser Char
-charLit = Tok.charLiteral lexer
+charLit = lexeme (Tok.charLiteral lexer)
 
 reserved :: String -> TerminaParser ()
-reserved = Tok.reserved lexer
+reserved = lexeme . Tok.reserved lexer
 
 reservedOp :: String -> TerminaParser ()
-reservedOp = Tok.reservedOp lexer
+reservedOp = lexeme . Tok.reservedOp lexer
 
 identifierParser :: TerminaParser String
 identifierParser = do
   startPos <- getPosition
-  Tok.identifier lexer >>= checkUnderscores startPos
+  lexeme (Tok.identifier lexer) >>= checkUnderscores startPos
 
 -- | Checks that an identifier does not contain two consecutive underscores.
 checkUnderscores :: SourcePos -> Identifier -> TerminaParser Identifier
@@ -216,19 +325,19 @@ sign = (char '-' >> return negate)
 -- | TerminaParser for integer decimal numbers
 -- This parser is used when defining regular integer literals
 decimal :: TerminaParser Integer
-decimal =  Tok.lexeme lexer $ do
-  f <- Tok.lexeme lexer sign
+decimal =  lexeme $ do
+  f <- lexeme sign
   n <- number 10 digit
   return (f n)
 
 hexadecimal :: TerminaParser Integer
-hexadecimal = Tok.lexeme lexer $
+hexadecimal = lexeme $
   char '0' >> oneOf "xX" >> number 16 hexDigit
 
 -- | TerminaParser for floating-point numbers in decimal notation: digits '.' digits.
 floating :: TerminaParser Double
-floating = Tok.lexeme lexer $ do
-  f  <- Tok.lexeme lexer sign
+floating = lexeme $ do
+  f  <- lexeme sign
   ip <- many1 digit
   _  <- char '.'
   fp <- many1 digit
@@ -237,8 +346,8 @@ floating = Tok.lexeme lexer $ do
 -- | TerminaParser for floating-point numbers in scientific notation:
 -- digits ['.' digits] exponent.
 scientific :: TerminaParser Double
-scientific = Tok.lexeme lexer $ do
-  f  <- Tok.lexeme lexer sign
+scientific = lexeme $ do
+  f  <- lexeme sign
   ip <- many1 digit
   fp <- option "" (('.' :) <$> (char '.' *> many1 digit))
   e  <- oneOf "eE"
@@ -299,7 +408,7 @@ typeSpecifierParser =
 objectIdentifierParser :: TerminaParser Identifier
 objectIdentifierParser = do
   startPos <- getPosition
-  ident <- try ((char '_' >> Tok.identifier lexer) <&> ('_' :)) <|> Tok.identifier lexer
+  ident <- lexeme (try ((char '_' >> Tok.identifier lexer) <&> ('_' :)) <|> Tok.identifier lexer)
   checkUnderscores startPos ident
 
 parameterParser :: TerminaParser (Parameter ParserAnn)
@@ -945,8 +1054,13 @@ singleExprStmtParser = do
   _ <- semi
   return $ SingleExpStmt expression (Position current startPos endPos)
 
+-- | A statement of a block, with its documentation comments before it and
+-- after it, if any.
 blockItemParser :: TerminaParser (Statement ParserAnn)
-blockItemParser
+blockItemParser = documented statementParser <* docAfter
+
+statementParser :: TerminaParser (Statement ParserAnn)
+statementParser
   =   try ifElseIfStmtParser
   <|> try mutableObjDeclarationParser
   <|> try immutableObjDeclarationParser
@@ -1014,6 +1128,9 @@ isRegularCase = do
 
 parseCases :: [MatchCase ParserAnn] -> TerminaParser ([MatchCase ParserAnn], Maybe (DefaultCase ParserAnn))
 parseCases acc = do
+  -- A case may have a documentation comment before it
+  docPos <- getPosition
+  doc <- optionMaybe (docComment DocBefore)
   -- Check for default case first
   mDefault <- optionMaybe $ try $ lookAhead isDefaultCase >> defaultCaseParser
   case mDefault of
@@ -1021,11 +1138,12 @@ parseCases acc = do
     Nothing -> do
       -- Check for normal case
       canContinue <- optionMaybe $ try $ lookAhead isRegularCase
-      case canContinue of
-        Just _ -> do
+      case (canContinue, doc) of
+        (Just _, _) -> do
           c <- matchCaseParser -- If this fails, it should propagate!
           parseCases (c : acc)
-        Nothing -> return (reverse acc, Nothing)
+        (Nothing, Nothing) -> return (reverse acc, Nothing)
+        (Nothing, Just _) -> failAt docPos (misplacedDocComment DocBefore)
 
 matchStmtParser :: TerminaParser (Statement ParserAnn)
 matchStmtParser = do
@@ -1034,7 +1152,7 @@ matchStmtParser = do
   reserved "match"
   matchExpression <- expressionParser
   (cases, defaultCase) <- braces (do
-      c <- matchCaseParser
+      c <- documented matchCaseParser
       (cs, dc) <- parseCases [c]
       return (cs, dc))
   MatchStmt matchExpression cases defaultCase . Position current startPos <$> getPosition
@@ -1060,12 +1178,15 @@ ifElseIfStmtParser = do
   ifBlkEndPos <- getPosition
   let ifBlk = Block ifCompound (Position current ifBlkStartPos ifBlkEndPos)
   let condIf = CondIf expression ifBlk (Position current startPos ifBlkEndPos)
-  elseIfs <- many $ try elseIfParser
-  mCondElse <- option Nothing (do
+  -- A documentation comment after the block belongs to the branch that follows,
+  -- if any, and otherwise to the next statement.
+  elseIfs <- many $ try (optional (docComment DocBefore) *> elseIfParser)
+  mCondElse <- optionMaybe (do
+    _ <- try (optional (docComment DocBefore) *> lookAhead (reserved "else"))
     elseBlkStartPos <- getPosition
     _ <- reserved "else"
     elseBlk <- blockParser
-    Just . CondElse elseBlk . Position current elseBlkStartPos <$> getPosition)
+    CondElse elseBlk . Position current elseBlkStartPos <$> getPosition)
   IfElseStmt condIf elseIfs mCondElse . Position current startPos <$> getPosition
 
 forLoopStmtParser :: TerminaParser (Statement ParserAnn)
@@ -1245,7 +1366,7 @@ structDefinitionParser = do
   startPos <- getPosition
   reserved "struct"
   identifier <- identifierParser
-  fields <- braces (many1 $ try fieldDefinitionParser)
+  fields <- braces (many1 $ documented (try fieldDefinitionParser) <* docAfter)
   endPos <- getPosition
   _ <- semi
   return $ TypeDefinition (Struct identifier fields modifiers) (Position current startPos endPos)
@@ -1367,7 +1488,7 @@ interfaceDefinitionParser = do
   reserved "interface"
   identifier <- identifierParser
   extends <- option [] (reserved "extends" >> sepBy identifierParser comma)
-  procedures <- braces (many1 interfaceProcedureParser)
+  procedures <- braces (many1 (documented interfaceProcedureParser))
   endPos <- getPosition
   _ <- semi
   return $ TypeDefinition (Interface RegularInterface identifier extends procedures modifiers) (Position current startPos endPos)
@@ -1382,12 +1503,12 @@ classDefinitionParser = do
   identifier <- identifierParser
   provides <- option [] (reserved "provides" >> sepBy identifierParser comma)
   fields <-
-    braces (many1 $ classMethodParser
+    braces (many1 $ documented (classMethodParser
       <|> classViewerParser
       <|> classProcedureParser
       <|> classActionParser
       <|> classCaseParser
-      <|> classFieldDefinitionParser)
+      <|> (classFieldDefinitionParser <* docAfter)))
   endPos <- getPosition
   _ <- semi
   return $ TypeDefinition (Class classKind identifier fields provides modifiers) (Position current startPos endPos)
@@ -1404,6 +1525,18 @@ variantDefinitionParser = identifierParser >>= \identifier ->
   try (parens (sepBy1 typeSpecifierParser comma) <&> EnumVariant identifier)
   <|> return (EnumVariant identifier [])
 
+-- | The variants of an enum, separated by commas. The documentation comment
+-- after a variant goes before or after its comma, or after the last variant.
+variantListParser :: TerminaParser [EnumVariant ParserAnn]
+variantListParser = do
+  variant <- documented (try variantDefinitionParser)
+  before <- docAfter
+  more <- optionMaybe comma
+  _ <- maybe docAfter (const (return Nothing)) before
+  case more of
+    Nothing -> return [variant]
+    Just _ -> (variant :) <$> variantListParser
+
 enumDefinitionParser :: TerminaParser (AnnASTElement ParserAnn)
 enumDefinitionParser = do
   current <- getState
@@ -1411,16 +1544,17 @@ enumDefinitionParser = do
   startPos <- getPosition
   reserved "enum"
   identifier <- identifierParser
-  variants <- braces (sepBy1 (try variantDefinitionParser) comma)
+  variants <- braces variantListParser
   endPos <- getPosition
   _ <- semi
   return $ TypeDefinition (Enum identifier variants modifiers) (Position current startPos endPos)
 
--- | Top Level parser
+-- | Top Level parser. Of the declarations, only a global one takes a
+-- documentation comment after it.
 topLevel :: TerminaParser (AnnotatedProgram ParserAnn)
-topLevel = many $
-  try functionParser <|> try externFunctionParser <|> try globalDeclParser
-  <|> try typeDefintionParser
+topLevel = many $ documented (
+  try functionParser <|> try externFunctionParser <|> (try globalDeclParser <* docAfter)
+  <|> try typeDefintionParser)
 
 moduleIdentifierParser :: TerminaParser [ String ]
 moduleIdentifierParser = do
@@ -1454,7 +1588,7 @@ contents :: TerminaParser a -> TerminaParser a
 contents p = wspcs *> p <* eof
 
 terminaModuleParser :: TerminaParser (TerminaModule ParserAnn)
-terminaModuleParser = wspcs *> (Termina <$> many moduleImportParser <*> contents topLevel)
+terminaModuleParser = wspcs *> optional (docComment DocModule) *> (Termina <$> many moduleImportParser <*> contents topLevel)
 
 -- | Parses the text of a module, given its qualified name and its file. The
 -- positions of the tree and of the error count characters, as the error

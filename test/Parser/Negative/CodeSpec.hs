@@ -18,6 +18,13 @@ pe004ModA, pe004ModB :: String
 pe004ModA = unlines ["import pkg.b;", "", "function fa() -> u32 { return 0 : u32; }"]
 pe004ModB = unlines ["import pkg.a;", "", "function fb() -> u32 { return 0 : u32; }"]
 
+pe009 :: String
+pe009 = unlines
+  [ "function foo() {"
+  , "    return;"
+  , "    /// Nothing follows."
+  , "}" ]
+
 spec :: Spec
 spec = describe "Parser stage: error-code coverage" $ do
   it "PE-001: parsing error" $
@@ -25,3 +32,5 @@ spec = describe "Parser stage: error-code coverage" $ do
   it "PE-004: cycle between project source files" $
     parserStageErrorCode [("pkg/a", pe004ModA), ("pkg/b", pe004ModB)]
       `shouldBe` Just "PE-004"
+  it "PE-009: misplaced documentation comment" $
+    parserStageErrorCode [("test", pe009)] `shouldBe` Just "PE-009"

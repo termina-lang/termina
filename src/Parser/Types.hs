@@ -10,3 +10,12 @@ the position in the source file where the element is located.
 
 type ParserAnn = Location
 
+-- | Where a documentation comment goes: before an element, after it on the
+-- same line, or at the start of a module.
+data DocPlacement = DocBefore | DocAfter | DocModule
+  deriving (Show, Eq, Enum, Bounded)
+
+-- | The two forms of a documentation comment.
+data DocForm = LineDoc | BlockDoc
+  deriving (Show, Eq)
+

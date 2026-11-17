@@ -3,6 +3,8 @@
 module Parser.Errors where
 
 import Modules.Modules
+import Parser.Parsing (misplacedDocComment)
+import Parser.Types (DocPlacement(..))
 import Utils.Annotations
 import Text.Parsec
 import Utils.Errors
@@ -26,7 +28,23 @@ data Error
     | EImportedModuleNotExported T.Text -- ^ Imported module outside the exports of a library (PE-006)
     | EModuleNameCollision T.Text -- ^ Two modules of a build with one name (PE-007)
     | EInvalidUtf8 -- ^ Module file that is not valid UTF-8 (PE-008)
+    | EMisplacedDocComment DocPlacement -- ^ Documentation comment where the grammar takes none (PE-009)
   deriving Show
+
+-- | The error of a failed parse of a module. A documentation comment where the
+-- grammar takes none has its own code.
+parseError :: ParseError -> Error
+parseError err =
+  case [ placement | placement <- [minBound .. maxBound]
+                   , misplacedDocComment placement `elem` messages ] of
+    placement : _ -> EMisplacedDocComment placement
+    [] -> EParseError err
+
+  where
+
+    -- The Eq instance of Message compares only the kind of message, so the
+    -- texts are compared instead.
+    messages = [ messageString m | m@(Message _) <- errorMessages err ]
 
 type ParsingErrors = AnnotatedError Error Location
 
@@ -63,6 +81,26 @@ instance Diagnosable Error where
         diagnostic "PE-007" "two modules with the same name" detail
     describe EInvalidUtf8 =
         diagnostic "PE-008" "invalid file encoding" "The file is not valid UTF-8."
+    describe (EMisplacedDocComment placement) =
+        diagnostic "PE-009" "misplaced documentation comment"
+            (wherePlaced placement <> "\n"
+                <> "A note that documents nothing is written with " <> emph "//"
+                <> " or " <> emph "/* */" <> ".")
+
+        where
+
+            wherePlaced DocBefore =
+                "A documentation comment that starts with " <> emph "///" <> " or "
+                    <> emph "/**" <> " goes right before the declaration, field, variant,"
+                    <> " statement or case that it documents."
+            wherePlaced DocAfter =
+                "A documentation comment that starts with " <> emph "///<" <> " or "
+                    <> emph "/**<" <> " goes after the declaration, field, variant or"
+                    <> " statement that it documents, on the same line."
+            wherePlaced DocModule =
+                "A documentation comment that starts with " <> emph "//!" <> " or "
+                    <> emph "/*!" <> " documents the module and goes at its start,"
+                    <> " before the imports."
     describe EEmptyModuleName = diagnosticWithoutDetail "Internal" "internal error"
 
 instance ErrorMessage ParsingErrors where

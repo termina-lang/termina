@@ -58,7 +58,7 @@ import Command.Types
 import Command.Utils (CheckFailure(..), sortProjectDepsOrLoop)
 import Modules.Modules (TerminaModuleData(..), ModuleDependency(..))
 import Modules.Utils (buildModuleName)
-import Parser.Errors (Error(..), ParsingErrors)
+import Parser.Errors (Error(..), ParsingErrors, parseError)
 import Utils.Annotations (QualifiedName, annotateError, Location(Internal))
 
 import Command.Pipeline (CheckedModules(..), checkModules, typeProject)
@@ -316,7 +316,7 @@ parseModule (qname, src) =
   -- module, as in a real build, so that the error printer finds its source.
   case parseTerminaModule qname qname src of
     Left err -> Left (failure (M.singleton qname (pack src))
-      (annotateError Internal (EParseError err) :: ParsingErrors))
+      (annotateError Internal (parseError err) :: ParsingErrors))
     Right (Termina imports prog) -> do
       deps <- mapM toDep imports
       pure (qname, TerminaModuleData qname qname deps [] (pack src) (ParsingData prog))

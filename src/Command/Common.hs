@@ -98,7 +98,7 @@ parsedModule :: QualifiedName -> FilePath -> ParsedFile -> Either CheckFailure (
 parsedModule filePath fullP parsedFile =
   case parsedFile of
     Left NotUtf8 -> Left (loadFailure (Position fullP (initialPos fullP) (initialPos fullP)) EInvalidUtf8)
-    Left (InvalidSyntax _ err) -> Left (loadFailure (Position filePath (errorPos err) (errorPos err)) (EParseError err))
+    Left (InvalidSyntax _ err) -> Left (loadFailure (Position filePath (errorPos err) (errorPos err)) (parseError err))
     Right parsed -> Right parsed
 
 -- | The text and the tree of a parsed module file, given its qualified name

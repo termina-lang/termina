@@ -57,7 +57,7 @@ loadSingleModule filePath = do
     -- parse it
     case parseTerminaModule noExtension filePath (T.unpack src_code) of
         Left err -> 
-            let pErr = annotateError (Position filePath (errorPos err) (errorPos err)) (EParseError err)
+            let pErr = annotateError (Position filePath (errorPos err) (errorPos err)) (parseError err)
                 fileMap = M.singleton filePath src_code
             in
             dieWithReport (toText pErr fileMap)

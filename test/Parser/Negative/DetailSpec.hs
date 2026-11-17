@@ -5,8 +5,11 @@ module Parser.Negative.DetailSpec (spec) where
 
 import Parser.Common (parserStageError, moduleStageError)
 import Modules.Modules (ModuleDependency(..))
-import Parser.Errors (Error(..))
+import Parser.Errors (Error(..), parseError)
+import Parser.Parsing (parseTerminaModule)
+import Parser.Types (DocPlacement(..))
 import Utils.Annotations (AnnotatedError(..))
+import Text.Parsec (errorPos, sourceLine, sourceColumn)
 import Text.Parsec.Error (errorMessages, messageString)
 
 import Test.Hspec
@@ -49,8 +52,44 @@ doubleUnderscore =
   where
     identifierMsg name = "Identifiers cannot contain two consecutive underscores: " ++ name ++ "."
 
+-- | The placement, line and column of a misplaced documentation comment in a
+-- module, or Nothing if the module parses or fails for another reason.
+misplacedAt :: [String] -> Maybe (DocPlacement, Int, Int)
+misplacedAt src =
+  case parseTerminaModule "test" "test" (unlines src) of
+    Left err | EMisplacedDocComment placement <- parseError err ->
+      Just (placement, sourceLine (errorPos err), sourceColumn (errorPos err))
+    _ -> Nothing
+
+-- | One module per kind of misplaced documentation comment, with the placement
+-- and the position of the comment.
+misplaced :: [(String, [String], (DocPlacement, Int, Int))]
+misplaced =
+  [ ("a block comment before the imports", ["/** Header. */", "import foo.bar;"], (DocBefore, 1, 1))
+  , ("a module comment after a declaration", ["function f() { return; }", "//! Late."], (DocModule, 2, 1))
+  , ("a comment that no statement follows", ["function f() {", "    return;", "    /// Nothing.", "}"], (DocBefore, 3, 5))
+  , ("a comment at the end of the module", ["function f() { return; }", "/// Nothing."], (DocBefore, 2, 1))
+  , ("a comment that no case follows", [ "function f(o : Option<u32>) -> u32 {", "    var r : u32 = 0;"
+                                       , "    match o {", "        case Some(x) => { r = x; }"
+                                       , "        case None => { r = 1; }", "        /// Nothing.", "    }"
+                                       , "    return r;", "}" ], (DocBefore, 6, 9))
+  , ("a comment inside an expression", ["function f() -> u32 {", "    let x : u32 = /** mid */ 3;", "    return x;", "}"], (DocBefore, 2, 19))
+  , ("a comment after with nothing before", ["function f() {", "    ///< After nothing.", "    return;", "}"], (DocAfter, 2, 5))
+  , ("a comment before on the side of after", ["struct S {", "    x : u32 /// Wrong side.", "    ;", "};"], (DocBefore, 2, 13))
+  , ("a comment after an import", ["import foo.bar; ///< Wrong.", "function f() { return; }"], (DocAfter, 1, 17))
+  , ("a comment before a parameter", ["function f(/// The value.", "    v : u32) { return; }"], (DocBefore, 1, 12))
+  , ("a comment after on the line below its field", ["struct S {", "    x : u32;", "    ///< Below.", "};"], (DocAfter, 3, 5))
+  , ("a second line of a comment after", ["struct S {", "    x : u32; ///< First.", "             ///< Second.", "};"], (DocAfter, 3, 14))
+  , ("a comment after a function", ["function f() {", "    return;", "} ///< A function."], (DocAfter, 3, 3))
+  , ("a comment after a method", ["resource class C provides I {", "    method m(&priv self) { return; } ///< A method.", "};"], (DocAfter, 2, 38))
+  , ("a comment after an interface procedure", ["interface I {", "    procedure p(&mut self); ///< A procedure.", "};"], (DocAfter, 2, 29))
+  , ("a comment after the brace of a branch", ["function f(v : u32) {", "    if (v == 0) { ///< First.", "        return;", "    }", "    return;", "}"], (DocAfter, 2, 19))
+  ]
+
 spec :: Spec
 spec = describe "Parser stage: error detail" $ do
+  describe "PE-009 points at the comment" $
+    mapM_ (\(what, src, expected) -> it ("for " ++ what) $ misplacedAt src `shouldBe` Just expected) misplaced
   it "PE-001 wraps the underlying parse error" $
     moduleStageError "function f() -> { return; }" `shouldSatisfy` \case
       Just (AnnotatedError (EParseError _) _) -> True
