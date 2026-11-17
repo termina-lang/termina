@@ -8,6 +8,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.List (isInfixOf, isPrefixOf, isSuffixOf, nub, sortOn)
 import qualified Data.Map.Strict as M
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Encoding.Error as TEE
@@ -19,10 +20,11 @@ import Runner.CoverageModel
 import Utils.Files (filesUnder)
 import Utils.Hash (sha256File)
 
--- | Writes the report, given the version of termina and the stylesheet of the project, from the
--- results whose stamps match a map built from the current source by this version
-buildReport :: String -> Maybe FilePath -> FilePath -> IO ()
-buildReport terminaVersion projectStyle outputRoot = do
+-- | Writes the report, given its provenance and the stylesheet of the project, from the results
+-- whose stamps match a map built from the current source by the version of termina
+buildReport :: Provenance -> Maybe FilePath -> FilePath -> IO ()
+buildReport provenance projectStyle outputRoot = do
+    let terminaVersion = provenanceTermina provenance
     let coverageRoot = outputRoot </> "coverage"
     projectRoot <- canonicalizePath =<< getCurrentDirectory
     mapFiles <- filter (\f -> ".json" `isSuffixOf` f && "/map/" `isInfixOf` ("/" ++ f)) <$> filesUnder coverageRoot
@@ -44,11 +46,12 @@ buildReport terminaVersion projectStyle outputRoot = do
     texts <- M.fromList <$> mapM (\path -> (,) path <$> readLines path) (nub (map mapSource maps))
     let byStamp = M.fromList [ ((mapModule m, mapStamp m), m) | m <- maps ]
         current = [ (r, [ (mf, m) | mf <- runModules r, Just m <- [M.lookup (flagsModule mf, flagsStamp mf) byStamp] ]) | r <- sortOn runStarted runs ]
-        views = [ ("Everything", "all", current)
-                , ("Tests", "tests", [ c | c@(r, _) <- current, runKind r == "test" ])
-                , ("Application", "app", [ c | c@(r, _) <- current, runKind r == "app" ]) ]
-                ++ [ ("Platform " ++ p, "platform" </> p, [ c | c@(r, _) <- current, runPlatform r == p ]) | p <- nub (map (runPlatform . fst) current) ]
-                ++ [ (labelOf r, "runs" </> runName r, [c]) | c@(r, _) <- current ]
+        views = [ ("Everything", "all", current, [])
+                , ("Tests", "tests", [ c | c@(r, _) <- current, runKind r == "test" ], [])
+                , ("Application", "app", [ c | c@(r, _) <- current, runKind r == "app" ], []) ]
+                ++ [ ("Platform " ++ p, "platform" </> p, [ c | c@(r, _) <- current, runPlatform r == p ], [])
+                   | p <- nub (map (runPlatform . fst) current) ]
+                ++ [ (labelOf r, "runs" </> runName r, [c], factsOf r) | c@(r, _) <- current ]
         shownOf path = let relative = makeRelative projectRoot path
                        in if isRelative relative then relative else "external" </> dropDrive relative
         styles = styleFile : [ projectStyleFile | Just _ <- [projectStyle] ]
@@ -59,7 +62,7 @@ buildReport terminaVersion projectStyle outputRoot = do
     when exists (removeDirectoryRecursive html)
     oldInfo <- filter (".info" `isSuffixOf`) <$> listDirectory coverageRoot
     mapM_ (removeFile . (coverageRoot </>)) oldInfo
-    entries <- fmap concat $ forM views $ \(title, folder, selected) -> do
+    entries <- fmap concat $ forM views $ \(title, folder, selected, facts) -> do
         let name = map (\c -> if c == '/' then '-' else c) folder
         if null selected then return [] else do
             writeFile (coverageRoot </> name <.> "info") (infoOf texts selected)
@@ -67,14 +70,14 @@ buildReport terminaVersion projectStyle outputRoot = do
                 viewRoot = html </> folder
                 toLanding = upTo (1 + depth folder)
             createDirectoryIfMissing True viewRoot
-            writeFile (viewRoot </> "index.html") (viewPage styles title toLanding sources)
+            writeFile (viewRoot </> "index.html") (viewPage styles title toLanding facts sources)
             forM_ sources $ \(shown, s) -> do
                 let file = viewRoot </> shown <.> "html"
                 createDirectoryIfMissing True (takeDirectory file)
                 writeFile file (sourcePage styles title (upTo (depth shown - 1)) (upTo (depth folder + depth shown)) shown s)
             return [(title, "html" </> folder, foldr (addTotals . sourceTotals . snd) noTotals sources)]
     let viewEntries = [ ViewEntry title folder totals | (title, folder, totals) <- entries, not ("html/runs" `isPrefixOf` folder) ]
-        runEntries = [ RunEntry (labelOf r) (runPlatform r) (runStarted r) (runEnded r)
+        runEntries = [ RunEntry (labelOf r) (runPlatform r) (timeOf r (runStarted r)) (timeOf r (runEnded r)) (endOf r) (endTipOf r) (rebootsOf r)
                          (if null kept then Nothing else Just ("html" </> "runs" </> runName r))
                          (length kept, length (runModules r))
                      | (r, kept) <- current ]
@@ -88,11 +91,31 @@ buildReport terminaVersion projectStyle outputRoot = do
             old <- doesFileExist (coverageRoot </> projectStyleFile)
             when old (removeFile (coverageRoot </> projectStyleFile))
     writeFile (coverageRoot </> "index.html")
-        (landingPage styles (foldr (addTotals . sourceTotals) noTotals everything) viewEntries runEntries notLinked)
+        (landingPage styles provenance (foldr (addTotals . sourceTotals) noTotals everything) viewEntries runEntries notLinked)
 
   where
 
     labelOf r = (if runKind r == "test" then "test " else "application ") ++ runWhat r ++ " (" ++ runStarted r ++ ")"
+
+    endOf r = fromMaybe "–" (runEnd r)
+
+    rebootsOf r = maybe "–" show (runReboots r)
+
+    -- | A time of a run, unknown in a recorded one
+    timeOf r time = if runEnd r == Just "recorded" then "–" else time
+
+    -- | The explanation of how a run ended
+    endTipOf r = case runEnd r of
+        Just "recorded" -> Just "Coverage imported from a run outside termina"
+        Just _ | runKind r == "test" -> Just "Verdicts of the test run with coverage"
+        Just "timeout" -> Just "Stopped when its time limit ran out"
+        Just "interrupted" -> Just "Stopped by the user"
+        Just e | "signal " `isPrefixOf` e -> Just "Stopped by a signal of the program"
+        _ -> Nothing
+
+    -- | The facts at the top of the view of one run
+    factsOf r = [ ("Platform", runPlatform r, Nothing), ("Started", timeOf r (runStarted r), Nothing), ("Ended", timeOf r (runEnded r), Nothing)
+                , ("End", endOf r, endTipOf r), ("Reboots", rebootsOf r, Nothing) ]
 
     depth path = length (splitDirectories path)
 

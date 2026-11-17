@@ -29,9 +29,10 @@ Patch versions on either side are interchangeable.
 - Each run of `termina coverage` writes its result to
   `output/coverage/runs/` and rebuilds the report from every result whose
   module sources and version of `termina` match the current build: static
-  HTML pages in `output/coverage/index.html`, with views of every run, the
-  tests, the application, each platform and each run alone, and an lcov
-  `.info` per view. `--report-only` rebuilds the report without building or
+  HTML pages in `output/coverage/index.html`, with the project, the version
+  of `termina` and the time of the report, how each run ended and its
+  reboots, views of every run, the tests, the application, each platform and
+  each run alone, and an lcov `.info` per view. `--report-only` rebuilds the report without building or
   running.
 - `termina coverage --build-only` builds with coverage and writes
   `gdb/clear.gdb` and `gdb/dump.gdb` next to each binary, and

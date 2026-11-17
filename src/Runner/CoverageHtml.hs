@@ -1,6 +1,6 @@
 -- | The pages of the report of the coverage: the landing page, the views and the sources.
 module Runner.CoverageHtml (
-    ViewEntry(..), RunEntry(..), landingPage, viewPage, sourcePage, markFile, styleFile, projectStyleFile
+    ViewEntry(..), RunEntry(..), Provenance(..), landingPage, viewPage, sourcePage, markFile, styleFile, projectStyleFile
 ) where
 
 import Data.Char (isSpace)
@@ -35,14 +35,26 @@ data RunEntry = RunEntry {
     runPlatform' :: String,
     runStarted' :: String,
     runEnded' :: String,
+    runEnd' :: String, -- ^ how it ended, or the summary of the verdicts of a test
+    runEndTip :: Maybe String, -- ^ the explanation of its end
+    runReboots' :: String,
     runFolder :: Maybe FilePath, -- ^ the folder of its view, when it has one
     runTaken :: (Int, Int) -- ^ the modules taken of those in the result
   }
 
--- | The landing page, given its stylesheets: the totals, the views, the runs and the number of sources not linked
-landingPage :: [FilePath] -> Totals -> [ViewEntry] -> [RunEntry] -> Int -> String
-landingPage styles totals views runs notLinked = page styles "Termina coverage" "" [] $
+-- | Where a report comes from: the project with its version, the version of termina and when it was written
+data Provenance = Provenance {
+    provenanceProject :: String,
+    provenanceTermina :: String,
+    provenanceWritten :: String
+  }
+
+-- | The landing page, given its stylesheets and its provenance: the totals, the views, the runs and the number of sources not linked
+landingPage :: [FilePath] -> Provenance -> Totals -> [ViewEntry] -> [RunEntry] -> Int -> String
+landingPage styles provenance totals views runs notLinked = page styles "Termina coverage" "" [] $
     [ "<h1><small>Project</small>Coverage</h1>"
+    , "<p class=\"meta\">" ++ escape (provenanceProject provenance) ++ " · termina " ++ escape (provenanceTermina provenance)
+      ++ " · written " ++ escape (provenanceWritten provenance) ++ "</p>"
     , tiles totals
     , "<h2>Views</h2>"
     , "<table class=\"list\"><tr><th>View</th>" ++ concatMap metricHead metrics ++ "</tr>" ]
@@ -50,9 +62,12 @@ landingPage styles totals views runs notLinked = page styles "Termina coverage" 
        | v <- views ]
     ++ [ "</table>", "<h2>Runs</h2>"
        , "<table class=\"list\"><tr><th>Run</th><th>Platform</th><th>Started</th><th>Ended</th>"
+         ++ "<th>" ++ help "How the application ended, or the verdicts of a test" "End" ++ "</th><th>Reboots</th>"
          ++ "<th>" ++ help "Modules of the run that match the current build" "Modules" ++ "</th></tr>" ]
     ++ [ "<tr><td>" ++ maybe (escape (runLabel r)) (\f -> "<a href=\"" ++ f ++ "/index.html\">" ++ escape (runLabel r) ++ "</a>") (runFolder r)
          ++ "</td><td>" ++ escape (runPlatform' r) ++ "</td><td>" ++ escape (runStarted' r) ++ "</td><td>" ++ escape (runEnded' r)
+         ++ "</td><td>" ++ maybe (escape (runEnd' r)) (\tip -> help tip (escape (runEnd' r))) (runEndTip r)
+         ++ "</td><td>" ++ escape (runReboots' r)
          ++ "</td><td>" ++ show taken ++ " of " ++ show total
          ++ (if taken < total
                 then " <span class=\"tag\" data-tip=\"Built from another version of the source or of termina. Not counted.\">"
@@ -64,11 +79,16 @@ landingPage styles totals views runs notLinked = page styles "Termina coverage" 
     ++ (if notLinked == 0 then [] else
         [ "<p class=\"note\">" ++ sourcesWord notLinked ++ " not linked in any run, counted as not covered.</p>" ])
 
--- | The index of a view, given the stylesheets and its path to the landing page: its totals and those of each source
-viewPage :: [FilePath] -> String -> FilePath -> [(FilePath, SourceCoverage)] -> String
-viewPage styles title toLanding sources = page styles ("Termina coverage: " ++ title) toLanding [(title, Nothing)] $
-    [ "<h1><small>View</small>" ++ escape title ++ "</h1>"
-    , tiles (foldr (addTotals . sourceTotals . snd) noTotals sources)
+-- | The index of a view, given the stylesheets, its path to the landing page and the facts of its run when it has one
+viewPage :: [FilePath] -> String -> FilePath -> [(String, String, Maybe String)] -> [(FilePath, SourceCoverage)] -> String
+viewPage styles title toLanding facts sources = page styles ("Termina coverage: " ++ title) toLanding [(title, Nothing)] $
+    [ "<h1><small>View</small>" ++ escape title ++ "</h1>" ]
+    ++ (if null facts then [] else
+        [ "<dl class=\"facts\">"
+          ++ concat [ "<div><dt>" ++ escape k ++ "</dt><dd>" ++ maybe (escape v) (\tip -> help tip (escape v)) mTip ++ "</dd></div>"
+                    | (k, v, mTip) <- facts ]
+          ++ "</dl>" ])
+    ++ [ tiles (foldr (addTotals . sourceTotals . snd) noTotals sources)
     , "<table class=\"list\"><tr><th>Source</th>" ++ concatMap metricHead metrics ++ "</tr>" ]
     ++ [ "<tr><td><a href=\"" ++ shown ++ ".html\">" ++ escape shown ++ "</a>"
          ++ (if sourceLinked s then "" else " <span class=\"tag\">not linked</span>")

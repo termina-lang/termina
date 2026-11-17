@@ -77,18 +77,19 @@ coverageArrays maps = concat
       ++ [ (witnessesArrayName (mapModule m), 2 * mapWitnesses m) | mapWitnesses m > 0 ]
     | m <- maps ]
 
--- | Writes the result of a run of a test over the one of its previous run
-writeTestResult :: FilePath -> String -> String -> String -> String -> [ModuleMap] -> [(String, BS.ByteString)] -> IO FilePath
-writeTestResult outputRoot testName plt started ended =
+-- | Writes the result of a run of a test over the one of its previous run, with the summary of its verdicts as its end
+writeTestResult :: FilePath -> String -> String -> String -> String -> String -> [ModuleMap] -> [(String, BS.ByteString)] -> IO FilePath
+writeTestResult outputRoot testName plt started ended end =
     writeResult (outputRoot </> "coverage" </> "runs" </> ("test-" ++ testName ++ "-" ++ plt) <.> "json")
-        [ "kind" .= ("test" :: T.Text), "test" .= testName, "platform" .= plt, "started" .= started, "ended" .= ended ]
+        [ "kind" .= ("test" :: T.Text), "test" .= testName, "platform" .= plt, "started" .= started, "ended" .= ended,
+          "end" .= end ]
 
--- | Writes the result of a campaign of the application, named by its start time
-writeAppResult :: FilePath -> String -> String -> String -> String -> Int -> [ModuleMap] -> [(String, BS.ByteString)] -> IO FilePath
+-- | Writes the result of a campaign of the application, named by its start time, with its reboots when they are known
+writeAppResult :: FilePath -> String -> String -> String -> String -> Maybe Int -> [ModuleMap] -> [(String, BS.ByteString)] -> IO FilePath
 writeAppResult outputRoot plt started ended end reboots =
     writeResult (outputRoot </> "coverage" </> "runs" </> ("app-" ++ plt ++ "-" ++ map noColon started) <.> "json")
-        [ "kind" .= ("app" :: T.Text), "platform" .= plt, "started" .= started, "ended" .= ended,
-          "end" .= end, "reboots" .= reboots ]
+        ([ "kind" .= ("app" :: T.Text), "platform" .= plt, "started" .= started, "ended" .= ended,
+          "end" .= end ] ++ [ "reboots" .= r | Just r <- [reboots] ])
 
   where
 

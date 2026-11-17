@@ -49,6 +49,14 @@ h1 small { display: block; font-family: var(--body); font-weight: 400; font-size
 h2 { font-family: var(--display); font-weight: 500; font-size: 1.1em; margin: 1.4em 0 .6em; }
 .note { color: var(--note); }
 .tag { font-size: .75em; color: var(--miss); border: 1px solid var(--miss); border-radius: 4px; padding: 0 .3em; }
+.meta { color: var(--muted); font-size: .9em; margin: -.4em 0 1.2em; }
+
+/* Facts of a run */
+
+.facts { display: flex; flex-wrap: wrap; gap: .5em 1.8em; margin: 0 0 1.2em; }
+.facts div { display: flex; align-items: baseline; gap: .5em; }
+.facts dt { color: var(--muted); font-size: .75em; text-transform: uppercase; letter-spacing: .05em; }
+.facts dd { margin: 0; font-family: var(--mono); font-size: .9em; }
 
 /* Totals */
 

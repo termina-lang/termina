@@ -260,7 +260,7 @@ runCovered project servers mode instrumentation deployment plainResult = do
                         (_, Nothing) -> putStrLn (warnMessage (label ++ ": the run with coverage could not be read"))
                         _ -> return ()
                     file <- writeTestResult outputFolderName (T.unpack (name config)) (T.unpack (platform config))
-                        started ended moduleMaps (runDumps run)
+                        started ended (maybe "not read" (A.verdictSummary . A.testCases) (runResult run)) moduleMaps (runDumps run)
                     putStrLn (infoMessage ("The coverage of " ++ label ++ " is in " ++ file))
                     -- | The report takes every result whose stamps match the build
                     writeCoverageReport terminaVersion

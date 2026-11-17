@@ -90,6 +90,8 @@ data RunResult = RunResult {
     runPlatform :: String,
     runStarted :: String,
     runEnded :: String,
+    runEnd :: Maybe String, -- ^ how it ended, none in a result of an older termina
+    runReboots :: Maybe Int, -- ^ the reboots of a run of the application
     runModules :: [ModuleFlags]
   }
 
@@ -101,8 +103,10 @@ instance FromJSON RunResult where
         plt <- o .: "platform"
         started <- o .: "started"
         ended <- o .: "ended"
+        end <- o .:? "end"
+        reboots <- o .:? "reboots"
         modules <- o .: "modules"
-        return (RunResult "" kind what plt started ended modules)
+        return (RunResult "" kind what plt started ended end reboots modules)
 
 -- | Whether a decision was seen true and false, or a condition with each value
 data Outcomes = Outcomes {

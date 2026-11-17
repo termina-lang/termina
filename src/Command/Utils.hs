@@ -44,6 +44,7 @@ import Control.Exception (IOException, try)
 import System.Process (readCreateProcessWithExitCode)
 import Configuration.Fetch (gitProcess)
 import Configuration.Configuration (ProjectProfile(..), outputFolderName)
+import Runner.CoverageHtml (Provenance(..))
 import Runner.CoverageReport (buildReport)
 import Data.Time (defaultTimeLocale, formatTime, getZonedTime)
 import Utils.Files (filesUnder)
@@ -363,11 +364,14 @@ readProfile "debug" = Right Debug
 readProfile "release" = Right Release
 readProfile other = Left $ "Unknown profile: " ++ other ++ " (use debug or release)"
 
--- | Writes the coverage report with the stylesheet of the manifest, given the version of termina, and says where it is
+-- | Writes the coverage report with the project and the stylesheet of the manifest, given the version of termina, and says where it is
 writeCoverageReport :: String -> IO ()
 writeCoverageReport terminaVersion = do
     manifest <- loadManifest projectRoot >>= either dieWithFirstError return
-    buildReport terminaVersion ((projectRoot </>) <$> coverageStyle (manifestCoverage manifest)) outputFolderName
+    written <- formatTime defaultTimeLocale "%Y-%m-%d %H:%M" <$> getZonedTime
+    let project = manifestProject manifest
+        provenance = Provenance (T.unpack (projectName project) ++ " " ++ T.unpack (projectVersion project)) terminaVersion written
+    buildReport provenance ((projectRoot </>) <$> coverageStyle (manifestCoverage manifest)) outputFolderName
     putStrLn (infoMessage ("The coverage report is " ++ (outputFolderName </> "coverage" </> "index.html")))
 
 -- | The local time, as the results of the runs record it

@@ -59,7 +59,7 @@ moduleMap = ModuleMap "m" "sha256:0" (Just "0.0.0") path (Just "source-hash")
 run :: String -> [Int] -> [[Int]] -> (RunResult, [(ModuleFlags, ModuleMap)])
 run name statements witnesses =
     let flags = ModuleFlags "m" "sha256:0" True statements witnesses
-    in (RunResult name "test" name "posix-gcc" "2026-11-16T10:00:00" "2026-11-16T10:00:01" [flags], [(flags, moduleMap)])
+    in (RunResult name "test" name "posix-gcc" "2026-11-16T10:00:00" "2026-11-16T10:00:01" (Just "1 passed") Nothing [flags], [(flags, moduleMap)])
 
 -- | Two runs whose flags complete each other
 first, second :: (RunResult, [(ModuleFlags, ModuleMap)])

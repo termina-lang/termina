@@ -103,7 +103,7 @@ runApplication instrumentation mProfile offline seconds withGdb mServer mXsdb = 
                         ++ show (appReboots run) ++ (if appReboots run == 1 then " reboot" else " reboots")))
                     when withCoverage $ do
                         maps <- either dieWithError return =<< readMaps (outputFolder config)
-                        file <- writeAppResult outputFolderName (show plt) started ended (appEnd run) (appReboots run)
+                        file <- writeAppResult outputFolderName (show plt) started ended (appEnd run) (Just (appReboots run))
                             maps (appCoverage run)
                         putStrLn (infoMessage ("The coverage of the run is in " ++ file))
                         writeCoverageReport terminaVersion

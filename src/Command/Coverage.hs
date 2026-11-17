@@ -158,8 +158,8 @@ coverageCommand (CoverageCmdArgs target mPlatform mProfile mCase isolated second
         when (null dumps) $ cannotRun (folder ++ " has no coverage dump of " ++ outputFolder config)
         now <- timestamp
         file <- case target of
-            Application -> writeAppResult outputFolderName (show (deploymentPlatform deployment)) now now "recorded" 0 maps dumps
-            _ -> writeTestResult outputFolderName (T.unpack (name config)) (T.unpack (platform config)) now now maps dumps
+            Application -> writeAppResult outputFolderName (show (deploymentPlatform deployment)) now now "recorded" Nothing maps dumps
+            _ -> writeTestResult outputFolderName (T.unpack (name config)) (T.unpack (platform config)) now now "recorded" maps dumps
         putStrLn (infoMessage ("The coverage of the record is in " ++ file))
         report
 
