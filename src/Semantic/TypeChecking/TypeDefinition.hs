@@ -71,6 +71,7 @@ typeClassFieldDefinition ::
   -> ClassMember ParserAnn
   -> SemanticMonad (SAST.ClassMember SemanticAnn)
 typeClassFieldDefinition fldDependencies (ClassField (FieldDefinition fs_id fs_ts annCF)) = do
+  checkReservedMemberName annCF fs_id
   fs_ty <- typeTypeSpecifier annCF typeGlobalObject fs_ts
   checkTerminaType annCF fs_ty
   classFieldTyorFail annCF fs_ty
@@ -133,6 +134,7 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
 
     typeInterfaceProcedure :: InterfaceMember Location -> SemanticMonad (SAST.InterfaceMember SemanticAnn)
     typeInterfaceProcedure (InterfaceProcedure ak procId ps_ts mds_ts' annIP) = do
+      checkReservedMemberName annIP procId
       ps_ty <- localScope $ do
           forM ps_ts (\param@(Parameter paramId _ pann) -> do
             typedParam <- typeProcedureParameter annIP param
@@ -433,6 +435,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
 -- Field definition helpers.
 typeFieldDefinition :: FieldDefinition ParserAnn -> SemanticMonad (SAST.FieldDefinition SemanticAnn)
 typeFieldDefinition (FieldDefinition ident ts loc) = do
+  checkReservedMemberName loc ident
   -- First we check its type is well-defined
   ty <- typeTypeSpecifier loc typeGlobalObject ts
   checkTerminaType loc ty

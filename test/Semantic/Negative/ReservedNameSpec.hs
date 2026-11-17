@@ -129,8 +129,46 @@ globalNamedPool =
   "    return 0;\n" ++
   "}\n"
 
+-- | A field of a struct or of a class, and a procedure of an interface, are
+-- members of a generated struct: the procedure is a member of the struct of an
+-- access port. A keyword of C does not parse there; the names of the library
+-- and of the platform are at file scope and do not reach a member.
+structFieldNamedSwitch, classFieldNamedDefault, ifaceProcedureNamedSwitch :: String
+structFieldNamedSwitch = "struct Pair {\n    switch : u32;\n};\n"
+classFieldNamedDefault =
+  "interface ICounter {\n" ++
+  "    procedure add(&mut self, value : u32);\n" ++
+  "};\n" ++
+  "resource class CCounter provides ICounter {\n" ++
+  "    default : u32;\n" ++
+  "    procedure add(&mut self, value : u32) {\n" ++
+  "        self->default = self->default + value;\n" ++
+  "        return;\n" ++
+  "    }\n" ++
+  "};\n"
+ifaceProcedureNamedSwitch =
+  "interface IDevice {\n" ++
+  "    procedure switch(&mut self, address : u32);\n" ++
+  "};\n"
+
+structFieldNamedIndex, structFieldNamedMalloc :: String
+structFieldNamedIndex = "struct Slot {\n    index : u32;\n};\n"
+structFieldNamedMalloc = "struct Slot {\n    malloc : u32;\n};\n"
+
 spec :: Spec
 spec = do
+  describe "SE-213: members of a generated struct" $ do
+    it "rejects a field of a struct named after a keyword of C" $
+      typeCheckErrorOn TestPlatform structFieldNamedSwitch `shouldBe` Just (pack "SE-213")
+    it "rejects a field of a class named after a keyword of C" $
+      typeCheckErrorOn TestPlatform classFieldNamedDefault `shouldBe` Just (pack "SE-213")
+    it "rejects a procedure of an interface named after a keyword of C" $
+      typeCheckErrorOn TestPlatform ifaceProcedureNamedSwitch `shouldBe` Just (pack "SE-213")
+    it "accepts a field named after a function the platform declares" $
+      typeCheckErrorOn POSIXGCC structFieldNamedIndex `shouldBe` Nothing
+    it "accepts a field named after a function of the standard library" $
+      typeCheckErrorOn TestPlatform structFieldNamedMalloc `shouldBe` Nothing
+
   describe "SE-213: names that C keeps for itself" $ do
     it "rejects a local object named after a keyword of C" $
       typeCheckErrorOn TestPlatform localNamedUnion `shouldBe` Just (pack "SE-213")

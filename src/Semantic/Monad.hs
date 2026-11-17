@@ -137,6 +137,13 @@ checkReservedName loc ident = do
     Nothing -> return ()
     Just reservedBy -> throwError $ annotateError loc $ EReservedIdentifier ident reservedBy
 
+-- | Reject the name of a member of a generated struct that C keeps for itself.
+checkReservedMemberName :: Location -> Identifier -> SemanticMonad ()
+checkReservedMemberName loc ident =
+  case reservedMemberName ident of
+    Nothing -> return ()
+    Just reservedBy -> throwError $ annotateError loc $ EReservedIdentifier ident reservedBy
+
 -- | Reject a top-level name that takes a symbol the platform links.
 checkLinkedName :: Location -> Identifier -> SemanticMonad ()
 checkLinkedName loc ident = do

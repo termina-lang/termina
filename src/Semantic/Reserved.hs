@@ -20,7 +20,7 @@
 -- link or, with a static library, replaces the definition of the library
 -- without any error.
 module Semantic.Reserved (
-    ReservedBy(..), reservedName, linkedName
+    ReservedBy(..), reservedName, reservedMemberName, linkedName
 ) where
 
 import Core.AST (Identifier)
@@ -64,6 +64,16 @@ reservedName plt ident =
   else if S.member ident cStandardLibrary then Just CStandardLibrary
   else if underscoreUpper ident then Just CImplementation
   else if S.member ident (platformNames plt) then Just (CPlatform plt)
+  else Nothing
+
+-- | What holds the name of a member of a generated struct: a field of a struct
+-- or of a class, or a procedure of an interface, which is a field of the struct
+-- of an access port. A member has the name space of its struct, so only the
+-- keywords and the names that C reserves at every scope apply to it.
+reservedMemberName :: Identifier -> Maybe ReservedBy
+reservedMemberName ident =
+  if S.member ident cKeywords then Just CKeyword
+  else if underscoreUpper ident then Just CImplementation
   else Nothing
 
 -- | Whether a top-level element takes a symbol that the platform links. A local
