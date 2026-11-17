@@ -12,7 +12,7 @@ import Semantic.Types
 import Utils.Annotations
 import Data.Maybe (catMaybes, isJust)
 import qualified Data.Set as S
-import Utils.Graph (findDisjointPaths, reverseGraph)
+import Utils.Graph (findDisjointPaths, reverseGraph, FindDisPathsError(..))
 import Control.Monad.State
 
 -- | A test with test instances is a unit test, and one without them is concurrent
@@ -178,17 +178,23 @@ genResourceUsageGraph progArchitecture = S.toList <$> resDependenciesMap
           -- | Resolve a set of access-port connections to the resources they
           -- ultimately depend on. A connection to an unprotected resource is
           -- replaced by the resources that the unprotected resource itself
-          -- accesses, because unprotected resources are not nodes of the
-          -- dependency graph. This must be applied to the access ports of
-          -- resources, tasks and handlers alike, so that a resource reached
-          -- only through an unprotected resource is not left without a path
-          -- to the entity that uses it.
-          inlineUnprotected aps = concatMap (\(usedRes, _) ->
+          -- accesses, repeatedly while those are unprotected too, because
+          -- unprotected resources are not nodes of the dependency graph. This
+          -- must be applied to the access ports of resources, tasks and
+          -- handlers alike, so that a resource reached only through a chain
+          -- of unprotected resources is not left without a path to the
+          -- entity that uses it.
+          inlineUnprotected aps = concatMap (resolve S.empty . fst) (M.elems aps)
+
+          resolve visited usedRes =
                 case M.lookup usedRes unprotectedResources of
                   Just (TPResource _ _ usedAps _ _ _) ->
-                    fst <$> M.elems usedAps
+                    if S.member usedRes visited then
+                      []
+                    else
+                      concatMap (resolve (S.insert usedRes visited) . fst) (M.elems usedAps)
                   Nothing ->
-                    [usedRes]) (M.elems aps)
+                    [usedRes]
 
           resoucesGraph = foldr (\(TPResource identifier _ aps _ _ _) acc ->
                 M.insert identifier (S.fromList (inlineUnprotected aps)) acc) initialMap (M.elems protectedResources)
@@ -288,9 +294,11 @@ genResourceLockingsInternal programArchitecture =
           else do
             -- Non-atomic resources need appropriate locking based on their dependencies
             case findDisjointPaths reversedGraph resId of
-              -- | The test instances are not nodes of the graph, so a resource
-              -- that only they reach has no path
-              Left _ | reachedByTest resId ->
+              -- | A resource without users in the graph is reached only by test
+              -- instances, which are not nodes of the graph, directly or
+              -- through unprotected resources, or by nobody: none of them
+              -- runs concurrently with another user
+              Left (EFDPNoDependencies _) ->
                 let resLock = ResourceLockNone in
                 modify (\st ->
                   st { resLockingMap = M.insert resId resLock (resLockingMap st) }) >> return resLock
@@ -324,13 +332,6 @@ genResourceLockingsInternal programArchitecture =
 
     isDeque :: Identifier -> Bool
     isDeque identifier = M.member identifier (deques programArchitecture)
-
-    -- | A case and the tasks of the unit are never inside a resource at the
-    -- same time, so the test instances are not users of a resource
-    reachedByTest :: Identifier -> Bool
-    reachedByTest identifier =
-        any (\(source, _, _) -> M.member source (testInstances programArchitecture))
-            (M.findWithDefault [] identifier (resourceSources programArchitecture))
 
     isTaskOrHandler :: Identifier -> Bool
     isTaskOrHandler identifier =
