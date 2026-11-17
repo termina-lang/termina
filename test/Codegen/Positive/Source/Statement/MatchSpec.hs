@@ -146,9 +146,40 @@ test5 = "enum Sample {\n" ++
         "    return ret;\n" ++
         "}"
 
+-- | A match on the value a function returns, which the generated code keeps in
+-- a temporary of the type of the enum.
+test6 :: String
+test6 = "enum Kind {\n" ++
+        "    First,\n" ++
+        "    Second\n" ++
+        "};\n" ++
+        "\n" ++
+        "function classify(value : u32) -> Kind {\n" ++
+        "    var kind : Kind = Kind::First;\n" ++
+        "    if (value > 10) {\n" ++
+        "        kind = Kind::Second;\n" ++
+        "    }\n" ++
+        "    return kind;\n" ++
+        "}\n" ++
+        "\n" ++
+        "function match_test6(value : u32) -> u32 {\n" ++
+        "    var ret : u32 = 0;\n" ++
+        "    match classify(value) {\n" ++
+        "        case First => {\n" ++
+        "            ret = 1;\n" ++
+        "        }\n" ++
+        "        case Second => {\n" ++
+        "            ret = 2;\n" ++
+        "        }\n" ++
+        "    }\n" ++
+        "    return ret;\n" ++
+        "}"
+
 spec :: Spec
 spec = do
   describe "Code generation for match statements" $ do
+    it "Keeps the enum a function returns in a temporary of the type of the enum" $ do
+      renderSource test6 `shouldSatisfy` isInfixOf (pack "Kind termina__match = classify(value);")
     it "Binds a pointer to const data through a reference taken in the match" $ do
       renderSource test5 `shouldSatisfy` isInfixOf (pack "const uint32_t * const b = &s.Pair._1;")
     it "Binds a pointer to writable data through a mutable reference taken in the match" $ do

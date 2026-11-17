@@ -667,38 +667,30 @@ genBlocks (ForLoopBlock iterator iteratorTS initValue endValue breakCond body an
             (trail_cr . block $ cBody)) |>> getLocation ann]
 genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
     exprType <- withoutConst <$> getExprType expr
-    (casePrefix, structName, genParamsStructName) <-
+    (casePrefix, genParamsStructName) <-
         case exprType of
             -- | If the expression is an enumeration, the case identifier must 
             -- be prefixed with the enumeration identifier.
-            (TEnum enumId) -> do
-                enumStructName <- genEnumStructName enumId
-                return ((<::>) enumId, enumStructName, genEnumParameterStructName enumId)
-            TReference _ (TEnum enumId) -> do
-                enumStructName <- genEnumStructName enumId
-                return ((<::>) enumId, enumStructName, genEnumParameterStructName enumId)
+            (TEnum enumId) ->
+                return ((<::>) enumId, genEnumParameterStructName enumId)
+            TReference _ (TEnum enumId) ->
+                return ((<::>) enumId, genEnumParameterStructName enumId)
             (TOption ts) -> do
-                sname <- genOptionStructName ts
                 pname <- genOptionParameterStructName ts
-                return ((<::>) optionType, sname, const (return pname))
+                return ((<::>) optionType, const (return pname))
             (TReference _ (TOption ts)) -> do
-                sname <- genOptionStructName ts
                 pname <- genOptionParameterStructName ts
-                return ((<::>) optionType, sname, const (return pname))
+                return ((<::>) optionType, const (return pname))
             (TStatus ts) -> do
-                sname <- genStatusStructName ts
                 pname <- genStatusParameterStructName ts
-                return ((<::>) statusType, sname, const (return pname))
+                return ((<::>) statusType, const (return pname))
             (TReference _ (TStatus ts)) -> do
-                sname <- genStatusStructName ts
                 pname <- genStatusParameterStructName ts
-                return ((<::>) statusType, sname, const (return pname))
-            (TReference _ (TResult okTy errorTy)) -> do
-                sname <- genResultStructName okTy errorTy
-                return ((<::>) resultType, sname, genResultParameterStructName okTy errorTy)
-            (TResult okTy errorTy) -> do
-                sname <- genResultStructName okTy errorTy
-                return ((<::>) resultType, sname, genResultParameterStructName okTy errorTy)
+                return ((<::>) statusType, const (return pname))
+            (TReference _ (TResult okTy errorTy)) ->
+                return ((<::>) resultType, genResultParameterStructName okTy errorTy)
+            (TResult okTy errorTy) ->
+                return ((<::>) resultType, genResultParameterStructName okTy errorTy)
             _ -> throwError $ InternalError $ "Unsupported match expression type: " ++ show expr
     case expr of
         (ReferenceExpression _ obj _) -> do
@@ -765,7 +757,7 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                 _ -> throwError $ InternalError $ "Match statement without cases: " ++ show match
         _ -> do
             cExpr <- genExpression expr
-            cType <- genType noqual (TStruct structName)
+            cType <- genType noqual exprType
             let decl = var (terminafy "match") cType @:= cExpr
                 cObj' = terminafy "match" @: cType
             case matchCases of
