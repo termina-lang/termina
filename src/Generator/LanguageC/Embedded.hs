@@ -596,6 +596,8 @@ instance Alignment CFileItem CFileItem where
         CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) loc)
     pre_cr (CExtDecl (CEDVariable storage decl) (LocatedElement _ loc)) =
         CExtDecl (CEDVariable storage decl) (LocatedElement (CDeclarationAnn True) loc)
+    pre_cr (CExtDecl (CEDMacroVariable macro decl) (LocatedElement _ loc)) =
+        CExtDecl (CEDMacroVariable macro decl) (LocatedElement (CDeclarationAnn True) loc)
     pre_cr (CExtDecl (CEDFunction storage funspecs cType ident decls) (LocatedElement _ loc)) =
         CExtDecl (CEDFunction storage funspecs cType ident decls) (LocatedElement (CDeclarationAnn True) loc)
     pre_cr (CExtDecl (CEDEnum maybeIdent enum) (LocatedElement _ loc)) =
@@ -619,6 +621,8 @@ instance Alignment CFileItem CFileItem where
         CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn False) loc)
     no_cr (CExtDecl (CEDVariable storage decl) (LocatedElement _ loc)) =
         CExtDecl (CEDVariable storage decl) (LocatedElement (CDeclarationAnn False) loc)
+    no_cr (CExtDecl (CEDMacroVariable macro decl) (LocatedElement _ loc)) =
+        CExtDecl (CEDMacroVariable macro decl) (LocatedElement (CDeclarationAnn False) loc)
     no_cr (CExtDecl (CEDFunction storage funspecs cType ident decls) (LocatedElement _ loc)) =
         CExtDecl (CEDFunction storage funspecs cType ident decls) (LocatedElement (CDeclarationAnn False) loc)
     no_cr (CExtDecl (CEDEnum maybeIdent enum) (LocatedElement _ loc)) =

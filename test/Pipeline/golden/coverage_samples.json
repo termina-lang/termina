@@ -1,0 +1,1222 @@
+{
+    "module": "test",
+    "stamp": "sha256:31b80b41584362e383745419bcf41e78c9be08e6579def6c6cb036ae5517e53b",
+    "termina": "0.0.0",
+    "source": "test",
+    "source-sha256": "source-hash",
+    "statements": 56,
+    "witnesses": 30,
+    "points": [
+        {
+            "index": 0,
+            "kind": "statement",
+            "construct": "return",
+            "function": "check",
+            "start": [
+                8,
+                5
+            ],
+            "end": [
+                8,
+                18
+            ]
+        },
+        {
+            "index": 1,
+            "kind": "statement",
+            "function": "if_no_else",
+            "start": [
+                12,
+                5
+            ],
+            "end": [
+                12,
+                20
+            ]
+        },
+        {
+            "index": 2,
+            "kind": "statement",
+            "construct": "if",
+            "function": "if_no_else",
+            "start": [
+                13,
+                5
+            ],
+            "end": [
+                16,
+                5
+            ]
+        },
+        {
+            "index": 0,
+            "kind": "decision",
+            "construct": "if",
+            "function": "if_no_else",
+            "start": [
+                13,
+                8
+            ],
+            "end": [
+                13,
+                16
+            ]
+        },
+        {
+            "index": 3,
+            "kind": "statement",
+            "function": "if_no_else",
+            "start": [
+                14,
+                9
+            ],
+            "end": [
+                14,
+                18
+            ]
+        },
+        {
+            "index": 4,
+            "kind": "statement",
+            "construct": "return",
+            "function": "if_no_else",
+            "start": [
+                16,
+                5
+            ],
+            "end": [
+                16,
+                13
+            ]
+        },
+        {
+            "index": 5,
+            "kind": "statement",
+            "construct": "if",
+            "function": "if_chain",
+            "start": [
+                21,
+                5
+            ],
+            "end": [
+                28,
+                5
+            ]
+        },
+        {
+            "index": 1,
+            "kind": "decision",
+            "construct": "if",
+            "function": "if_chain",
+            "start": [
+                21,
+                8
+            ],
+            "end": [
+                21,
+                16
+            ]
+        },
+        {
+            "index": 6,
+            "kind": "statement",
+            "function": "if_chain",
+            "start": [
+                22,
+                9
+            ],
+            "end": [
+                22,
+                14
+            ]
+        },
+        {
+            "index": 7,
+            "kind": "statement",
+            "function": "if_chain",
+            "start": [
+                26,
+                9
+            ],
+            "end": [
+                26,
+                14
+            ]
+        },
+        {
+            "index": 2,
+            "kind": "decision",
+            "construct": "if",
+            "function": "if_chain",
+            "start": [
+                23,
+                15
+            ],
+            "end": [
+                23,
+                23
+            ]
+        },
+        {
+            "index": 8,
+            "kind": "statement",
+            "function": "if_chain",
+            "start": [
+                24,
+                9
+            ],
+            "end": [
+                24,
+                14
+            ]
+        },
+        {
+            "index": 9,
+            "kind": "statement",
+            "construct": "return",
+            "function": "if_chain",
+            "start": [
+                28,
+                5
+            ],
+            "end": [
+                28,
+                13
+            ]
+        },
+        {
+            "index": 10,
+            "kind": "statement",
+            "function": "for_plain",
+            "start": [
+                32,
+                5
+            ],
+            "end": [
+                32,
+                22
+            ]
+        },
+        {
+            "index": 11,
+            "kind": "statement",
+            "construct": "for",
+            "function": "for_plain",
+            "start": [
+                33,
+                5
+            ],
+            "end": [
+                36,
+                5
+            ]
+        },
+        {
+            "index": 3,
+            "kind": "decision",
+            "construct": "for",
+            "function": "for_plain",
+            "start": [
+                33,
+                5
+            ],
+            "end": [
+                36,
+                5
+            ]
+        },
+        {
+            "index": 12,
+            "kind": "statement",
+            "function": "for_plain",
+            "start": [
+                34,
+                9
+            ],
+            "end": [
+                34,
+                22
+            ]
+        },
+        {
+            "index": 13,
+            "kind": "statement",
+            "construct": "return",
+            "function": "for_plain",
+            "start": [
+                36,
+                5
+            ],
+            "end": [
+                36,
+                19
+            ]
+        },
+        {
+            "index": 14,
+            "kind": "statement",
+            "function": "for_while",
+            "start": [
+                40,
+                5
+            ],
+            "end": [
+                40,
+                22
+            ]
+        },
+        {
+            "index": 15,
+            "kind": "statement",
+            "construct": "for",
+            "function": "for_while",
+            "start": [
+                41,
+                5
+            ],
+            "end": [
+                44,
+                5
+            ]
+        },
+        {
+            "index": 4,
+            "kind": "decision",
+            "construct": "for",
+            "function": "for_while",
+            "start": [
+                41,
+                5
+            ],
+            "end": [
+                44,
+                5
+            ]
+        },
+        {
+            "index": 5,
+            "kind": "condition",
+            "decision": 4,
+            "function": "for_while",
+            "start": [
+                41,
+                5
+            ],
+            "end": [
+                44,
+                5
+            ]
+        },
+        {
+            "index": 6,
+            "kind": "condition",
+            "decision": 4,
+            "function": "for_while",
+            "start": [
+                41,
+                33
+            ],
+            "end": [
+                41,
+                47
+            ]
+        },
+        {
+            "index": 16,
+            "kind": "statement",
+            "function": "for_while",
+            "start": [
+                42,
+                9
+            ],
+            "end": [
+                42,
+                22
+            ]
+        },
+        {
+            "index": 17,
+            "kind": "statement",
+            "construct": "return",
+            "function": "for_while",
+            "start": [
+                44,
+                5
+            ],
+            "end": [
+                44,
+                15
+            ]
+        },
+        {
+            "index": 18,
+            "kind": "statement",
+            "construct": "match",
+            "function": "match_no_default",
+            "start": [
+                49,
+                5
+            ],
+            "end": [
+                60,
+                5
+            ]
+        },
+        {
+            "index": 7,
+            "kind": "decision",
+            "construct": "case",
+            "function": "match_no_default",
+            "start": [
+                50,
+                9
+            ],
+            "end": [
+                53,
+                9
+            ]
+        },
+        {
+            "index": 19,
+            "kind": "statement",
+            "function": "match_no_default",
+            "start": [
+                51,
+                13
+            ],
+            "end": [
+                51,
+                18
+            ]
+        },
+        {
+            "index": 8,
+            "kind": "decision",
+            "construct": "case",
+            "function": "match_no_default",
+            "start": [
+                53,
+                9
+            ],
+            "end": [
+                56,
+                9
+            ]
+        },
+        {
+            "index": 20,
+            "kind": "statement",
+            "function": "match_no_default",
+            "start": [
+                54,
+                13
+            ],
+            "end": [
+                54,
+                18
+            ]
+        },
+        {
+            "kind": "case",
+            "after": 8,
+            "function": "match_no_default",
+            "start": [
+                56,
+                9
+            ],
+            "end": [
+                59,
+                5
+            ]
+        },
+        {
+            "index": 21,
+            "kind": "statement",
+            "function": "match_no_default",
+            "start": [
+                57,
+                13
+            ],
+            "end": [
+                57,
+                18
+            ]
+        },
+        {
+            "index": 22,
+            "kind": "statement",
+            "construct": "return",
+            "function": "match_no_default",
+            "start": [
+                60,
+                5
+            ],
+            "end": [
+                60,
+                13
+            ]
+        },
+        {
+            "index": 23,
+            "kind": "statement",
+            "construct": "match",
+            "function": "match_default",
+            "start": [
+                65,
+                5
+            ],
+            "end": [
+                73,
+                5
+            ]
+        },
+        {
+            "index": 9,
+            "kind": "decision",
+            "construct": "case",
+            "function": "match_default",
+            "start": [
+                66,
+                9
+            ],
+            "end": [
+                69,
+                9
+            ]
+        },
+        {
+            "index": 24,
+            "kind": "statement",
+            "function": "match_default",
+            "start": [
+                67,
+                13
+            ],
+            "end": [
+                67,
+                18
+            ]
+        },
+        {
+            "kind": "case",
+            "after": 9,
+            "function": "match_default",
+            "start": [
+                69,
+                9
+            ],
+            "end": [
+                72,
+                5
+            ]
+        },
+        {
+            "index": 25,
+            "kind": "statement",
+            "function": "match_default",
+            "start": [
+                70,
+                13
+            ],
+            "end": [
+                70,
+                18
+            ]
+        },
+        {
+            "index": 26,
+            "kind": "statement",
+            "construct": "return",
+            "function": "match_default",
+            "start": [
+                73,
+                5
+            ],
+            "end": [
+                73,
+                13
+            ]
+        },
+        {
+            "index": 27,
+            "kind": "statement",
+            "construct": "if",
+            "function": "cond_and",
+            "start": [
+                78,
+                5
+            ],
+            "end": [
+                83,
+                5
+            ]
+        },
+        {
+            "index": 10,
+            "kind": "decision",
+            "construct": "if",
+            "function": "cond_and",
+            "start": [
+                78,
+                8
+            ],
+            "end": [
+                78,
+                25
+            ]
+        },
+        {
+            "index": 11,
+            "kind": "condition",
+            "decision": 10,
+            "function": "cond_and",
+            "start": [
+                78,
+                9
+            ],
+            "end": [
+                78,
+                15
+            ]
+        },
+        {
+            "index": 12,
+            "kind": "condition",
+            "decision": 10,
+            "function": "cond_and",
+            "start": [
+                78,
+                18
+            ],
+            "end": [
+                78,
+                23
+            ]
+        },
+        {
+            "index": 28,
+            "kind": "statement",
+            "function": "cond_and",
+            "start": [
+                79,
+                9
+            ],
+            "end": [
+                79,
+                14
+            ]
+        },
+        {
+            "index": 29,
+            "kind": "statement",
+            "function": "cond_and",
+            "start": [
+                81,
+                9
+            ],
+            "end": [
+                81,
+                14
+            ]
+        },
+        {
+            "index": 30,
+            "kind": "statement",
+            "construct": "return",
+            "function": "cond_and",
+            "start": [
+                83,
+                5
+            ],
+            "end": [
+                83,
+                13
+            ]
+        },
+        {
+            "index": 31,
+            "kind": "statement",
+            "construct": "if",
+            "function": "elif_or",
+            "start": [
+                88,
+                5
+            ],
+            "end": [
+                95,
+                5
+            ]
+        },
+        {
+            "index": 13,
+            "kind": "decision",
+            "construct": "if",
+            "function": "elif_or",
+            "start": [
+                88,
+                8
+            ],
+            "end": [
+                88,
+                17
+            ]
+        },
+        {
+            "index": 32,
+            "kind": "statement",
+            "function": "elif_or",
+            "start": [
+                89,
+                9
+            ],
+            "end": [
+                89,
+                14
+            ]
+        },
+        {
+            "index": 33,
+            "kind": "statement",
+            "function": "elif_or",
+            "start": [
+                93,
+                9
+            ],
+            "end": [
+                93,
+                14
+            ]
+        },
+        {
+            "index": 14,
+            "kind": "decision",
+            "construct": "if",
+            "function": "elif_or",
+            "start": [
+                90,
+                15
+            ],
+            "end": [
+                90,
+                32
+            ]
+        },
+        {
+            "index": 15,
+            "kind": "condition",
+            "decision": 14,
+            "function": "elif_or",
+            "start": [
+                90,
+                16
+            ],
+            "end": [
+                90,
+                22
+            ]
+        },
+        {
+            "index": 16,
+            "kind": "condition",
+            "decision": 14,
+            "function": "elif_or",
+            "start": [
+                90,
+                25
+            ],
+            "end": [
+                90,
+                30
+            ]
+        },
+        {
+            "index": 34,
+            "kind": "statement",
+            "function": "elif_or",
+            "start": [
+                91,
+                9
+            ],
+            "end": [
+                91,
+                14
+            ]
+        },
+        {
+            "index": 35,
+            "kind": "statement",
+            "construct": "return",
+            "function": "elif_or",
+            "start": [
+                95,
+                5
+            ],
+            "end": [
+                95,
+                13
+            ]
+        },
+        {
+            "index": 36,
+            "kind": "statement",
+            "function": "value_and",
+            "start": [
+                99,
+                5
+            ],
+            "end": [
+                99,
+                37
+            ]
+        },
+        {
+            "index": 17,
+            "kind": "decision",
+            "function": "value_and",
+            "start": [
+                99,
+                23
+            ],
+            "end": [
+                99,
+                37
+            ]
+        },
+        {
+            "index": 18,
+            "kind": "condition",
+            "decision": 17,
+            "function": "value_and",
+            "start": [
+                99,
+                23
+            ],
+            "end": [
+                99,
+                29
+            ]
+        },
+        {
+            "index": 19,
+            "kind": "condition",
+            "decision": 17,
+            "function": "value_and",
+            "start": [
+                99,
+                32
+            ],
+            "end": [
+                99,
+                37
+            ]
+        },
+        {
+            "index": 37,
+            "kind": "statement",
+            "construct": "return",
+            "function": "value_and",
+            "start": [
+                100,
+                5
+            ],
+            "end": [
+                100,
+                16
+            ]
+        },
+        {
+            "index": 38,
+            "kind": "statement",
+            "construct": "return",
+            "function": "arg_or",
+            "start": [
+                104,
+                5
+            ],
+            "end": [
+                104,
+                30
+            ]
+        },
+        {
+            "index": 20,
+            "kind": "decision",
+            "function": "arg_or",
+            "start": [
+                104,
+                12
+            ],
+            "end": [
+                104,
+                30
+            ]
+        },
+        {
+            "index": 21,
+            "kind": "condition",
+            "decision": 20,
+            "function": "arg_or",
+            "start": [
+                104,
+                12
+            ],
+            "end": [
+                104,
+                21
+            ]
+        },
+        {
+            "index": 22,
+            "kind": "condition",
+            "decision": 20,
+            "function": "arg_or",
+            "start": [
+                104,
+                24
+            ],
+            "end": [
+                104,
+                30
+            ]
+        },
+        {
+            "index": 39,
+            "kind": "statement",
+            "construct": "if",
+            "function": "pick",
+            "start": [
+                109,
+                5
+            ],
+            "end": [
+                114,
+                5
+            ]
+        },
+        {
+            "index": 23,
+            "kind": "decision",
+            "construct": "if",
+            "function": "pick",
+            "start": [
+                109,
+                9
+            ],
+            "end": [
+                109,
+                10
+            ]
+        },
+        {
+            "index": 40,
+            "kind": "statement",
+            "function": "pick",
+            "start": [
+                110,
+                9
+            ],
+            "end": [
+                110,
+                14
+            ]
+        },
+        {
+            "index": 41,
+            "kind": "statement",
+            "function": "pick",
+            "start": [
+                112,
+                9
+            ],
+            "end": [
+                112,
+                14
+            ]
+        },
+        {
+            "index": 42,
+            "kind": "statement",
+            "construct": "return",
+            "function": "pick",
+            "start": [
+                114,
+                5
+            ],
+            "end": [
+                114,
+                13
+            ]
+        },
+        {
+            "index": 43,
+            "kind": "statement",
+            "function": "call_with_and",
+            "start": [
+                118,
+                5
+            ],
+            "end": [
+                118,
+                42
+            ]
+        },
+        {
+            "index": 24,
+            "kind": "decision",
+            "function": "call_with_and",
+            "start": [
+                118,
+                24
+            ],
+            "end": [
+                118,
+                38
+            ]
+        },
+        {
+            "index": 25,
+            "kind": "condition",
+            "decision": 24,
+            "function": "call_with_and",
+            "start": [
+                118,
+                24
+            ],
+            "end": [
+                118,
+                30
+            ]
+        },
+        {
+            "index": 26,
+            "kind": "condition",
+            "decision": 24,
+            "function": "call_with_and",
+            "start": [
+                118,
+                33
+            ],
+            "end": [
+                118,
+                38
+            ]
+        },
+        {
+            "index": 44,
+            "kind": "statement",
+            "construct": "return",
+            "function": "call_with_and",
+            "start": [
+                119,
+                5
+            ],
+            "end": [
+                119,
+                13
+            ]
+        },
+        {
+            "index": 45,
+            "kind": "statement",
+            "function": "index_check",
+            "start": [
+                123,
+                5
+            ],
+            "end": [
+                123,
+                25
+            ]
+        },
+        {
+            "index": 46,
+            "kind": "statement",
+            "function": "index_check",
+            "start": [
+                124,
+                5
+            ],
+            "end": [
+                124,
+                24
+            ]
+        },
+        {
+            "index": 47,
+            "kind": "statement",
+            "construct": "return",
+            "function": "index_check",
+            "start": [
+                125,
+                5
+            ],
+            "end": [
+                125,
+                13
+            ]
+        },
+        {
+            "index": 48,
+            "kind": "statement",
+            "function": "negated_and",
+            "start": [
+                129,
+                5
+            ],
+            "end": [
+                129,
+                20
+            ]
+        },
+        {
+            "index": 49,
+            "kind": "statement",
+            "construct": "if",
+            "function": "negated_and",
+            "start": [
+                130,
+                5
+            ],
+            "end": [
+                133,
+                5
+            ]
+        },
+        {
+            "index": 27,
+            "kind": "decision",
+            "construct": "if",
+            "function": "negated_and",
+            "start": [
+                130,
+                8
+            ],
+            "end": [
+                130,
+                36
+            ]
+        },
+        {
+            "index": 28,
+            "kind": "condition",
+            "decision": 27,
+            "function": "negated_and",
+            "start": [
+                130,
+                10
+            ],
+            "end": [
+                130,
+                16
+            ]
+        },
+        {
+            "index": 29,
+            "kind": "condition",
+            "decision": 27,
+            "function": "negated_and",
+            "start": [
+                130,
+                19
+            ],
+            "end": [
+                130,
+                24
+            ]
+        },
+        {
+            "index": 50,
+            "kind": "statement",
+            "function": "negated_and",
+            "start": [
+                131,
+                9
+            ],
+            "end": [
+                131,
+                14
+            ]
+        },
+        {
+            "index": 51,
+            "kind": "statement",
+            "construct": "return",
+            "function": "negated_and",
+            "start": [
+                133,
+                5
+            ],
+            "end": [
+                133,
+                13
+            ]
+        },
+        {
+            "index": 52,
+            "kind": "statement",
+            "function": "match_sole",
+            "start": [
+                141,
+                5
+            ],
+            "end": [
+                141,
+                20
+            ]
+        },
+        {
+            "index": 53,
+            "kind": "statement",
+            "construct": "match",
+            "function": "match_sole",
+            "start": [
+                142,
+                5
+            ],
+            "end": [
+                147,
+                5
+            ]
+        },
+        {
+            "kind": "case",
+            "statement": 53,
+            "function": "match_sole",
+            "start": [
+                143,
+                9
+            ],
+            "end": [
+                146,
+                5
+            ]
+        },
+        {
+            "index": 54,
+            "kind": "statement",
+            "function": "match_sole",
+            "start": [
+                144,
+                13
+            ],
+            "end": [
+                144,
+                22
+            ]
+        },
+        {
+            "index": 55,
+            "kind": "statement",
+            "construct": "return",
+            "function": "match_sole",
+            "start": [
+                147,
+                5
+            ],
+            "end": [
+                147,
+                13
+            ]
+        }
+    ]
+}

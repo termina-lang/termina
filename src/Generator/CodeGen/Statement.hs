@@ -8,9 +8,12 @@ import Control.Monad ( zipWithM )
 import Control.Monad.Except
 import Generator.CodeGen.Common
 import Generator.CodeGen.Expression
+import Generator.CodeGen.Coverage (statementPoint, newPoint, witness, casePoint, currentStatement)
 import Utils.Annotations
 import Generator.CodeGen.Types
 import Core.Utils (withoutConst)
+import Control.Monad.State (gets)
+import Data.Maybe (isJust)
 
 genAtomicStore :: Location -> Bool -> CObject -> Expression SemanticAnn -> CGenerator CCompoundBlockItem
 genAtomicStore loc before' cObj expr = do
@@ -525,33 +528,86 @@ genDequeCall procName params obj args ann = do
         cDequeExpr = cObj @: getCObjType cObj |>> loc
     return [pre_cr (termina__deque__procedure procName params @@ (cDequeExpr : cArgs) |>> loc) |>> loc]
 
+-- | A block, with the flag of the coverage before each statement that generates code.
 genBlocks :: BasicBlock SemanticAnn -> CGenerator [CCompoundBlockItem]
-genBlocks (RegularBlock stmts) = concat <$> traverse genStatement stmts
-genBlocks (ProcedureInvoke obj ident args ann) = genAccessPortCall obj ident args ann
+genBlocks (RegularBlock stmts) = concat <$> traverse genCoveredStatement stmts
 
-genBlocks (AllocBox obj arg ann) = do
+    where
+
+        genCoveredStatement stmt = do
+            point <- case stmt of
+                Declaration _ _ _ Nothing _ -> return []
+                AssignmentStmt _ _ ann -> statementPoint Nothing (getLocation ann)
+                Declaration _ _ _ _ ann -> statementPoint Nothing (getLocation ann)
+                SingleExpStmt _ ann -> statementPoint Nothing (getLocation ann)
+            (point ++) <$> genStatement stmt
+genBlocks blk = do
+    point <- statementPoint (blockConstruct blk) (getLocation (basicBlockAnnotation blk))
+    (point ++) <$> genBlock blk
+
+-- | The construct that a block starts, for the map of the coverage.
+blockConstruct :: BasicBlock SemanticAnn -> Maybe String
+blockConstruct (IfElseBlock {}) = Just "if"
+blockConstruct (ForLoopBlock {}) = Just "for"
+blockConstruct (MatchBlock {}) = Just "match"
+blockConstruct (ReturnBlock {}) = Just "return"
+blockConstruct (ContinueBlock {}) = Just "continue"
+blockConstruct (RebootBlock {}) = Just "reboot"
+blockConstruct (NoReturnCall {}) = Just "noreturn"
+blockConstruct _ = Nothing
+
+-- | The annotation of a block that is not a regular one.
+basicBlockAnnotation :: BasicBlock SemanticAnn -> SemanticAnn
+basicBlockAnnotation blk = case blk of
+    ProcedureInvoke _ _ _ ann -> ann
+    AllocBox _ _ ann -> ann
+    FreeBox _ _ ann -> ann
+    DequeTake _ _ ann -> ann
+    DequePut _ _ _ ann -> ann
+    DequeExchange _ _ _ _ ann -> ann
+    AtomicLoad _ _ ann -> ann
+    AtomicStore _ _ ann -> ann
+    AtomicArrayLoad _ _ _ ann -> ann
+    AtomicArrayStore _ _ _ ann -> ann
+    SendMessage _ _ ann -> ann
+    IfElseBlock _ _ _ ann -> ann
+    ForLoopBlock _ _ _ _ _ _ ann -> ann
+    MatchBlock _ _ _ ann -> ann
+    ReturnBlock _ ann -> ann
+    ContinueBlock _ ann -> ann
+    RebootBlock ann -> ann
+    NoReturnCall _ ann -> ann
+    SystemCall _ _ _ ann -> ann
+    RegularBlock _ -> error "a regular block has no annotation"
+
+-- | The C of a block, without the flag of the coverage before it.
+genBlock :: BasicBlock SemanticAnn -> CGenerator [CCompoundBlockItem]
+genBlock (RegularBlock stmts) = concat <$> traverse genStatement stmts
+genBlock (ProcedureInvoke obj ident args ann) = genAccessPortCall obj ident args ann
+
+genBlock (AllocBox obj arg ann) = do
     -- Generate the C code for the object
     cObj <- genObject obj
     -- Generate the C code for the parameters
     cArg <- genExpression arg
     methodCallExpr <- genPoolMethodCallExpr "alloc" cObj cArg (buildGenericAnn ann)
     return [pre_cr methodCallExpr |>> getLocation ann]
-genBlocks (FreeBox obj arg ann) = do
+genBlock (FreeBox obj arg ann) = do
     -- Generate the C code for the object
     cObj <- genObject obj
     -- Generate the C code for the parameters
     cArg <- genExpression arg
     methodCallExpr <- genPoolMethodCallExpr "free" cObj cArg (buildGenericAnn ann)
     return [pre_cr methodCallExpr |>> getLocation ann]
-genBlocks (DequeTake obj arg ann) =
+genBlock (DequeTake obj arg ann) =
     genDequeCall "take" [_const (ptr _Option__box)] obj [arg] ann
-genBlocks (DequePut end obj arg ann) =
+genBlock (DequePut end obj arg ann) =
     let procName = case end of { DequeBack -> "put"; DequeFront -> "put_front" } in
     genDequeCall procName [termina__box_t] obj [arg] ann
-genBlocks (DequeExchange kind obj arg out ann) =
+genBlock (DequeExchange kind obj arg out ann) =
     let procName = case kind of { DequeTryPut -> "try_put"; DequeReplace -> "replace" } in
     genDequeCall procName [termina__box_t, _const (ptr _Option__box)] obj [arg, out] ann
-genBlocks (AtomicLoad obj arg ann) = do
+genBlock (AtomicLoad obj arg ann) = do
     -- Generate the C code for the object
     cObj <- genObject obj
     let cObjExpr = cObj @: getCObjType cObj |>> getLocation ann
@@ -563,7 +619,7 @@ genBlocks (AtomicLoad obj arg ann) = do
             mCall <- genAtomicMethodCall "load" cObjExpr [cArg] (buildGenericAnn ann)
             return [pre_cr (cRefObj @= mCall) |>> getLocation ann]
         _ -> throwError $ InternalError $ "invalid params for atomic load: " ++ show arg
-genBlocks (AtomicStore obj arg ann) = do
+genBlock (AtomicStore obj arg ann) = do
     -- Generate the C code for the object
     cObj <- genObject obj
     let cObjExpr = cObj @: getCObjType cObj |>> getLocation ann
@@ -571,7 +627,7 @@ genBlocks (AtomicStore obj arg ann) = do
     cArg <- genExpression arg
     methodCallExpr <- genAtomicMethodCall "store" cObjExpr [cArg] (buildGenericAnn ann)
     return [pre_cr methodCallExpr |>> getLocation ann]
-genBlocks (AtomicArrayLoad obj idx arg ann) = do
+genBlock (AtomicArrayLoad obj idx arg ann) = do
     let cAnn = buildGenericAnn ann
     -- Generate the C code for the object
     cObj <- genObject obj
@@ -585,7 +641,7 @@ genBlocks (AtomicArrayLoad obj idx arg ann) = do
             mCall <- genAtomicMethodCall "load" cRefIndexedObj [cArg] cAnn
             return [pre_cr (cRefObj @= mCall) |>> getLocation ann]
         _ -> throwError $ InternalError $ "invalid params for atomic load_index: " ++ show arg
-genBlocks (AtomicArrayStore obj idx arg ann) = do
+genBlock (AtomicArrayStore obj idx arg ann) = do
     let cAnn = buildGenericAnn ann
     -- Generate the C code for the object
     cObj <- genObject obj
@@ -595,7 +651,7 @@ genBlocks (AtomicArrayStore obj idx arg ann) = do
     cRefIndexedObj <- genAddrOf cIndexedObj noqual cAnn
     mCall <- genAtomicMethodCall "store" cRefIndexedObj [cArg] cAnn
     return [pre_cr mCall |>> getLocation ann]
-genBlocks (SendMessage obj arg ann) = do
+genBlock (SendMessage obj arg ann) = do
     let cAnn = buildGenericAnn ann
     cObj <- genObject obj
     -- Generate the C code for the object
@@ -623,8 +679,8 @@ genBlocks (SendMessage obj arg ann) = do
                         no_cr mCall
                     ]
                 ]
-genBlocks (IfElseBlock (CondIf expr ifBlks _) elifsBlks elseBlk ann) = do
-    cExpr <- genExpression expr
+genBlock (IfElseBlock (CondIf expr ifBlks _) elifsBlks elseBlk ann) = do
+    cExpr <- genDecision (Just "if") expr
     cIfBlk <- concat <$> traverse genBlocks (blockBody ifBlks)
     cElseBlk <- mapM (\elseBlk' -> do
                     blks <- concat <$> traverse genBlocks (blockBody . condElseBody $ elseBlk')
@@ -639,24 +695,37 @@ genBlocks (IfElseBlock (CondIf expr ifBlks _) elifsBlks elseBlk ann) = do
         genAlternatives :: Maybe CStatement -> [CondElseIf SemanticAnn] -> CGenerator (Maybe CStatement)
         genAlternatives prev [] = return prev
         genAlternatives prev (CondElseIf expr' blk ann' : xs) = do
-            cExpr' <- genExpression expr'
+            cExpr' <- genDecision (Just "if") expr'
             cBlk <- concat <$> traverse genBlocks (blockBody blk)
             mPrev <- genAlternatives prev xs
             case mPrev of
                 Nothing -> return . Just $ _if cExpr' (trail_cr . block $ cBlk) |>> getLocation ann'
                 Just prev' -> return . Just $ _if_else cExpr' (trail_cr . block $ cBlk) prev' |>> getLocation ann'
 
-genBlocks (ForLoopBlock iterator iteratorTS initValue endValue breakCond body ann) = do
+genBlock (ForLoopBlock iterator iteratorTS initValue endValue breakCond body ann) = do
     initExpr <- genExpression initValue
     endExpr <- genExpression endValue
     cIteratorType <- genType noqual iteratorTS
-    let cIteratorExpr = iterator @: cIteratorType |>> getLocation ann
+    covered <- gets (isJust . coverageState)
+    let loc = getLocation ann
+        cIteratorExpr = iterator @: cIteratorType |>> loc
+        cRange = cIteratorExpr @< endExpr |>> loc
     condExpr <-
         case breakCond of
-            Nothing -> return $ cIteratorExpr @< endExpr |>> getLocation ann
+            Nothing | covered -> do
+                decision <- newPoint (DecisionPoint (Just "for")) loc
+                witness decision loc cRange
+            Nothing -> return cRange
+            -- | The guard is a decision, with the range and the while as its conditions
+            Just break' | covered -> do
+                decision <- newPoint (DecisionPoint (Just "for")) loc
+                rangeFlag <- newPoint (ConditionPoint decision) loc
+                cRange' <- witness rangeFlag loc cRange
+                cBreak <- genConditions decision break'
+                witness decision loc (cRange' @&& cBreak |>> loc)
             Just break' -> do
                     cBreak <- genExpression break'
-                    return $ (cIteratorExpr @< endExpr |>> getLocation ann) @&& cBreak |>> getLocation ann
+                    return $ cRange @&& cBreak |>> loc
 
     cBody <- concat <$> traverse genBlocks (blockBody body)
     return
@@ -665,7 +734,7 @@ genBlocks (ForLoopBlock iterator iteratorTS initValue endValue breakCond body an
             condExpr
             (iterator @: cIteratorType @= (cIteratorExpr @+ dec 1 @: cIteratorType) @: cIteratorType)
             (trail_cr . block $ cBody)) |>> getLocation ann]
-genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
+genBlock match@(MatchBlock expr matchCases mDefaultCase ann) = do
     exprType <- withoutConst <$> getExprType expr
     (casePrefix, structName, genParamsStructName) <-
         case exprType of
@@ -714,23 +783,25 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                         Just d@(DefaultCase {}) -> do
                             let cEnumVariantsFieldExpr = cObj @. variant @: uint32_t
                                 cCasePrefixIdentExpr = casePrefix identifier @: uint32_t
+                            (cTest, test) <- matchTest loc' (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr)
                             theCase <- flip CSCompound (buildCompoundAnn ann' False True) <$> genMatchCase cObj cTy m
-                            defCaseBlk <- genDefaultCase d
+                            defCaseBlk <- genDefaultCase test d
                             let cDefaultCase = (trail_cr . block) defCaseBlk
-                            return [pre_cr (_if_else (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr) theCase cDefaultCase) |>> loc']
+                            return [pre_cr (_if_else cTest theCase cDefaultCase) |>> loc']
                         Nothing -> genSoleMatchCase cObj cTy m
                 -- | The first one must add a preceding blank line
                 m@(MatchCase identifier _ _ ann') : xs -> do
                     let loc' = getLocation ann'
                     paramsStructName <- genParamsStructName identifier
                     cTy <- genType noqual (TStruct paramsStructName)
-                    rest <- genMatchCases cObj casePrefix genParamsStructName xs
-                    cBlk <- flip CSCompound (buildCompoundAnn ann' False True) <$> genMatchCase cObj cTy m
                     -- | TODO: The size of the enum field has been hardcoded, it should be
                     -- platform dependent
                     let cEnumVariantsFieldExpr = cObj @. variant @: uint32_t |>> getLocation ann
                         cCasePrefixIdentExpr = casePrefix identifier @: uint32_t |>> getLocation ann
-                    return [pre_cr (_if_else (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr) cBlk rest) |>> loc']
+                    (cTest, test) <- matchTest loc' (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr)
+                    cBlk <- flip CSCompound (buildCompoundAnn ann' False True) <$> genMatchCase cObj cTy m
+                    rest <- genMatchCases cObj casePrefix genParamsStructName test xs
+                    return [pre_cr (_if_else cTest cBlk rest) |>> loc']
                 _ -> throwError $ InternalError $ "Match statement without cases: " ++ show match
         (AccessObject {}) -> do
             cObj <- genExpression expr >>= getCObject
@@ -745,23 +816,25 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                         Just d@(DefaultCase {}) -> do
                             let cEnumVariantsFieldExpr = cObj @. variant @: uint32_t
                                 cCasePrefixIdentExpr = casePrefix identifier @: uint32_t
+                            (cTest, test) <- matchTest loc' (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr)
                             theCase <- flip CSCompound (buildCompoundAnn ann' False True) <$> genMatchCase cObj cTy m
-                            defCaseBlk <- genDefaultCase d
+                            defCaseBlk <- genDefaultCase test d
                             let cDefaultCase = (trail_cr . block) defCaseBlk
-                            return [pre_cr (_if_else (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr) theCase cDefaultCase) |>> loc']
+                            return [pre_cr (_if_else cTest theCase cDefaultCase) |>> loc']
                         Nothing -> genSoleMatchCase cObj cTy m
                 -- | The first one must add a preceding blank line
                 m@(MatchCase identifier _ _ ann') : xs -> do
                     let loc' = getLocation ann'
                     paramsStructName <- genParamsStructName identifier
                     cTy <- genType noqual (TStruct paramsStructName)
-                    rest <- genMatchCases cObj casePrefix genParamsStructName xs
-                    cBlk <- flip CSCompound (buildCompoundAnn ann' False True) <$> genMatchCase cObj cTy m
                     -- | TODO: The size of the enum field has been hardcoded, it should be
                     -- platform dependent
                     let cEnumVariantsFieldExpr = cObj @. variant @: uint32_t
                         cCasePrefixIdentExpr = casePrefix identifier @: uint32_t
-                    return [pre_cr (_if_else (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr) cBlk rest) |>> loc']
+                    (cTest, test) <- matchTest loc' (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr)
+                    cBlk <- flip CSCompound (buildCompoundAnn ann' False True) <$> genMatchCase cObj cTy m
+                    rest <- genMatchCases cObj casePrefix genParamsStructName test xs
+                    return [pre_cr (_if_else cTest cBlk rest) |>> loc']
                 _ -> throwError $ InternalError $ "Match statement without cases: " ++ show match
         _ -> do
             cExpr <- genExpression expr
@@ -775,25 +848,28 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                     cTy <- genType noqual (TStruct paramsStructName)
                     case mDefaultCase of
                         Just d@(DefaultCase {}) -> do
-                            cBlk <- trail_cr . block <$> genMatchCase cObj' cTy m
                             let cEnumVariantsFieldExpr = cObj' @. variant @: uint32_t
                                 cCasePrefixIdentExpr = casePrefix identifier @: uint32_t
-                            defCaseBlk <- genDefaultCase d
+                            (cTest, test) <- matchTest loc' (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr)
+                            cBlk <- trail_cr . block <$> genMatchCase cObj' cTy m
+                            defCaseBlk <- genDefaultCase test d
                             let cDefaultCase = (trail_cr . block) defCaseBlk
                             return [pre_cr $ (trail_cr . block) (pre_cr decl : [pre_cr
-                                    (_if_else (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr) cBlk cDefaultCase) |>> loc'])]
+                                    (_if_else cTest cBlk cDefaultCase) |>> loc'])]
                         Nothing -> do
+                            soleCasePoint ann'
                             cBlk <- genMatchCase cObj' cTy m
                             return [no_cr $ (trail_cr . block) (pre_cr decl : cBlk)]
-                m@(MatchCase identifier _ _ _) : xs -> do
+                m@(MatchCase identifier _ _ ann') : xs -> do
                     paramsStructName <- genParamsStructName identifier
                     cTy <- genType noqual (TStruct paramsStructName)
-                    rest <- genMatchCases cObj' casePrefix genParamsStructName xs
-                    cBlk <- trail_cr . block <$> genMatchCase cObj' cTy m
                     let cEnumVariantsFieldExpr = cObj' @. variant @: uint32_t
                         cCasePrefixIdentExpr = casePrefix identifier @: uint32_t
-                    return [pre_cr $ (trail_cr . block) (pre_cr decl : [pre_cr 
-                            (_if_else (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr) cBlk rest)])]
+                    (cTest, test) <- matchTest (getLocation ann') (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr)
+                    cBlk <- trail_cr . block <$> genMatchCase cObj' cTy m
+                    rest <- genMatchCases cObj' casePrefix genParamsStructName test xs
+                    return [pre_cr $ (trail_cr . block) (pre_cr decl : [pre_cr
+                            (_if_else cTest cBlk rest)])]
                 _ -> throwError $ InternalError $ "Match statement without cases: " ++ show match
 
     where
@@ -803,36 +879,41 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
             CObject
             -- | A function to prefix the case identifier
             -> (Identifier -> Identifier)
-            -- | A function to get the parameter struct name 
+            -- | A function to get the parameter struct name
             -> (Identifier -> CGenerator Identifier)
+            -- | The test of the case before, with coverage
+            -> Maybe Integer
             -- | The list of remaining match cases
             -> [MatchCase SemanticAnn]
             -> CGenerator CStatement
         -- | This should never happen
-        genMatchCases _ _ _ [] = throwError $ InternalError "Match statement without cases"
+        genMatchCases _ _ _ _ [] = throwError $ InternalError "Match statement without cases"
         -- | The last one does not need to check the variant
-        genMatchCases cObj casePrefix genParamsStructName [m@(MatchCase identifier _ _ ann')] = do
+        genMatchCases cObj casePrefix genParamsStructName previous [m@(MatchCase identifier _ _ ann')] = do
             paramsStructName <- genParamsStructName identifier
             cTy <- genType noqual (TStruct paramsStructName)
-            cBlk <- genMatchCase cObj cTy m
             case mDefaultCase of
                 Just d@(DefaultCase _ ann'') -> do
                     let cEnumVariantsFieldExpr = cObj @. variant @: uint32_t |>> getLocation ann
                         cCasePrefixIdentExpr = casePrefix identifier @: uint32_t |>> getLocation ann
-                        cExpr' = cEnumVariantsFieldExpr @== cCasePrefixIdentExpr |>> getLocation ann'
-                    defCaseBlk <- genDefaultCase d
+                    (cExpr', test) <- matchTest (getLocation ann') (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr |>> getLocation ann')
+                    cBlk <- genMatchCase cObj cTy m
+                    defCaseBlk <- genDefaultCase test d
                     let cLastCase = (trail_cr . block) cBlk |>> getLocation ann'
                         cDefaultCase = (trail_cr . block) defCaseBlk |>> getLocation ann''
                     return $ _if_else cExpr' cLastCase cDefaultCase |>> getLocation ann'
-                Nothing -> return $ (trail_cr . block) cBlk |>> getLocation ann'
-        genMatchCases cObj casePrefix genParamsStructName (m@(MatchCase identifier _ _ ann') : xs) = do
+                Nothing -> do
+                    mapM_ (\p -> casePoint (AfterCase p) (getLocation ann')) previous
+                    cBlk <- genMatchCase cObj cTy m
+                    return $ (trail_cr . block) cBlk |>> getLocation ann'
+        genMatchCases cObj casePrefix genParamsStructName _ (m@(MatchCase identifier _ _ ann') : xs) = do
             let cEnumVariantsFieldExpr = cObj @. variant @: uint32_t |>> getLocation ann'
                 cCasePrefixIdentExpr = casePrefix identifier @: uint32_t |>> getLocation ann'
-                cExpr' = cEnumVariantsFieldExpr @== cCasePrefixIdentExpr |>> getLocation ann'
+            (cExpr', test) <- matchTest (getLocation ann') (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr |>> getLocation ann')
             paramsStructName <- genParamsStructName identifier
             cTs <- genType noqual (TStruct paramsStructName)
             cBlk <- trail_cr . block  <$> genMatchCase cObj cTs m
-            rest <- genMatchCases cObj casePrefix genParamsStructName xs
+            rest <- genMatchCases cObj casePrefix genParamsStructName test xs
             return $ _if_else cExpr' (cBlk |>> getLocation ann') rest |>> getLocation ann'
 
         genMatchCase ::
@@ -851,7 +932,8 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
             CObject -> CType
             -> MatchCase SemanticAnn
             -> CGenerator [CCompoundBlockItem]
-        genSoleMatchCase cObj cParamsStructType c@(MatchCase _ _ blk' _) = do
+        genSoleMatchCase cObj cParamsStructType c@(MatchCase _ _ blk' ann') = do
+            soleCasePoint ann'
             decls <- genMatchCaseParams cObj cParamsStructType c
             cBlk <- concat <$> traverse genBlocks (blockBody blk')
             let cAnn = internalAnn CGenericAnn
@@ -860,9 +942,14 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                     (internalAnn (CStatementAnn True False))
             return $ (if null decls then [discard] else decls) ++ cBlk
 
-        genDefaultCase :: DefaultCase SemanticAnn -> CGenerator [CCompoundBlockItem]
-        genDefaultCase (DefaultCase blk' _) = do
+        -- | The default case, entered when the test of the case before it is false
+        genDefaultCase :: Maybe Integer -> DefaultCase SemanticAnn -> CGenerator [CCompoundBlockItem]
+        genDefaultCase previous (DefaultCase blk' ann') = do
+            mapM_ (\p -> casePoint (AfterCase p) (getLocation ann')) previous
             concat <$> traverse genBlocks (blockBody blk')
+
+        -- | The only case of a match without a default, entered when the match runs
+        soleCasePoint ann' = currentStatement >>= mapM_ (\s -> casePoint (WithStatement s) (getLocation ann'))
 
         genMatchCaseParams :: CObject -> CType -> MatchCase SemanticAnn -> CGenerator [CCompoundBlockItem]
         genMatchCaseParams cObj cParamsStructType (MatchCase this_variant params _ (SemanticAnn semann loc')) = do
@@ -886,7 +973,7 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                 (d : ds) -> return $ (pre_cr d |>> loc') : map (\d' -> no_cr d' |>> loc') ds
 
 
-genBlocks (ReturnBlock mExpr ann) =
+genBlock (ReturnBlock mExpr ann) =
     case mExpr of
         Nothing ->
             return [pre_cr (_return Nothing) |>> getLocation ann]
@@ -895,15 +982,15 @@ genBlocks (ReturnBlock mExpr ann) =
             return [pre_cr (_return (Just cExpr)) |>> getLocation ann]
 -- | The continued action runs in place of the rest of the current one, which
 -- then returns, since actions return nothing.
-genBlocks (ContinueBlock expr ann) = do
+genBlock (ContinueBlock expr ann) = do
     cExpr <- genExpression expr
     return [
             pre_cr cExpr |>> getLocation ann,
             no_cr (_return Nothing) |>> getLocation ann
         ]
-genBlocks (RebootBlock ann) = do
+genBlock (RebootBlock ann) = do
     return [pre_cr $ termina__exec__reboot @@ [] |>> getLocation ann]
-genBlocks (NoReturnCall expr ann) = do
+genBlock (NoReturnCall expr ann) = do
     cExpr <- genExpression expr
     return [
             pre_cr $ termina__exec__handover @@ [] |>> getLocation ann,
@@ -911,7 +998,18 @@ genBlocks (NoReturnCall expr ann) = do
         ]
 -- | A system call is generated as any other call through an access port: the
 -- block only tells the schedulability analysis that it calls the platform.
-genBlocks (SystemCall obj ident args ann) = genAccessPortCall obj ident args ann
+genBlock (SystemCall obj ident args ann) = genAccessPortCall obj ident args ann
+
+-- | The test of a case of a match, with its witness and its index when the module has coverage.
+matchTest :: Location -> CExpression -> CGenerator (CExpression, Maybe Integer)
+matchTest loc cTest = do
+    covered <- gets (isJust . coverageState)
+    if covered
+        then do
+            decision <- newPoint (DecisionPoint (Just "case")) loc
+            cWitness <- witness decision loc cTest
+            return (cWitness, Just decision)
+        else return (cTest, Nothing)
 
 -- | A call to a procedure through an access port, which passes the event and
 -- the object the port is connected to, whatever the kind of the interface

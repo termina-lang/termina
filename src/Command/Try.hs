@@ -103,7 +103,7 @@ printSourceModule debugBuild eModule = do
         config = defaultConfig "test" TestPlatform
     case runGenSourceFile config TestPlatform (qualifiedName eModule) tAST of
         Left err -> dieWithError $ show err
-        Right cSourceFile -> TIO.putStrLn $ runCPrinter debugBuild cSourceFile
+        Right (cSourceFile, _) -> TIO.putStrLn $ runCPrinter debugBuild cSourceFile
 
 printHeaderModule :: Bool -> ElaboratedModule -> IO ()
 printHeaderModule debugBuild eModule = do

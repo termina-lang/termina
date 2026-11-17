@@ -1,7 +1,7 @@
 -- | The executor of posix: the binary of a test is a process of the host,
 -- whose record the runtime maps onto a file that the runner creates.
 module Runner.Posix (
-    PosixRun(..), runPosix
+    PosixRun(..), runPosix, waitFor
 ) where
 
 import Runner.Record (Layout(..), headerSize)
@@ -35,17 +35,21 @@ runPosix layout binary recordFile logFile capacity selectedCase seconds = do
                 std_out = UseHandle logHandle,
                 std_err = UseHandle logHandle
             }
-        -- | An interrupted runner does not leave the process behind
-        ended <- (case seconds of
-            Nothing -> Just <$> waitForProcess process
-            Just s -> timeout (fromIntegral s * 1000000) (waitForProcess process))
-            `onException` (terminateProcess process >> waitForProcess process)
-        case ended of
-            Just code -> return (Just code)
-            Nothing -> terminateProcess process >> waitForProcess process >> return Nothing
+        waitFor seconds process
     case started of
         Left err -> return (Left ("could not run " ++ binary ++ ": " ++ show (err :: IOException)))
         Right code -> Right . PosixRun code <$> BS.readFile recordFile
+
+-- | Waits for the process up to the timeout, and terminates it at the timeout or when the wait is interrupted
+waitFor :: Maybe Integer -> ProcessHandle -> IO (Maybe ExitCode)
+waitFor seconds process = do
+    ended <- (case seconds of
+        Nothing -> Just <$> waitForProcess process
+        Just s -> timeout (fromIntegral s * 1000000) (waitForProcess process))
+        `onException` (terminateProcess process >> waitForProcess process)
+    case ended of
+        Just code -> return (Just code)
+        Nothing -> terminateProcess process >> waitForProcess process >> return Nothing
 
 -- | The file before the run: zeros, and the case to run in selected_case
 emptyRecord :: Layout -> Integer -> Integer -> BS.ByteString

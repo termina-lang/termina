@@ -73,7 +73,7 @@ renderSourceWith configParams input = case runP (contents topLevel) "test" "" in
           Right bbAST -> 
             case runGenSourceFile configParams TestPlatform "test" (fst (elaborateProgram (foldingProofs (mapM foldElement bbAST)) bbAST)) of
               Left err -> pack $ show err
-              Right cSourceFile -> runCPrinter False cSourceFile
+              Right (cSourceFile, _) -> runCPrinter False cSourceFile
 
 renderOption :: MonadicTypes -> Text
 renderOption monadicTypes =

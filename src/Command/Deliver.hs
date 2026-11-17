@@ -22,6 +22,7 @@ import Generator.Makefile.AST
 import Generator.Makefile.Printer
 import Utils.Annotations (QualifiedName)
 import Utils.Files (filesUnder)
+import Utils.Hash (sha256File)
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
@@ -118,7 +119,7 @@ deliverDeployment chatty loaded archive withTrace folder deployment = do
         binary = "bin" </> T.unpack (name config)
     -- | The build with the #line pragmas gives the values of the Makefile,
     -- the dependency files and the binary to compare with
-    (modules, externs) <- buildDeployment (BuildCmdArgs chatty False Nothing SelectApp Nothing Nothing True) loaded deployment
+    (modules, externs) <- buildDeployment (BuildCmdArgs chatty False Nothing SelectApp Nothing Nothing True NoCoverage) loaded deployment
     info <- buildInfo label built
     let value key = M.findWithDefault "" key info
         list key = words (value key)

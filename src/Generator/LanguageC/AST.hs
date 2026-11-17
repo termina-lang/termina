@@ -65,6 +65,8 @@ data CDeclaration' a =
 
 data CExternalDeclaration' a
     = CEDVariable (Maybe CStorageSpecifier) (CDeclaration' a)
+    -- | A variable preceded by a macro of the OSAL
+    | CEDMacroVariable Ident (CDeclaration' a)
     | CEDFunction (Maybe CStorageSpecifier) [CFunctionSpecifier] CType Ident [CDeclaration' a]
     | CEDEnum (Maybe Ident) (CEnum' a)
     | CEDStructUnion (Maybe Ident) (CStructureUnion' a)

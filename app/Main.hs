@@ -11,6 +11,8 @@ import Command.Update
 import Command.Build
 import Command.Deliver
 import Command.Test
+import Command.Run
+import Command.Coverage
 import Command.Try
 import Command.LSP
 import Command.Sched
@@ -26,6 +28,8 @@ data Command =
     | Build BuildCmdArgs
     | Deliver DeliverCmdArgs
     | Test TestCmdArgs
+    | Run RunCmdArgs
+    | Coverage CoverageCmdArgs
     | Try TryCmdArgs
     | LSP LSPCmdArgs
     | Sched SchedCmdArgs
@@ -86,6 +90,14 @@ testCommandParser :: Parser Command
 testCommandParser = Test
     <$> testCmdArgsParser
 
+runCommandParser :: Parser Command
+runCommandParser = Run
+    <$> runCmdArgsParser
+
+coverageCommandParser :: Parser Command
+coverageCommandParser = Coverage
+    <$> coverageCmdArgsParser
+
 schedCommandParser :: Parser Command
 schedCommandParser = Sched
     <$> schedCmdArgsParser
@@ -109,6 +121,8 @@ commandParser = subparser
  <> withHelp "build" buildCommandParser "Generate and compile the project"
  <> withHelp "deliver" deliverCommandParser "Build the self-contained deliverable of the project"
  <> withHelp "test" testCommandParser "Build and run the tests of the project, or list them"
+ <> withHelp "run" runCommandParser "Build the application if needed and run it on its platform"
+ <> withHelp "coverage" coverageCommandParser "Run the application or the tests with coverage, and write the report"
  <> withHelp "try" tryCommandParser "Translate a single file"
  <> withHelp "lsp" lspCommandParser "Start language server"
  <> withHelp "sched" schedCommandParser "Generate scheduling models"
@@ -143,6 +157,8 @@ main = do
         Build cmdargs -> enterProject >> buildCommand cmdargs
         Deliver cmdargs -> enterProject >> deliverCommand cmdargs
         Test cmdargs -> enterProject >> testCommand cmdargs
+        Run cmdargs -> enterProject >> runCommand cmdargs
+        Coverage cmdargs -> enterProject >> coverageCommand cmdargs
         Try cmdargs -> tryCommand cmdargs
         LSP cmdargs -> lspCommand cmdargs
         Sched cmdargs -> enterProject >> schedCommand cmdargs

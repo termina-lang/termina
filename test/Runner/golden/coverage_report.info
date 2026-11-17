@@ -1,0 +1,64 @@
+TN:first
+SF:/project/src/m.fin
+FN:2,f
+FNDA:1,f
+FN:13,g::run
+FNDA:0,g::run
+FNF:2
+FNH:1
+BRDA:3,0,(a > 1 && (b > 2)): true,1
+BRDA:3,0,(a > 1 && (b > 2)): false,0
+BRDA:3,1,a > 1: true,1
+BRDA:3,1,a > 1: false,0
+BRDA:3,2,(b > 2): true,1
+BRDA:3,2,(b > 2): false,0
+BRDA:6,3,for i : u32 in 0 .. 8 while y < 4: true,1
+BRDA:6,3,for i : u32 in 0 .. 8 while y < 4: false,1
+BRDA:6,4,range for i : u32 in 0 .. 8: true,1
+BRDA:6,4,range for i : u32 in 0 .. 8: false,0
+BRDA:6,5,y < 4: true,1
+BRDA:6,5,y < 4: false,0
+BRF:12
+BRH:7
+DA:2,1
+DA:3,1
+DA:4,1
+DA:6,1
+DA:7,1
+DA:9,1
+DA:13,0
+LF:7
+LH:6
+end_of_record
+TN:second
+SF:/project/src/m.fin
+FN:2,f
+FNDA:1,f
+FN:13,g::run
+FNDA:0,g::run
+FNF:2
+FNH:1
+BRDA:3,0,(a > 1 && (b > 2)): true,0
+BRDA:3,0,(a > 1 && (b > 2)): false,1
+BRDA:3,1,a > 1: true,0
+BRDA:3,1,a > 1: false,1
+BRDA:3,2,(b > 2): true,-
+BRDA:3,2,(b > 2): false,-
+BRDA:6,3,for i : u32 in 0 .. 8 while y < 4: true,0
+BRDA:6,3,for i : u32 in 0 .. 8 while y < 4: false,1
+BRDA:6,4,range for i : u32 in 0 .. 8: true,1
+BRDA:6,4,range for i : u32 in 0 .. 8: false,0
+BRDA:6,5,y < 4: true,0
+BRDA:6,5,y < 4: false,1
+BRF:12
+BRH:5
+DA:2,1
+DA:3,1
+DA:4,0
+DA:6,1
+DA:7,0
+DA:9,1
+DA:13,0
+LF:7
+LH:4
+end_of_record

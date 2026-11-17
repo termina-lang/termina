@@ -43,11 +43,10 @@ import System.Environment (getEnvironment)
 import Control.Exception (IOException, try)
 import System.Process (readCreateProcessWithExitCode)
 import Configuration.Fetch (gitProcess)
+import Configuration.Configuration (ProjectProfile(..), outputFolderName)
+import Runner.CoverageReport (buildReport)
+import Data.Time (defaultTimeLocale, formatTime, getZonedTime)
 import Utils.Files (filesUnder)
-import qualified Crypto.Hash.SHA256 as SHA256
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as BL
-import Text.Printf (printf)
 
 -- | Error message formatter
 -- Prints error messages in the form "[error] <message>"
@@ -358,5 +357,19 @@ runGit args = do
         Right (ExitSuccess, out, _) -> Right out
         Right (ExitFailure _, _, err) -> Left err
 
-sha256File :: FilePath -> IO String
-sha256File file = concatMap (printf "%02x") . BS.unpack . SHA256.hashlazy <$> BL.readFile file
+-- | The profile of the option --profile
+readProfile :: String -> Either String ProjectProfile
+readProfile "debug" = Right Debug
+readProfile "release" = Right Release
+readProfile other = Left $ "Unknown profile: " ++ other ++ " (use debug or release)"
+
+-- | Writes the coverage report with the stylesheet of the manifest, given the version of termina, and says where it is
+writeCoverageReport :: String -> IO ()
+writeCoverageReport terminaVersion = do
+    manifest <- loadManifest projectRoot >>= either dieWithFirstError return
+    buildReport terminaVersion ((projectRoot </>) <$> coverageStyle (manifestCoverage manifest)) outputFolderName
+    putStrLn (infoMessage ("The coverage report is " ++ (outputFolderName </> "coverage" </> "index.html")))
+
+-- | The local time, as the results of the runs record it
+timestamp :: IO String
+timestamp = formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S" <$> getZonedTime
