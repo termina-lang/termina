@@ -4,8 +4,7 @@ module Configuration.TestListSpec (spec) where
 
 import Command.Test (TestCase(..), testCases)
 import Core.AST (frags)
-import Parser.Parsing (terminaModuleParser)
-import Text.Parsec (runParser)
+import Parser.Parsing (parseTerminaModule)
 import Test.Hspec
 
 -- | A test class with a case per name, each of four lines
@@ -42,4 +41,4 @@ spec = describe "termina test --list" $ do
 
     casesIn files =
       map (\c -> (caseInstance c, caseName c, caseFile c, caseLine c))
-        <$> testCases [ either (error . show) frags (runParser terminaModuleParser path path src) | (path, src) <- files ]
+        <$> testCases [ either (error . show) frags (parseTerminaModule path path src) | (path, src) <- files ]

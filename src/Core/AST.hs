@@ -652,6 +652,6 @@ instance (ShowText (ty a)) => ShowText (Const' ty a) where
 data TerminaModule' ty expr blk pf a = Termina
   { modules :: [ModuleImport' pf a]
   , frags :: [AnnASTElement' ty expr blk a] }
-  deriving Show
+  deriving (Show, Functor)
 
 type AnnotatedProgram' ty blk expr a = [AnnASTElement' ty expr blk a]

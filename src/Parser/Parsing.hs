@@ -22,6 +22,7 @@ import Text.Parsec.Expr
 import qualified Data.List as L
 import Control.Monad
 import Data.Char
+import qualified Data.IntMap.Strict as IM
 import Utils.Annotations
 import Parser.Types
 
@@ -1454,6 +1455,39 @@ contents p = wspcs *> p <* eof
 
 terminaModuleParser :: TerminaParser (TerminaModule ParserAnn)
 terminaModuleParser = wspcs *> (Termina <$> many moduleImportParser <*> contents topLevel)
+
+-- | Parses the text of a module, given its qualified name and its file. The
+-- positions of the tree and of the error count characters, as the error
+-- printer and the LSP do, and not the columns of Parsec.
+parseTerminaModule :: QualifiedName -> FilePath -> String -> Either ParseError (TerminaModule ParserAnn)
+parseTerminaModule qname file src =
+  case runParser terminaModuleParser qname file src of
+    Left err -> Left (PE.setErrorPos (toCharacter (errorPos err)) err)
+    Right ast -> Right (fmap characterLocation ast)
+
+  where
+
+    toCharacter = characterColumn src
+    characterLocation (Position q start end) = Position q (toCharacter start) (toCharacter end)
+    characterLocation loc = loc
+
+-- | Turns the column of a position in a text, as Parsec counts it, into the
+-- number of the character in its line. Parsec ('updatePosChar') moves a tab to
+-- the next column 1 + 8k, so both differ only on a line with a tab.
+characterColumn :: String -> SourcePos -> SourcePos
+characterColumn src
+  | '\t' `notElem` src = id
+  | otherwise = \pos ->
+      case IM.lookup (sourceLine pos) linesOfText of
+        Just line -> setSourceColumn pos (1 + length (takeWhile (< sourceColumn pos) (scanl advance 1 line)))
+        Nothing -> pos
+
+  where
+
+    linesOfText = IM.fromList (zip [1 ..] (lines src))
+    -- The column of Parsec after a character, from the one before it.
+    advance column '\t' = column + 8 - ((column - 1) `mod` 8)
+    advance column _ = column + 1
 
 getStartPosition :: ParserAnn -> SourcePos
 getStartPosition (Position _ startPos _) = startPos

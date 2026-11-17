@@ -34,8 +34,7 @@ import qualified Data.Text as T
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
-import Parser.Parsing (terminaModuleParser)
-import Text.Parsec (runParser)
+import Parser.Parsing (parseTerminaModule)
 import Core.AST (TerminaModule'(..), ModuleImport'(..))
 
 import Semantic.Environment (makeInitialGlobalEnv, Environment)
@@ -315,7 +314,7 @@ parseModule :: (QualifiedName, String) -> Either Failure (QualifiedName, ParsedM
 parseModule (qname, src) =
   -- | The source name the parser stamps on every position is the name of the
   -- module, as in a real build, so that the error printer finds its source.
-  case runParser terminaModuleParser qname qname src of
+  case parseTerminaModule qname qname src of
     Left err -> Left (failure (M.singleton qname (pack src))
       (annotateError Internal (EParseError err) :: ParsingErrors))
     Right (Termina imports prog) -> do

@@ -18,7 +18,7 @@ module Parser.Common
 import qualified Data.Map.Strict as M
 import Data.Text (Text)
 
-import Parser.Parsing (TerminaParser, terminaModuleParser)
+import Parser.Parsing (TerminaParser, parseTerminaModule)
 import Parser.Errors (Error(..), ParsingErrors)
 import Core.AST (TerminaModule'(..), ModuleImport'(..))
 import Modules.Modules (ModuleDependency(..))
@@ -65,7 +65,7 @@ parserStageError sources =
     parseOne (qname, src) =
       -- | As in a real build, every position carries the name of its module, so
       -- that a rendered message finds the source it quotes.
-      case runParser terminaModuleParser qname qname src of
+      case parseTerminaModule qname qname src of
         Left err -> Left (annotateError Internal (EParseError err))
         Right (Termina imports _) -> (qname,) <$> mapM toDep imports
     toDep (ModuleImport ident ann) =

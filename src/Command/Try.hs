@@ -11,8 +11,7 @@ import System.FilePath
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import qualified Data.Map.Strict as M
-import Parser.Parsing (terminaModuleParser)
-import Text.Parsec (runParser)
+import Parser.Parsing (parseTerminaModule)
 import Generator.LanguageC.Printer (runCPrinter)
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
@@ -56,7 +55,7 @@ loadSingleModule filePath = do
     -- read it
     src_code <- TIO.readFile filePath
     -- parse it
-    case runParser terminaModuleParser noExtension filePath (T.unpack src_code) of
+    case parseTerminaModule noExtension filePath (T.unpack src_code) of
         Left err -> 
             let pErr = annotateError (Position filePath (errorPos err) (errorPos err)) (EParseError err)
                 fileMap = M.singleton filePath src_code
