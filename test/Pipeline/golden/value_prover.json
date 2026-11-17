@@ -12,11 +12,11 @@
                 {
                     "start": {
                         "line": 6,
-                        "column": 40
+                        "column": 39
                     },
                     "end": {
                         "line": 6,
-                        "column": 54
+                        "column": 55
                     },
                     "property": "shift-below-width",
                     "status": "discharged",

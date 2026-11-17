@@ -617,8 +617,13 @@ expressionTermParser = try isEnumVariantExprParser
   <|> try accessObjectParser
   <|> parensExprParser
 
+-- | An expression in parentheses, whose location takes them in
 parensExprParser :: TerminaParser (Expression ParserAnn)
-parensExprParser = parens expressionParser
+parensExprParser = do
+  current <- getState
+  startPos <- getPosition
+  expr <- parens expressionParser
+  updateAnnotation expr . Position current startPos <$> getPosition
 
 parensObjectParser :: TerminaParser (Object ParserAnn)
 parensObjectParser = parens objectParser
