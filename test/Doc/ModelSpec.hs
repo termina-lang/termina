@@ -1,12 +1,14 @@
+{-# LANGUAGE OverloadedStrings #-}
 -- | The documentation model of a comment: the margin, the split into body and
--- tags, and the errors of the tags.
+-- tags, the errors of the tags and the Markdown.
 module Doc.ModelSpec (spec) where
 
 import Data.List (intercalate)
 import Text.Parsec.Pos (initialPos, newPos)
 
-import Core.AST (DocForm(..))
+import Core.AST (DocComment(..), DocForm(..), DocPlacement(..))
 import Doc.Model
+import Utils.Annotations (Location(..))
 
 import Test.Hspec
 
@@ -56,8 +58,54 @@ spiEnd =
   , "     * @error Incomplete Bytes were written and not read back."
   , "     " ]
 
+-- | The summary, the body and the tags of the model of a block comment, given
+-- its text between the delimiters, line by line.
+model :: [String] -> Maybe ([DocInline], [DocBlock], [(TagKind, [DocBlock])])
+model ls =
+  case docModel (DocComment DocBefore BlockDoc (intercalate "\n" ls) (Position "test" (newPos "test" 1 1) (newPos "test" 1 1))) of
+    Right m -> Just (docSummary m, docBody m, [ (tagKind t, tagText t) | t <- docTags m ])
+    Left _ -> Nothing
+
+-- | The body of a block comment whose first line is a summary.
+bodyOf :: [String] -> Maybe [DocBlock]
+bodyOf ls = (\(_, body, _) -> body) <$> model ("" : " * Summary." : " *" : map (" * " ++) ls ++ [" "])
+
 spec :: Spec
 spec = describe "Documentation model" $ do
+
+  describe "the Markdown" $ do
+    it "builds the model of the comment of ISPIBus::end" $
+      model spiEnd `shouldBe` Just
+        ( [DText "Ends the transaction and releases the bus."]
+        , [ DPara [ DText "As master, the bytes still being shifted are waited for and the chip", DSoftBreak
+                  , DText "select is deasserted. The bytes not read back are discarded, and the", DSoftBreak
+                  , DText "transaction is then reported as ", DLink (DocRef ["SPIError", "Incomplete"])
+                  , DText "; as slave,", DSoftBreak
+                  , DText "that includes the bytes the master did not shift." ] ]
+        , [ (TagParam ParamOut "status", [DPara [DText "Error seen during the transaction, if any."]])
+          , (TagError "NotStarted", [DPara [DText "No transaction is in course."]])
+          , (TagError "ModeFault", [DPara [DText "As master, another master drove the bus."]])
+          , (TagError "Overrun", [DPara [DText "The receiver lost bytes."]])
+          , (TagError "Underrun", [DPara [DText "As slave, the master shifted more bytes than were", DSoftBreak, DText "written."]])
+          , (TagError "Incomplete", [DPara [DText "Bytes were written and not read back."]]) ] )
+    it "links to what belongs to the language" $
+      bodyOf ["Or [`Option::None`]."] `shouldBe` Just [DPara [DText "Or ", DLink (DocRef ["Option", "None"]), DText "."]]
+    it "keeps a code span in brackets that is not a name as text" $
+      bodyOf ["The sum [`a + b`]."] `shouldBe` Just [DPara [DText "The sum [", DCode "a + b", DText "]."]]
+    it "keeps a bracketed word without backticks as text" $
+      bodyOf ["An [unprotected] port."] `shouldBe` Just [DPara [DText "An [unprotected] port."]]
+    it "turns an escaped @ into @" $
+      bodyOf ["\\@ starts a tag."] `shouldBe` Just [DPara [DText "@ starts a tag."]]
+    it "keeps raw HTML as text" $
+      bodyOf ["A <b>bold</b> word."] `shouldBe` Just [DPara [DText "A <b>bold</b> word."]]
+    it "reads math and tables" $
+      bodyOf ["Takes $x^2$.", "", "| A | B |", "|:--|--:|", "| 1 | 2 |"] `shouldBe` Just
+        [ DPara [DText "Takes ", DMath "x^2", DText "."]
+        , DTable [DAlignLeft, DAlignRight] [[DText "A"], [DText "B"]] [[[DText "1"], [DText "2"]]] ]
+    it "keeps the language and the text of a code block" $
+      bodyOf ["```termina", "let x : u32 = 0;", "```"] `shouldBe` Just [DCodeBlock "termina" "let x : u32 = 0;\n"]
+    it "has no summary when the comment starts with something else than a paragraph" $
+      model ["", " * - one", " * - two", " "] `shouldBe` Just ([], [DList DBullets [[DPara [DText "one"]], [DPara [DText "two"]]]], [])
 
   describe "the margin" $ do
     it "removes the stars of a block comment and the blank lines at its ends" $

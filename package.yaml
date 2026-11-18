@@ -57,6 +57,9 @@ dependencies:
 - cryptohash-sha256
 # The XSDB command server of the PYNQ
 - network
+# Markdown of the documentation comments
+- commonmark
+- commonmark-extensions
 
 ghc-options:
 - -Wall
