@@ -68,7 +68,7 @@ spec = describe "Parser: documentation comments" $ do
       accepts [ "/// A point.", "struct P {", "    /// Abscissa.", "    x : u32;", "    y : u32; /**< in mm */", "};" ]
         `shouldBe` True
     it "takes one before an enum, its variants and after them, on either side of the comma" $
-      accepts [ "/// A mode.", "enum M {", "    /// Off.", "    Off, ///< no power"
+      accepts [ "/// A mode.", "enum M {", "    /// Off.", "    Off,"
               , "    Low ///< some power", "    , On(u8) /**< full power */", "};" ]
         `shouldBe` True
     it "takes one before an interface and its procedures" $
@@ -136,6 +136,11 @@ spec = describe "Parser: documentation comments" $ do
                , "    /// An action.", "    action act(&priv self, v : u32) { return; }", "};" ]
         `shouldBe` [ (3, DocBefore, " A procedure."), (7, DocBefore, " Abscissa."), (8, DocAfter, " Ordinate.")
                    , (11, DocAfter, " A port."), (13, DocBefore, " A viewer."), (15, DocBefore, " An action.") ]
+    it "gives a comment to each variant, on either side of its comma" $
+      attached [ "enum M {", "    /// Off.", "    Off,", "    Low, ///< Some power."
+               , "    Mid ///< Half power.", "    , On(u8) /**< Full power. */", "};" ]
+        `shouldBe` [ (3, DocBefore, " Off."), (4, DocAfter, " Some power.")
+                   , (5, DocAfter, " Half power."), (6, DocAfter, " Full power. ") ]
     it "gives a comment to each statement" $
       attached (inBody ["    /// Doubles it.", "    r = v + v;", "    r = r + 1; ///< Adds one."])
         `shouldBe` [(4, DocBefore, " Doubles it."), (5, DocAfter, " Adds one.")]

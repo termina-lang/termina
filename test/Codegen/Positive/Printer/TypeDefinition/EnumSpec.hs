@@ -4,8 +4,6 @@ import Test.Hspec
 import Semantic.AST
 import Data.Text
 import Semantic.Types
-import Parser.Types (undocumented)
-import Utils.Annotations
 import Generator.Monadic
 
 import Codegen.Positive.Printer.Common
@@ -13,32 +11,32 @@ import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 
 enumWithOneRegularField :: AnnASTElement SemanticAnn
-enumWithOneRegularField = TypeDefinition
+enumWithOneRegularField = internalTypeDefinition
   (Enum "id0" [
-    EnumVariant "variant0" []
-  ] []) (buildTypeAnn (undocumented Internal))
+    internalVariant "variant0" []
+  ] [])
 
 enumWithTwoRegularFields :: AnnASTElement SemanticAnn
-enumWithTwoRegularFields = TypeDefinition
+enumWithTwoRegularFields = internalTypeDefinition
   (Enum "id0" [
-    EnumVariant "variant0" [],
-    EnumVariant "variant1" []
-  ] []) (buildTypeAnn (undocumented Internal))
+    internalVariant "variant0" [],
+    internalVariant "variant1" []
+  ] [])
 
 enumWithOneParameterizedField :: AnnASTElement SemanticAnn
-enumWithOneParameterizedField = TypeDefinition
+enumWithOneParameterizedField = internalTypeDefinition
   (Enum "id0" [
-    EnumVariant "variant0" [TUInt32]
-  ] []) (buildTypeAnn (undocumented Internal))
+    internalVariant "variant0" [TUInt32]
+  ] [])
 
 enumWithMultipleParameterizedFields :: AnnASTElement SemanticAnn
-enumWithMultipleParameterizedFields = TypeDefinition
+enumWithMultipleParameterizedFields = internalTypeDefinition
   (Enum "id0" [
-    EnumVariant "variant0" [TUInt32],
-    EnumVariant "variant1" [],
-    EnumVariant "variant2" [TUInt64, TEnum "id1", TChar],
-    EnumVariant "variant3" [TInt8, TArray (TArray TChar (buildConstExprTUSize 20)) (buildConstExprTUSize 35)]
-  ] []) (buildTypeAnn (undocumented Internal))
+    internalVariant "variant0" [TUInt32],
+    internalVariant "variant1" [],
+    internalVariant "variant2" [TUInt64, TEnum "id1", TChar],
+    internalVariant "variant3" [TInt8, TArray (TArray TChar (buildConstExprTUSize 20)) (buildConstExprTUSize 35)]
+  ] [])
 
 spec :: Spec
 spec = do

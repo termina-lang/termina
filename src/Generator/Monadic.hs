@@ -155,7 +155,7 @@ mapTypeDefMonadic (Struct _ fields _) =
   mapM_ (\(FieldDefinition _ ts _) -> insertMonadicType ts) fields
 mapTypeDefMonadic (Enum _ variants _) =
   -- | Get the monadic types types from the fields
-  mapM_ (\(EnumVariant _ tss) -> mapM_ insertMonadicType tss) variants
+  mapM_ (\(EnumVariant _ tss _) -> mapM_ insertMonadicType tss) variants
 mapTypeDefMonadic (Class _ _ members _ _) =
   -- | Get the monadic types types from the class members
   mapM_ mapClassMemberMonadic members

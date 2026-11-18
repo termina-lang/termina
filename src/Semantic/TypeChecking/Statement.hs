@@ -154,7 +154,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
           LocatedElement (Enum ident flsDef _mods) eloc -> do
             let flsDefIdents = variantIdentifier <$> flsDef
                 casesIdents = matchIdentifier <$> cases
-                variantMap = M.fromList (map (\variant@(EnumVariant vId _) -> (vId, variant)) flsDef)
+                variantMap = M.fromList (map (\variant@(EnumVariant vId _ _) -> (vId, variant)) flsDef)
                 caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
             when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
               \case { [] -> return (); cs -> throwError $ annotateError (getLocation ann) (EMatchMissingCases cs); })
@@ -173,8 +173,8 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
                 -- | The parameters will now be refernces to the the actual objects
                 -- inside the enum
                 variantMap = M.fromList (
-                  map (\(EnumVariant vId variantParams) ->
-                    (vId, EnumVariant vId (TReference refKind <$> variantParams))) flsDef)
+                  map (\(EnumVariant vId variantParams vann) ->
+                    (vId, EnumVariant vId (TReference refKind <$> variantParams) vann)) flsDef)
                 caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
             when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
               \case { [] -> return (); cs -> throwError $ annotateError (getLocation ann) (EMatchMissingCases cs); })
@@ -188,7 +188,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
     TOption t -> do
       let flsDefIdents = ["None", "Some"]
           casesIdents = matchIdentifier <$> cases
-          variantMap = M.fromList [("None", EnumVariant "None" []), ("Some", EnumVariant "Some" [t])]
+          variantMap = M.fromList [("None", internalVariant "None" []), ("Some", internalVariant "Some" [t])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
       when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
         \case { [] -> return (); cs -> throwError $ annotateError (getLocation ann) (EMatchMissingCases cs); })
@@ -199,7 +199,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
     TReference refKind (TOption t) -> do
       let flsDefIdents = ["None", "Some"]
           casesIdents = matchIdentifier <$> cases
-          variantMap = M.fromList [("None", EnumVariant "None" []), ("Some", EnumVariant "Some" [TReference refKind t])]
+          variantMap = M.fromList [("None", internalVariant "None" []), ("Some", internalVariant "Some" [TReference refKind t])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
       when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
         \case { [] -> return (); cs -> throwError $ annotateError (getLocation ann) (EMatchMissingCases cs); })
@@ -210,7 +210,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
     TStatus t -> do
       let flsDefIdents = ["Success", "Failure"]
           casesIdents = matchIdentifier <$> cases
-          variantMap = M.fromList [("Success", EnumVariant "Success" []), ("Failure", EnumVariant "Failure" [t])]
+          variantMap = M.fromList [("Success", internalVariant "Success" []), ("Failure", internalVariant "Failure" [t])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
       when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
         \case { [] -> return (); cs -> throwError $ annotateError (getLocation ann) (EMatchMissingCases cs); })
@@ -221,7 +221,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
     TReference refKind (TStatus t) -> do
       let flsDefIdents = ["Success", "Failure"]
           casesIdents = matchIdentifier <$> cases
-          variantMap = M.fromList [("Success", EnumVariant "Success" []), ("Failure", EnumVariant "Failure" [TReference refKind t])]
+          variantMap = M.fromList [("Success", internalVariant "Success" []), ("Failure", internalVariant "Failure" [TReference refKind t])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
       when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
         \case { [] -> return (); cs -> throwError $ annotateError (getLocation ann) (EMatchMissingCases cs); })
@@ -232,7 +232,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
     TResult okTy errorTy -> do
       let flsDefIdents = ["Ok", "Error"]
           casesIdents = matchIdentifier <$> cases
-          variantMap = M.fromList [("Ok", EnumVariant "Ok" [okTy]), ("Error", EnumVariant "Error" [errorTy])]
+          variantMap = M.fromList [("Ok", internalVariant "Ok" [okTy]), ("Error", internalVariant "Error" [errorTy])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
       when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
         \case { [] -> return (); cs -> throwError $ annotateError (getLocation ann) (EMatchMissingCases cs); })
@@ -243,7 +243,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
     TReference refKind (TResult okTy errorTy) -> do
       let flsDefIdents = ["Ok", "Error"]
           casesIdents = matchIdentifier <$> cases
-          variantMap = M.fromList [("Ok", EnumVariant "Ok" [TReference refKind okTy]), ("Error", EnumVariant "Error" [TReference refKind errorTy])]
+          variantMap = M.fromList [("Ok", internalVariant "Ok" [TReference refKind okTy]), ("Error", internalVariant "Error" [TReference refKind errorTy])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
       when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
         \case { [] -> return (); cs -> throwError $ annotateError (getLocation ann) (EMatchMissingCases cs); })
@@ -290,7 +290,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
       typeMatchCase enumId loc caseMap variantMap caseId =
         case M.lookup caseId variantMap of
           Nothing -> throwError $ annotateError (getLocation ann) (EMatchCaseUnknownVariant caseId)
-          Just (EnumVariant _ vData) ->  typeMatchCase' c vData
+          Just (EnumVariant _ vData _) ->  typeMatchCase' c vData
 
         where
 

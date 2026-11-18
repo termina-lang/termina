@@ -651,7 +651,12 @@ instance Annotated (FieldDefinition' ty) where
 data EnumVariant' ty a = EnumVariant {
   variantIdentifier :: Identifier
   , assocData       :: [ ty a ]
+  , variantAnnotation :: a
 } deriving (Show, Functor, Foldable)
+
+instance Annotated (EnumVariant' ty) where
+  getAnnotation = variantAnnotation
+  updateAnnotation v a = v { variantAnnotation = a }
 
 -- | Constant values:
 -- - Booleans

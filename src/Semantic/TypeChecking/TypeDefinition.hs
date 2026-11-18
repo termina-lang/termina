@@ -442,13 +442,13 @@ typeFieldDefinition (FieldDefinition ident ts ann) = do
 
 -- Enum Variant definition helpers.
 typeEnumVariant :: Location -> EnumVariant ParserAnn -> SemanticMonad (SAST.EnumVariant SemanticAnn)
-typeEnumVariant loc (EnumVariant ident ps_ts) = do
+typeEnumVariant loc (EnumVariant ident ps_ts ann) = do
   ptys <- mapM (
     \ts -> do
         ty <- typeTypeSpecifier loc typeGlobalObject ts
         enumParamTyOrFail loc ty
         return ty) ps_ts
-  return $ SAST.EnumVariant ident ptys
+  return $ SAST.EnumVariant ident ptys (buildEnumVariantAnn ann)
 
 checkMemberFunctionAccessKind :: Location -> ClassKind -> AccessKind -> Identifier -> SemanticMonad ()
 checkMemberFunctionAccessKind loc clsKind ak ident = do

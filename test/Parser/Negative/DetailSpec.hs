@@ -104,6 +104,7 @@ twoComments =
                , "    action a(&priv self, v : u32) { return; }", "};"], (3, 28))
   , ("a statement", ["function f() {", "    /// Before.", "    return; ///< After.", "}"], (3, 13))
   , ("a constant", ["/// Before.", "const a : u32 = 1; ///< After."], (2, 20))
+  , ("a variant", ["enum E {", "    /// Before.", "    A, ///< After.", "    B", "};"], (3, 8))
   ]
 
 spec :: Spec

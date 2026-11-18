@@ -6,7 +6,7 @@ module Semantic.Types where
 import Semantic.AST
 import Core.Utils
 import Utils.Annotations
-import Parser.Types (ParserAnn)
+import Parser.Types (ParserAnn, undocumented)
 import Data.Maybe
 import qualified Data.Map.Strict as M
 
@@ -223,6 +223,25 @@ buildGlobalAnn ann ty = SemanticAnn (GTy ty) (getLocation ann)
 
 buildTypeAnn :: ParserAnn -> SemanticAnn
 buildTypeAnn = SemanticAnn TTy . getLocation
+
+buildEnumVariantAnn :: ParserAnn -> SemanticAnn
+buildEnumVariantAnn = SemanticAnn TTy . getLocation
+
+-- Elements that no source file declares, such as the variants of the enums of
+-- the environment and of Option, Status and Result, or the elements that a
+-- test builds by hand.
+
+internalVariant :: Identifier -> [TerminaType SemanticAnn] -> EnumVariant SemanticAnn
+internalVariant ident params = EnumVariant ident params (buildEnumVariantAnn (undocumented Internal))
+
+internalTypeDefinition :: TypeDef SemanticAnn -> AnnASTElement SemanticAnn
+internalTypeDefinition tydef = TypeDefinition tydef (buildTypeAnn (undocumented Internal))
+
+internalField :: Identifier -> TerminaType SemanticAnn -> FieldDefinition SemanticAnn
+internalField ident ty = FieldDefinition ident ty (buildFieldAnn (undocumented Internal))
+
+internalAccessPortField :: Identifier -> TerminaType SemanticAnn -> M.Map Identifier (InterfaceMember SemanticAnn) -> FieldDefinition SemanticAnn
+internalAccessPortField ident ty procs = FieldDefinition ident ty (buildAccessPortFieldAnn (undocumented Internal) procs)
 
 buildStmtAnn :: ParserAnn -> SemanticAnn
 buildStmtAnn = SemanticAnn (STy SimpleStmtType) . getLocation

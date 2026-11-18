@@ -215,7 +215,7 @@ genAttribute (Modifier name (Just expr)) = do
     return $ CAttr name [cExpr]
 
 genEnumVariantParameterStruct :: SemanticAnn -> Identifier -> EnumVariant SemanticAnn -> CGenerator CFileItem
-genEnumVariantParameterStruct ann identifier (EnumVariant this_variant params) = do
+genEnumVariantParameterStruct ann identifier (EnumVariant this_variant params _) = do
     let cAnn = buildDeclarationAnn ann True
     pParams <- zipWithM genEnumVariantParameter params [0..]
     paramsStructName <- genEnumParameterStructName identifier this_variant
@@ -322,7 +322,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
     let cAnn = buildDeclarationAnn ann True
         variantsWithParams = filter (not . null . assocData) variants
     enumName <- genEnumStructName identifier
-    pEnumVariants <- mapM (\(EnumVariant this_variant _) -> genEnumVariantName identifier this_variant) variants
+    pEnumVariants <- mapM (\(EnumVariant this_variant _ _) -> genEnumVariantName identifier this_variant) variants
     pEnumParameterStructs <- mapM (genEnumVariantParameterStruct ann identifier) variantsWithParams
     enumStruct <- genEnumStruct enumName variantsWithParams
     opts <- gets (optionTypes . monadicTypes)
@@ -339,7 +339,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
         where
 
             genParameterUnionField :: EnumVariant SemanticAnn -> CGenerator CDeclaration
-            genParameterUnionField (EnumVariant this_variant _) = do
+            genParameterUnionField (EnumVariant this_variant _ _) = do
                 paramsStructName <- genEnumParameterStructName identifier this_variant
                 paramsStructType <- genType noqual (TStruct paramsStructName)
                 return $ CDecl (CTypeSpec paramsStructType) (Just this_variant) Nothing

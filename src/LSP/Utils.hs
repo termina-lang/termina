@@ -100,7 +100,7 @@ getDocumentSymbols = Prelude.concatMap toDocumentSymbol
         (Prelude.concatMap toFieldSymbol fields)
     toDocumentSymbol (SAST.TypeDefinition (Enum name variants _) ann) =
       symbol (T.pack name) LSP.SymbolKind_Enum (getLocation ann)
-        [ v | SAST.EnumVariant variantName _ <- variants
+        [ v | SAST.EnumVariant variantName _ _ <- variants
             , v <- symbol (T.pack variantName) LSP.SymbolKind_EnumMember (getLocation ann) [] ]
     toDocumentSymbol (SAST.TypeDefinition (Interface _ name _ members _) ann) =
       symbol (T.pack name) LSP.SymbolKind_Interface (getLocation ann)

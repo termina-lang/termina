@@ -1044,7 +1044,7 @@ typeAssignmentExpression expected_type typeObj (EnumVariantInitializer id_ty var
         LocatedElement (Enum enumId ty_vs _mods) loc ->
           case Data.List.find ((variant ==) . variantIdentifier) ty_vs of
             Nothing -> throwError $ annotateError (getLocation pann) (EEnumVariantNotFound enumId variant)
-            Just (EnumVariant _ ps) ->
+            Just (EnumVariant _ ps _) ->
               let (psLen , asLen ) = (length ps, length args) in
               if psLen == asLen
               then

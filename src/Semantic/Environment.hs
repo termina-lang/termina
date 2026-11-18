@@ -91,11 +91,11 @@ stdlibGlobalEnv outBufSize inBufSize =
     ("TimeVal", LocatedElement (GType (Struct "TimeVal" [FieldDefinition "tv_sec" TUInt32 (buildExpAnn Internal TUInt32), FieldDefinition "tv_usec" TUInt32 (buildExpAnn Internal TUInt32)] [])) Internal),
     ("Interrupt", LocatedElement (GType (Class EmitterClass "Interrupt" [] [] [])) Internal),
     ("PeriodicTimer", LocatedElement (GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (TStruct "TimeVal") (buildExpAnn Internal (TStruct "TimeVal")))] [] [])) Internal),
-    ("SysPrintBase", LocatedElement (GType (Enum "SysPrintBase" [EnumVariant "Decimal" [], EnumVariant "Hexadecimal" []] [])) Internal),
-    ("MutexProtocol", LocatedElement (GType (Enum "MutexProtocol" [EnumVariant "Ceiling" [TUInt32]] [])) Internal),
+    ("SysPrintBase", LocatedElement (GType (Enum "SysPrintBase" [internalVariant "Decimal" [], internalVariant "Hexadecimal" []] [])) Internal),
+    ("MutexProtocol", LocatedElement (GType (Enum "MutexProtocol" [internalVariant "Ceiling" [TUInt32]] [])) Internal),
     ("Exception", LocatedElement (GType (Enum "Exception" [
       -- | Error sending a message to a message queue
-      EnumVariant "EMsgQueueSendError" [
+      internalVariant "EMsgQueueSendError" [
         -- | Address of the call to the runtime that sent the message, or 0
         TUSize,
         -- | ID of the message queue
@@ -103,33 +103,33 @@ stdlibGlobalEnv outBufSize inBufSize =
         -- | Error code
         TInt32],
       -- | Error receiving a message from a message queue
-      EnumVariant "EMsgQueueRecvError" [
+      internalVariant "EMsgQueueRecvError" [
         -- | ID of the message queue
         TUSize,
         -- | Error code
         TInt32],
-      EnumVariant "EArrayIndexOutOfBounds" [
+      internalVariant "EArrayIndexOutOfBounds" [
         -- | Address of the offending expression
         TUSize,
         -- | Size of the array
         TUSize,
         -- | Offending index
         TUSize],
-      EnumVariant "EArraySliceOutOfBounds" [
+      internalVariant "EArraySliceOutOfBounds" [
         -- | Address of the offending expression
         TUSize,
         -- | Size of the array
         TUSize,
         -- | Offending upper index
         TUSize],
-      EnumVariant "EArraySliceNegativeRange" [
+      internalVariant "EArraySliceNegativeRange" [
         -- | Address of the offending expression
         TUSize,
         -- | Lower index
         TUSize,
         -- | Upper index
         TUSize],
-      EnumVariant "EArraySliceInvalidRange" [
+      internalVariant "EArraySliceInvalidRange" [
         -- | Address of the offending expression
         TUSize,
         -- | Expected size of the array
@@ -138,20 +138,20 @@ stdlibGlobalEnv outBufSize inBufSize =
         TUSize,
         -- | Upper index
         TUSize],
-      EnumVariant "EShiftAmountOutOfBounds" [
+      internalVariant "EShiftAmountOutOfBounds" [
         -- | Address of the offending expression
         TUSize,
         -- | Bit width of the shifted type
         TUSize,
         -- | Offending shift amount
         TUSize],
-      EnumVariant "EArithmeticOverflow" [
+      internalVariant "EArithmeticOverflow" [
         -- | Address of the offending expression
         TUSize],
-      EnumVariant "EDivisionByZero" [
+      internalVariant "EDivisionByZero" [
         -- | Address of the offending expression
         TUSize],
-      EnumVariant "ERuntimeFailure" [
+      internalVariant "ERuntimeFailure" [
         -- | Address of the call to the runtime that failed, or 0
         TUSize,
         -- | Operation of the runtime that failed
@@ -160,7 +160,7 @@ stdlibGlobalEnv outBufSize inBufSize =
         TInt32],
       -- | Fault of the processor. The fields are numbers of the platform,
       -- decoded with the platform at hand.
-      EnumVariant "EProcessorFault" [
+      internalVariant "EProcessorFault" [
         -- | Exception number of the architecture
         TUInt32,
         -- | Fault status register, or 0 when there is none
@@ -170,13 +170,13 @@ stdlibGlobalEnv outBufSize inBufSize =
         -- | Faulting address, or 0 when the architecture gives none
         TUSize],
       -- | Fatal error raised by the operating system itself
-      EnumVariant "EKernelFailure" [
+      internalVariant "EKernelFailure" [
         -- | Source of the fatal error, as the operating system numbers it
         TUInt32,
         -- | Code of the fatal error, which may be an address
         TUSize],
       -- | Stack overflow detected by the operating system
-      EnumVariant "EStackOverflow" [
+      internalVariant "EStackOverflow" [
         -- | Identifier of the task, or the invalid identifier when the stack
         -- is not of a task of the application
         TUSize]

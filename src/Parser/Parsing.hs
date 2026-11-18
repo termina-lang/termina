@@ -1567,22 +1567,25 @@ classDefinitionParser = do
       <|> (reserved "test" >> return TestClass)
 
 variantDefinitionParser :: TerminaParser (EnumVariant ParserAnn)
-variantDefinitionParser = identifierParser >>= \identifier ->
-  try (parens (sepBy1 typeSpecifierParser comma) <&> EnumVariant identifier)
-  <|> return (EnumVariant identifier [])
+variantDefinitionParser = do
+  current <- getState
+  startPos <- getPosition
+  identifier <- identifierParser
+  params <- try (parens (sepBy1 typeSpecifierParser comma)) <|> return []
+  EnumVariant identifier params . located current startPos <$> getPosition
 
 -- | The variants of an enum, separated by commas. The documentation comment
 -- after a variant goes before or after its comma, or after the last variant.
--- A variant has no annotation yet, so its comments are read and dropped.
 variantListParser :: TerminaParser [EnumVariant ParserAnn]
 variantListParser = do
-  (_, variant) <- docBefore (try variantDefinitionParser)
-  before <- docAfter
+  variant <- documented (try variantDefinitionParser)
+  beforeComma <- docAfter
   more <- optionMaybe comma
-  _ <- maybe docAfter (const (return Nothing)) before
+  doc <- maybe docAfter (return . Just) beforeComma
+  documentedVariant <- withDoc doc variant
   case more of
-    Nothing -> return [variant]
-    Just _ -> (variant :) <$> variantListParser
+    Nothing -> return [documentedVariant]
+    Just _ -> (documentedVariant :) <$> variantListParser
 
 enumDefinitionParser :: TerminaParser (AnnASTElement ParserAnn)
 enumDefinitionParser = do

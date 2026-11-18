@@ -714,9 +714,9 @@ foldTypeDef loc (Enum ident variants mods) = do
   where 
 
     foldEnumVariant :: EnumVariant SemanticAnn -> ConstFoldMonad (EnumVariant SemanticAnn)
-    foldEnumVariant (EnumVariant variantId tys) = do
+    foldEnumVariant (EnumVariant variantId tys ann) = do
       tys' <- mapM (foldType loc) tys
-      return $ EnumVariant variantId tys'
+      return $ EnumVariant variantId tys' ann
 
 foldTypeDef loc (Class ck classId members provides mods) = do
   members' <- mapM foldClassMember members
