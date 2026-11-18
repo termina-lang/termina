@@ -31,7 +31,7 @@ genModuleDefineLabel mn =
     unpack $ intercalate (pack "__") (map (toUpper . replace (pack ".") (pack "_")) filePath) <> pack "__"
 
 genInclude :: QualifiedName -> Bool -> CFileItem
-genInclude mName before = CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn before) Internal)
+genInclude mName before = CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn before Nothing) Internal)
 
 genHeaderASTElement :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genHeaderASTElement typedef@(TypeDefinition {}) = genTypeDefinitionDecl typedef
@@ -67,16 +67,16 @@ genHeaderFile includeOptionH includeStatusH includeResultH mName imports program
     let includeList = genIncludeList (S.toList (S.union (S.fromList imports) extra))
     let file = CHeaderFile mName $
             [
-                CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False) Internal),
-                CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False) Internal),
-                CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True) Internal)
+                CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False Nothing) Internal),
+                CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False Nothing) Internal),
+                CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True Nothing) Internal)
             ] ++ includeList
-            ++ ([CPPDirective (CPPInclude False genOptionPathName) (LocatedElement (CPPDirectiveAnn True) Internal) | includeOptionH])
-            ++ ([CPPDirective (CPPInclude False genStatusPathName) (LocatedElement (CPPDirectiveAnn False) Internal) | includeStatusH])
-            ++ ([CPPDirective (CPPInclude False genResultPathName) (LocatedElement (CPPDirectiveAnn False) Internal) | includeResultH])
+            ++ ([CPPDirective (CPPInclude False genOptionPathName) (LocatedElement (CPPDirectiveAnn True Nothing) Internal) | includeOptionH])
+            ++ ([CPPDirective (CPPInclude False genStatusPathName) (LocatedElement (CPPDirectiveAnn False Nothing) Internal) | includeStatusH])
+            ++ ([CPPDirective (CPPInclude False genResultPathName) (LocatedElement (CPPDirectiveAnn False Nothing) Internal) | includeResultH])
             ++ items
             ++ [
-                CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) Internal)
+                CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True Nothing) Internal)
             ]
     plt <- gets targetPlatform
     checkIdentifierLengths (maxIdentifierLength plt) file
@@ -97,7 +97,7 @@ genSourceFile ::
 genSourceFile mName program = do
     items <- concat <$> traverse genSourceASTElement program
     let file = CSourceFile mName $
-            CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn True) Internal)
+            CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn True Nothing) Internal)
             : items
     plt <- gets targetPlatform
     checkIdentifierLengths (maxIdentifierLength plt) file

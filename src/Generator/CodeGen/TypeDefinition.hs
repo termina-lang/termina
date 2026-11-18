@@ -48,7 +48,7 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface _ _)) (
     return [
             CDecl
                 (CTSStructUnion
-                    (CStruct CStructTag Nothing (cThatField : memberFields) []))
+                    (CStruct CStructTag Nothing (map undocumentedMember (cThatField : memberFields)) []))
                 (Just identifier) Nothing
         ]
 
@@ -219,7 +219,7 @@ genEnumVariantParameterStruct ann identifier (EnumVariant this_variant params _)
     let cAnn = buildDeclarationAnn ann True
     pParams <- zipWithM genEnumVariantParameter params [0..]
     paramsStructName <- genEnumParameterStructName identifier this_variant
-    return $ CExtDecl (CEDStructUnion (Just paramsStructName) (CStruct CStructTag Nothing pParams [])) cAnn
+    return $ CExtDecl (CEDStructUnion (Just paramsStructName) (CStruct CStructTag Nothing (map undocumentedMember pParams) [])) cAnn
     where
         genEnumVariantParameter :: TerminaType SemanticAnn -> Integer -> CGenerator CDeclaration
         genEnumVariantParameter ts index = do
@@ -317,7 +317,7 @@ genTypeDefinitionDecl (TypeDefinition (Struct identifier fls modifiers) ann) = d
                 generatedTypes = M.insert (TStruct identifier) currModule (generatedTypes . monadicTypes $ st)
             }
         }
-    return $ CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing cFields structModifiers)) cAnn : (optsDeclExt ++ statusDeclExt ++ resultsDeclExt)
+    return $ CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing (map undocumentedMember cFields) structModifiers)) cAnn : (optsDeclExt ++ statusDeclExt ++ resultsDeclExt)
 genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
     let cAnn = buildDeclarationAnn ann True
         variantsWithParams = filter (not . null . assocData) variants
@@ -333,7 +333,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
     statusDeclExt <- if S.member (TEnum identifier) stats then
         genStatusStruct (TStruct identifier)
         else return []
-    return $ CExtDecl (CEDEnum (Just enumName) (CEnum Nothing [(v, Nothing) | v <- pEnumVariants] [])) cAnn
+    return $ CExtDecl (CEDEnum (Just enumName) (CEnum Nothing (map undocumentedEnumerator pEnumVariants) [])) cAnn
                 : pEnumParameterStructs ++ (enumStruct : optsDeclExt ++ statusDeclExt)
 
         where
@@ -347,7 +347,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
             genParameterUnion :: [EnumVariant SemanticAnn] -> CGenerator CDeclaration
             genParameterUnion variantsWithParams = do
                 pFields <- mapM genParameterUnionField variantsWithParams
-                return $ CDecl (CTSStructUnion (CStruct CUnionTag Nothing pFields [])) Nothing Nothing
+                return $ CDecl (CTSStructUnion (CStruct CUnionTag Nothing (map undocumentedMember pFields) [])) Nothing Nothing
 
             genEnumStruct :: Identifier -> [EnumVariant SemanticAnn] -> CGenerator CFileItem
             genEnumStruct enumName variantsWithParams = do

@@ -93,22 +93,22 @@ genInitFile mName prjprogs = do
 
         initFunctionName = terminafy $ "app" <::> "init_globals"
 
-        includeTermina = CPPDirective (CPPInclude True ("termina" <.> "h")) (internalAnn (CPPDirectiveAnn True))
+        includeTermina = CPPDirective (CPPInclude True ("termina" <.> "h")) (internalAnn (CPPDirectiveAnn True Nothing))
 
         -- | The identifiers of the deployment. The OSAL API does not include
         -- config.h, so that the modules do not depend on it.
-        includeConfig = CPPDirective (CPPInclude False genConfigPathName) (internalAnn (CPPDirectiveAnn False))
+        includeConfig = CPPDirective (CPPInclude False genConfigPathName) (internalAnn (CPPDirectiveAnn False Nothing))
 
         -- Generate include preprocessor directives for the modules
         genIncludes :: [QualifiedName] -> [CFileItem]
         genIncludes [] = []
         genIncludes (inc:xincs) = 
-            CPPDirective (CPPInclude False (inc <.> "h")) (internalAnn (CPPDirectiveAnn True)) : genIncludes' xincs
+            CPPDirective (CPPInclude False (inc <.> "h")) (internalAnn (CPPDirectiveAnn True Nothing)) : genIncludes' xincs
         
         genIncludes' :: [QualifiedName] -> [CFileItem]
         genIncludes' [] = []
         genIncludes' (inc:xincs) =
-            CPPDirective (CPPInclude False (inc <.> "h")) (internalAnn (CPPDirectiveAnn False)) : genIncludes' xincs
+            CPPDirective (CPPInclude False (inc <.> "h")) (internalAnn (CPPDirectiveAnn False Nothing)) : genIncludes' xincs
 
         genItems :: [Global SemanticAnn] -> CGenerator [CCompoundBlockItem]
         genItems [] = return []

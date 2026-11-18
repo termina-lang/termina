@@ -5,6 +5,7 @@
 -- another one.
 module Generator.LanguageC.DocPrinter
   ( pprintCDoc
+  , pprintTrailingCDoc
   , cDocLines
   , escapeDoxygen
   , escapeComment
@@ -30,6 +31,15 @@ pprintCDoc doc = column $ \c ->
     where
 
         commentLine l = pretty (if T.null l then " *" else " * " <> l)
+
+-- | A documentation comment after a member or an enumerator, @/**< ... */@,
+-- when it is only a brief of at most 60 characters on one line.
+pprintTrailingCDoc :: CDoc -> Maybe DocStyle
+pprintTrailingCDoc (CDoc brief [] []) =
+    case map escapeComment (wrapText maxBound (inlineText brief)) of
+        [text] | T.length text <= 60 -> Just (pretty ("/**< " <> text <> " */"))
+        _ -> Nothing
+pprintTrailingCDoc _ = Nothing
 
 -- | The lines of a documentation comment, without the delimiters and the
 -- star of each line, wrapped at a width. The brief, each block of the body,

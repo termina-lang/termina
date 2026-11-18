@@ -59,7 +59,7 @@ generatedIdentifiers file = concatMap itemIdents (fileItems file)
     extDeclIdents :: CExternalDeclaration -> [Ident]
     extDeclIdents (CEDVariable _ (CDecl _ mid _)) = maybeToList mid
     extDeclIdents (CEDFunction _ _ _ ident params) = ident : paramIdents params
-    extDeclIdents (CEDEnum mid (CEnum _ constants _)) = maybeToList mid ++ map fst constants
+    extDeclIdents (CEDEnum mid (CEnum _ constants _)) = maybeToList mid ++ [ ident | CEnumerator ident _ _ <- constants ]
     extDeclIdents (CEDStructUnion mid _) = maybeToList mid
     extDeclIdents (CEDTypeDef ident _) = [ident]
 
@@ -430,13 +430,13 @@ buildStatementAnn :: SemanticAnn -> Bool -> CAnns
 buildStatementAnn ann before = LocatedElement (CStatementAnn before False) (getLocation ann)
 
 buildDeclarationAnn :: SemanticAnn -> Bool -> CAnns
-buildDeclarationAnn ann before = LocatedElement (CDeclarationAnn before) (getLocation ann)
+buildDeclarationAnn ann before = LocatedElement (CDeclarationAnn before Nothing) (getLocation ann)
 
 buildCompoundAnn :: SemanticAnn -> Bool -> Bool -> CAnns
 buildCompoundAnn ann before trailing = LocatedElement (CCompoundAnn before trailing) (getLocation ann)
 
 buildCPPDirectiveAnn :: SemanticAnn -> Bool -> CAnns
-buildCPPDirectiveAnn ann before = LocatedElement (CPPDirectiveAnn before) (getLocation ann)
+buildCPPDirectiveAnn ann before = LocatedElement (CPPDirectiveAnn before Nothing) (getLocation ann)
 
 -- | TODO: The size of the enum field has been hardcoded, it should be
 -- platform dependent

@@ -795,7 +795,7 @@ genMainFile :: QualifiedName
     -> TerminaProgArch SemanticAnn
     -> CGenerator CFile
 genMainFile mName stamp cases progArchitecture = do
-    let includeTermina = CPPDirective (CPPInclude True "termina.h") (internalAnn (CPPDirectiveAnn True))
+    let includeTermina = CPPDirective (CPPInclude True "termina.h") (internalAnn (CPPDirectiveAnn True Nothing))
     sinkPortMessageQueues <- getSinkPortMessageQueues progArchitecture
     channelMessageQueues <- getChannelsMessageQueues progArchitecture
     taskMessageQueues <- getTasksMessageQueues progArchitecture (sinkPortMessageQueues ++ channelMessageQueues)
@@ -835,7 +835,7 @@ genMainFile mName stamp cases progArchitecture = do
     let harnessDeclaration = [
                 pre_cr $ CExtDecl (CEDFunction (Just CStatic) [] void testHarnessFunction
                     [CDecl (CTypeSpec (_const . ptr $ void)) (Just "arg") Nothing])
-                    (internalAnn (CDeclarationAnn True))
+                    (internalAnn (CDeclarationAnn True Nothing))
             | testBuild ]
 
     -- | The steps are listed in the order in which they are called
@@ -856,7 +856,7 @@ genMainFile mName stamp cases progArchitecture = do
             includeTermina,
             -- | The identifiers of the deployment. The OSAL API does not
             -- include config.h, so that the modules do not depend on it.
-            CPPDirective (CPPInclude False genConfigPathName) (internalAnn (CPPDirectiveAnn False))
+            CPPDirective (CPPInclude False genConfigPathName) (internalAnn (CPPDirectiveAnn False Nothing))
         ] ++ includes
         ++ testRecord
         ++ cPoolMemoryAreas
@@ -870,7 +870,7 @@ genMainFile mName stamp cases progArchitecture = do
         -- | List of modules that must be included
         incs = getGlobDeclModules progArchitecture
         -- | List of include directives
-        includes = map (\nm -> CPPDirective (CPPInclude False (nm <.> "h")) (internalAnn (CPPDirectiveAnn True))) incs
+        includes = map (\nm -> CPPDirective (CPPInclude False (nm <.> "h")) (internalAnn (CPPDirectiveAnn True Nothing))) incs
 
 runGenMainFile ::
     TerminaConfig

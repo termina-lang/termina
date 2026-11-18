@@ -3,6 +3,7 @@
 module Generator.LanguageC.Printer where
 
 import Generator.LanguageC.AST
+import Generator.LanguageC.DocPrinter (pprintCDoc, pprintTrailingCDoc)
 import Prettyprinter
 import Data.Text (Text)
 import Control.Monad.Reader
@@ -13,10 +14,32 @@ import Utils.Printer
 
 data CPrinterConfig = CPrinterConfig
   { debug :: Bool,
-    printAnnotations :: Bool
+    printAnnotations :: Bool,
+    -- | Print the documentation comments of the declarations
+    printDocs :: Bool
   }
 
 type CPrinter = Reader CPrinterConfig DocStyle
+
+-- | A declaration with its documentation comment before it, when the
+-- comments are printed.
+withDoc :: Maybe CDoc -> DocStyle -> CPrinter
+withDoc doc pdecl = do
+    docs <- asks printDocs
+    return $ case doc of
+        Just d | docs -> pprintCDoc d <> hardline <> pdecl
+        _ -> pdecl
+
+-- | A member of a struct or an enumerator, already printed with its
+-- punctuation, with its documentation comment after it when it is a short
+-- brief, and before it otherwise.
+withMemberDoc :: CAnns -> DocStyle -> CPrinter
+withMemberDoc ann pmember = do
+    docs <- asks printDocs
+    return $ case itemAnnotation ann of
+        CMemberAnn (Just d) | docs ->
+            maybe (pprintCDoc d <> hardline <> pmember) (pmember <+>) (pprintTrailingCDoc d)
+        _ -> pmember
 
 -- precedence of C operators
 binPrec :: CBinaryOp -> Integer
@@ -399,69 +422,79 @@ instance CPrint CAttribute where
         return $ pretty attrName <> parens (hsep (punctuate comma pattrParams))
 
 instance CPrint CStructureUnion where
-    pprint (CStruct tag mid decls attrs) = do
-        pdecls <- mapM pprint decls
+    pprint (CStruct tag mid members attrs) = do
+        pdecls <- mapM member members
         case mid of
             Nothing -> do
-                case attrs of 
+                case attrs of
                     [] -> return $ vcat [
                         pretty tag <+> pretty "{",
-                        indentTab $ vsep (map (<> semi) pdecls),
+                        indentTab $ vsep pdecls,
                         pretty "}"]
                     _ -> do
                         pattrs <- pprintCAttributeList attrs
                         return $ vcat [
                             pretty tag <+> pretty "{",
-                            indentTab $ vsep (map (<> semi) pdecls),
+                            indentTab $ vsep pdecls,
                             pretty "}" <+> pattrs]
             Just ident -> do
-                case attrs of 
+                case attrs of
                     [] -> return $ vcat [
                         pretty tag <+> pretty ident <+> pretty "{",
-                        indentTab $ vsep (map (<> semi) pdecls),
+                        indentTab $ vsep pdecls,
                         pretty "}"]
                     _ -> do
                         pattrs <- pprintCAttributeList attrs
                         return $ vcat [
                             pretty tag <+> pretty ident <+> pretty "{",
-                            indentTab $ vsep (map (<> semi) pdecls),
-                            pretty "}" <+> pattrs] 
+                            indentTab $ vsep pdecls,
+                            pretty "}" <+> pattrs]
+
+        where
+
+            member (CMember decl ann) = do
+                pdecl <- pprint decl
+                withMemberDoc ann (pdecl <> semi)
 
 instance CPrint CEnum where
 
     pprint (CEnum mid decls attrs) = do
-        pdecls <- mapM p decls
-        case mid of 
+        pdecls <- sequence (zipWith p (map (const True) (drop 1 decls) ++ [False]) decls)
+        case mid of
             Nothing -> do
                 case attrs of
                     [] -> return $ vcat [
                         pretty "enum" <+> pretty "{",
-                        indentTab $ vsep (punctuate comma pdecls),
+                        indentTab $ vsep pdecls,
                         pretty "}"]
                     _ -> do
                         pattrs <- pprintCAttributeList attrs
                         return $ vcat [
                             pretty "enum" <+> pretty "{",
-                            indentTab $ vsep (punctuate comma pdecls),
+                            indentTab $ vsep pdecls,
                             pretty "}" <+> pattrs]
             Just ident -> do
                 case attrs of
                     [] -> return $ vcat [
                         pretty "enum" <+> pretty ident <+> pretty "{",
-                        indentTab $ vsep (punctuate comma pdecls),
+                        indentTab $ vsep pdecls,
                         pretty "}"]
                     _ -> do
                         pattrs <- pprintCAttributeList attrs
                         return $ vcat [
                             pretty "enum" <+> pretty ident <+> pretty "{",
-                            indentTab $ vsep (punctuate comma pdecls),
+                            indentTab $ vsep pdecls,
                             pretty "}" <+> pattrs]
         where
-            p :: (Ident, Maybe CExpression) -> CPrinter
-            p (ident', Just expr) = do
-                pexpr <- pprintPrec 25 expr
-                return $ pretty ident' <+> pretty "=" <+> pexpr
-            p (ident', Nothing) = return $ pretty ident'
+            -- An enumerator, with the comma after it unless it is the last.
+            p :: Bool -> CEnumerator -> CPrinter
+            p followed (CEnumerator ident' value ann) = do
+                pvalue <- case value of
+                    Just expr -> do
+                        pexpr <- pprintPrec 25 expr
+                        return $ pretty ident' <+> pretty "=" <+> pexpr
+                    Nothing -> return $ pretty ident'
+                withMemberDoc ann (if followed then pvalue <> comma else pvalue)
 
 
 instance CPrint CDeclaration where
@@ -595,7 +628,7 @@ instance CPrint CCompoundBlockItem where
     pprint (CBlockStmt stat) = pprint stat
     pprint (CBlockDecl decl ann) = do
         case itemAnnotation ann of 
-            CDeclarationAnn before -> do
+            CDeclarationAnn before _ -> do
                 debugLines <- asks debug
                 pdecl <- pprint decl
                 return $ prependLine before . addDebugLine debugLines (location ann) $ pdecl <> semi
@@ -662,29 +695,29 @@ instance CPrint CExternalDeclaration where
         return $ pretty "typedef" <+> pty <+> pretty ident <> semi
 
 instance CPrint CFileItem where
-    pprint (CExtDecl decl ann) = 
-        case itemAnnotation ann of 
-            CDeclarationAnn before -> do
+    pprint (CExtDecl decl ann) =
+        case itemAnnotation ann of
+            CDeclarationAnn before doc -> do
                 pdecl <- pprint decl
-                return $ prependLine before pdecl
+                prependLine before <$> withDoc doc pdecl
             _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPDirective directive ann) = 
-        case itemAnnotation ann of 
-            CPPDirectiveAnn before -> do
+    pprint (CPPDirective directive ann) =
+        case itemAnnotation ann of
+            CPPDirectiveAnn before doc -> do
                 pdir <- pprint directive
-                return $ prependLine before pdir
+                prependLine before <$> withDoc doc pdir
             _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CFunctionDef Nothing func ann) = 
-        case itemAnnotation ann of 
-            CDeclarationAnn before -> do
+    pprint (CFunctionDef Nothing func ann) =
+        case itemAnnotation ann of
+            CDeclarationAnn before doc -> do
                 pfunc <- pprint func
-                return $ prependLine before pfunc
+                prependLine before <$> withDoc doc pfunc
             _ -> error $ "Invalid annotation: " ++ show ann
     pprint (CFunctionDef (Just CStatic) func ann) = do
-        case itemAnnotation ann of 
-            CDeclarationAnn before -> do
+        case itemAnnotation ann of
+            CDeclarationAnn before doc -> do
                 pfunc <- pprint func
-                return $ prependLine before $ pretty "static" <+> pfunc
+                prependLine before <$> withDoc doc (pretty "static" <+> pfunc)
             _ -> error $ "Invalid annotation: " ++ show ann
     pprint (CFunctionDef {}) = error "Invalid function definition"
 
@@ -697,6 +730,6 @@ instance CPrint CFile where
         return $ vsep pItems <> line
 
 runCPrinter :: Bool -> CFile -> Text
-runCPrinter dbg cFile = render' $ runReader (pprint cFile) (CPrinterConfig dbg False)
+runCPrinter dbg cFile = render' $ runReader (pprint cFile) (CPrinterConfig dbg False False)
     where
         render' = if dbg then unboundedRender else render

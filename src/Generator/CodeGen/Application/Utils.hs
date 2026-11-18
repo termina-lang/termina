@@ -169,7 +169,7 @@ genPoolMemoryAreas (obj : objs) = do
 
 genAtomicDeclaration :: Bool -> TPAtomic SemanticAnn -> CGenerator CFileItem
 genAtomicDeclaration before (TPAtomic identifier ts _ _) = do
-    let declStmt = internalAnn (CDeclarationAnn before)
+    let declStmt = internalAnn (CDeclarationAnn before Nothing)
     cType <- genType atomic ts
     return $ CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec cType) (Just identifier) Nothing)) declStmt
 
@@ -182,7 +182,7 @@ genAtomicDeclarations (obj : objs) = do
 
 genAtomicArrayDeclaration :: Bool -> TPAtomicArray SemanticAnn -> CGenerator CFileItem
 genAtomicArrayDeclaration before (TPAtomicArray identifier ts size _ _) = do
-    let declStmt = internalAnn (CDeclarationAnn before)
+    let declStmt = internalAnn (CDeclarationAnn before Nothing)
     cSize <- genConstExpression size
     cType <- genType atomic ts
     return $ CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec (CTArray cType cSize)) (Just identifier) Nothing)) declStmt

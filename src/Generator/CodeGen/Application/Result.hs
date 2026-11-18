@@ -30,12 +30,12 @@ genResultHeaderFile = do
     items <- concat <$> traverse (uncurry genResultStruct) (S.toList resultSet)
     return $ CHeaderFile genResultPathName $
         [
-            CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False) Internal),
-            CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False) Internal),
-            CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True) Internal)
+            CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False Nothing) Internal),
+            CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False Nothing) Internal),
+            CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True Nothing) Internal)
         ]
         ++ items ++ [
-            CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) Internal)
+            CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True Nothing) Internal)
         ]
 
 runGenResultHeaderFile ::

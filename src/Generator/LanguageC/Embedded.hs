@@ -16,7 +16,7 @@ module Generator.LanguageC.Embedded (
     uint8_t, uint16_t, uint32_t, uint64_t,
     int8_t, int16_t, int32_t, int64_t,
     dec, indent, trail_cr, pre_cr, no_cr,
-    block, var, field, struct, _const,
+    block, var, field, struct, undocumentedMember, undocumentedEnumerator, _const,
     function, static_function,
     global, static_global, extern,
     _if, _if_else, _break, _switch, _case, 
@@ -509,10 +509,10 @@ field ident cType = CDecl (CTypeSpec cType) (Just ident) Nothing
 
 instance Alignment Declaration CCompoundBlockItem where
     pre_cr (Declaration ident ts) =
-        let declAnn = internalAnn (CDeclarationAnn True) in
+        let declAnn = internalAnn (CDeclarationAnn True Nothing) in
         CBlockDecl (CDecl ts (Just ident) Nothing) declAnn
     no_cr (Declaration ident ts) =
-        let declAnn = internalAnn (CDeclarationAnn False) in
+        let declAnn = internalAnn (CDeclarationAnn False Nothing) in
         CBlockDecl (CDecl ts (Just ident) Nothing) declAnn
     
 (@:=) :: Declaration -> CExpression -> CDeclaration
@@ -520,8 +520,8 @@ instance Alignment Declaration CCompoundBlockItem where
     CDecl ts (Just ident) (Just expr)
 
 instance Alignment CDeclaration CCompoundBlockItem where
-    pre_cr decl = CBlockDecl decl (internalAnn (CDeclarationAnn True))
-    no_cr decl = CBlockDecl decl (internalAnn (CDeclarationAnn False))
+    pre_cr decl = CBlockDecl decl (internalAnn (CDeclarationAnn True Nothing))
+    no_cr decl = CBlockDecl decl (internalAnn (CDeclarationAnn False Nothing))
 
 data FunctionPrototype = 
     FunctionPrototype Ident [Declaration]
@@ -543,25 +543,25 @@ class GlobalDecl a where
 
 instance GlobalDecl Declaration where
     global (Declaration ident ts) =
-        let declAnn = internalAnn (CDeclarationAnn False) in
+        let declAnn = internalAnn (CDeclarationAnn False Nothing) in
         CExtDecl (CEDVariable Nothing (CDecl ts (Just ident) Nothing)) declAnn
     static_global (Declaration ident ts) =
-        let declAnn = internalAnn (CDeclarationAnn False) in
+        let declAnn = internalAnn (CDeclarationAnn False Nothing) in
         CExtDecl (CEDVariable (Just CStatic) (CDecl ts (Just ident) Nothing)) declAnn
     extern (Declaration ident ts) =
-        let declAnn = internalAnn (CDeclarationAnn False) in
+        let declAnn = internalAnn (CDeclarationAnn False Nothing) in
         CExtDecl (CEDVariable (Just CExtern) (CDecl ts (Just ident) Nothing)) declAnn
 
 instance GlobalDecl CDeclaration where
     global :: CDeclaration -> CFileItem
     global decl =
-        let declAnn = internalAnn (CDeclarationAnn False) in
+        let declAnn = internalAnn (CDeclarationAnn False Nothing) in
         CExtDecl (CEDVariable Nothing decl) declAnn
     static_global decl =
-        let declAnn = internalAnn (CDeclarationAnn False) in
+        let declAnn = internalAnn (CDeclarationAnn False Nothing) in
         CExtDecl (CEDVariable (Just CStatic) decl) declAnn
     extern decl =
-        let declAnn = internalAnn (CDeclarationAnn False) in
+        let declAnn = internalAnn (CDeclarationAnn False Nothing) in
         CExtDecl (CEDVariable (Just CExtern) decl) declAnn
 
 data Function = Function FunctionDeclaration CStatement
@@ -573,82 +573,63 @@ instance TypeElement Ident Declaration where
 
 (@->) :: FunctionPrototype -> CType -> CStatement -> CFileItem
 (@->) (FunctionPrototype ident decls) cType stmt =
-    let declStmt = internalAnn (CDeclarationAnn False) in
+    let declStmt = internalAnn (CDeclarationAnn False Nothing) in
     CFunctionDef Nothing  
         (CFunction cType ident (map (\(Declaration paramId ts) -> CDecl ts (Just paramId) Nothing) decls) stmt) declStmt
 (@->) (StaticFunctionPrototype ident decls) cType stmt =
-    let declStmt = internalAnn (CDeclarationAnn False) in
+    let declStmt = internalAnn (CDeclarationAnn False Nothing) in
     CFunctionDef (Just CStatic) 
         (CFunction cType ident (map (\(Declaration paramId ts) -> CDecl ts (Just paramId) Nothing) decls) stmt) declStmt
 
 instance Alignment CFileItem CFileItem where
-    pre_cr (CFunctionDef storage (CFunction cType ident decls stmt) (LocatedElement _ loc)) = 
-        CFunctionDef storage (CFunction cType ident decls stmt) (LocatedElement (CDeclarationAnn True) loc)
-    pre_cr (CPPDirective (CPPInclude system path) (LocatedElement _ loc)) =
-        CPPDirective (CPPInclude system path) (LocatedElement (CPPDirectiveAnn True) loc)
-    pre_cr (CPPDirective (CPPDefine ident maybeValues) (LocatedElement _ loc)) =
-        CPPDirective (CPPDefine ident maybeValues) (LocatedElement (CPPDirectiveAnn True) loc)
-    pre_cr (CPPDirective (CPPIfDef ident) (LocatedElement _ loc)) =
-        CPPDirective (CPPIfDef ident) (LocatedElement (CPPDirectiveAnn True) loc)
-    pre_cr (CPPDirective (CPPIfNDef ident) (LocatedElement _ loc)) =
-        CPPDirective (CPPIfNDef ident) (LocatedElement (CPPDirectiveAnn True) loc)
-    pre_cr (CPPDirective CPPEndif (LocatedElement _ loc)) =
-        CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) loc)
-    pre_cr (CExtDecl (CEDVariable storage decl) (LocatedElement _ loc)) =
-        CExtDecl (CEDVariable storage decl) (LocatedElement (CDeclarationAnn True) loc)
-    pre_cr (CExtDecl (CEDFunction storage funspecs cType ident decls) (LocatedElement _ loc)) =
-        CExtDecl (CEDFunction storage funspecs cType ident decls) (LocatedElement (CDeclarationAnn True) loc)
-    pre_cr (CExtDecl (CEDEnum maybeIdent enum) (LocatedElement _ loc)) =
-        CExtDecl (CEDEnum maybeIdent enum) (LocatedElement (CDeclarationAnn True) loc)
-    pre_cr (CExtDecl (CEDStructUnion maybeIdent structUnion) (LocatedElement _ loc)) =
-        CExtDecl (CEDStructUnion maybeIdent structUnion) (LocatedElement (CDeclarationAnn True) loc)
-    pre_cr (CExtDecl (CEDTypeDef ident cType) (LocatedElement _ loc)) =
-        CExtDecl (CEDTypeDef ident cType) (LocatedElement (CDeclarationAnn True) loc)
+    pre_cr = newLineBefore True
+    no_cr = newLineBefore False
 
-    no_cr (CFunctionDef storage (CFunction cType ident decls stmt) (LocatedElement _ loc)) = 
-        CFunctionDef storage (CFunction cType ident decls stmt) (LocatedElement (CDeclarationAnn False) loc)
-    no_cr (CPPDirective (CPPInclude system path) (LocatedElement _ loc)) =
-        CPPDirective (CPPInclude system path) (LocatedElement (CPPDirectiveAnn False) loc)
-    no_cr (CPPDirective (CPPDefine ident maybeValues) (LocatedElement _ loc)) =
-        CPPDirective (CPPDefine ident maybeValues) (LocatedElement (CPPDirectiveAnn False) loc)
-    no_cr (CPPDirective (CPPIfDef ident) (LocatedElement _ loc)) =
-        CPPDirective (CPPIfDef ident) (LocatedElement (CPPDirectiveAnn False) loc)
-    no_cr (CPPDirective (CPPIfNDef ident) (LocatedElement _ loc)) =
-        CPPDirective (CPPIfNDef ident) (LocatedElement (CPPDirectiveAnn False) loc)
-    no_cr (CPPDirective CPPEndif (LocatedElement _ loc)) =
-        CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn False) loc)
-    no_cr (CExtDecl (CEDVariable storage decl) (LocatedElement _ loc)) =
-        CExtDecl (CEDVariable storage decl) (LocatedElement (CDeclarationAnn False) loc)
-    no_cr (CExtDecl (CEDFunction storage funspecs cType ident decls) (LocatedElement _ loc)) =
-        CExtDecl (CEDFunction storage funspecs cType ident decls) (LocatedElement (CDeclarationAnn False) loc)
-    no_cr (CExtDecl (CEDEnum maybeIdent enum) (LocatedElement _ loc)) =
-        CExtDecl (CEDEnum maybeIdent enum) (LocatedElement (CDeclarationAnn False) loc)
-    no_cr (CExtDecl (CEDStructUnion maybeIdent structUnion) (LocatedElement _ loc)) =
-        CExtDecl (CEDStructUnion maybeIdent structUnion) (LocatedElement (CDeclarationAnn False) loc)
-    no_cr (CExtDecl (CEDTypeDef ident cType) (LocatedElement _ loc)) =
-        CExtDecl (CEDTypeDef ident cType) (LocatedElement (CDeclarationAnn False) loc)
-    
+-- | An item of a file with or without a blank line before it. The rest of
+-- its annotation, its documentation comment included, is kept.
+newLineBefore :: Bool -> CFileItem -> CFileItem
+newLineBefore before item = case item of
+    CFunctionDef storage func (LocatedElement ann loc) -> CFunctionDef storage func (LocatedElement (declaration ann) loc)
+    CExtDecl decl (LocatedElement ann loc) -> CExtDecl decl (LocatedElement (declaration ann) loc)
+    CPPDirective directive (LocatedElement ann loc) -> CPPDirective directive (LocatedElement (directiveAnn ann) loc)
+
+    where
+
+        declaration ann = CDeclarationAnn before (itemDoc ann)
+        directiveAnn ann = CPPDirectiveAnn before (itemDoc ann)
+        itemDoc (CDeclarationAnn _ doc) = doc
+        itemDoc (CPPDirectiveAnn _ doc) = doc
+        itemDoc _ = Nothing
+
 _include :: Bool -> FilePath -> CFileItem
 _include system filePath =
-    CPPDirective (CPPInclude system filePath) (internalAnn (CPPDirectiveAnn False))
+    CPPDirective (CPPInclude system filePath) (internalAnn (CPPDirectiveAnn False Nothing))
 
 _define :: Ident -> Maybe [String] -> CFileItem
 _define ident maybeValues =
-    CPPDirective (CPPDefine ident maybeValues) (internalAnn (CPPDirectiveAnn False))
+    CPPDirective (CPPDefine ident maybeValues) (internalAnn (CPPDirectiveAnn False Nothing))
 
 _ifdef :: Ident -> CFileItem
 _ifdef ident =
-    CPPDirective (CPPIfDef ident) (internalAnn (CPPDirectiveAnn False))
+    CPPDirective (CPPIfDef ident) (internalAnn (CPPDirectiveAnn False Nothing))
 
 _ifndef :: Ident -> CFileItem
 _ifndef ident =
-    CPPDirective (CPPIfNDef ident) (internalAnn (CPPDirectiveAnn False))
+    CPPDirective (CPPIfNDef ident) (internalAnn (CPPDirectiveAnn False Nothing))
 
 _endif :: CFileItem
 _endif =
-    CPPDirective CPPEndif (internalAnn (CPPDirectiveAnn False))
+    CPPDirective CPPEndif (internalAnn (CPPDirectiveAnn False Nothing))
 
 struct :: Ident 
     -> [CDeclaration]  -- member declarations
     -> [CAttribute] -> CFileItem
-struct ident flds attrs = CExtDecl (CEDStructUnion (Just ident) (CStruct CStructTag Nothing flds attrs)) (internalAnn (CDeclarationAnn False))
+struct ident flds attrs = CExtDecl (CEDStructUnion (Just ident) (CStruct CStructTag Nothing (map undocumentedMember flds) attrs)) (internalAnn (CDeclarationAnn False Nothing))
+
+-- | A member of a struct or a union without a documentation comment.
+undocumentedMember :: CDeclaration -> CMember
+undocumentedMember decl = CMember decl (internalAnn (CMemberAnn Nothing))
+
+-- | An enumerator without a value and without a documentation comment.
+undocumentedEnumerator :: Ident -> CEnumerator
+undocumentedEnumerator ident = CEnumerator ident Nothing (internalAnn (CMemberAnn Nothing))

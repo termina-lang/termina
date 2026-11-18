@@ -29,12 +29,12 @@ genStatusHeaderFile = do
     items <- concat <$> traverse genStatusStruct (S.toList statusSet)
     return $ CHeaderFile genStatusPathName $
         [
-            CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False) Internal),
-            CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False) Internal),
-            CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True) Internal)
+            CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False Nothing) Internal),
+            CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False Nothing) Internal),
+            CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True Nothing) Internal)
         ]
         ++ items ++ [
-            CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) Internal)
+            CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True Nothing) Internal)
         ]
 
 runGenStatusHeaderFile ::

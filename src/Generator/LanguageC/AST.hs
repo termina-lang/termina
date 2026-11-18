@@ -60,8 +60,13 @@ data CStructureUnion' a
   = CStruct
     CStructTag
     (Maybe Ident)      -- struct/union name (optional)
-    [CDeclaration' a]  -- member declarations
+    [CMember' a]       -- member declarations
     [CAttribute' a]    -- __attribute__s
+    deriving Show
+
+-- | A member of a struct or a union, with its annotation, which holds its
+-- documentation comment.
+data CMember' a = CMember (CDeclaration' a) a
     deriving Show
 
 data CStructTag = CStructTag
@@ -72,11 +77,16 @@ instance Pretty CStructTag where
   pretty CStructTag = pretty "struct"
   pretty CUnionTag = pretty "union"
 
-data CEnum' a = 
-    CEnum 
+data CEnum' a =
+    CEnum
     (Maybe Ident) -- ^ enum name (optional)
-    [(Ident, Maybe (CExpression' a))] -- ^ enum constants
+    [CEnumerator' a] -- ^ enumerators, one per variant
     [CAttribute' a] -- ^ __attribute__s
+    deriving Show
+
+-- | An enumerator of an enum, its value if it has one, and its annotation,
+-- which holds its documentation comment.
+data CEnumerator' a = CEnumerator Ident (Maybe (CExpression' a)) a
     deriving Show
 
 data CTerminaType' a = 
@@ -452,9 +462,14 @@ data CItemAnn =
       Bool -- ^ Add new line before the compound block
       Bool -- ^ Add trailing line inside the compound block
     | CDeclarationAnn
-      Bool -- ^ Add new line before declaration 
+      Bool -- ^ Add new line before declaration
+      (Maybe CDoc) -- ^ Documentation comment
     | CPPDirectiveAnn
       Bool -- ^ Add new line before directive
+      (Maybe CDoc) -- ^ Documentation comment
+    -- | Annotation of a member of a struct or a union, or of an enumerator
+    | CMemberAnn
+      (Maybe CDoc) -- ^ Documentation comment
     deriving Show
 
 type CAnns = LocatedElement CItemAnn
@@ -474,7 +489,9 @@ type CDeclaration = CDeclaration' CAnns
 type CTerminaType = CTerminaType' CAnns
 type CAttribute = CAttribute' CAnns
 type CStructureUnion = CStructureUnion' CAnns
+type CMember = CMember' CAnns
 type CEnum = CEnum' CAnns
+type CEnumerator = CEnumerator' CAnns
 
 instance Located (CExpression' CAnns) where
   getLocation = getLocation . getAnnotation 

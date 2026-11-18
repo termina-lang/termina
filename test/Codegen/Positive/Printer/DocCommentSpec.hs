@@ -4,13 +4,17 @@
 module Codegen.Positive.Printer.DocCommentSpec (spec) where
 
 import Control.Monad (replicateM)
+import Control.Monad.Reader (runReader)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Prettyprinter (indent)
+import Prettyprinter (indent, vsep)
 
 import Doc.Model
+import Generator.CodeGen.Common (internalAnn)
 import Generator.LanguageC.AST
 import Generator.LanguageC.DocPrinter
+import Generator.LanguageC.Embedded (pre_cr)
+import Generator.LanguageC.Printer (CPrinterConfig(..), pprint)
 import Utils.Printer (render)
 
 import Test.Hspec
@@ -39,8 +43,68 @@ spipsEnd = CDoc
 brief :: Text -> CDoc
 brief t = CDoc [DText t] [] []
 
+-- | A documented struct with a member whose comment is short, one whose
+-- comment is long and one without, and a documented enum with a blank line
+-- added before it by 'pre_cr', which keeps its comment.
+documentedItems :: [CFileItem]
+documentedItems =
+  [ CExtDecl (CEDStructUnion (Just "Point") (CStruct CStructTag Nothing
+      [ member "x" (Just (brief "Abscissa."))
+      , member "y" (Just (brief "Ordinate, measured from the bottom edge of the screen of the device."))
+      , member "z" Nothing ] []))
+      (internalAnn (CDeclarationAnn False (Just (brief "A point."))))
+  , pre_cr (CExtDecl (CEDEnum (Just "Mode") (CEnum Nothing
+      [ CEnumerator "Mode__Off" Nothing (internalAnn (CMemberAnn (Just (brief "Off."))))
+      , CEnumerator "Mode__On" Nothing (internalAnn (CMemberAnn Nothing)) ] []))
+      (internalAnn (CDeclarationAnn False (Just (brief "A mode.")))))
+  ]
+
+  where
+
+    member name doc = CMember (CDecl (CTypeSpec (CTInt IntSize32 Unsigned noqual)) (Just name) Nothing) (internalAnn (CMemberAnn doc))
+
+-- | The items of a file printed with or without their comments.
+printedItems :: Bool -> [CFileItem] -> Text
+printedItems docs items = render (vsep (runReader (mapM pprint items) (CPrinterConfig False False docs)))
+
 spec :: Spec
 spec = describe "Documentation comments of the C" $ do
+
+  describe "on the declarations of a file" $ do
+    it "are not printed by default" $
+      printedItems False documentedItems `shouldBe` T.intercalate "\n"
+        [ "typedef struct {"
+        , "    uint32_t x;"
+        , "    uint32_t y;"
+        , "    uint32_t z;"
+        , "} Point;"
+        , ""
+        , "typedef enum {"
+        , "    Mode__Off,"
+        , "    Mode__On"
+        , "} Mode;" ]
+    it "go before a declaration, and after a member or an enumerator when they are a short brief" $
+      printedItems True documentedItems `shouldBe` T.intercalate "\n"
+        [ "/**"
+        , " * @brief A point."
+        , " */"
+        , "typedef struct {"
+        , "    uint32_t x; /**< Abscissa. */"
+        , "    /**"
+        , "     * @brief Ordinate, measured from the bottom edge of the screen of the"
+        , "     *        device."
+        , "     */"
+        , "    uint32_t y;"
+        , "    uint32_t z;"
+        , "} Point;"
+        , ""
+        , "/**"
+        , " * @brief A mode."
+        , " */"
+        , "typedef enum {"
+        , "    Mode__Off, /**< Off. */"
+        , "    Mode__On"
+        , "} Mode;" ]
 
   it "prints the comment of CSPIPSDriver::end" $
     render (pprintCDoc spipsEnd) `shouldBe` T.intercalate "\n"
