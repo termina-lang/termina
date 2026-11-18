@@ -180,23 +180,31 @@ ordinaryComment = do
     _ -> parserZero
 
 -- | A documentation comment and the white space after it. A run of line
--- comments, or a single block comment, is one comment. The text is returned
--- without the delimiters.
-docComment :: DocPlacement -> TerminaParser String
-docComment placement = (blockDoc <|> (unlines <$> lineDocs)) <* wspcs
+-- comments, or a single block comment, is one comment. Its text is everything
+-- between the delimiters, with the lines of a run joined by a newline.
+docComment :: DocPlacement -> TerminaParser DocComment
+docComment placement = do
+  current <- getState
+  start <- getPosition
+  (form, text) <- ((BlockDoc,) <$> blockDoc) <|> ((LineDoc,) . L.intercalate "\n" <$> lineDocs)
+  end <- getPosition
+  wspcs
+  return (DocComment placement form text (Position current start end))
+
   where
+
     -- A comment after an element is a single line: another one on the next
     -- line is not on the line of the element.
     lineDocs
       | placement == DocAfter = (: []) <$> lineDoc
-      | otherwise = many1 lineDoc
+      | otherwise = (:) <$> lineDoc <*> many (try (wspcs *> lineDoc))
     opener form = do
       input <- getInput
       case docOpener input of
         Just (placement', form', len) | placement' == placement && form' == form ->
           void (count len anyChar)
         _ -> parserZero
-    lineDoc = opener LineDoc *> skipMany (oneOf " \t") *> many (satisfy (/= '\n')) <* wspcs
+    lineDoc = opener LineDoc *> many (satisfy (/= '\n'))
     blockDoc = opener BlockDoc *> manyTill anyChar (try (string "*/"))
 
 -- | Fails without consuming input where a documentation comment starts. Every
@@ -209,15 +217,49 @@ noDocComment = do
     Just (placement, _, _) -> fail (misplacedDocComment placement)
     Nothing -> return ()
 
--- | An element with its documentation comment before it, if any. A comment
--- that no element follows is reported at its own position.
-documented :: TerminaParser a -> TerminaParser a
-documented p = do
+-- | The documentation comment before an element, if any, and the element. A
+-- comment that no element follows is reported at its own position.
+docBefore :: TerminaParser a -> TerminaParser (Maybe DocComment, a)
+docBefore p = do
   pos <- getPosition
   doc <- optionMaybe (docComment DocBefore)
   case doc of
-    Nothing -> p
-    Just _ -> p <|> failAt pos (misplacedDocComment DocBefore)
+    Nothing -> (Nothing,) <$> p
+    Just _ -> ((doc,) <$> p) <|> failAt pos (misplacedDocComment DocBefore)
+
+-- | An element with its documentation comment before it in its annotation.
+documented :: Annotated f => TerminaParser (f ParserAnn) -> TerminaParser (f ParserAnn)
+documented p = docBefore p >>= uncurry withDoc
+
+-- | An element with its documentation comment after it, on the same line, in
+-- its annotation.
+documentedAfter :: Annotated f => TerminaParser (f ParserAnn) -> TerminaParser (f ParserAnn)
+documentedAfter p = do
+  x <- p
+  doc <- docAfter
+  withDoc doc x
+
+-- | An element with a documentation comment in its annotation. An element
+-- takes one comment, so a second one is reported at the comment after it.
+withDoc :: Annotated f => Maybe DocComment -> f ParserAnn -> TerminaParser (f ParserAnn)
+withDoc Nothing x = return x
+withDoc (Just doc) x =
+  case parsedDoc ann of
+    Nothing -> return (updateAnnotation x ann { parsedDoc = Just doc })
+    Just previous -> failAt (startOf (afterOf previous doc)) twoDocComments
+
+  where
+
+    ann = getAnnotation x
+    afterOf a b = if docPlacement a == DocAfter then a else b
+    startOf d = case docLocation d of
+      Position _ start _ -> start
+      _ -> error "Internal error: a documentation comment without a position"
+
+-- | The message of an element with a documentation comment before it and
+-- another one after it.
+twoDocComments :: String
+twoDocComments = "An element with two documentation comments."
 
 -- | The message of a documentation comment where the grammar takes none. Each
 -- placement has its own, which the error of the parse keeps.
@@ -227,7 +269,7 @@ misplacedDocComment DocAfter = "Misplaced documentation comment after an element
 misplacedDocComment DocModule = "Misplaced documentation comment of the module."
 
 -- | The documentation comment after an element on the same line, if any.
-docAfter :: TerminaParser (Maybe String)
+docAfter :: TerminaParser (Maybe DocComment)
 docAfter = optionMaybe (docComment DocAfter)
 
 -- Lexemes
@@ -1057,7 +1099,7 @@ singleExprStmtParser = do
 -- | A statement of a block, with its documentation comments before it and
 -- after it, if any.
 blockItemParser :: TerminaParser (Statement ParserAnn)
-blockItemParser = documented statementParser <* docAfter
+blockItemParser = documentedAfter (documented statementParser)
 
 statementParser :: TerminaParser (Statement ParserAnn)
 statementParser
@@ -1134,13 +1176,15 @@ parseCases acc = do
   -- Check for default case first
   mDefault <- optionMaybe $ try $ lookAhead isDefaultCase >> defaultCaseParser
   case mDefault of
-    Just defCase -> return (reverse acc, Just defCase)
+    Just defCase -> do
+      documentedDefault <- withDoc doc defCase
+      return (reverse acc, Just documentedDefault)
     Nothing -> do
       -- Check for normal case
       canContinue <- optionMaybe $ try $ lookAhead isRegularCase
       case (canContinue, doc) of
         (Just _, _) -> do
-          c <- matchCaseParser -- If this fails, it should propagate!
+          c <- matchCaseParser >>= withDoc doc -- If this fails, it should propagate!
           parseCases (c : acc)
         (Nothing, Nothing) -> return (reverse acc, Nothing)
         (Nothing, Just _) -> failAt docPos (misplacedDocComment DocBefore)
@@ -1180,13 +1224,15 @@ ifElseIfStmtParser = do
   let condIf = CondIf expression ifBlk (located current startPos ifBlkEndPos)
   -- A documentation comment after the block belongs to the branch that follows,
   -- if any, and otherwise to the next statement.
-  elseIfs <- many $ try (optional (docComment DocBefore) *> elseIfParser)
+  elseIfs <- many $ try (do
+    doc <- optionMaybe (docComment DocBefore)
+    elseIfParser >>= withDoc doc)
   mCondElse <- optionMaybe (do
-    _ <- try (optional (docComment DocBefore) *> lookAhead (reserved "else"))
+    doc <- try (optionMaybe (docComment DocBefore) <* lookAhead (reserved "else"))
     elseBlkStartPos <- getPosition
     _ <- reserved "else"
     elseBlk <- blockParser
-    CondElse elseBlk . located current elseBlkStartPos <$> getPosition)
+    (CondElse elseBlk . located current elseBlkStartPos <$> getPosition) >>= withDoc doc)
   IfElseStmt condIf elseIfs mCondElse . located current startPos <$> getPosition
 
 forLoopStmtParser :: TerminaParser (Statement ParserAnn)
@@ -1366,7 +1412,7 @@ structDefinitionParser = do
   startPos <- getPosition
   reserved "struct"
   identifier <- identifierParser
-  fields <- braces (many1 $ documented (try fieldDefinitionParser) <* docAfter)
+  fields <- braces (many1 $ documentedAfter (documented (try fieldDefinitionParser)))
   endPos <- getPosition
   _ <- semi
   return $ TypeDefinition (Struct identifier fields modifiers) (located current startPos endPos)
@@ -1508,7 +1554,7 @@ classDefinitionParser = do
       <|> classProcedureParser
       <|> classActionParser
       <|> classCaseParser
-      <|> (classFieldDefinitionParser <* docAfter)))
+      <|> documentedAfter classFieldDefinitionParser))
   endPos <- getPosition
   _ <- semi
   return $ TypeDefinition (Class classKind identifier fields provides modifiers) (located current startPos endPos)
@@ -1527,9 +1573,10 @@ variantDefinitionParser = identifierParser >>= \identifier ->
 
 -- | The variants of an enum, separated by commas. The documentation comment
 -- after a variant goes before or after its comma, or after the last variant.
+-- A variant has no annotation yet, so its comments are read and dropped.
 variantListParser :: TerminaParser [EnumVariant ParserAnn]
 variantListParser = do
-  variant <- documented (try variantDefinitionParser)
+  (_, variant) <- docBefore (try variantDefinitionParser)
   before <- docAfter
   more <- optionMaybe comma
   _ <- maybe docAfter (const (return Nothing)) before
@@ -1553,7 +1600,7 @@ enumDefinitionParser = do
 -- documentation comment after it.
 topLevel :: TerminaParser (AnnotatedProgram ParserAnn)
 topLevel = many $ documented (
-  try functionParser <|> try externFunctionParser <|> (try globalDeclParser <* docAfter)
+  try functionParser <|> try externFunctionParser <|> documentedAfter (try globalDeclParser)
   <|> try typeDefintionParser)
 
 moduleIdentifierParser :: TerminaParser [ String ]
@@ -1588,7 +1635,8 @@ contents :: TerminaParser a -> TerminaParser a
 contents p = wspcs *> p <* eof
 
 terminaModuleParser :: TerminaParser (TerminaModule ParserAnn)
-terminaModuleParser = wspcs *> optional (docComment DocModule) *> (Termina <$> many moduleImportParser <*> contents topLevel)
+terminaModuleParser =
+  wspcs *> (Termina <$> optionMaybe (docComment DocModule) <*> many moduleImportParser <*> contents topLevel)
 
 -- | Parses the text of a module, given its qualified name and its file. The
 -- positions of the tree and of the error count characters, as the error
@@ -1597,13 +1645,13 @@ parseTerminaModule :: QualifiedName -> FilePath -> String -> Either ParseError (
 parseTerminaModule qname file src =
   case runParser terminaModuleParser qname file src of
     Left err -> Left (PE.setErrorPos (toCharacter (errorPos err)) err)
-    Right ast -> Right (fmap characterAnn ast)
+    Right ast -> Right ((fmap characterAnn ast) { moduleDoc = characterDoc <$> moduleDoc ast })
 
   where
 
     toCharacter = characterColumn src
-    characterAnn (ParserAnn loc doc) =
-      ParserAnn (characterLocation loc) (fmap (\d -> d { docLocation = characterLocation (docLocation d) }) doc)
+    characterAnn (ParserAnn loc doc) = ParserAnn (characterLocation loc) (characterDoc <$> doc)
+    characterDoc d = d { docLocation = characterLocation (docLocation d) }
     characterLocation (Position q start end) = Position q (toCharacter start) (toCharacter end)
     characterLocation loc = loc
 

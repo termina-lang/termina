@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE DeriveFoldable    #-}
 {-# LANGUAGE EmptyDataDeriving #-}
 {-# LANGUAGE KindSignatures    #-}
 {-# LANGUAGE InstanceSigs #-}
@@ -105,7 +106,7 @@ data AnnASTElement' ty expr blk a =
   | TypeDefinition
     (TypeDef' ty expr blk a) -- ^ the type definition (struct, union, etc.)
     a
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 instance Annotated (AnnASTElement' ty expr blk) where
   getAnnotation :: AnnASTElement' ty expr blk a -> a
@@ -124,7 +125,7 @@ data ModuleImport' pf a = ModuleImport
   { moduleIdentifier ::  pf  -- Filepath!
   , moduleAnn :: a
   }
-  deriving (Functor, Show)
+  deriving (Functor, Foldable, Show)
 
 -- | Whether a call to a function comes back to the caller. Only an extern
 -- function can be declared @noreturn@: it hands control to software outside
@@ -136,7 +137,7 @@ data ReturnMode = Returns | NoReturn
 -- Modifiers can be applied to different constructs. They must include
 -- an identifier and also may define an expression.
 data Modifier' expr a = Modifier Identifier (Maybe (expr a))
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 -- | Identifiers as `String`
 type Identifier = String
@@ -146,7 +147,7 @@ data TypeParameter' expr a =
   TypeParamIdentifier Identifier
   | TypeParamTypeSpec (TypeSpecifier' expr a)
   | TypeParamSize (expr a)
-  deriving (Show, Ord, Eq, Functor)
+  deriving (Show, Ord, Eq, Functor, Foldable)
 
 data TypeSpecifier' expr a
   = TSUInt8 | TSUInt16 | TSUInt32 | TSUInt64
@@ -165,7 +166,7 @@ data TypeSpecifier' expr a
   | TSInPort (TypeSpecifier' expr a) Identifier
   | TSOutPort (TypeSpecifier' expr a)
   | TSUnit
-  deriving (Show, Ord, Eq, Functor)
+  deriving (Show, Ord, Eq, Functor, Foldable)
 
 -- | Termina types
 data TerminaType' expr a
@@ -212,7 +213,7 @@ data TerminaType' expr a
   | TUnit
   -- | Global object types
   | TGlobal ClassKind Identifier
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 instance Eq (TerminaType' expr a) where
   TUInt8 == TUInt8 = True
@@ -381,7 +382,7 @@ data MonadicVariant' expr a =
   None | Some (expr a)
   | Ok (expr a) | Error (expr a)
   | Success | Failure (expr a)
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 instance (ShowText (expr a)) => ShowText (MonadicVariant' expr a) where
     showText (Some e) = "Some(" <> showText e <> ")"
@@ -469,7 +470,7 @@ data Global' ty expr a
       [Modifier' expr a] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 instance Annotated (Global' ty expr) where
   getAnnotation (Task _ _ _ _ a) = a
@@ -496,7 +497,7 @@ data TypeDef' ty expr blk a
   | Enum Identifier [EnumVariant' ty a] [Modifier' expr a]
   | Class ClassKind Identifier [ClassMember' ty blk a] [Identifier] [Modifier' expr a]
   | Interface InterfaceKind Identifier [Identifier] [InterfaceMember' ty expr a] [Modifier' expr a]
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 instance ShowText (TypeDef' ty expr blk a) where
     showText (Struct ident _ _) = T.pack $ "struct " <> ident
@@ -531,7 +532,12 @@ data InterfaceMember' ty expr a
       [Parameter' ty a] -- ^ list of parameters (possibly empty)
       [Modifier' expr a] -- ^ list of possible modifiers
       a
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
+
+instance Annotated (InterfaceMember' ty expr) where
+  getAnnotation (InterfaceProcedure _ _ _ _ a) = a
+
+  updateAnnotation (InterfaceProcedure ak n ps m _) = InterfaceProcedure ak n ps m
 
 -------------------------------------------------
 -- Class Member
@@ -580,7 +586,22 @@ data ClassMember' ty blk a
       [Parameter' ty a] -- ^ parameters, which a case does not have
       (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
+
+instance Annotated (ClassMember' ty blk) where
+  getAnnotation (ClassField fld) = getAnnotation fld
+  getAnnotation (ClassMethod _ _ _ _ _ a) = a
+  getAnnotation (ClassProcedure _ _ _ _ a) = a
+  getAnnotation (ClassViewer _ _ _ _ a) = a
+  getAnnotation (ClassAction _ _ _ _ a) = a
+  getAnnotation (ClassCase _ _ _ _ a) = a
+
+  updateAnnotation (ClassField fld) = ClassField . updateAnnotation fld
+  updateAnnotation (ClassMethod ak n ps t b _) = ClassMethod ak n ps t b
+  updateAnnotation (ClassProcedure ak n ps b _) = ClassProcedure ak n ps b
+  updateAnnotation (ClassViewer n ps t b _) = ClassViewer n ps t b
+  updateAnnotation (ClassAction ak n p b _) = ClassAction ak n p b
+  updateAnnotation (ClassCase ak n ps b _) = ClassCase ak n ps b
 
 
 ----------------------------------------
@@ -597,13 +618,13 @@ data Parameter' ty a = Parameter {
   paramIdentifier      :: Identifier -- ^ paramter identifier (name)
   , paramType :: ty a -- ^ type of the parameter
   , paramAnnotation :: a -- ^ transpiler annotations
-} deriving (Show, Functor)
+} deriving (Show, Functor, Foldable)
 
 data FieldAssignment' expr a =
   FieldValueAssignment Identifier (expr a) a
   | FieldAddressAssignment Identifier (expr a) a
   | FieldPortConnection PortConnectionKind Identifier Identifier a
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 instance (ShowText (expr a)) => ShowText (FieldAssignment' expr a) where
     showText (FieldValueAssignment ident expr _) =
@@ -621,19 +642,23 @@ data FieldDefinition' ty a = FieldDefinition {
   fieldIdentifier      :: Identifier
   , fieldTerminaType :: ty a
   , fieldAnnotation :: a
-} deriving (Show, Functor)
+} deriving (Show, Functor, Foldable)
+
+instance Annotated (FieldDefinition' ty) where
+  getAnnotation = fieldAnnotation
+  updateAnnotation fld a = fld { fieldAnnotation = a }
 
 data EnumVariant' ty a = EnumVariant {
   variantIdentifier :: Identifier
   , assocData       :: [ ty a ]
-} deriving (Show, Functor)
+} deriving (Show, Functor, Foldable)
 
 -- | Constant values:
 -- - Booleans
 -- - Integers
 -- - Characters
 data Const' ty a = B Bool | I TInteger (Maybe (ty a)) | F TFloat (Maybe (ty a)) | C Char | Null
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 
 instance (ShowText (ty a)) => ShowText (Const' ty a) where
@@ -647,11 +672,33 @@ instance (ShowText (ty a)) => ShowText (Const' ty a) where
     showText Null = "null"
 
 ----------------------------------------
+-- Documentation comments
+
+-- | Where a documentation comment goes: before an element, after it on the
+-- same line, or at the start of a module.
+data DocPlacement = DocBefore | DocAfter | DocModule
+  deriving (Show, Eq, Enum, Bounded)
+
+-- | The two forms of a documentation comment.
+data DocForm = LineDoc | BlockDoc
+  deriving (Show, Eq)
+
+-- | A documentation comment as written: where it goes, its form, its text
+-- without the delimiters, and where it is in the file.
+data DocComment = DocComment
+  { docPlacement :: DocPlacement
+  , docForm :: DocForm
+  , docText :: String
+  , docLocation :: Location
+  } deriving Show
+
+----------------------------------------
 -- Termina Programs definitions
 
 data TerminaModule' ty expr blk pf a = Termina
-  { modules :: [ModuleImport' pf a]
+  { moduleDoc :: Maybe DocComment
+  , modules :: [ModuleImport' pf a]
   , frags :: [AnnASTElement' ty expr blk a] }
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 type AnnotatedProgram' ty blk expr a = [AnnASTElement' ty expr blk a]

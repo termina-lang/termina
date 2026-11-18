@@ -25,6 +25,13 @@ pe009 = unlines
   , "    /// Nothing follows."
   , "}" ]
 
+pe010 :: String
+pe010 = unlines
+  [ "struct S {"
+  , "    /// Before."
+  , "    x : u32; ///< After."
+  , "};" ]
+
 spec :: Spec
 spec = describe "Parser stage: error-code coverage" $ do
   it "PE-001: parsing error" $
@@ -34,3 +41,5 @@ spec = describe "Parser stage: error-code coverage" $ do
       `shouldBe` Just "PE-004"
   it "PE-009: misplaced documentation comment" $
     parserStageErrorCode [("test", pe009)] `shouldBe` Just "PE-009"
+  it "PE-010: element with two documentation comments" $
+    parserStageErrorCode [("test", pe010)] `shouldBe` Just "PE-010"

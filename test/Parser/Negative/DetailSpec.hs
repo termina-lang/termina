@@ -7,7 +7,7 @@ import Parser.Common (parserStageError, moduleStageError)
 import Modules.Modules (ModuleDependency(..))
 import Parser.Errors (Error(..), parseError)
 import Parser.Parsing (parseTerminaModule)
-import Parser.Types (DocPlacement(..))
+import Core.AST (DocPlacement(..))
 import Utils.Annotations (AnnotatedError(..))
 import Text.Parsec (errorPos, sourceLine, sourceColumn)
 import Text.Parsec.Error (errorMessages, messageString)
@@ -86,10 +86,32 @@ misplaced =
   , ("a comment after the brace of a branch", ["function f(v : u32) {", "    if (v == 0) { ///< First.", "        return;", "    }", "    return;", "}"], (DocAfter, 2, 19))
   ]
 
+-- | The line and column of the second documentation comment of an element, or
+-- Nothing if the module parses or fails for another reason.
+secondCommentAt :: [String] -> Maybe (Int, Int)
+secondCommentAt src =
+  case parseTerminaModule "test" "test" (unlines src) of
+    Left err | ETwoDocComments <- parseError err ->
+      Just (sourceLine (errorPos err), sourceColumn (errorPos err))
+    _ -> Nothing
+
+-- | One module per kind of element with a comment before it and another one
+-- after it, with the position of the comment after it.
+twoComments :: [(String, [String], (Int, Int))]
+twoComments =
+  [ ("a field", ["struct S {", "    /// Before.", "    x : u32; ///< After.", "};"], (3, 14))
+  , ("a port", ["task class T {", "    /// Before.", "    i : in u32 triggers a; ///< After."
+               , "    action a(&priv self, v : u32) { return; }", "};"], (3, 28))
+  , ("a statement", ["function f() {", "    /// Before.", "    return; ///< After.", "}"], (3, 13))
+  , ("a constant", ["/// Before.", "const a : u32 = 1; ///< After."], (2, 20))
+  ]
+
 spec :: Spec
 spec = describe "Parser stage: error detail" $ do
   describe "PE-009 points at the comment" $
     mapM_ (\(what, src, expected) -> it ("for " ++ what) $ misplacedAt src `shouldBe` Just expected) misplaced
+  describe "PE-010 points at the comment after the element" $
+    mapM_ (\(what, src, expected) -> it ("for " ++ what) $ secondCommentAt src `shouldBe` Just expected) twoComments
   it "PE-001 wraps the underlying parse error" $
     moduleStageError "function f() -> { return; }" `shouldSatisfy` \case
       Just (AnnotatedError (EParseError _) _) -> True

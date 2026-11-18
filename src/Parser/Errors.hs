@@ -3,8 +3,8 @@
 module Parser.Errors where
 
 import Modules.Modules
-import Parser.Parsing (misplacedDocComment)
-import Parser.Types (DocPlacement(..))
+import Parser.Parsing (misplacedDocComment, twoDocComments)
+import Core.AST (DocPlacement(..))
 import Utils.Annotations
 import Text.Parsec
 import Utils.Errors
@@ -29,16 +29,19 @@ data Error
     | EModuleNameCollision T.Text -- ^ Two modules of a build with one name (PE-007)
     | EInvalidUtf8 -- ^ Module file that is not valid UTF-8 (PE-008)
     | EMisplacedDocComment DocPlacement -- ^ Documentation comment where the grammar takes none (PE-009)
+    | ETwoDocComments -- ^ Element with a documentation comment before it and another one after it (PE-010)
   deriving Show
 
--- | The error of a failed parse of a module. A documentation comment where the
--- grammar takes none has its own code.
+-- | The error of a failed parse of a module. The errors of the documentation
+-- comments have their own codes.
 parseError :: ParseError -> Error
-parseError err =
-  case [ placement | placement <- [minBound .. maxBound]
-                   , misplacedDocComment placement `elem` messages ] of
-    placement : _ -> EMisplacedDocComment placement
-    [] -> EParseError err
+parseError err
+  | twoDocComments `elem` messages = ETwoDocComments
+  | otherwise =
+      case [ placement | placement <- [minBound .. maxBound]
+                       , misplacedDocComment placement `elem` messages ] of
+        placement : _ -> EMisplacedDocComment placement
+        [] -> EParseError err
 
   where
 
@@ -101,6 +104,11 @@ instance Diagnosable Error where
                 "A documentation comment that starts with " <> emph "//!" <> " or "
                     <> emph "/*!" <> " documents the module and goes at its start,"
                     <> " before the imports."
+    describe ETwoDocComments =
+        diagnostic "PE-010" "element with two documentation comments"
+            ("This element already has a documentation comment before it, and an element"
+                <> " takes only one. The two texts go together in one comment, before the"
+                <> " element or after it.")
     describe EEmptyModuleName = diagnosticWithoutDetail "Internal" "internal error"
 
 instance ErrorMessage ParsingErrors where

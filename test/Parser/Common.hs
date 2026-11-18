@@ -67,7 +67,7 @@ parserStageError sources =
       -- that a rendered message finds the source it quotes.
       case parseTerminaModule qname qname src of
         Left err -> Left (annotateError Internal (parseError err))
-        Right (Termina imports _) -> (qname,) <$> mapM toDep imports
+        Right (Termina _ imports _) -> (qname,) <$> mapM toDep imports
     toDep (ModuleImport ident ann) =
       (`ModuleDependency` getLocation ann) <$> buildModuleName (getLocation ann) ident
 

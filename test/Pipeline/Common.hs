@@ -317,7 +317,7 @@ parseModule (qname, src) =
   case parseTerminaModule qname qname src of
     Left err -> Left (failure (M.singleton qname (pack src))
       (annotateError Internal (parseError err) :: ParsingErrors))
-    Right (Termina imports prog) -> do
+    Right (Termina _ imports prog) -> do
       deps <- mapM toDep imports
       pure (qname, TerminaModuleData qname qname deps [] (pack src) (ParsingData prog))
 

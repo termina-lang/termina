@@ -16,7 +16,7 @@ import Test.Hspec
 returnAt :: [String] -> Maybe ((Int, Int), (Int, Int))
 returnAt src =
   case parseTerminaModule "test" "test" (unlines src) of
-    Right (Termina _ [Function _ _ _ (Block [ReturnStmt _ (ParserAnn (Position _ start end) _)] _) _ _]) ->
+    Right (Termina _ _ [Function _ _ _ (Block [ReturnStmt _ (ParserAnn (Position _ start end) _)] _) _ _]) ->
       Just ((sourceLine start, sourceColumn start), (sourceLine end, sourceColumn end))
     _ -> Nothing
 
