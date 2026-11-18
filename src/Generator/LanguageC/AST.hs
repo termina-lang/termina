@@ -4,9 +4,38 @@ module Generator.LanguageC.AST where
 import Prettyprinter
 import Numeric
 import Data.Char
+import qualified Data.Text as T
 import Utils.Annotations
+import Doc.Model (DocInline', DocBlock')
 
 type Ident = String
+
+-- | The documentation comment of a C declaration, printed as a Doxygen block:
+-- its brief, its body and its tags. Its links name C identifiers.
+data CDoc = CDoc
+  { cdocBrief :: [DocInline' Ident]
+  , cdocBody :: [DocBlock' Ident]
+  , cdocTags :: [CDocTag]
+  } deriving Show
+
+-- | A tag of a Doxygen comment and its text.
+data CDocTag
+  = CDocParam CParamDirection Ident [DocBlock' Ident]
+  | CDocReturn [DocBlock' Ident]
+  | CDocPre [DocBlock' Ident]
+  | CDocPost [DocBlock' Ident]
+  | CDocInvariant [DocBlock' Ident]
+  | CDocNote [DocBlock' Ident]
+  | CDocWarning [DocBlock' Ident]
+  | CDocSee [DocBlock' Ident]
+  | CDocDeprecated [DocBlock' Ident]
+  | CDocSince [DocBlock' Ident]
+  | CDocSection T.Text [DocBlock' Ident] -- ^ A section with a title, printed @\@par@
+  deriving Show
+
+-- | The direction of a parameter in the C, from the reader's side.
+data CParamDirection = CParamIn | CParamOut | CParamInOut
+  deriving Show
 
 data CFile' a
     = CSourceFile FilePath [CFileItem' a]

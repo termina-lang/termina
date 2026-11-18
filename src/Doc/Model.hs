@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 -- | The documentation model of a comment: its lines without the margin, the
@@ -9,10 +10,12 @@ module Doc.Model
   , DocTag(..)
   , DocError(..)
   , DocModel(..)
-  , DocBlock(..)
+  , DocBlock'(..)
+  , DocBlock
   , DocListKind(..)
   , DocAlignment(..)
-  , DocInline(..)
+  , DocInline'(..)
+  , DocInline
   , DocRef(..)
   , linesAt
   , commentLines
@@ -79,16 +82,20 @@ data DocModel = DocModel
   , docSource :: DocComment
   } deriving Show
 
--- | A block of Markdown. A paragraph of a tight list is a paragraph too.
-data DocBlock
-  = DPara [DocInline]
-  | DHeading Int [DocInline]
-  | DList DocListKind [[DocBlock]]
+-- | A block of Markdown, whose links name an @r@: a name of the program in
+-- the model, the name it has in the generated code in an output. A paragraph
+-- of a tight list is a paragraph too.
+data DocBlock' r
+  = DPara [DocInline' r]
+  | DHeading Int [DocInline' r]
+  | DList DocListKind [[DocBlock' r]]
   | DCodeBlock T.Text T.Text -- ^ The language, maybe empty, and the code
-  | DQuote [DocBlock]
+  | DQuote [DocBlock' r]
   | DRule
-  | DTable [DocAlignment] [[DocInline]] [[[DocInline]]] -- ^ Alignments, header and rows
-  deriving (Show, Eq)
+  | DTable [DocAlignment] [[DocInline' r]] [[[DocInline' r]]] -- ^ Alignments, header and rows
+  deriving (Show, Eq, Functor)
+
+type DocBlock = DocBlock' DocRef
 
 data DocListKind = DBullets | DNumbered Int
   deriving (Show, Eq)
@@ -96,20 +103,24 @@ data DocListKind = DBullets | DNumbered Int
 data DocAlignment = DAlignDefault | DAlignLeft | DAlignCenter | DAlignRight
   deriving (Show, Eq)
 
--- | An inline element of Markdown. Raw HTML is kept as text.
-data DocInline
+-- | An inline element of Markdown, whose links name an @r@. Raw HTML is kept
+-- as text.
+data DocInline' r
   = DText T.Text
   | DCode T.Text
   | DSoftBreak
   | DLineBreak
-  | DEmph [DocInline]
-  | DStrong [DocInline]
-  | DLink DocRef -- ^ A link to a name, written [`Name`], not resolved yet
-  | DUrl T.Text [DocInline] -- ^ A link with a destination, and its text
-  | DImage T.Text [DocInline] -- ^ An image, and its description
+  | DEmph [DocInline' r]
+  | DStrong [DocInline' r]
+  | DLink r -- ^ A link to a name, written [`Name`]
+  | DUrl T.Text [DocInline' r] -- ^ A link with a destination, and its text
+  | DImage T.Text [DocInline' r] -- ^ An image, and its description
   | DMath T.Text
   | DDisplayMath T.Text
-  deriving (Show, Eq)
+  deriving (Show, Eq, Functor)
+
+-- | An inline element of the model, whose links are not resolved yet.
+type DocInline = DocInline' DocRef
 
 -- | A name of the program or of the language, as @Type@, @Type::member@ or
 -- @Enum::Variant@, split at each @::@.
