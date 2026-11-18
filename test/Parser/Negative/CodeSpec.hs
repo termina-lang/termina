@@ -32,8 +32,26 @@ pe010 = unlines
   , "    x : u32; ///< After."
   , "};" ]
 
+pe011 :: String
+pe011 = unlines
+  [ "/**"
+  , " * @brief Does nothing."
+  , " */"
+  , "function foo() { return; }" ]
+
+pe012 :: String
+pe012 = unlines
+  [ "/**"
+  , " * @param"
+  , " */"
+  , "function foo() { return; }" ]
+
 spec :: Spec
 spec = describe "Parser stage: error-code coverage" $ do
+  it "PE-011: unknown documentation tag" $
+    parserStageErrorCode [("test", pe011)] `shouldBe` Just "PE-011"
+  it "PE-012: malformed documentation tag" $
+    parserStageErrorCode [("test", pe012)] `shouldBe` Just "PE-012"
   it "PE-001: parsing error" $
     parserStageErrorCode [("test", pe001)] `shouldBe` Just "PE-001"
   it "PE-004: cycle between project source files" $

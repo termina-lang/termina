@@ -107,8 +107,38 @@ twoComments =
   , ("a variant", ["enum E {", "    /// Before.", "    A, ///< After.", "    B", "};"], (3, 8))
   ]
 
+-- | The error in the tags of a documentation comment and its line and column,
+-- or Nothing if the module parses or fails for another reason.
+docTagErrorAt :: [String] -> Maybe (Error, (Int, Int))
+docTagErrorAt src =
+  case parseTerminaModule "test" "test" (unlines src) of
+    Left err -> case parseError err of
+      e@(EUnknownDocTag _) -> Just (e, at err)
+      e@(EMalformedDocTag _) -> Just (e, at err)
+      _ -> Nothing
+    Right _ -> Nothing
+
+  where
+
+    at err = (sourceLine (errorPos err), sourceColumn (errorPos err))
+
+-- | One module per kind of error in the tags, with the error and its position.
+docTagErrors :: [(String, [String], (String, (Int, Int)))]
+docTagErrors =
+  [ ("an unknown tag in a block comment", ["/**", " * Summary.", " *", " * @brief Nope.", " */", "function f() { return; }"], ("EUnknownDocTag \"brief\"", (4, 4)))
+  , ("an unknown tag in a run of line comments", ["/// Summary.", "///", "/// @brief Nope.", "function f() { return; }"], ("EUnknownDocTag \"brief\"", (3, 5)))
+  , ("an unknown tag after a tab", ["struct S {", "\t/**", "\t * @brief Nope.", "\t */", "\tx : u32;", "};"], ("EUnknownDocTag \"brief\"", (3, 5)))
+  , ("an unknown tag on the line of the delimiter", ["/** @brief Nope. */", "function f() { return; }"], ("EUnknownDocTag \"brief\"", (1, 5)))
+  , ("an unknown tag in a comment after a field", ["struct S {", "    x : u32; /**< @todo Later. */", "};"], ("EUnknownDocTag \"todo\"", (2, 19)))
+  , ("a parameter without a name", ["/**", " * Summary.", " * @param", " */", "function f() { return; }"], ("EMalformedDocTag (MissingArgument \"param\")", (3, 4)))
+  , ("text after the tags", ["/**", " * Summary.", " * @pre Never.", " *", " * Loose text.", " */", "function f() { return; }"], ("EMalformedDocTag TextAfterTags", (5, 4)))
+  ]
+
 spec :: Spec
 spec = describe "Parser stage: error detail" $ do
+  describe "PE-011 and PE-012 point at the tag" $
+    mapM_ (\(what, src, (expected, pos)) -> it ("for " ++ what) $
+      fmap (\(e, p) -> (show e, p)) (docTagErrorAt src) `shouldBe` Just (expected, pos)) docTagErrors
   describe "PE-009 points at the comment" $
     mapM_ (\(what, src, expected) -> it ("for " ++ what) $ misplacedAt src `shouldBe` Just expected) misplaced
   describe "PE-010 points at the comment after the element" $

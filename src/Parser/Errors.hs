@@ -3,8 +3,9 @@
 module Parser.Errors where
 
 import Modules.Modules
-import Parser.Parsing (misplacedDocComment, twoDocComments)
+import Parser.Parsing (misplacedDocComment, twoDocComments, docTagError)
 import Core.AST (DocPlacement(..))
+import Doc.Model (DocError(..))
 import Utils.Annotations
 import Text.Parsec
 import Utils.Errors
@@ -30,12 +31,16 @@ data Error
     | EInvalidUtf8 -- ^ Module file that is not valid UTF-8 (PE-008)
     | EMisplacedDocComment DocPlacement -- ^ Documentation comment where the grammar takes none (PE-009)
     | ETwoDocComments -- ^ Element with a documentation comment before it and another one after it (PE-010)
+    | EUnknownDocTag String -- ^ Documentation tag that does not exist (PE-011)
+    | EMalformedDocTag DocError -- ^ Documentation tag without its argument, or text after the tags (PE-012)
   deriving Show
 
 -- | The error of a failed parse of a module. The errors of the documentation
 -- comments have their own codes.
 parseError :: ParseError -> Error
 parseError err
+  | UnknownTag name : _ <- docErrors = EUnknownDocTag name
+  | docError : _ <- docErrors = EMalformedDocTag docError
   | twoDocComments `elem` messages = ETwoDocComments
   | otherwise =
       case [ placement | placement <- [minBound .. maxBound]
@@ -48,6 +53,7 @@ parseError err
     -- The Eq instance of Message compares only the kind of message, so the
     -- texts are compared instead.
     messages = [ messageString m | m@(Message _) <- errorMessages err ]
+    docErrors = [ e | Just e <- map docTagError messages ]
 
 type ParsingErrors = AnnotatedError Error Location
 
@@ -109,6 +115,48 @@ instance Diagnosable Error where
             ("This element already has a documentation comment before it, and an element"
                 <> " takes only one. The two texts go together in one comment, before the"
                 <> " element or after it.")
+    describe (EUnknownDocTag name) =
+        diagnostic "PE-011" "unknown documentation tag"
+            ("There is no tag " <> emph (T.pack ('@' : name)) <> ". The tags are "
+                <> T.intercalate ", " (map (emph . ("@" <>)) (init tagNames))
+                <> " and " <> emph ("@" <> last tagNames) <> "."
+                <> hint)
+
+        where
+
+            tagNames =
+                [ "param", "return", "error", "pre", "post", "invariant", "range", "unit"
+                , "note", "warning", "see", "deprecated", "since", "satisfies", "verifies"
+                , "example" ]
+            hint
+                | name == "brief" = "\nThe first paragraph of the comment is its summary."
+                | "param[" `T.isPrefixOf` T.pack name =
+                    "\nThe direction of a parameter comes from its type; " <> emph "@param[out]"
+                        <> " marks a " <> emph "&mut" <> " parameter that is only written."
+                | otherwise = "\nA line of text that starts with " <> emph "@" <> " is written "
+                    <> emph "\\@" <> "."
+    describe (EMalformedDocTag docError) =
+        diagnostic "PE-012" "malformed documentation tag" (detail docError)
+
+        where
+
+            detail (MissingArgument tag) =
+                emph (T.pack ('@' : tag)) <> " is followed by " <> argumentOf tag <> "."
+            detail (OutOnOtherTag tag) =
+                emph "[out]" <> " goes only on " <> emph "@param" <> ", not on "
+                    <> emph (T.pack ('@' : tag)) <> "."
+            detail TextAfterTags =
+                "The tags go at the end of the comment, and this text follows them. A tag"
+                    <> " continues on the lines right after it, and after a blank line on"
+                    <> " indented lines; any other text goes before the first tag."
+            detail (UnknownTag tag) = "There is no tag " <> emph (T.pack ('@' : tag)) <> "."
+            argumentOf "param" = "the name of a parameter"
+            argumentOf "error" = "a variant of the error type, written " <> emph "V"
+                <> " or " <> emph "E::V"
+            argumentOf "see" = "a link"
+            argumentOf "since" = "a version"
+            argumentOf "example" = "a link to a test case"
+            argumentOf _ = "the identifier of a requirement"
     describe EEmptyModuleName = diagnosticWithoutDetail "Internal" "internal error"
 
 instance ErrorMessage ParsingErrors where

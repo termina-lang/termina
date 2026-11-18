@@ -24,8 +24,10 @@ import Control.Monad
 import Data.Char
 import Data.Maybe (isJust)
 import qualified Data.IntMap.Strict as IM
+import Text.Read (readMaybe)
 import Utils.Annotations
 import Parser.Types
+import Doc.Model (DocLine(..), DocError, linesAt, commentLines, splitDoc)
 
 type TerminaParser = Parsec String FilePath
 
@@ -181,15 +183,18 @@ ordinaryComment = do
 
 -- | A documentation comment and the white space after it. A run of line
 -- comments, or a single block comment, is one comment. Its text is everything
--- between the delimiters, with the lines of a run joined by a newline.
+-- between the delimiters, with the lines of a run joined by a newline. An error
+-- in its tags is reported at the tag.
 docComment :: DocPlacement -> TerminaParser DocComment
 docComment placement = do
   current <- getState
   start <- getPosition
-  (form, text) <- ((BlockDoc,) <$> blockDoc) <|> ((LineDoc,) . L.intercalate "\n" <$> lineDocs)
+  (form, written) <- ((BlockDoc,) <$> blockDoc) <|> ((LineDoc,) <$> lineDocs)
   end <- getPosition
+  either (\(pos, err) -> failAt pos (docTagMessage err)) (const (return ()))
+    (splitDoc (commentLines form written))
   wspcs
-  return (DocComment placement form text (Position current start end))
+  return (DocComment placement form (L.intercalate "\n" (map lineText written)) (Position current start end))
 
   where
 
@@ -204,8 +209,8 @@ docComment placement = do
         Just (placement', form', len) | placement' == placement && form' == form ->
           void (count len anyChar)
         _ -> parserZero
-    lineDoc = opener LineDoc *> many (satisfy (/= '\n'))
-    blockDoc = opener BlockDoc *> manyTill anyChar (try (string "*/"))
+    lineDoc = opener LineDoc *> (DocLine <$> getPosition <*> many (satisfy (/= '\n')))
+    blockDoc = opener BlockDoc *> (linesAt <$> getPosition <*> manyTill anyChar (try (string "*/")))
 
 -- | Fails without consuming input where a documentation comment starts. Every
 -- token begins with it, so that a parse error at a comment that the grammar
@@ -267,6 +272,18 @@ misplacedDocComment :: DocPlacement -> String
 misplacedDocComment DocBefore = "Misplaced documentation comment before an element."
 misplacedDocComment DocAfter = "Misplaced documentation comment after an element."
 misplacedDocComment DocModule = "Misplaced documentation comment of the module."
+
+-- | The message of an error in the tags of a documentation comment. The error
+-- itself is in the message, from which 'docTagError' takes it back.
+docTagMessage :: DocError -> String
+docTagMessage err = docTagPrefix ++ show err
+
+-- | The error in the tags of a documentation comment that a message carries.
+docTagError :: String -> Maybe DocError
+docTagError msg = L.stripPrefix docTagPrefix msg >>= readMaybe
+
+docTagPrefix :: String
+docTagPrefix = "Error in a documentation tag: "
 
 -- | The documentation comment after an element on the same line, if any.
 docAfter :: TerminaParser (Maybe DocComment)
