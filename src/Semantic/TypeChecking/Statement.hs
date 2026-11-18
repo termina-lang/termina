@@ -301,7 +301,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
                   asLen = length bVars
                   -- | Each bound variable keeps the position the parser gave it
                   -- and takes the type the variant declares for it.
-                  typedBVars = [ (ident, buildExpAnn (getLocation bloc) tVar)
+                  typedBVars = [ (ident, buildExpAnn bloc tVar)
                                | ((ident, bloc), tVar) <- zip bVars tVars ] in
               if psLen == asLen then
               flip (SAST.MatchCase cIdent typedBVars)
@@ -317,11 +317,11 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
 
 typeStatement rTy (ReturnStmt retExpression anns) =
   case (rTy, retExpression) of
-    (Nothing, Nothing) -> return $ SAST.ReturnStmt Nothing (buildExpAnn (getLocation anns) TUnit)
+    (Nothing, Nothing) -> return $ SAST.ReturnStmt Nothing (buildExpAnn anns TUnit)
     (Just ts, Just e) -> do
       typed_e <- catchMismatch (getLocation (getAnnotation e)) (EReturnValueTypeMismatch ts) (typeExpression (Just ts) typeRHSObject e)
-      -- ReturnStmt (Just ety) . buildExpAnn (getLocation anns) <$> getExprType ety
-      return $ SAST.ReturnStmt (Just typed_e) (buildExpAnn (getLocation anns) ts)
+      -- ReturnStmt (Just ety) . buildExpAnn anns <$> getExprType ety
+      return $ SAST.ReturnStmt (Just typed_e) (buildExpAnn anns ts)
     (Just ty, Nothing) -> throwError $ annotateError (getLocation anns) $ EReturnValueExpected ty
     (Nothing, Just _) -> throwError $ annotateError (getLocation anns) EReturnValueNotUnit
 typeStatement _ (ContinueStmt contE anns) =
@@ -330,14 +330,14 @@ typeStatement _ (ContinueStmt contE anns) =
       obj_typed <- typeRHSObject obj
       (_, obj_ty) <- getObjType obj_typed
       ((ps, typed_args), fty) <- typeActionCall ann obj_ty ident args
-      return $ SAST.ContinueStmt (SAST.MemberFunctionCall obj_typed ident typed_args (buildExpAnnApp (getLocation ann) ps fty)) (buildStmtAnn anns)
+      return $ SAST.ContinueStmt (SAST.MemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)) (buildStmtAnn anns)
     DerefMemberFunctionCall obj ident args ann -> do
       obj_typed <- typeRHSObject obj
       (_, obj_ty) <- getObjType obj_typed
       case obj_ty of
         TReference _ rTy -> do
           ((ps, typed_args), fty) <- typeActionCall ann rTy ident args
-          return $ SAST.ContinueStmt (SAST.DerefMemberFunctionCall obj_typed ident typed_args (buildExpAnnApp (getLocation ann) ps fty)) (buildStmtAnn anns)
+          return $ SAST.ContinueStmt (SAST.DerefMemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)) (buildStmtAnn anns)
         ty -> throwError $ annotateError (getLocation anns) $ EDereferenceInvalidType ty
     _ -> throwError $ annotateError (getLocation anns) EContinueInvalidExpression
 
@@ -364,12 +364,12 @@ typeStatement _ (ContinueStmt contE anns) =
                           [arg] -> do
                             typed_arg <- typeExpression (Just ty) typeRHSObject arg
                             return (([param], [typed_arg]), TUnit)
-                          [] -> throwError $ annotateError (getLocation ann) (EContinueActionMissingArgs (ident, loc))
-                          _ -> throwError $ annotateError (getLocation ann) (EContinueActionExtraArgs (ident, [param], loc) (fromIntegral (length args)))
+                          [] -> throwError $ annotateError (getLocation ann) (EContinueActionMissingArgs (ident, getLocation loc))
+                          _ -> throwError $ annotateError (getLocation ann) (EContinueActionExtraArgs (ident, [param], getLocation loc) (fromIntegral (length args)))
                     Just (Nothing, SemanticAnn _ loc) ->
                       case args of
                         [] -> return (([], []), TUnit)
-                        _ -> throwError $ annotateError (getLocation ann) (EContinueActionExtraArgs (ident, [], loc) (fromIntegral (length args)))
+                        _ -> throwError $ annotateError (getLocation ann) (EContinueActionExtraArgs (ident, [], getLocation loc) (fromIntegral (length args)))
                     -- This should not happen, since the expression has been 
                     -- type-checked before and the method should have been found.
                     _ -> throwError $ annotateError Internal EContinueActionNotFound

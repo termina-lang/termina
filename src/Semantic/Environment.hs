@@ -5,6 +5,7 @@ import Semantic.AST
 import Core.Utils (getGlobalIdentifier, getTypeIdentifier)
 import Utils.Annotations
 import Semantic.Types
+import Parser.Types (undocumented)
 import Configuration.Configuration
 import Configuration.Platform (Platform)
 import qualified Data.Set as S
@@ -76,7 +77,7 @@ declaredNames = foldr addName M.empty
 -- | A parameter of one of the interfaces the environment declares by hand,
 -- which no source file writes and which therefore has no position.
 builtinParameter :: Identifier -> TerminaType SemanticAnn -> Parameter SemanticAnn
-builtinParameter ident ty = Parameter ident ty (buildExpAnn Internal ty)
+builtinParameter ident ty = Parameter ident ty (buildExpAnn (undocumented Internal) ty)
 
 stdlibGlobalEnv :: Integer -> Integer -> [(Identifier, LocatedElement (GEntry SemanticAnn))]
 stdlibGlobalEnv outBufSize inBufSize =
@@ -88,9 +89,9 @@ stdlibGlobalEnv outBufSize inBufSize =
     ("f32_from_bits", LocatedElement (GFun (FunctionSeman [builtinParameter "bits" TUInt32] TFloat32 Returns)) Internal),
     ("f64_to_bits", LocatedElement (GFun (FunctionSeman [builtinParameter "value" TFloat64] TUInt64 Returns)) Internal),
     ("f64_from_bits", LocatedElement (GFun (FunctionSeman [builtinParameter "bits" TUInt64] TFloat64 Returns)) Internal),
-    ("TimeVal", LocatedElement (GType (Struct "TimeVal" [FieldDefinition "tv_sec" TUInt32 (buildExpAnn Internal TUInt32), FieldDefinition "tv_usec" TUInt32 (buildExpAnn Internal TUInt32)] [])) Internal),
+    ("TimeVal", LocatedElement (GType (Struct "TimeVal" [FieldDefinition "tv_sec" TUInt32 (buildExpAnn (undocumented Internal) TUInt32), FieldDefinition "tv_usec" TUInt32 (buildExpAnn (undocumented Internal) TUInt32)] [])) Internal),
     ("Interrupt", LocatedElement (GType (Class EmitterClass "Interrupt" [] [] [])) Internal),
-    ("PeriodicTimer", LocatedElement (GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (TStruct "TimeVal") (buildExpAnn Internal (TStruct "TimeVal")))] [] [])) Internal),
+    ("PeriodicTimer", LocatedElement (GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (TStruct "TimeVal") (buildExpAnn (undocumented Internal) (TStruct "TimeVal")))] [] [])) Internal),
     ("SysPrintBase", LocatedElement (GType (Enum "SysPrintBase" [internalVariant "Decimal" [], internalVariant "Hexadecimal" []] [])) Internal),
     ("MutexProtocol", LocatedElement (GType (Enum "MutexProtocol" [internalVariant "Ceiling" [TUInt32]] [])) Internal),
     ("Exception", LocatedElement (GType (Enum "Exception" [
@@ -184,42 +185,42 @@ stdlibGlobalEnv outBufSize inBufSize =
     -- | SysTime interface
     ("SysTime", LocatedElement (GType (Interface SystemInterface "SysTime" [] [
       -- | procedure clock_get_uptime (&mut self, current_time : &mut TimeVal)
-      InterfaceProcedure Immutable "clock_get_uptime" [builtinParameter "current_time" (TReference Mutable (TStruct "TimeVal"))] [] (buildExpAnn Internal TUnit)
+      InterfaceProcedure Immutable "clock_get_uptime" [builtinParameter "current_time" (TReference Mutable (TStruct "TimeVal"))] [] (buildExpAnn (undocumented Internal) TUnit)
     ] [])) Internal),
     -- | SysPrint interface
     ("SysPrint", LocatedElement (GType (Interface SystemInterface "SysPrint" [] [
       -- | procedure clock_get_uptime (&mut self, current_time : &mut TimeVal)
-      InterfaceProcedure Mutable "print" [builtinParameter "str" (TReference Immutable (TArray TChar (Constant (I (TInteger outBufSize DecRepr) (Just (TConstSubtype TUSize))) (buildExpAnn Internal (TConstSubtype TUSize)))))] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "println" [builtinParameter "str" (TReference Immutable (TArray TChar (Constant (I (TInteger outBufSize DecRepr) (Just (TConstSubtype TUSize))) (buildExpAnn Internal (TConstSubtype TUSize)))))] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "print_char" [builtinParameter "value" TChar] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "println_char" [builtinParameter "value" TChar] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "print_u8" [builtinParameter "value" TUInt8, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "println_u8" [builtinParameter "value" TUInt8, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "print_u16" [builtinParameter "value" TUInt16, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "println_u16" [builtinParameter "value" TUInt16, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "print_u32" [builtinParameter "value" TUInt32, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "println_u32" [builtinParameter "value" TUInt32, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "print_u64" [builtinParameter "value" TUInt64, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "println_u64" [builtinParameter "value" TUInt64, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "print_i8" [builtinParameter "value" TInt8, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "println_i8" [builtinParameter "value" TInt8, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "print_i16" [builtinParameter "value" TInt16, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "println_i16" [builtinParameter "value" TInt16, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "print_i32" [builtinParameter "value" TInt32, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "println_i32" [builtinParameter "value" TInt32, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "print_i64" [builtinParameter "value" TInt64, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "println_i64" [builtinParameter "value" TInt64, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "print_usize" [builtinParameter "value" TUSize, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "println_usize" [builtinParameter "value" TUSize, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "print_f32" [builtinParameter "value" TFloat32] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "println_f32" [builtinParameter "value" TFloat32] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "print_f64" [builtinParameter "value" TFloat64] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "println_f64" [builtinParameter "value" TFloat64] [] (buildExpAnn Internal TUnit)
+      InterfaceProcedure Mutable "print" [builtinParameter "str" (TReference Immutable (TArray TChar (Constant (I (TInteger outBufSize DecRepr) (Just (TConstSubtype TUSize))) (buildExpAnn (undocumented Internal) (TConstSubtype TUSize)))))] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "println" [builtinParameter "str" (TReference Immutable (TArray TChar (Constant (I (TInteger outBufSize DecRepr) (Just (TConstSubtype TUSize))) (buildExpAnn (undocumented Internal) (TConstSubtype TUSize)))))] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "print_char" [builtinParameter "value" TChar] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "println_char" [builtinParameter "value" TChar] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "print_u8" [builtinParameter "value" TUInt8, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "println_u8" [builtinParameter "value" TUInt8, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "print_u16" [builtinParameter "value" TUInt16, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "println_u16" [builtinParameter "value" TUInt16, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "print_u32" [builtinParameter "value" TUInt32, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "println_u32" [builtinParameter "value" TUInt32, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "print_u64" [builtinParameter "value" TUInt64, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "println_u64" [builtinParameter "value" TUInt64, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "print_i8" [builtinParameter "value" TInt8, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "println_i8" [builtinParameter "value" TInt8, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "print_i16" [builtinParameter "value" TInt16, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "println_i16" [builtinParameter "value" TInt16, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "print_i32" [builtinParameter "value" TInt32, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "println_i32" [builtinParameter "value" TInt32, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "print_i64" [builtinParameter "value" TInt64, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "println_i64" [builtinParameter "value" TInt64, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "print_usize" [builtinParameter "value" TUSize, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "println_usize" [builtinParameter "value" TUSize, builtinParameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "print_f32" [builtinParameter "value" TFloat32] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "println_f32" [builtinParameter "value" TFloat32] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "print_f64" [builtinParameter "value" TFloat64] [] (buildExpAnn (undocumented Internal) TUnit),
+      InterfaceProcedure Mutable "println_f64" [builtinParameter "value" TFloat64] [] (buildExpAnn (undocumented Internal) TUnit)
     ] [])) Internal),
     ("SysGetChar", LocatedElement (GType (Interface SystemInterface "SysGetChar" [] [
       InterfaceProcedure Mutable "read" [ 
-          builtinParameter "str" (TReference Mutable (TArray TChar (Constant (I (TInteger inBufSize DecRepr) (Just (TConstSubtype TUSize))) (buildExpAnn Internal (TConstSubtype TUSize))))),
-          builtinParameter "read_bytes" (TReference Mutable TUSize)] [] (buildExpAnn Internal TUnit)
+          builtinParameter "str" (TReference Mutable (TArray TChar (Constant (I (TInteger inBufSize DecRepr) (Just (TConstSubtype TUSize))) (buildExpAnn (undocumented Internal) (TConstSubtype TUSize))))),
+          builtinParameter "read_bytes" (TReference Mutable TUSize)] [] (buildExpAnn (undocumented Internal) TUnit)
     ] [])) Internal)
   ]
 
@@ -276,8 +277,8 @@ testGlobalEnv =
 
   where
 
-    procedure procName params = InterfaceProcedure Mutable procName params [] (buildExpAnn Internal TUnit)
-    viewProcedure procName params = InterfaceProcedure Immutable procName params [] (buildExpAnn Internal TUnit)
+    procedure procName params = InterfaceProcedure Mutable procName params [] (buildExpAnn (undocumented Internal) TUnit)
+    viewProcedure procName params = InterfaceProcedure Immutable procName params [] (buildExpAnn (undocumented Internal) TUnit)
 
     checkedTypes = [
       ("u8", TUInt8), ("u16", TUInt16), ("u32", TUInt32), ("u64", TUInt64),

@@ -56,7 +56,7 @@ typeElement (Function ident ps_ts mts bret mds_ts anns) = do
       return (ps_ty, typedBret)
   mds_ty <- typeModifiers (getLocation anns) FunctionDeclaration typeGlobalObject mds_ts
   let functionSeman = FunctionSeman ps_ty (fromMaybe TUnit mty) Returns
-  return (Function ident ps_ty mty typedBret mds_ty (SemanticAnn (FnTy functionSeman) (getLocation anns)), LocatedElement (GFun functionSeman) (getLocation anns))
+  return (Function ident ps_ty mty typedBret mds_ty (SemanticAnn (FnTy functionSeman) anns), LocatedElement (GFun functionSeman) (getLocation anns))
 typeElement (ExternFunction ident ps_ts mts mode mds_ts anns) = do
   -- A function that never comes back to the caller has nothing to return
   when (mode == NoReturn && isJust mts) $
@@ -70,7 +70,7 @@ typeElement (ExternFunction ident ps_ts mts mode mds_ts anns) = do
       return typedParam)
   mds_ty <- typeModifiers (getLocation anns) ExternFunctionDeclaration typeGlobalObject mds_ts
   let functionSeman = FunctionSeman ps_ty (fromMaybe TUnit mty) mode
-  return (ExternFunction ident ps_ty mty mode mds_ty (SemanticAnn (FnTy functionSeman) (getLocation anns)), LocatedElement (GFun functionSeman) (getLocation anns))
+  return (ExternFunction ident ps_ty mty mode mds_ty (SemanticAnn (FnTy functionSeman) anns), LocatedElement (GFun functionSeman) (getLocation anns))
 typeElement (GlobalDeclaration gbl) = first GlobalDeclaration <$> typeGlobal gbl
 typeElement (TypeDefinition tydef ann) = do
   typed_tydef <- typeTypeDefinition (getLocation ann) tydef

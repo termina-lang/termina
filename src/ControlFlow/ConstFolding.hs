@@ -7,6 +7,7 @@ import ControlFlow.ConstFolding.Monad
 import Lowering.AST
 import ControlFlow.Traversal (Rewriter(..), rewriteObject, rewriteExpression)
 import Utils.Annotations
+import Parser.Types (undocumented)
 import qualified Control.Monad.State as ST
 import qualified Data.Map as M
 import ControlFlow.ConstFolding.Utils
@@ -38,7 +39,7 @@ constInitializerOf obj@(Variable ident ann) = do
   case M.lookup ident globalEnv of
     Just (ConstValue value) -> do
       ty <- getObjType obj
-      return $ Constant value (buildExpAnn (getLocation ann) ty)
+      return $ Constant value (buildExpAnn (sourceOf ann) ty)
     Just (ConstInitializer initializer) -> return initializer
     Nothing -> throwError $ annotateError Internal (EUnknownIdentifier ident)
 constInitializerOf (MemberAccess obj field _) = do
@@ -122,22 +123,23 @@ evalConstExpression _ = throwError $ annotateError Internal ENotConstant
 
 -- | Evaluates a type. This basically only applies to arrays. The function
 -- returns the same expression but with the types (i.e., the array sizes)
--- evaluated.
+-- evaluated. A size it folds is a new constant at the given location, without
+-- the documentation comment of the element whose type it is.
 foldType :: Location -> TerminaType SemanticAnn -> ConstFoldMonad (TerminaType SemanticAnn)
 foldType loc (TArray ty arraySize)= do
   arraySizeValue <- evalConstExpression arraySize
   ty' <- foldType loc ty
-  return (TArray ty' (Constant arraySizeValue (buildExpAnn loc TUSize)))
+  return (TArray ty' (Constant arraySizeValue (buildExpAnn (undocumented loc) TUSize)))
 foldType loc (TAtomicArray ty arraySize) = do
   arraySizeValue <- evalConstExpression arraySize
-  return (TAtomicArray ty (Constant arraySizeValue (buildExpAnn loc TUSize)))
+  return (TAtomicArray ty (Constant arraySizeValue (buildExpAnn (undocumented loc) TUSize)))
 foldType loc (TDeque ty capacity) = do
   capacityValue <- evalConstExpression capacity
-  return (TDeque ty (Constant capacityValue (buildExpAnn loc TUSize)))
+  return (TDeque ty (Constant capacityValue (buildExpAnn (undocumented loc) TUSize)))
 foldType loc (TFixedLocation (TArray ty arraySize)) = do
   arraySizeValue <- evalConstExpression arraySize
   ty' <- foldType loc ty
-  return (TFixedLocation (TArray ty' (Constant arraySizeValue (buildExpAnn loc TUSize))))
+  return (TFixedLocation (TArray ty' (Constant arraySizeValue (buildExpAnn (undocumented loc) TUSize))))
 foldType loc (TConstSubtype ty) = TConstSubtype <$> foldType loc ty
 foldType loc (TReference ak ty) = TReference ak <$> foldType loc ty
 foldType _ ty = return ty
@@ -153,71 +155,71 @@ foldInterfaceMember (InterfaceProcedure ak procId params mods ann) = do
   return $ InterfaceProcedure ak procId params' mods ann'
 
 foldAnnotation :: SemanticAnn -> ConstFoldMonad SemanticAnn
-foldAnnotation (SemanticAnn (ETy (SimpleType ty)) exprLoc) = do
-  ty' <- foldType exprLoc ty
-  return $ SemanticAnn (ETy (SimpleType ty')) exprLoc
-foldAnnotation (SemanticAnn (ETy (ObjectType ak ty)) exprLoc) = do
-  ty' <- foldType exprLoc ty
-  return $ SemanticAnn (ETy (ObjectType ak ty')) exprLoc
-foldAnnotation (SemanticAnn (ETy (AccessPortObjType ak fields ty)) exprLoc) = do
-  ty' <- foldType exprLoc ty
-  return $ SemanticAnn (ETy (AccessPortObjType ak fields ty')) exprLoc
-foldAnnotation (SemanticAnn (ETy (AppType params ty)) exprLoc) = do
-  ty' <- foldType exprLoc ty
-  params' <- mapM (foldParam exprLoc) params
-  return $ SemanticAnn (ETy (AppType params' ty')) exprLoc
+foldAnnotation (SemanticAnn (ETy (SimpleType ty)) src) = do
+  ty' <- foldType (getLocation src) ty
+  return $ SemanticAnn (ETy (SimpleType ty')) src
+foldAnnotation (SemanticAnn (ETy (ObjectType ak ty)) src) = do
+  ty' <- foldType (getLocation src) ty
+  return $ SemanticAnn (ETy (ObjectType ak ty')) src
+foldAnnotation (SemanticAnn (ETy (AccessPortObjType ak fields ty)) src) = do
+  ty' <- foldType (getLocation src) ty
+  return $ SemanticAnn (ETy (AccessPortObjType ak fields ty')) src
+foldAnnotation (SemanticAnn (ETy (AppType params ty)) src) = do
+  ty' <- foldType (getLocation src) ty
+  params' <- mapM (foldParam (getLocation src)) params
+  return $ SemanticAnn (ETy (AppType params' ty')) src
 foldAnnotation ann@(SemanticAnn (FTy SimpleField) _) = return ann
-foldAnnotation (SemanticAnn (FTy (AccessPortField ifaces)) exprLoc) = do
+foldAnnotation (SemanticAnn (FTy (AccessPortField ifaces)) src) = do
   ifaces' <- mapM foldInterfaceMember ifaces
-  return $ SemanticAnn (FTy (AccessPortField ifaces')) exprLoc
+  return $ SemanticAnn (FTy (AccessPortField ifaces')) src
 foldAnnotation ann@(SemanticAnn (STy SimpleStmtType) _) = return ann
 foldAnnotation ann@(SemanticAnn (STy NoReturnCallStmtType) _) = return ann
-foldAnnotation (SemanticAnn (STy (MatchCaseStmtType tys)) exprLoc) = do
-  tys' <- mapM (foldType exprLoc) tys
-  return $ SemanticAnn (STy (MatchCaseStmtType tys')) exprLoc
-foldAnnotation (SemanticAnn (STy (PortConnection (APConnTy pty resTy procs))) loc) = do
-  pty' <- foldType loc pty
-  resTy' <- foldType loc resTy
+foldAnnotation (SemanticAnn (STy (MatchCaseStmtType tys)) src) = do
+  tys' <- mapM (foldType (getLocation src)) tys
+  return $ SemanticAnn (STy (MatchCaseStmtType tys')) src
+foldAnnotation (SemanticAnn (STy (PortConnection (APConnTy pty resTy procs))) src) = do
+  pty' <- foldType (getLocation src) pty
+  resTy' <- foldType (getLocation src) resTy
   procs' <- mapM (\(ProcedureSeman ident params mods) -> do
-    params' <- mapM (foldParam loc) params
+    params' <- mapM (foldParam (getLocation src)) params
     return $ ProcedureSeman ident params' mods) procs
-  return $ SemanticAnn (STy (PortConnection (APConnTy pty' resTy' procs'))) loc
-foldAnnotation (SemanticAnn (STy (PortConnection (APAtomicConnTy ty))) loc) = do
-  ty' <- foldType loc ty
-  return $ SemanticAnn (STy (PortConnection (APAtomicConnTy ty'))) loc
-foldAnnotation (SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ty arrSize arrPortSize))) loc) = do
-  ty' <- foldType loc ty
+  return $ SemanticAnn (STy (PortConnection (APConnTy pty' resTy' procs'))) src
+foldAnnotation (SemanticAnn (STy (PortConnection (APAtomicConnTy ty))) src) = do
+  ty' <- foldType (getLocation src) ty
+  return $ SemanticAnn (STy (PortConnection (APAtomicConnTy ty'))) src
+foldAnnotation (SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ty arrSize arrPortSize))) src) = do
+  ty' <- foldType (getLocation src) ty
   arraySizeValue <- evalConstExpression arrSize
   arrayPortSizeValue <- evalConstExpression arrPortSize
-  let arrSizeConst = Constant arraySizeValue (buildExpAnn loc TUSize)
-      arrPortSizeValue = Constant arrayPortSizeValue (buildExpAnn loc TUSize)
-  return $ SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ty' arrSizeConst arrPortSizeValue))) loc
-foldAnnotation (SemanticAnn (STy (PortConnection (APPoolConnTy ty))) loc) = do
-  ty' <- foldType loc ty
-  return $ SemanticAnn (STy (PortConnection (APPoolConnTy ty'))) loc
-foldAnnotation (SemanticAnn (STy (PortConnection (APTestPoolConnTy ty))) loc) = do
-  ty' <- foldType loc ty
-  return $ SemanticAnn (STy (PortConnection (APTestPoolConnTy ty'))) loc
-foldAnnotation (SemanticAnn (STy (PortConnection (APDequeConnTy ty))) loc) = do
-  ty' <- foldType loc ty
-  return $ SemanticAnn (STy (PortConnection (APDequeConnTy ty'))) loc
-foldAnnotation (SemanticAnn (STy (PortConnection (SPConnTy ty ident))) loc) = do
-  ty' <- foldType loc ty
-  return $ SemanticAnn (STy (PortConnection (SPConnTy ty' ident))) loc
-foldAnnotation (SemanticAnn (STy (PortConnection (InPConnTy ty ident))) loc) = do
-  ty' <- foldType loc ty
-  return $ SemanticAnn (STy (PortConnection (InPConnTy ty' ident))) loc
-foldAnnotation (SemanticAnn (STy (PortConnection (OutPConnTy ty))) loc) = do
-  ty' <- foldType loc ty
-  return $ SemanticAnn (STy (PortConnection (OutPConnTy ty'))) loc
-foldAnnotation (SemanticAnn (GTy ty) loc) = do
-  ty' <- foldType loc ty
-  return $ SemanticAnn (GTy ty') loc
+  let arrSizeConst = Constant arraySizeValue (buildExpAnn (undocumented (getLocation src)) TUSize)
+      arrPortSizeValue = Constant arrayPortSizeValue (buildExpAnn (undocumented (getLocation src)) TUSize)
+  return $ SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ty' arrSizeConst arrPortSizeValue))) src
+foldAnnotation (SemanticAnn (STy (PortConnection (APPoolConnTy ty))) src) = do
+  ty' <- foldType (getLocation src) ty
+  return $ SemanticAnn (STy (PortConnection (APPoolConnTy ty'))) src
+foldAnnotation (SemanticAnn (STy (PortConnection (APTestPoolConnTy ty))) src) = do
+  ty' <- foldType (getLocation src) ty
+  return $ SemanticAnn (STy (PortConnection (APTestPoolConnTy ty'))) src
+foldAnnotation (SemanticAnn (STy (PortConnection (APDequeConnTy ty))) src) = do
+  ty' <- foldType (getLocation src) ty
+  return $ SemanticAnn (STy (PortConnection (APDequeConnTy ty'))) src
+foldAnnotation (SemanticAnn (STy (PortConnection (SPConnTy ty ident))) src) = do
+  ty' <- foldType (getLocation src) ty
+  return $ SemanticAnn (STy (PortConnection (SPConnTy ty' ident))) src
+foldAnnotation (SemanticAnn (STy (PortConnection (InPConnTy ty ident))) src) = do
+  ty' <- foldType (getLocation src) ty
+  return $ SemanticAnn (STy (PortConnection (InPConnTy ty' ident))) src
+foldAnnotation (SemanticAnn (STy (PortConnection (OutPConnTy ty))) src) = do
+  ty' <- foldType (getLocation src) ty
+  return $ SemanticAnn (STy (PortConnection (OutPConnTy ty'))) src
+foldAnnotation (SemanticAnn (GTy ty) src) = do
+  ty' <- foldType (getLocation src) ty
+  return $ SemanticAnn (GTy ty') src
 foldAnnotation ann@(SemanticAnn TTy _) = return ann
-foldAnnotation (SemanticAnn (FnTy (FunctionSeman params rty mode)) loc) = do
-  rty' <- foldType loc rty
-  params' <- mapM (foldParam loc) params
-  return $ SemanticAnn (FnTy (FunctionSeman params' rty' mode)) loc
+foldAnnotation (SemanticAnn (FnTy (FunctionSeman params rty mode)) src) = do
+  rty' <- foldType (getLocation src) rty
+  params' <- mapM (foldParam (getLocation src)) params
+  return $ SemanticAnn (FnTy (FunctionSeman params' rty' mode)) src
 
 foldFieldValueAssignment :: FieldAssignment SemanticAnn -> ConstFoldMonad (FieldAssignment SemanticAnn)
 foldFieldValueAssignment (FieldValueAssignment ident expr ann) = do
@@ -225,7 +227,7 @@ foldFieldValueAssignment (FieldValueAssignment ident expr ann) = do
   expr' <- foldExpression expr
   case ann' of 
     (SemanticAnn (ETy (SimpleType exprTy)) exprLoc) -> 
-      checkType exprLoc exprTy expr'
+      checkType (getLocation exprLoc) exprTy expr'
     _ -> return ()
   return $ FieldValueAssignment ident expr' ann'
 foldFieldValueAssignment (FieldAddressAssignment ident expr ann) = do
@@ -362,7 +364,7 @@ foldExpression (AccessObject obj) = do
       if intTy scalar || boolTy scalar
         then do
           value <- evalConstObject obj'
-          return $ Constant value (buildExpAnn (getLocation (getAnnotation obj')) ty)
+          return $ Constant value (buildExpAnn (sourceOf (getAnnotation obj')) ty)
         else return $ AccessObject obj'
     _ -> return $ AccessObject obj'
 -- | Two constant operands are folded into the constant they produce.
@@ -546,8 +548,8 @@ foldBasicBlock (ForLoopBlock iter ty from_expr to_expr mWhile body_stmt ann) = d
   fromValue <- evalConstExpression from_expr
   toValue <- evalConstExpression to_expr
   -- | The bounds are written as the values they fold to.
-  let from_expr' = Constant fromValue (buildExpAnn (getLocation (getAnnotation from_expr)) ty')
-      to_expr' = Constant toValue (buildExpAnn (getLocation (getAnnotation to_expr)) ty')
+  let from_expr' = Constant fromValue (buildExpAnn (sourceOf (getAnnotation from_expr)) ty')
+      to_expr' = Constant toValue (buildExpAnn (sourceOf (getAnnotation to_expr)) ty')
   return $ ForLoopBlock iter ty' from_expr' to_expr' mWhile' body_stmt' ann'
 foldBasicBlock (MatchBlock expr cases mDefaultCase ann) = do
   expr' <- foldExpression expr
@@ -687,7 +689,7 @@ foldBasicBlock (SystemCall obj ident exprs ann) = do
 checkCallArgs :: SemanticAnn -> [Expression SemanticAnn] -> ConstFoldMonad ()
 checkCallArgs (SemanticAnn (ETy (AppType params _ty)) exprLoc) args =
   zipWithM_ (\param arg -> case param of
-    Parameter _ paramTy _ -> checkType exprLoc paramTy arg) params args
+    Parameter _ paramTy _ -> checkType (getLocation exprLoc) paramTy arg) params args
 checkCallArgs _ _ = throwError $ annotateError Internal EInvalidConstantEvaluation
 
 foldBasicBlocks :: Block SemanticAnn -> ConstFoldMonad (Block SemanticAnn)
@@ -885,7 +887,7 @@ foldConstInitializer ty expr = do
   if computed
     then do
       value <- evalConstExpression expr
-      return $ Constant value (buildExpAnn (getLocation (getAnnotation expr)) ty)
+      return $ Constant value (buildExpAnn (sourceOf (getAnnotation expr)) ty)
     else foldExpression expr >>= substituteConstants
 
   where

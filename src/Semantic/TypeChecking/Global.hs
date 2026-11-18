@@ -34,7 +34,7 @@ typeGlobal (Task ident ts mexpr mods anns) = do
           -- If it has an initial value great
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
           -- If it has not, we need to check that the type has actually NO fields
-          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing (undocumented (getLocation anns)))
       tyMods <- typeModifiers (getLocation anns) TaskDeclaration typeGlobalObject mods
       unless (any (\(SAST.Modifier modIdent _) -> modIdent == "priority") tyMods) $
         throwError $ annotateError (getLocation anns) (EMissingTaskPriority ident)
@@ -50,7 +50,7 @@ typeGlobal (Handler ident ts mexpr mods anns) = do
           -- If it has an initial value great
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
           -- If it has not, we need to check that the type has actually NO fields
-          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing (undocumented (getLocation anns)))
       tyMods <- typeModifiers (getLocation anns) HandlerDeclaration typeGlobalObject mods
       return (SAST.Handler ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) (getLocation anns))
     _ -> throwError $ annotateError (getLocation anns) (EInvalidHandlerType ty)
@@ -63,7 +63,7 @@ typeGlobal (Test ident ts mexpr mods anns) = do
       exprty <-
         case mexpr of
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
-          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing (undocumented (getLocation anns)))
       tyMods <- typeModifiers (getLocation anns) TestInstanceDeclaration typeGlobalObject mods
       return (SAST.Test ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) (getLocation anns))
     _ -> throwError $ annotateError (getLocation anns) (EInvalidTestType ty)
@@ -78,7 +78,7 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
           -- If it has an initial value great
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
           -- If it has not, we need to check that the type has actually NO fields
-          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing (undocumented (getLocation anns)))
       tyMods <- typeModifiers (getLocation anns) ResourceDeclaration typeGlobalObject mods
       -- Check if the resource is unprotected, and if it is, check that it has no regular fields
       when (isUnprotected tyMods) $ 
@@ -118,7 +118,7 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
       exprty <-
         case mexpr of
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
-          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing (undocumented (getLocation anns)))
       tyMods <- typeModifiers (getLocation anns) AtomicDeclaration typeGlobalObject mods
       return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) (getLocation anns))
     -- | Atomic arrays
@@ -126,7 +126,7 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
       exprty <-
         case mexpr of
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
-          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing (undocumented (getLocation anns)))
       tyMods <- typeModifiers (getLocation anns) AtomicArrayDeclaration typeGlobalObject mods
       return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) (getLocation anns))
     _ -> throwError $ annotateError (getLocation anns) (EInvalidResourceType ty)
@@ -149,7 +149,7 @@ typeGlobal (Emitter ident ts mexpr mods anns) = do
           -- If it has an initial value great
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
           -- If it has not, we need to check that the type has actually NO fields
-          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing (undocumented (getLocation anns)))
       tyMods <- typeModifiers (getLocation anns) EmitterDeclaration typeGlobalObject mods
       return (SAST.Emitter ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) (getLocation anns))
     -- | Emitters of a unit test, which only a case fires

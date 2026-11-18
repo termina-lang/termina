@@ -10,6 +10,7 @@ import Control.Monad.Except
 import Generator.CodeGen.Common
 import ControlFlow.Architecture.Types
 import Semantic.Types
+import Parser.Types (undocumented)
 import Generator.LanguageC.AST
 import qualified Data.Map.Strict as M
 import Generator.LanguageC.Embedded
@@ -72,7 +73,7 @@ getSinkPortMessageQueues progArchitecture = return $ foldr (\glb acc ->
                 let tpClass = taskClasses progArchitecture M.! classId in
                 foldr (\portId acc' ->
                     let (ts, _) = sinkPorts tpClass M.! portId in
-                    OSALSinkPortMsgQueue identifier classId portId ts (Constant (I (TInteger 1 DecRepr) Nothing) (buildExpAnn Internal (TConstSubtype TUSize))) : acc'
+                    OSALSinkPortMsgQueue identifier classId portId ts (Constant (I (TInteger 1 DecRepr) Nothing) (buildExpAnn (undocumented Internal) (TConstSubtype TUSize))) : acc'
                 ) acc (M.keys sinkPConns)
     ) [] (tasks progArchitecture)
 
@@ -102,8 +103,8 @@ getTasksMessageQueues progArchitecture msgqs = do
             size' <- foldM (\acc q ->
                 case q of
                     OSALTaskMsgQueue {} -> throwError $ InternalError "getTaskMessageQueue: there is already a task message queue"
-                    OSALChannelMsgQueue _ _ size' _ _ -> return $ BinOp Addition acc size' (buildExpAnn Internal (TConstSubtype TUSize))
-                    OSALSinkPortMsgQueue _ _ _ _ size' -> return $ BinOp Addition acc size' (buildExpAnn Internal (TConstSubtype TUSize))
+                    OSALChannelMsgQueue _ _ size' _ _ -> return $ BinOp Addition acc size' (buildExpAnn (undocumented Internal) (TConstSubtype TUSize))
+                    OSALSinkPortMsgQueue _ _ _ _ size' -> return $ BinOp Addition acc size' (buildExpAnn (undocumented Internal) (TConstSubtype TUSize))
                     _ -> throwError $ InternalError "getTaskMessageQueue: a queue of a test channel reaches no task"
                 ) size msgQueues
             return $ OSALTaskMsgQueue identifier classId size'
@@ -130,7 +131,7 @@ msgQueueElements (OSALSinkPortMsgQueue _ _ _ ty size) = Just . (size,) <$> genTy
 msgQueueElements (OSALTestChannelMsgQueue _ ty size) = Just . (size,) <$> genType noqual ty
 msgQueueElements (OSALTestEventMsgQueue _ size) = return $ Just (size, termina__event_t)
 msgQueueElements OSALTestHarnessMsgQueue =
-    return $ Just (Constant (I (TInteger 1 DecRepr) Nothing) (buildExpAnn Internal (TConstSubtype TUSize)), uint8_t)
+    return $ Just (Constant (I (TInteger 1 DecRepr) Nothing) (buildExpAnn (undocumented Internal) (TConstSubtype TUSize)), uint8_t)
 
 -- | The queue of the messages and the queue of the events of each TestChannel
 getTestChannelsMessageQueues :: TerminaProgArch SemanticAnn -> [OSALMsgQueue]

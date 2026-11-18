@@ -4,6 +4,7 @@ import Test.Hspec
 import Semantic.AST
 import Data.Text
 import Semantic.Types
+import Parser.Types (undocumented)
 import qualified Data.Map.Strict as M
 import Utils.Annotations
 import Generator.Monadic
@@ -85,7 +86,7 @@ classWithAccessPortField = internalTypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (internalField "field0" TUInt32),
     ClassField (internalAccessPortField "field1" (TAccessPort (TInterface RegularInterface "Interface1"))
-      (M.fromList [("test0", InterfaceProcedure Mutable "test0" [] [] (buildExpAnn Internal TUnit))])),
+      (M.fromList [("test0", InterfaceProcedure Mutable "test0" [] [] (buildExpAnn (undocumented Internal) TUnit))])),
     ClassProcedure Mutable "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] [])
 

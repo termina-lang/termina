@@ -311,7 +311,7 @@ mustBeTy ty expression =
   sameTyOrError loc ty
   >> return expression
   where
-    SemanticAnn _ loc = getAnnotation expression
+    loc = getLocation (getAnnotation expression)
 
 getIntConst :: Const a -> SemanticMonad Integer
 getIntConst (I (TInteger i _) _) = return i

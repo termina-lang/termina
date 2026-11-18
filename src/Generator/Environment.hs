@@ -3,6 +3,7 @@ import Configuration.Configuration
 import Semantic.AST
 import Utils.Annotations
 import Semantic.Types
+import Parser.Types (undocumented)
 import ControlFlow.Architecture.Types
 import qualified Data.Map.Strict as M
 import ControlFlow.Architecture
@@ -55,5 +56,5 @@ getPlatformInitialProgram _ TestPlatform = emptyTerminaProgArch
 getPlatformInitialProgram _ plt =
     emptyTerminaProgArch {
         emitters = M.union (emitters emptyTerminaProgArch) . M.fromList $
-            [(irq, TPInterruptEmitter irq (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | irq <- M.keys (getPlatformInterruptMap plt)]
+            [(irq, TPInterruptEmitter irq (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) (undocumented Internal))) | irq <- M.keys (getPlatformInterruptMap plt)]
     }

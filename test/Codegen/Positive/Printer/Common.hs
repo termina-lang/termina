@@ -8,6 +8,7 @@ import Codegen.Positive.Source.Common (foldingProofs)
 import Utils.Annotations
 import Text.Parsec.Pos (newPos)
 import Semantic.Types
+import Parser.Types (undocumented)
 import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.Except
@@ -29,25 +30,25 @@ import Prettyprinter
 import Utils.Printer
 
 objSemAnn :: AccessKind -> TerminaType SemanticAnn -> SemanticAnn
-objSemAnn ak ts = SemanticAnn (ETy (ObjectType ak ts)) Internal
+objSemAnn ak ts = SemanticAnn (ETy (ObjectType ak ts)) (undocumented Internal)
 
 stmtSemAnn :: SemanticAnn
-stmtSemAnn = SemanticAnn (STy SimpleStmtType) Internal
+stmtSemAnn = SemanticAnn (STy SimpleStmtType) (undocumented Internal)
 
 simpleTySemAnn :: TerminaType SemanticAnn -> SemanticAnn
-simpleTySemAnn ts = SemanticAnn (ETy (SimpleType ts)) Internal
+simpleTySemAnn ts = SemanticAnn (ETy (SimpleType ts)) (undocumented Internal)
 
 matchCaseSemAnn :: [TerminaType SemanticAnn] -> SemanticAnn
-matchCaseSemAnn ts = SemanticAnn (STy (MatchCaseStmtType ts)) Internal
+matchCaseSemAnn ts = SemanticAnn (STy (MatchCaseStmtType ts)) (undocumented Internal)
 
 -- | Gives an annotation a position of its own in the source. Two operations
 -- of the same kind in one expression are told apart by their positions.
 located :: Int -> SemanticAnn -> SemanticAnn
 located row (SemanticAnn e _) =
-  SemanticAnn e (Position "test" (newPos "test" row 1) (newPos "test" row 2))
+  SemanticAnn e (undocumented (Position "test" (newPos "test" row 1) (newPos "test" row 2)))
 
 buildConstExprTUSize :: Integer -> Expression SemanticAnn
-buildConstExprTUSize i = Constant (I (TInteger i DecRepr) Nothing) (buildExpAnn Internal TUSize)
+buildConstExprTUSize i = Constant (I (TInteger i DecRepr) Nothing) (buildExpAnn (undocumented Internal) TUSize)
 
 unitSemAnn :: SemanticAnn
 unitSemAnn = simpleTySemAnn TUnit
@@ -188,7 +189,7 @@ msgQueueSemAnn :: TerminaType SemanticAnn -> SemanticAnn
 msgQueueSemAnn ts = objSemAnn Mutable (TOutPort ts)
 
 funSemAnn :: [Parameter SemanticAnn] -> TerminaType SemanticAnn -> SemanticAnn
-funSemAnn params ts = SemanticAnn (ETy (AppType params ts)) Internal
+funSemAnn params ts = SemanticAnn (ETy (AppType params ts)) (undocumented Internal)
 
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 

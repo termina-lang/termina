@@ -4,6 +4,7 @@ import Elaboration.AST
 import Generator.LanguageC.AST
 import Generator.LanguageC.Embedded
 import Semantic.Types
+import Parser.Types (undocumented)
 import Control.Monad ( zipWithM )
 import Control.Monad.Except
 import Generator.CodeGen.Common
@@ -141,7 +142,7 @@ genStringAssign loc before level cObj value = do
                             condExpr = cIteratorExpr @< cSize |>> loc
                             incrExpr = iterator @: size_t @= (cIteratorExpr @+ dec 1 @: size_t) @: size_t |>> loc
                         cObjArrayItemType <- getCArrayItemType cObjType
-                        let expr' = Constant (C '\0') (SemanticAnn (ETy (SimpleType TChar)) loc)
+                        let expr' = Constant (C '\0') (buildExpAnn (undocumented loc) TChar)
                         arrayInit <- genArrayAssign loc False (level' + 1) (cObj @$$ cIteratorExpr @: cObjArrayItemType) expr'
                         if before' then
                             return [pre_cr (_for_let initDecl condExpr incrExpr (block arrayInit)) |>> loc]
@@ -171,7 +172,7 @@ genStringAssign loc before level cObj value = do
                         condExpr = cIteratorExpr @< cArraySize |>> loc
                         incrExpr = iterator @: size_t @= (cIteratorExpr @+ dec 1 @: size_t) @: size_t |>> loc
                     cObjArrayItemType <- getCArrayItemType cObjType
-                    let expr' = Constant (C '\0') (SemanticAnn (ETy (SimpleType TChar)) loc)
+                    let expr' = Constant (C '\0') (buildExpAnn (undocumented loc) TChar)
                     arrayInit <- genArrayAssign loc False (level' + 1) (cObj @$$ cIteratorExpr @: cObjArrayItemType) expr'
                     if before' then
                         return [pre_cr (_for_let initDecl condExpr incrExpr (block arrayInit)) |>> loc]
@@ -865,7 +866,8 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
             concat <$> traverse genBlocks (blockBody blk')
 
         genMatchCaseParams :: CObject -> CType -> MatchCase SemanticAnn -> CGenerator [CCompoundBlockItem]
-        genMatchCaseParams cObj cParamsStructType (MatchCase this_variant params _ (SemanticAnn semann loc')) = do
+        genMatchCaseParams cObj cParamsStructType (MatchCase this_variant params _ ann'@(SemanticAnn semann _)) = do
+            let loc' = getLocation ann'
             -- | The variables a case binds are immutable, as a let is, so they
             -- are const in C
             cParamTypes <- case getMatchCaseTypes semann of

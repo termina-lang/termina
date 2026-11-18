@@ -424,19 +424,19 @@ internalAnn :: CItemAnn -> CAnns
 internalAnn = flip LocatedElement Internal
 
 buildGenericAnn :: SemanticAnn -> CAnns
-buildGenericAnn (SemanticAnn _ loc) = LocatedElement CGenericAnn loc
+buildGenericAnn ann = LocatedElement CGenericAnn (getLocation ann)
 
 buildStatementAnn :: SemanticAnn -> Bool -> CAnns
-buildStatementAnn (SemanticAnn _ loc) before = LocatedElement (CStatementAnn before False) loc
+buildStatementAnn ann before = LocatedElement (CStatementAnn before False) (getLocation ann)
 
 buildDeclarationAnn :: SemanticAnn -> Bool -> CAnns
-buildDeclarationAnn (SemanticAnn _ loc) before = LocatedElement (CDeclarationAnn before) loc
+buildDeclarationAnn ann before = LocatedElement (CDeclarationAnn before) (getLocation ann)
 
 buildCompoundAnn :: SemanticAnn -> Bool -> Bool -> CAnns
-buildCompoundAnn (SemanticAnn _ loc) before trailing = LocatedElement (CCompoundAnn before trailing) loc
+buildCompoundAnn ann before trailing = LocatedElement (CCompoundAnn before trailing) (getLocation ann)
 
 buildCPPDirectiveAnn :: SemanticAnn -> Bool -> CAnns
-buildCPPDirectiveAnn (SemanticAnn _ loc) before = LocatedElement (CPPDirectiveAnn before) loc
+buildCPPDirectiveAnn ann before = LocatedElement (CPPDirectiveAnn before) (getLocation ann)
 
 -- | TODO: The size of the enum field has been hardcoded, it should be
 -- platform dependent
