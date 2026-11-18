@@ -17,6 +17,8 @@ import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
 import ControlFlow.ValueAnalysis (runValueAnalysisCheck)
 import Control.Applicative ((<|>))
 import Data.List (foldl')
+import Data.Maybe (listToMaybe, mapMaybe)
+import Doc.Check (runDocCheck)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Elaboration (ElaborationReport)
@@ -54,6 +56,7 @@ checkModules config plt deps parsedProject orderedModules =
     (typedProject, typeFailure) = typeProject deps initialEnv parsedProject orderedModules
 
     checkTyped typed = do
+        docCheck typed
         rawLoweredProject <- lowerModules typed
         maybe (Right ()) Left (loweredChecks rawLoweredProject)
         (loweredProject, constEnvs, foldProofs) <- foldProject config plt rawLoweredProject orderedModules
@@ -63,6 +66,11 @@ checkModules config plt deps parsedProject orderedModules =
         programArchitecture <- genProjectArchitecture (getPlatformInitialProgram config plt) loweredProject orderedModules
         architectureCheck orderedModules programArchitecture
         return (CheckedModules (monadicTypesOf typed) loweredProject elaboratedProject checksReports programArchitecture)
+
+-- | Check the documentation comments of the typed modules against their
+-- elements.
+docCheck :: TypedProject -> Either CheckFailure ()
+docCheck = maybe (Right ()) (Left . checkFailure) . listToMaybe . mapMaybe (runDocCheck . typedAST . metadata) . M.elems
 
 -- | Obtain the basic-block AST of the modules.
 lowerModules :: TypedProject -> Either CheckFailure LoweredProject
