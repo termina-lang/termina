@@ -986,16 +986,39 @@ genStatement (AssignmentStmt obj expr ann) = do
     typeObj <- getObjType obj
     cObj <- genObject obj
     case typeObj of
-        TArray _ _ -> genArrayAssign loc True 0 cObj expr
-        (TFixedLocation _) -> do
-            return [pre_cr (addrOf cObj) |>> loc]
-        _ -> case expr of
-            (StructInitializer {}) -> genStructAssign loc True 0 cObj expr
-            (MonadicVariantInitializer {}) -> genMonadicVariantAssign loc True 0 cObj expr
-            (EnumVariantInitializer {}) -> genEnumAssign loc True 0 cObj expr
-            _ -> do
-                cExpr <- genExpression expr
-                return [pre_cr (cObj @= cExpr) |>> getLocation ann]
+        -- | A located array is a pointer to its first element in C, indexed as the array itself
+        (TFixedLocation ty@(TArray _ _)) -> genValueAssign loc ty (pointedArray cObj)
+        -- | Any other fixed location is a pointer in C, so the value goes to the pointed object
+        (TFixedLocation ty) -> genValueAssign loc ty (deref cObj)
+        _ -> genValueAssign loc typeObj cObj
+
+    where
+
+        pointedArray :: CObject -> CObject
+        pointedArray cObj =
+            case getCObjType cObj of
+                CTPointer cTy _ -> withCObjType cTy cObj
+                _ -> cObj
+
+        withCObjType :: CType -> CObject -> CObject
+        withCObjType cTy (CVar ident _) = CVar ident cTy
+        withCObjType cTy (CField cObj ident _) = CField cObj ident cTy
+        withCObjType cTy (CDeref cObj _) = CDeref cObj cTy
+        withCObjType cTy (CIndexOf cObj cIndex _) = CIndexOf cObj cIndex cTy
+        withCObjType cTy (CObjCast cObj _) = CObjCast cObj cTy
+
+        -- | Composite values are written field by field, which gives a fixed location one access per field
+        genValueAssign :: Location -> TerminaType SemanticAnn -> CObject -> CGenerator [CCompoundBlockItem]
+        genValueAssign loc ty cObj =
+            case ty of
+                TArray _ _ -> genArrayAssign loc True 0 cObj expr
+                _ -> case expr of
+                    (StructInitializer {}) -> genStructAssign loc True 0 cObj expr
+                    (MonadicVariantInitializer {}) -> genMonadicVariantAssign loc True 0 cObj expr
+                    (EnumVariantInitializer {}) -> genEnumAssign loc True 0 cObj expr
+                    _ -> do
+                        cExpr <- genExpression expr
+                        return [pre_cr (cObj @= cExpr) |>> loc]
 genStatement (Declaration identifier ak ts expr ann) = do
   let loc = getLocation ann
   -- | A let is lowered as a const in C

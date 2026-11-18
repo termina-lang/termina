@@ -2,6 +2,7 @@
 module Semantic.Negative.FixedLocationReferenceSpec (spec) where
 
 import Test.Hspec
+import Semantic.AST
 import Semantic.Errors
 import Semantic.Common
 
@@ -26,6 +27,7 @@ resource stmt =
     "    procedure get(&mut self, r : &mut u32);\n" ++
     "};\n" ++
     "resource class CR provides IR {\n" ++
+    "    status : loc u32;\n" ++
     "    single : loc Desc;\n" ++
     "    tables : loc [Desc; 4];\n" ++
     "    procedure get(&mut self, r : &mut u32) {\n" ++
@@ -37,6 +39,12 @@ resource stmt =
 isReferenceTo :: String -> Maybe Error -> Bool
 isReferenceTo field = \case
   Just (EReferenceToFixedLocation f) -> f == field
+  _ -> False
+
+-- | The value assigned to a scalar fixed location is checked against the located type.
+isScalarMismatch :: Maybe Error -> Bool
+isScalarMismatch = \case
+  Just (EAssignmentExprMismatch TUInt32 TBool) -> True
   _ -> False
 
 spec :: Spec
@@ -56,3 +64,12 @@ spec = describe "Semantic: references to fixed-location fields" $ do
 
   it "rejects a slice of a fixed-location array" $
     runNegativeTestTypeCheck (resource "*r = first(&self->tables[0..2]);") `shouldSatisfy` isReferenceTo "tables"
+
+  it "accepts writing a binary operation to a scalar fixed location" $
+    runNegativeTestTypeCheck (resource "self->status = (*r << 8 : u32) | (self->status & 0xFF : u32);") `shouldSatisfy` null
+
+  it "accepts writing an initializer to a whole fixed-location struct" $
+    runNegativeTestTypeCheck (resource "self->single = {master = [0 : u8; 32], size = 1 : u32} : Desc;") `shouldSatisfy` null
+
+  it "rejects writing a value of another type to a scalar fixed location" $
+    runNegativeTestTypeCheck (resource "self->status = true;") `shouldSatisfy` isScalarMismatch

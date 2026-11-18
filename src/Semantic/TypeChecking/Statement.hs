@@ -56,10 +56,14 @@ typeStatement _retTy (AssignmentStmt lhs_o rhs_expr anns) = do
   let (lhs_o_typed, lhs_o_ak, lhs_o_type) =
         maybe (lhs_o_typed', lhs_o_ak', lhs_o_type') (unBox lhs_o_typed', Mutable, ) (isBox lhs_o_type')
   unless (lhs_o_ak /= Immutable) (throwError $ annotateError anns EAssignmentToImmutable)
-  rhs_expr_typed' <- typeAssignmentExpression lhs_o_type typeRHSObject rhs_expr
+  -- | A value assigned to a fixed location has the type of the located object
+  let lhs_value_type = case lhs_o_type of
+        TFixedLocation ty -> ty
+        ty -> ty
+  rhs_expr_typed' <- typeAssignmentExpression lhs_value_type typeRHSObject rhs_expr
   type_rhs' <- getExprType rhs_expr_typed'
   rhs_expr_typed <- maybe (return rhs_expr_typed') (\_ -> unBoxExp rhs_expr_typed') (isBox type_rhs')
-  ety <- mustBeTy lhs_o_type rhs_expr_typed
+  ety <- mustBeTy lhs_value_type rhs_expr_typed
   return $ SAST.AssignmentStmt lhs_o_typed ety $ buildStmtAnn anns
 typeStatement retTy (IfElseStmt condIf elifs condElse anns) = do
   -- | Check that if the statement defines an else-if branch, then it must have an otherwise branch
