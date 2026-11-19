@@ -175,7 +175,10 @@ data TerminaConfig =
     xsdbInit :: !(Maybe FilePath),
     -- | Whether the generated C carries #line pragmas that point to the .fin.
     -- Without them it is broken to the usual width, the plain C.
-    lineDirectives :: !Bool
+    lineDirectives :: !Bool,
+    -- | Whether the generated C carries the documentation comments, which
+    -- termina deliver --docs asks for the plain C of the deliverable
+    docComments :: !Bool
   } deriving (Eq, Show)
 
 -- | What a deployment builds. What a test needs and the application does not
@@ -207,7 +210,8 @@ defaultConfig projectName plt = TerminaConfig {
     runTimeout = Nothing,
     linkerScript = Nothing,
     xsdbInit = Nothing,
-    lineDirectives = False
+    lineDirectives = False,
+    docComments = False
 }
 
 -- | Bytes of the record of results of a test when its entry does not say.

@@ -128,7 +128,7 @@ loadRTModule rtModelFile = do
           fileMap = M.singleton rtModelFile src_code
       in
       dieWithReport (toText pErr fileMap)
-    Right term -> return $ TerminaModuleData rtModelFile rtModelFile [] [] src_code (ParsingRTData term)
+    Right term -> return $ TerminaModuleData rtModelFile rtModelFile [] [] src_code Nothing (ParsingRTData term)
 
 typeRTModule :: TerminaProgArch SemanticAnn
   -> WCEPathMap WCEPSemAnn
@@ -156,6 +156,7 @@ typeRTModule arch trPathMap loweredProject pathProject rtModule = do
         []
         []
         (sourcecode rtModule)
+        Nothing
         (SemanticRTData tyElems)
 
 flattenRTModule :: TerminaProgArch SemanticAnn
@@ -234,7 +235,7 @@ loadWCETModules loweredProject efpPath = do
             fileMap = M.singleton fullP src_code
         in
         dieWithReport (toText pErr fileMap)
-      Right term -> return $ TerminaModuleData filePath fullP [] [] src_code (WCETData term)
+      Right term -> return $ TerminaModuleData filePath fullP [] [] src_code Nothing (WCETData term)
 
 -- | Type check the transactional worst-case execution paths of the project modules
 typeWCETModules :: TerminaProgArch SemanticAnn
@@ -305,7 +306,7 @@ loadWCEPathModules loweredProject efpPath = do
             fileMap = M.singleton fullP src_code
         in
         dieWithReport (toText pErr fileMap)
-      Right term -> return $ TerminaModuleData filePath fullP [] [] src_code (TransPathData term)
+      Right term -> return $ TerminaModuleData filePath fullP [] [] src_code Nothing (TransPathData term)
 
 -- | Type check the transactional worst-case execution paths of the project modules
 typeWCEPathModules :: TerminaProgArch SemanticAnn

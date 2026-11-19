@@ -36,6 +36,7 @@ data CDocTag
   | CDocDeprecated [DocBlock' Ident]
   | CDocSince [DocBlock' Ident]
   | CDocSection T.Text [DocBlock' Ident] -- ^ A section with a title, printed @\@par@
+  | CDocFile -- ^ The comment of a file, without which Doxygen lists none of its members
   deriving Show
 
 -- | The direction of a parameter in the C, from the reader's side.

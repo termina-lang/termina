@@ -1,15 +1,18 @@
+{-# LANGUAGE OverloadedStrings #-}
 -- | How termina deliver reads the dependency files and the values of make,
 -- and rewrites their paths for the flat Makefile of the deliverable.
 module Configuration.DeliverSpec (spec) where
 
-import Command.Deliver (dependencies, inFolder, pathsIn, relocatePaths, toolchainVariables, releaseBuild)
+import Command.Deliver (dependencies, inFolder, pathsIn, relocatePaths, toolchainVariables, releaseBuild, genDoxyfile)
 import Configuration.Configuration
 import Configuration.Manifest
 
 import qualified Data.ByteString.Char8 as BS
 import Data.List (isPrefixOf)
 import qualified Data.Map.Strict as M
+import qualified Data.Text as T
 import Data.Yaml (decodeEither')
+import Configuration.Platform (Platform(..))
 import System.FilePath
 import Test.Hspec
 
@@ -101,3 +104,26 @@ spec = describe "termina deliver" $ do
           map (\c -> (profile c, outputFolder c)) [deploymentConfig moved, deploymentPlainConfig moved]
             `shouldBe` [(Release, ".termina" </> "deliver" </> "app"), (Release, ".termina" </> "deliver" </> "plain" </> "app")]
           profile (deploymentConfig deployment) `shouldBe` Debug
+
+  describe "genDoxyfile" $ do
+
+    let info = ProjectInfo { projectName = "icu-asw", projectVersion = "1.2.0", projectManifestVersion = 1, projectAssurance = [] }
+
+    it "documents the C of the deliverable from its root, with the folders of the extern C" $
+      genDoxyfile info (defaultConfig "icu-asw" POSIXGCC) ["extern/icu"] `shouldBe` T.unlines
+        [ "PROJECT_NAME          = \"icu-asw\""
+        , "PROJECT_NUMBER        = 1.2.0"
+        , "OUTPUT_DIRECTORY      = doc"
+        , "INPUT                 = include src osal extern/icu"
+        , "RECURSIVE             = YES"
+        , "FILE_PATTERNS         = *.h *.c"
+        , "OPTIMIZE_OUTPUT_FOR_C = YES"
+        , "EXTRACT_STATIC        = YES"
+        , "MARKDOWN_SUPPORT      = YES"
+        , "WARN_IF_UNDOCUMENTED  = NO"
+        , "QUIET                 = YES"
+        ]
+
+    it "names the test in the project of a deliverable of a test" $
+      take 1 (T.lines (genDoxyfile info ((defaultConfig "uart" POSIXGCC) { deploymentKind = TestBuild "uart" }) []))
+        `shouldBe` ["PROJECT_NAME          = \"icu-asw, test uart\""]

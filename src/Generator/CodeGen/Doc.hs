@@ -5,6 +5,7 @@ module Generator.CodeGen.Doc
   ( genDoc
   , genProcedureDoc
   , genInstanceDoc
+  , genFileDoc
   , statementComment
   , genBriefDoc
   , generatedDoc
@@ -61,6 +62,14 @@ genInstanceDoc identifier ann = do
     doc <- genDoc ann []
     facts <- gets (M.findWithDefault [] identifier . deploymentFacts)
     return $ withFacts (map factInlines facts) doc
+
+-- | The comment of a C file: @\@file@, which Doxygen needs to list the
+-- members of the file, and the comment of the module, if it has one.
+genFileDoc :: Maybe DocComment -> CGenerator CDoc
+genFileDoc Nothing = return (CDoc [] [] [CDocFile])
+genFileDoc (Just comment) = do
+    doc <- cDoc [] <$> modelOf comment
+    return doc { cdocTags = CDocFile : cdocTags doc }
 
 -- | The comment of a statement, of a branch of an @if@ or of a case of a
 -- @match@: its lines as the author wrote them.

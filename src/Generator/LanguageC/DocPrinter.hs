@@ -26,8 +26,9 @@ import Utils.Printer (DocStyle)
 -- columns from the column where the comment starts.
 pprintCDoc :: CDoc -> DocStyle
 pprintCDoc doc = column $ \c ->
-    align (concatWith (\a b -> a <> hardline <> b)
-        ("/**" : map commentLine (cDocLines (max 40 (80 - c - 3)) doc) ++ [" */"]))
+    case cDocLines (max 40 (80 - c - 3)) doc of
+        [single@"@file"] -> pretty ("/** " <> single <> " */")
+        ls -> align (concatWith (\a b -> a <> hardline <> b) ("/**" : map commentLine ls ++ [" */"]))
 
     where
 
@@ -55,21 +56,26 @@ pprintTrailingCDoc (CDoc brief [] []) =
 pprintTrailingCDoc _ = Nothing
 
 -- | The lines of a documentation comment, without the delimiters and the
--- star of each line, wrapped at a width. The brief, each block of the body,
--- the tags and each section are separated by a blank line.
+-- star of each line, wrapped at a width. The @\@file@ of the comment of a
+-- file goes first, and it, the brief, each block of the body, the tags and
+-- each section are separated by a blank line.
 cDocLines :: Int -> CDoc -> [Text]
 cDocLines width (CDoc brief body tags) =
     map escapeComment (L.intercalate [""] (filter (not . null) groups))
 
     where
 
-        groups = [ hanging width "@brief " [DPara brief] | not (null brief) ]
+        groups = [ ["@file"] | any isFile tags ]
+            ++ [ hanging width "@brief " [DPara brief] | not (null brief) ]
             ++ map (blockLines width) body
-            ++ [ concatMap (tagLines width) [ t | t <- tags, not (isSection t) ] ]
+            ++ [ concatMap (tagLines width) [ t | t <- tags, not (isSection t), not (isFile t) ] ]
             ++ [ tagLines width t | t <- tags, isSection t ]
 
         isSection (CDocSection _ _) = True
         isSection _ = False
+
+        isFile CDocFile = True
+        isFile _ = False
 
 -- | The lines of a tag. Its text goes on its line and on the lines below,
 -- indented under it, without blank lines, which would end it.
@@ -86,6 +92,7 @@ tagLines width tag = case tag of
     CDocDeprecated bs -> hanging width "@deprecated " bs
     CDocSince bs -> hanging width "@since " bs
     CDocSection title bs -> ("@par " <> escapeDoxygen title) : concatMap (blockLines width) bs
+    CDocFile -> ["@file"]
 
     where
 

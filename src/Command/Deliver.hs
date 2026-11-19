@@ -7,7 +7,7 @@
 -- the #line pragmas.
 module Command.Deliver (
     deliverCmdArgsParser, deliverCommand, DeliverCmdArgs,
-    dependencies, inFolder, pathsIn, relocatePaths, toolchainVariables, releaseBuild
+    dependencies, inFolder, pathsIn, relocatePaths, toolchainVariables, releaseBuild, genDoxyfile
 ) where
 
 import Command.Build
@@ -45,6 +45,7 @@ data DeliverCmdArgs =
         Bool -- ^ Verbose mode
         Bool -- ^ Deliver the tests as well
         Bool -- ^ Pack each deliverable into a .tar.gz
+        Bool -- ^ Print the documentation comments in the C, and write the Doxyfile
     deriving Show
 
 -- | Parser for the "deliver" command arguments
@@ -57,10 +58,12 @@ deliverCmdArgsParser = DeliverCmdArgs
         <> O.help "Deliver every test as well, on every platform of its list")
     <*> O.switch (O.long "archive"
         <> O.help "Pack each deliverable into a .tar.gz")
+    <*> O.switch (O.long "docs"
+        <> O.help "Print the documentation comments in the C, and write the Doxyfile that documents it")
 
 -- | Command handler for the "deliver" command
 deliverCommand :: DeliverCmdArgs -> IO ()
-deliverCommand (DeliverCmdArgs chatty withTests archive) = do
+deliverCommand (DeliverCmdArgs chatty withTests archive docs) = do
     -- A deliverable is built from the state in git, with termina.lock and
     -- vendor/ as they are.
     loaded <- loadProject Frozen
@@ -79,12 +82,46 @@ deliverCommand (DeliverCmdArgs chatty withTests archive) = do
     when (null deployments) (putStrLn . infoMessage $ nothingSelected manifest selection Nothing)
     forM_ deployments $ \deployment -> do
       announce deployments ("Delivering " ++ deploymentLabel deployment)
-      deliverDeployment chatty loaded archive (deliverableFolder (deploymentConfig deployment)) (releaseBuild deployment)
+      deliverDeployment chatty loaded archive docs (deliverableFolder (deploymentConfig deployment))
+        (documentedBuild docs (releaseBuild deployment))
 
 -- | The folder of the deliverable of a deployment: "deliverable/app",
 -- "deliverable/tests/<name>/<platform>".
 deliverableFolder :: TerminaConfig -> FilePath
 deliverableFolder config = outputFolderName </> "deliverable" </> makeRelative outputFolderName (outputFolder config)
+
+-- | The Doxyfile of a deliverable, which documents its C from its root with
+-- nothing else: the name and the version of the project, the folders of the
+-- C, and the settings that the generated C needs. Doxygen lists the static
+-- functions, where the methods and viewers of the classes go, only with
+-- EXTRACT_STATIC. What is not documented is reported by the transpiler, so
+-- Doxygen does not warn about it.
+genDoxyfile :: ProjectInfo -> TerminaConfig -> [FilePath] -> T.Text
+genDoxyfile project config externFolders = T.unlines
+    [ "PROJECT_NAME          = \"" <> projectName project <> testSuffix <> "\""
+    , "PROJECT_NUMBER        = " <> projectVersion project
+    , "OUTPUT_DIRECTORY      = doc"
+    , "INPUT                 = " <> T.unwords (map T.pack (["include", "src", "osal"] ++ nub externFolders))
+    , "RECURSIVE             = YES"
+    , "FILE_PATTERNS         = *.h *.c"
+    , "OPTIMIZE_OUTPUT_FOR_C = YES"
+    , "EXTRACT_STATIC        = YES"
+    , "MARKDOWN_SUPPORT      = YES"
+    , "WARN_IF_UNDOCUMENTED  = NO"
+    , "QUIET                 = YES"
+    ]
+
+  where
+
+    testSuffix = if isTestBuild config then ", test " <> name config else ""
+
+-- | A deployment whose plain C, the one delivered, carries the documentation
+-- comments or not. The C with the #line pragmas, against whose binary the
+-- deliverable is checked, never carries them.
+documentedBuild :: Bool -> Deployment -> Deployment
+documentedBuild docs deployment = deployment {
+    deploymentPlainConfig = (deploymentPlainConfig deployment) { docComments = docs }
+  }
 
 -- | A deployment built in release under ".termina/deliver", whatever the
 -- profile of the manifest, so that delivering leaves the build of the
@@ -104,8 +141,8 @@ releaseBuild deployment = deployment {
 
 -- | Build a deployment and its deliverable in the given folder, and compare
 -- their binaries.
-deliverDeployment :: Bool -> LoadedProject -> Bool -> FilePath -> Deployment -> IO ()
-deliverDeployment chatty loaded archive folder deployment = do
+deliverDeployment :: Bool -> LoadedProject -> Bool -> Bool -> FilePath -> Deployment -> IO ()
+deliverDeployment chatty loaded archive docs folder deployment = do
     let config = deploymentConfig deployment
         label = deploymentLabel deployment
         built = outputFolder config
@@ -163,6 +200,9 @@ deliverDeployment chatty loaded archive folder deployment = do
     let makefile = runMakefilePrinter $
             genDeliverableMakefile config info (map relocated osalSources) sources externs (testModules config modules)
     TIO.writeFile (folder </> "Makefile") makefile
+    when docs $
+      TIO.writeFile (folder </> "Doxyfile") $
+        genDoxyfile (manifestProject (loadedManifest loaded)) config [ groupFolder g | g <- externs ]
     -- | The files delivered, as they are on disk
     delivered <- filesUnder folder
     -- | Build the deliverable and compare its binary with the one of the C

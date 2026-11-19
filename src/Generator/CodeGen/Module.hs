@@ -23,6 +23,7 @@ import Generator.Monadic
 import Control.Monad.State
 import qualified Data.Set as S
 import Doc.Facts (DocFact)
+import Generator.CodeGen.Doc (genFileDoc)
 
 
 genModuleDefineLabel :: QualifiedName -> String
@@ -59,16 +60,19 @@ genHeaderFile ::
     -> QualifiedName
     -- | Import list
     -> [QualifiedName]
+    -- | Comment of the module
+    -> Maybe DocComment
     -> AnnotatedProgram SemanticAnn
     -> CGenerator CFile
-genHeaderFile includeOptionH includeStatusH includeResultH mName imports program = do
+genHeaderFile includeOptionH includeStatusH includeResultH mName imports comment program = do
     let defineLabel = genModuleDefineLabel mName
+    fileDoc <- genFileDoc comment
     items <- concat <$> traverse genHeaderASTElement program
     extra <- gets extraImports
     let includeList = genIncludeList (S.toList (S.union (S.fromList imports) extra))
     let file = CHeaderFile mName $
             [
-                CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False Nothing) Internal),
+                CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False (Just fileDoc)) Internal),
                 CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False Nothing) Internal),
                 CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True Nothing) Internal)
             ] ++ includeList
@@ -96,9 +100,10 @@ genSourceFile ::
     -> AnnotatedProgram SemanticAnn
     -> CGenerator CFile
 genSourceFile mName program = do
+    fileDoc <- genFileDoc Nothing
     items <- concat <$> traverse genSourceASTElement program
     let file = CSourceFile mName $
-            CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn True Nothing) Internal)
+            CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn True (Just fileDoc)) Internal)
             : items
     plt <- gets targetPlatform
     checkIdentifierLengths (maxIdentifierLength plt) file
@@ -119,13 +124,14 @@ runGenHeaderFile ::
     TerminaConfig 
     -> Platform
     -> QualifiedName 
-    -> [QualifiedName] 
+    -> [QualifiedName]
+    -> Maybe DocComment
     -> AnnotatedProgram SemanticAnn
     -> MonadicTypes
     -- | The facts of the instances of the deployment
     -> M.Map Identifier [DocFact SemanticAnn]
     -> Either CGeneratorError (CFile, MonadicTypes)
-runGenHeaderFile config plt mName imports program monadicTys facts =
+runGenHeaderFile config plt mName imports comment program monadicTys facts =
     let includeOptionH = not (S.null (S.filter (\case {
             TStruct _ -> False;
             TEnum _ -> False;
@@ -142,7 +148,8 @@ runGenHeaderFile config plt mName imports program monadicTys facts =
             _ -> True;
             }) $ resultTypes monadicTys))
     in
-    case runState (runExceptT (genHeaderFile includeOptionH includeStatusH includeResultH mName imports program)) 
+    case runState (runExceptT (genHeaderFile includeOptionH includeStatusH includeResultH mName imports comment program))
+
         (CGeneratorEnv mName S.empty monadicTys config plt False facts) of
     (Left err, _) -> Left err
     (Right file, env) -> Right (file, monadicTypes env)

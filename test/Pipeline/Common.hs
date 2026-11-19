@@ -154,7 +154,7 @@ renderDocumentedFilesOn plt target sources = either (Left . failMessage) Right $
       printed = runCPrinterWith (CPrinterConfig False False True)
       generatorError err = Failure (T.pack (show err)) (T.pack (show err))
   (cHeaderFile, _) <- either (Left . generatorError) Right
-    (runGenHeaderFile configParams plt target deps program (pipelineMonadicTypes result)
+    (runGenHeaderFile configParams plt target deps (moduleComment eModule) program (pipelineMonadicTypes result)
       (instanceFacts plt (programArch result)))
   cSourceFile <- either (Left . generatorError) Right
     (runGenSourceFile configParams plt target program)
@@ -352,9 +352,9 @@ parseModule (qname, src) =
   case parseTerminaModule qname qname src of
     Left err -> Left (failure (M.singleton qname (pack src))
       (annotateError Internal (parseError err) :: ParsingErrors))
-    Right (Termina _ imports prog) -> do
+    Right (Termina comment imports prog) -> do
       deps <- mapM toDep imports
-      pure (qname, TerminaModuleData qname qname deps [] (pack src) (ParsingData prog))
+      pure (qname, TerminaModuleData qname qname deps [] (pack src) comment (ParsingData prog))
 
   where
 

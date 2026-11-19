@@ -195,6 +195,7 @@ lowerTypedModule typedModule = do
             (importedModules typedModule)
             (visibleModules typedModule)
             (sourcecode typedModule)
+            (moduleComment typedModule)
             (BasicBlockData bbAST)
 
 -- | Elaborates each module of a project, deciding the run-time checks of its

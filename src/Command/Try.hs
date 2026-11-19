@@ -63,7 +63,7 @@ loadSingleModule filePath = do
             dieWithReport (toText pErr fileMap)
         Right term -> do
             -- Imported modules are ignored
-            return $ TerminaModuleData noExtension filePath [] [] src_code (ParsingData . frags $ term)
+            return $ TerminaModuleData noExtension filePath [] [] src_code (moduleDoc term) (ParsingData . frags $ term)
 
 typeSingleModule :: ParsedModule -> IO TypedModule
 typeSingleModule parsedModule = do
@@ -79,6 +79,7 @@ typeSingleModule parsedModule = do
                     (fullPath parsedModule)
                     [] []
                     (sourcecode parsedModule)
+                    (moduleComment parsedModule)
                     (SemanticData typedProgram)
 
 -- | Folds the constants of the module, analyses its values, elaborates its
@@ -109,7 +110,7 @@ printHeaderModule debugBuild eModule = do
     let tAST = elaboratedAST . metadata $ eModule
         configParams = defaultConfig "test" TestPlatform
         moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules eModule
-    case runGenHeaderFile configParams TestPlatform (qualifiedName eModule) moduleDeps tAST emptyMonadicTypes M.empty of
+    case runGenHeaderFile configParams TestPlatform (qualifiedName eModule) moduleDeps (moduleComment eModule) tAST emptyMonadicTypes M.empty of
         Left err -> dieWithError $ show err
         Right (cHeaderFile, _) -> TIO.putStrLn $ runCPrinter debugBuild cHeaderFile
 

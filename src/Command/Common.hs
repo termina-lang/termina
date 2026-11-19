@@ -27,7 +27,7 @@ import Parser.Errors
 import qualified Data.Map.Strict as M
 import Modules.Modules
 import Core.AST
-    ( TerminaModule'(frags, modules), ModuleImport'(..) )
+    ( TerminaModule'(frags, modules, moduleDoc), ModuleImport'(..) )
 import Utils.Annotations
 import Text.Parsec.Error
 import Text.Parsec.Pos (initialPos)
@@ -51,7 +51,7 @@ loadTerminaModule sources root filePath = do
   return $ do
     (src_code, term) <- parsedModule filePath fullP parsedFile
     imports <- mapM importOf (modules term)
-    Right (TerminaModuleData filePath fullP imports [] src_code (ParsingData . frags $ term))
+    Right (TerminaModuleData filePath fullP imports [] src_code (moduleDoc term) (ParsingData . frags $ term))
 
   where
 

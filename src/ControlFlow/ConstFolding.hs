@@ -964,10 +964,10 @@ foldElement (ExternFunction ident params mrty mode mods ann) = do
 -- proofs start empty, so those left at the end belong to this module.
 constFoldModule :: BasicBlocksModule -> ConstFoldMonad BasicBlocksModule
 constFoldModule (TerminaModuleData modQualifiedName modFullPath
-    modImportedModules modVisibleModules modSourcecode (BasicBlockData ast)) = do
+    modImportedModules modVisibleModules modSourcecode modComment (BasicBlockData ast)) = do
     ST.modify (\env -> env { constProofs = M.empty })
     TerminaModuleData modQualifiedName modFullPath
-        modImportedModules modVisibleModules modSourcecode . BasicBlockData <$> mapM foldElement ast
+        modImportedModules modVisibleModules modSourcecode modComment . BasicBlockData <$> mapM foldElement ast
 
 runConstFolding
   :: ConstFoldEnv

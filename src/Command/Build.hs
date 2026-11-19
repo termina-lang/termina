@@ -35,7 +35,7 @@ import Data.List (nub)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Doc.Facts (DocFact, instanceFacts)
 import Semantic.Types (SemanticAnn)
-import Generator.LanguageC.Printer (runCPrinter)
+import Generator.LanguageC.Printer (CPrinterConfig(..), runCPrinter, runCPrinterWith)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
 import Generator.CodeGen.Application.Option (runGenOptionHeaderFile, genOptionPathName)
 import Generator.CodeGen.Application.Config (genConfigPathName)
@@ -243,6 +243,10 @@ genModules params plt initialMonadicTypes facts loweredProject =
 
   where
 
+    -- | The C of the modules, with #line pragmas or plain, and with the
+    -- documentation comments when the configuration asks for them
+    moduleConfig config = CPrinterConfig (lineDirectives config) False (docComments config)
+
     printModule :: MonadicTypes -> ElaboratedModule -> IO MonadicTypes
     printModule currentMonadicTypes bbModule = do
       printSource bbModule
@@ -255,18 +259,18 @@ genModules params plt initialMonadicTypes facts loweredProject =
           tAST = elaboratedAST . metadata $ bbModule
       case runGenSourceFile params plt (qualifiedName bbModule) tAST of
         Left err -> dieWithError $ show err
-        Right cSourceFile -> writeIfChanged sourceFile $ runCPrinter (lineDirectives params) cSourceFile
+        Right cSourceFile -> writeIfChanged sourceFile $ runCPrinterWith (moduleConfig params) cSourceFile
 
     printHeader :: MonadicTypes -> ElaboratedModule -> IO MonadicTypes
     printHeader currentMonadicTypes bbModule = do
       let destinationPath = outputFolder params
           tAST = elaboratedAST . metadata $ bbModule
           moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
-      case runGenHeaderFile params plt (qualifiedName bbModule) moduleDeps tAST currentMonadicTypes facts of
+      case runGenHeaderFile params plt (qualifiedName bbModule) moduleDeps (moduleComment bbModule) tAST currentMonadicTypes facts of
         Left err -> dieWithError $ show err
         Right (cHeaderFile, newMonadicTypes) -> do
           let headerFile = destinationPath </> "include" </> qualifiedName bbModule <.> "h"
-          writeIfChanged headerFile $ runCPrinter (lineDirectives params) cHeaderFile
+          writeIfChanged headerFile $ runCPrinterWith (moduleConfig params) cHeaderFile
           return newMonadicTypes
 
 genInitFile :: TerminaConfig -> Platform -> ElaboratedProject -> IO ()

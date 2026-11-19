@@ -604,7 +604,8 @@ configFor manifest kind plt prf tick = TerminaConfig {
     runTimeout = Nothing,
     linkerScript = Nothing,
     xsdbInit = Nothing,
-    lineDirectives = True
+    lineDirectives = True,
+    docComments = False
   }
 
   where
