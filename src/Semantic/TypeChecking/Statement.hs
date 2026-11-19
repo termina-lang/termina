@@ -151,8 +151,9 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
   case type_matchE of
     TEnum t -> getGlobalTypeDef (getLocation ann) t >>=
         \case {
-          LocatedElement (Enum ident flsDef _mods) eloc -> do
-            let flsDefIdents = variantIdentifier <$> flsDef
+          TypeDefinition (Enum ident flsDef _mods) enumAnn -> do
+            let eloc = getLocation enumAnn
+                flsDefIdents = variantIdentifier <$> flsDef
                 casesIdents = matchIdentifier <$> cases
                 variantMap = M.fromList (map (\variant@(EnumVariant vId _ _) -> (vId, variant)) flsDef)
                 caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
@@ -167,8 +168,9 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
         }
     TReference refKind (TEnum t) -> getGlobalTypeDef (getLocation ann) t >>=
         \case {
-          LocatedElement (Enum ident flsDef _mods) eloc -> do
-            let flsDefIdents = variantIdentifier <$> flsDef
+          TypeDefinition (Enum ident flsDef _mods) enumAnn -> do
+            let eloc = getLocation enumAnn
+                flsDefIdents = variantIdentifier <$> flsDef
                 casesIdents = matchIdentifier <$> cases
                 -- | The parameters will now be refernces to the the actual objects
                 -- inside the enum
@@ -354,7 +356,7 @@ typeStatement _ (ContinueStmt contE anns) =
         TGlobal _ dident -> getGlobalTypeDef (getLocation ann) dident >>=
           \case{
             -- This case corresponds to a call to an inner method or viewer from the self object.
-            LocatedElement (Class _ _identTy cls _provides _mods) _ ->
+            TypeDefinition (Class _ _identTy cls _provides _mods) _ ->
               case findClassViewerOrMethod ident cls of
                 Just _ -> throwError $ annotateError (getLocation ann) (EContinueInvalidMethodOrViewerCall ident)
                 Nothing ->

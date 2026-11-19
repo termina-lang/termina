@@ -118,19 +118,43 @@ instance Located SemanticAnn where
 
 ----------------------------------------
 
--- | General global entities
-data GEntry a
-  = GFun (FunctionSeman a)
-  -- ^ Functions
-  | GGlob (TerminaType a)
-  -- ^ Globals
-  | GConst (TerminaType a) (Expression a)
-  -- ^ Constants
-  | GConstExpr (TerminaType a) (Expression a)
-  -- ^ Constant Expressions
-  | GType (SemanTypeDef a)
-  -- ^ Types
-  deriving (Show, Functor)
+-- | A declaration of the program as the global environment keeps it: as in the
+-- AST, without the bodies of its functions and of the members of its classes,
+-- and with its annotation, which holds its location and its documentation
+-- comment.
+type GlobalDecl a = AnnASTElement' TerminaType Expression EmptyBlock a
+
+-- | The declaration that the global environment keeps of an element of the
+-- typed AST.
+globalDecl :: AnnASTElement a -> GlobalDecl a
+globalDecl (Function ident ps ty _ mods ann) = Function ident ps ty EmptyBlock mods ann
+globalDecl (ExternFunction ident ps ty mode mods ann) = ExternFunction ident ps ty mode mods ann
+globalDecl (GlobalDeclaration glb) = GlobalDeclaration glb
+globalDecl (TypeDefinition tydef ann) = TypeDefinition (semanTypeDef tydef) ann
+
+-- | The name that a declaration takes in the global environment.
+globalDeclName :: AnnASTElement' ty expr blk a -> Identifier
+globalDeclName (Function ident _ _ _ _ _) = ident
+globalDeclName (ExternFunction ident _ _ _ _ _) = ident
+globalDeclName (GlobalDeclaration glb) = getGlobalIdentifier glb
+globalDeclName (TypeDefinition tydef _) = getTypeIdentifier tydef
+
+-- | The type of a global object of the environment, which is a task, a
+-- handler, a resource, a channel, an emitter or a test; nothing for a
+-- constant, a function or a type.
+globalObjectType :: GlobalDecl a -> Maybe (TerminaType a)
+globalObjectType (GlobalDeclaration glb) = case glb of
+  Const {} -> Nothing
+  ConstExpr {} -> Nothing
+  _ -> Just (getGlobalType glb)
+globalObjectType _ = Nothing
+
+-- | The signature of a function of the environment, which its annotation
+-- holds; nothing for any other declaration.
+globalFunctionSeman :: GlobalDecl SemanticAnn -> Maybe (FunctionSeman SemanticAnn)
+globalFunctionSeman (Function _ _ _ _ _ (SemanticAnn (FnTy fs) _)) = Just fs
+globalFunctionSeman (ExternFunction _ _ _ _ _ (SemanticAnn (FnTy fs) _)) = Just fs
+globalFunctionSeman _ = Nothing
 
 -- Simple TypeDef
 -- It only has type information.
@@ -138,6 +162,13 @@ data GEntry a
 data EmptyBlock a = EmptyBlock
   deriving (Show, Functor)
 type SemanTypeDef a = TypeDef' TerminaType Expression EmptyBlock a
+
+-- | A type definition without the bodies of the members of its classes.
+semanTypeDef :: TypeDef a -> SemanTypeDef a
+semanTypeDef (Struct i f m) = Struct i f m
+semanTypeDef (Enum i e m) = Enum i e m
+semanTypeDef (Class kind i cls ps m) = Class kind i (map kClassMember cls) ps m
+semanTypeDef (Interface kind i extends cls m) = Interface kind i extends cls m
 
 -- Forgetfull Class member map
 kClassMember :: ClassMember' ty blk a -> ClassMember' ty EmptyBlock a

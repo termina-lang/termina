@@ -160,7 +160,7 @@ fixedLocationReference obj = do
 -- | Whether a named type is a struct carrying the @packed@ modifier.
 isPackedStruct :: Location -> Identifier -> SemanticMonad Bool
 isPackedStruct loc dident = getGlobalTypeDef loc dident >>= \case
-  LocatedElement (Struct _ _ mods) _ -> return (any isPacked mods)
+  TypeDefinition (Struct _ _ mods) _ -> return (any isPacked mods)
   _ -> return False
   where
     isPacked (Modifier "packed" Nothing) = True
@@ -363,7 +363,7 @@ collectExtendedInterfaces loc ident = do
     -- If the interface does not exist, we throw an error.
     (\_ -> throwError $ annotateError loc (EInterfaceNotFound ident)) >>= \case {
         -- If the global type is an interface, we return the procedures.
-        (LocatedElement (Interface _ _ extends _ _) _) -> (do
+        (TypeDefinition (Interface _ _ extends _ _) _) -> (do
           -- If the interface is well-typed, this should not fail:
           extendedTree <- concat <$> traverse (collectExtendedInterfaces loc) extends
           return $ extends ++ extendedTree);
@@ -377,7 +377,7 @@ collectInterfaceProcedures loc ident = do
     -- If the interface does not exist, we throw an error.
     (\_ -> throwError $ annotateError loc (EInterfaceNotFound ident)) >>= \case {
         -- If the global type is an interface, we return the procedures.
-        (LocatedElement (Interface _ _ extends iface_prcs _) _) -> (do
+        (TypeDefinition (Interface _ _ extends iface_prcs _) _) -> (do
           -- If the interface is well-typed, this should not fail:
           extededProcs <- mapM (collectInterfaceProcedures loc) extends
           procs <- mapM (\procedure@(InterfaceProcedure _ procId _ _ _) -> do
@@ -399,8 +399,9 @@ getMemberField loc obj_ty ident =
     TStruct dident -> getGlobalTypeDef loc dident >>=
       \case{
         -- Either a struct
-        (LocatedElement (Struct _identTy fields _mods) strLoc) ->
-            let mfield = Data.List.find ((ident ==) . fieldIdentifier) fields in
+        (TypeDefinition (Struct _identTy fields _mods) strAnn) ->
+            let mfield = Data.List.find ((ident ==) . fieldIdentifier) fields
+                strLoc = getLocation strAnn in
               maybe
               (throwError $ annotateError loc (EMemberAccessUnknownField (dident, strLoc) ident))
               (\fld -> return (fieldTerminaType fld, fieldAnnotation fld)) mfield
@@ -410,10 +411,10 @@ getMemberField loc obj_ty ident =
     TGlobal _ dident -> getGlobalTypeDef loc dident >>=
       \case {
         -- Or a class
-        LocatedElement (Class _clsKind _identTy cls _implements _mods) clsLoc ->
+        TypeDefinition (Class _clsKind _identTy cls _implements _mods) clsAnn ->
           -- Find |ident| field in the class.
           case findClassField ident cls of
-            Nothing -> throwError $ annotateError loc (EMemberAccessUnknownField (dident, clsLoc) ident)
+            Nothing -> throwError $ annotateError loc (EMemberAccessUnknownField (dident, getLocation clsAnn) ident)
             -- type |t| and the type inside |a| should be the same, no?
             Just fld -> return fld
         ;
@@ -523,7 +524,7 @@ typeMemberFunctionCall ann ak obj_ty ident args =
     TGlobal _clsKind dident -> getGlobalTypeDef (getLocation ann) dident >>=
       \case{
         -- This case corresponds to a call to an inner method or viewer from the self object.
-        LocatedElement (Class _ _identTy cls _provides _mods) _ ->
+        TypeDefinition (Class _ _identTy cls _provides _mods) _ ->
           case findClassProcedure ident cls of
             Just _ -> throwError $ annotateError (getLocation ann) EInvalidProcedureCallInsideMemberFunction
             Nothing ->
@@ -545,7 +546,7 @@ typeMemberFunctionCall ann ak obj_ty ident args =
     TAccessPort (TInterface _ dident) -> do
         getGlobalTypeDef (getLocation ann) dident >>=
           \case {
-            LocatedElement (Interface _ _identTy extends members _mods) _ -> (do
+            TypeDefinition (Interface _ _identTy extends members _mods) _ -> (do
               extendedProcedures <- concat <$> traverse (fmap M.elems . collectInterfaceProcedures (getLocation ann)) extends
               case findInterfaceProcedure ident (members ++ extendedProcedures) of
                 Nothing -> throwError $ annotateError (getLocation ann) (EUnknownProcedure ident)
@@ -889,7 +890,8 @@ typeTypeSpecifier loc typeObj (TSArray ts s) = do
   return $ TArray ty arraySize
 typeTypeSpecifier loc _typeObj (TSDefinedType ident []) = do
   -- Check that the type was defined
-  (LocatedElement glbTypeDef loc') <- getGlobalTypeDef loc ident
+  glbTypeDecl <- getGlobalTypeDef loc ident
+  let loc' = getLocation (getAnnotation glbTypeDecl)
   -- | Check that the location of the type is in the dependencies set
   -- of the current module. This is important because the type
   -- can be defined in another module and we need to check that
@@ -905,11 +907,12 @@ typeTypeSpecifier loc _typeObj (TSDefinedType ident []) = do
         throwError $ annotateError loc (ETypeNotInScope ident qualifiedName)
     _ -> return ()
 
-  case glbTypeDef of 
-    Struct s _ _ -> return $ TStruct s
-    Enum e _ _ -> return $ TEnum e
-    Class clsKind c _ _ _ -> return $ TGlobal clsKind c 
-    Interface kind i _ _ _ -> return $ TInterface kind i
+  case glbTypeDecl of
+    TypeDefinition (Struct s _ _) _ -> return $ TStruct s
+    TypeDefinition (Enum e _ _) _ -> return $ TEnum e
+    TypeDefinition (Class clsKind c _ _ _) _ -> return $ TGlobal clsKind c
+    TypeDefinition (Interface kind i _ _ _) _ -> return $ TInterface kind i
+    _ -> throwError $ annotateError loc (EGlobalNotType (ident, loc'))
 typeTypeSpecifier loc typeObj (TSReference ak ts) = 
   TReference ak <$> typeTypeSpecifier loc typeObj ts
 typeTypeSpecifier loc typeObj (TSBoxSubtype ts) = 
@@ -1004,10 +1007,10 @@ typeAssignmentExpression expected_type@(TGlobal _ id_ty) typeObj (StructInitiali
       getGlobalTypeDef (getLocation pann) id_ty
     Nothing -> getGlobalTypeDef (getLocation pann) id_ty
   >>= \case{
-    LocatedElement (Class clsKind _ident members _provides _mods) clsLoc ->
+    TypeDefinition (Class clsKind _ident members _provides _mods) clsAnn ->
       let fields = [fld | ClassField fld@(FieldDefinition {}) <- members] in
         SAST.StructInitializer
-        <$> typeFieldAssignments (getLocation pann) (expected_type, clsLoc) typeObj fields fs
+        <$> typeFieldAssignments (getLocation pann) (expected_type, getLocation clsAnn) typeObj fields fs
         <*> pure (buildExpAnn pann (TGlobal clsKind id_ty));
     _ -> throwError $ annotateError Internal EExpectedClassType;
   }
@@ -1026,11 +1029,11 @@ typeAssignmentExpression expected_type typeObj (StructInitializer fs mts pann) =
           getGlobalTypeDef (getLocation pann) id_ty
         Nothing -> getGlobalTypeDef (getLocation pann) id_ty
       >>= \case{
-        LocatedElement (Struct _ ty_fs _mods) strLoc  ->
+        TypeDefinition (Struct _ ty_fs _mods) strAnn  ->
           -- | A field of a constant is itself a constant.
           let fields = map (\fd -> fd { fieldTerminaType = partTy expected_type (fieldTerminaType fd) }) ty_fs
           in SAST.StructInitializer
-            <$> typeFieldAssignments (getLocation pann) (TStruct id_ty, strLoc) typeObj fields fs
+            <$> typeFieldAssignments (getLocation pann) (TStruct id_ty, getLocation strAnn) typeObj fields fs
             <*> pure (buildExpAnn pann (TStruct id_ty));
         _ -> throwError $ annotateError Internal EExpectedStructType;
       }
@@ -1042,7 +1045,8 @@ typeAssignmentExpression expected_type typeObj (EnumVariantInitializer id_ty var
       -- | Enum Variant
       getEnumTy (getLocation pann) id_ty
       >>= \case {
-        LocatedElement (Enum enumId ty_vs _mods) loc ->
+        TypeDefinition (Enum enumId ty_vs _mods) enumAnn ->
+          let loc = getLocation enumAnn in
           case Data.List.find ((variant ==) . variantIdentifier) ty_vs of
             Nothing -> throwError $ annotateError (getLocation pann) (EEnumVariantNotFound enumId variant)
             Just (EnumVariant _ ps _) ->
@@ -1209,7 +1213,7 @@ typeExpression expectedType typeObj (AccessObject obj) = do
       -- | We need to check if the variable name refers to a constexpression or not
       glb <- ST.gets global
       case M.lookup ident glb of
-        Just (LocatedElement (GConstExpr _ty expr) _) -> do
+        Just (GlobalDeclaration (ConstExpr _ _ty expr _ _)) -> do
           exprType <- getExprType expr
           checkExpectedTy (getLocation loc) expectedType exprType
           return expr
@@ -1551,7 +1555,7 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
     evalArraySizeExpr expr@(SAST.AccessObject (SAST.Variable ident' _)) = do
       glb <- ST.gets global
       case M.lookup ident' glb of
-        Just (LocatedElement (GConstExpr _ty cexpr) _) -> do
+        Just (GlobalDeclaration (ConstExpr _ _ty cexpr _ _)) -> do
           cExprType <- getExprType cexpr
           case cExprType of
             TConstSubtype TUSize -> return cexpr
@@ -1599,13 +1603,13 @@ typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann)
 typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_id pann) = do
   obj_typed <- typeObj obj
   (obj_ty, test_ty) <- testedTy <$> getObjType obj_typed
-  LocatedElement lhs_ty _ <- case obj_ty of
+  lhs_decl <- case obj_ty of
     TEnum lhs_id -> do
       unless (lhs_id == id_ty) (throwError $ annotateError (getLocation pann) (EIsVariantEnumTypeMismatch lhs_id id_ty))
       getEnumTy (getLocation pann) id_ty
     _ -> throwError $ annotateError (getLocation pann) (EIsVariantInvalidType obj_ty)
-  case lhs_ty of
-    Enum lhs_enum ty_vs _mods ->
+  case lhs_decl of
+    TypeDefinition (Enum lhs_enum ty_vs _mods) _ ->
       case Data.List.find ((variant_id ==) . variantIdentifier) ty_vs of
         Just (EnumVariant {}) -> do
           checkExpectedTy (getLocation pann) expectedType test_ty
@@ -1682,7 +1686,7 @@ typeFieldAssignment tyDef typeObj (FieldDefinition fid fty _) (FieldAddressAssig
 typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection InboundPortConnection pid sid pann) =
   if fid == pid
   then
-    getGlobalEntry (getLocation pann) sid >>=
+    globalObjectType <$> getGlobalEntry (getLocation pann) sid >>=
     \gentry ->
     case fty of
       TSinkPort ty action -> do
@@ -1690,18 +1694,18 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection Inb
           (TGlobal kind clsId, _) -> return (kind, clsId)
           _ -> throwError $ annotateError Internal EExpectedClassType
         case gentry of
-          LocatedElement  (GGlob ets@(TGlobal EmitterClass clsId)) _ -> do
+          Just ets@(TGlobal EmitterClass clsId) -> do
             checkEmitterDataType (getLocation pann) clsId ty
             checkEmitterTargetClass (getLocation pann) clsId targetKind targetCls
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets action)
           -- | An emitter of a unit test takes the place of any emitter
-          LocatedElement (GGlob ets@(TTestEmitter ty')) _ -> do
+          Just ets@(TTestEmitter ty') -> do
             catchMismatch (getLocation pann) (ETestComponentConnectionTypeMismatch sid fty) (sameTyOrError (getLocation pann) ty ty')
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets action)
           _ -> throwError $ annotateError (getLocation pann) $ ESinkPortConnectionInvalidGlobal sid
       TInPort ty action  ->
         case gentry of
-          LocatedElement (GGlob cts@(TMsgQueue ty' _)) _ -> do
+          Just cts@(TMsgQueue ty' _) -> do
             catchMismatch (getLocation pann) (EInboundPortConnectionMsgQueueTypeMismatch sid ty) (sameTyOrError (getLocation pann) ty ty')
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildInPortConnAnn pann cts action)
           _ -> throwError $ annotateError (getLocation pann) $ EInboundPortConnectionInvalidObject sid
@@ -1711,16 +1715,16 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection Inb
 typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection OutboundPortConnection pid sid pann) =
   if fid == pid
   then
-    getGlobalEntry (getLocation pann) sid >>=
+    globalObjectType <$> getGlobalEntry (getLocation pann) sid >>=
     \gentry ->
     case fty of
       TOutPort ty ->
         case gentry of
-          LocatedElement (GGlob cts@(TMsgQueue ty' _)) _ -> do
+          Just cts@(TMsgQueue ty' _) -> do
             catchMismatch (getLocation pann) (EOutboundPortConnectionMsgQueueTypeMismatch sid ty) (sameTyOrError (getLocation pann) ty ty')
             return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildOutPortConnAnn pann cts)
           -- | A channel of a unit test, which a case reads
-          LocatedElement (GGlob cts@(TTestChannel ty' _)) _ -> do
+          Just cts@(TTestChannel ty' _) -> do
             catchMismatch (getLocation pann) (ETestComponentConnectionTypeMismatch sid fty) (sameTyOrError (getLocation pann) ty ty')
             return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildOutPortConnAnn pann cts)
           _ -> throwError $ annotateError (getLocation pann) $ EOutboundPortConnectionInvalidGlobal sid
@@ -1729,35 +1733,35 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection Out
 typeFieldAssignment tyDef _ (FieldDefinition fid fty fann) (FieldPortConnection AccessPortConnection pid sid pann) =
   if fid == pid
   then
-    getGlobalEntry (getLocation pann) sid >>=
+    globalObjectType <$> getGlobalEntry (getLocation pann) sid >>=
     \gentry ->
     case fty of
       TAccessPort (TAllocator ty) ->
         case gentry of
-          LocatedElement (GGlob (TPool ty' _)) _ -> do
+          Just (TPool ty' _) -> do
             catchMismatch (getLocation pann) (EAllocatorPortConnectionPoolTypeMismatch sid ty) (sameTyOrError (getLocation pann) ty ty')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty)
           -- | A pool of a unit test is reached as any pool
-          LocatedElement (GGlob (TTestPool ty' _)) _ -> do
+          Just (TTestPool ty' _) -> do
             catchMismatch (getLocation pann) (EAllocatorPortConnectionPoolTypeMismatch sid ty) (sameTyOrError (getLocation pann) ty ty')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildTestPoolConnAnn pann ty)
           _ -> throwError $ annotateError (getLocation pann) $ EAllocatorPortConnectionInvalidGlobal sid
       TAccessPort (TAtomicAccess ty) ->
         case gentry of
-          LocatedElement (GGlob (TAtomic ty')) _ -> do
+          Just (TAtomic ty') -> do
             catchMismatch (getLocation pann) (EAtomicConnectionTypeMismatch ty) (sameTyOrError (getLocation pann) ty ty')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicConnAnn pann ty)
           _ -> throwError $ annotateError (getLocation pann) $ EAtomicAccessPortConnectionInvalidGlobal sid
       TAccessPort (TAtomicArrayAccess ty portSize) ->
         case gentry of
-          LocatedElement (GGlob (TAtomicArray ty' glbSize)) _ -> do
+          Just (TAtomicArray ty' glbSize) -> do
             catchMismatch (getLocation pann) (EAtomicArrayConnectionTypeMismatch ty) (sameTyOrError (getLocation pann) ty ty')
             -- We will check the size of the atomic array when we are performing the const propagation.
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty portSize glbSize)
           _ -> throwError $ annotateError (getLocation pann) $ EAtomicArrayAccessPortConnectionInvalidGlobal sid
       TAccessPort (TDequeAccess ty) ->
         case gentry of
-          LocatedElement (GGlob (TDeque ty' _)) _ -> do
+          Just (TDeque ty' _) -> do
             catchMismatch (getLocation pann) (EDequeAccessPortConnectionDequeTypeMismatch sid ty) (sameTyOrError (getLocation pann) ty ty')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildDequeConnAnn pann ty)
           _ -> throwError $ annotateError (getLocation pann) $ EDequeAccessPortConnectionInvalidGlobal sid
@@ -1765,14 +1769,14 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty fann) (FieldPortConnection 
       -- test, which provide the built-in procedures of the port
       TAccessPort accessTy@(TTestEmitterAccess ty) ->
         case gentry of
-          LocatedElement (GGlob ets@(TTestEmitter ty')) _ -> do
+          Just ets@(TTestEmitter ty') -> do
             catchMismatch (getLocation pann) (ETestComponentConnectionTypeMismatch sid accessTy) (sameTyOrError (getLocation pann) ty ty')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid
               (buildAccessPortConnAnn pann accessTy ets [ProcedureSeman "fire" [builtinParameter "value" ty] []])
           _ -> throwError $ annotateError (getLocation pann) $ ETestComponentConnectionInvalidGlobal sid accessTy
       TAccessPort accessTy@(TTestChannelAccess ty) ->
         case gentry of
-          LocatedElement (GGlob cts@(TTestChannel ty' _)) _ -> do
+          Just cts@(TTestChannel ty' _) -> do
             catchMismatch (getLocation pann) (ETestComponentConnectionTypeMismatch sid accessTy) (sameTyOrError (getLocation pann) ty ty')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid
               (buildAccessPortConnAnn pann accessTy cts [
@@ -1783,7 +1787,7 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty fann) (FieldPortConnection 
         -- | Get the interface definition
         getGlobalTypeDef (getLocation pann) iface >>=
           \case {
-            LocatedElement (Interface _ _ extends members _) _ -> (do
+            TypeDefinition (Interface _ _ extends members _) _ -> (do
               -- Collect the procedures of the interface
               extendedMembers <- concat <$> traverse (fmap M.elems . collectInterfaceProcedures (getLocation pann)) extends
               let procs = [ProcedureSeman procid params ms | (InterfaceProcedure _ak procid params ms _) <- members ++ extendedMembers]
@@ -1809,16 +1813,16 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty fann) (FieldPortConnection 
     -- and the interfaces it provides, extended ones included
     providedInterfaces gentry =
       case gentry of
-        LocatedElement (GGlob rts@(TGlobal ResourceClass clsId)) _ ->
+        Just rts@(TGlobal ResourceClass clsId) ->
           getGlobalTypeDef (getLocation pann) clsId >>=
           \case {
-              LocatedElement (Class _ _ _ provides _) _ -> (do
+              TypeDefinition (Class _ _ _ provides _) _ -> (do
                 extendedProvides <- concat <$> traverse (collectExtendedInterfaces (getLocation pann)) provides
                 return (rts, provides ++ extendedProvides));
               _ -> throwError $ annotateError Internal EExpectedInterfaceType
           }
         -- | A pool of a unit test provides TestPoolAccess
-        LocatedElement (GGlob pts@(TTestPool {})) _ -> return (pts, ["TestPoolAccess"])
+        Just pts@(TTestPool {}) -> return (pts, ["TestPoolAccess"])
         _ -> throwError $ annotateError (getLocation pann) $ EAccessPortConnectionInvalidGlobal sid
 
 typeFieldAssignments

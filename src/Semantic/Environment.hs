@@ -12,8 +12,8 @@ import qualified Data.Set as S
 
 ----------------------------------------
 -- | Global env
--- It has global definitions
-type GlobalEnv = M.Map Identifier (LocatedElement (GEntry SemanticAnn))
+-- The declarations of the program by their name
+type GlobalEnv = M.Map Identifier (GlobalDecl SemanticAnn)
 
 -- | Local env
 -- variables to their type
@@ -51,9 +51,6 @@ data Environment
  , dependencyModules :: S.Set QualifiedName
  }
 
-getEntry :: LocatedElement (GEntry SemanticAnn) -> GEntry SemanticAnn
-getEntry = element
-
 -- | Identifiers that a program declares at the top level, each with the
 -- location of its declaration. The constexpr declarations are in, even though
 -- the transpiler folds them and they reach no C identifier: an object that took
@@ -79,22 +76,45 @@ declaredNames = foldr addName M.empty
 builtinParameter :: Identifier -> TerminaType SemanticAnn -> Parameter SemanticAnn
 builtinParameter ident ty = Parameter ident ty (buildExpAnn (undocumented Internal) ty)
 
-stdlibGlobalEnv :: Integer -> Integer -> [(Identifier, LocatedElement (GEntry SemanticAnn))]
+-- | A function of the language whose body the OSAL provides.
+builtinFunction :: Identifier -> [Parameter SemanticAnn] -> TerminaType SemanticAnn -> GlobalDecl SemanticAnn
+builtinFunction ident params ty =
+  ExternFunction ident params (Just ty) Returns [] (SemanticAnn (FnTy (FunctionSeman params ty Returns)) (undocumented Internal))
+
+-- | A type that the language or the platform declares.
+builtinType :: SemanTypeDef SemanticAnn -> GlobalDecl SemanticAnn
+builtinType tydef = TypeDefinition tydef (buildTypeAnn (undocumented Internal))
+
+-- | An emitter and a resource that the system declares, given their names and
+-- the names of their classes.
+builtinEmitter, builtinResource :: Identifier -> Identifier -> GlobalDecl SemanticAnn
+builtinEmitter ident cls = GlobalDeclaration (Emitter ident ty Nothing [] (buildGlobalAnn (undocumented Internal) ty))
+
+  where
+
+    ty = TGlobal EmitterClass cls
+builtinResource ident cls = GlobalDeclaration (Resource ident ty Nothing [] (buildGlobalAnn (undocumented Internal) ty))
+
+  where
+
+    ty = TGlobal ResourceClass cls
+
+stdlibGlobalEnv :: Integer -> Integer -> [GlobalDecl SemanticAnn]
 stdlibGlobalEnv outBufSize inBufSize =
   [
     -- | Floating-point bit reinterpretation. These are Prelude functions whose
     -- body is provided by the OSAL (memcpy-based static inline). They lower to a
     -- direct C call of the same name.
-    ("f32_to_bits", LocatedElement (GFun (FunctionSeman [builtinParameter "value" TFloat32] TUInt32 Returns)) Internal),
-    ("f32_from_bits", LocatedElement (GFun (FunctionSeman [builtinParameter "bits" TUInt32] TFloat32 Returns)) Internal),
-    ("f64_to_bits", LocatedElement (GFun (FunctionSeman [builtinParameter "value" TFloat64] TUInt64 Returns)) Internal),
-    ("f64_from_bits", LocatedElement (GFun (FunctionSeman [builtinParameter "bits" TUInt64] TFloat64 Returns)) Internal),
-    ("TimeVal", LocatedElement (GType (Struct "TimeVal" [FieldDefinition "tv_sec" TUInt32 (buildExpAnn (undocumented Internal) TUInt32), FieldDefinition "tv_usec" TUInt32 (buildExpAnn (undocumented Internal) TUInt32)] [])) Internal),
-    ("Interrupt", LocatedElement (GType (Class EmitterClass "Interrupt" [] [] [])) Internal),
-    ("PeriodicTimer", LocatedElement (GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (TStruct "TimeVal") (buildExpAnn (undocumented Internal) (TStruct "TimeVal")))] [] [])) Internal),
-    ("SysPrintBase", LocatedElement (GType (Enum "SysPrintBase" [internalVariant "Decimal" [], internalVariant "Hexadecimal" []] [])) Internal),
-    ("MutexProtocol", LocatedElement (GType (Enum "MutexProtocol" [internalVariant "Ceiling" [TUInt32]] [])) Internal),
-    ("Exception", LocatedElement (GType (Enum "Exception" [
+    builtinFunction "f32_to_bits" [builtinParameter "value" TFloat32] TUInt32,
+    builtinFunction "f32_from_bits" [builtinParameter "bits" TUInt32] TFloat32,
+    builtinFunction "f64_to_bits" [builtinParameter "value" TFloat64] TUInt64,
+    builtinFunction "f64_from_bits" [builtinParameter "bits" TUInt64] TFloat64,
+    builtinType (Struct "TimeVal" [FieldDefinition "tv_sec" TUInt32 (buildExpAnn (undocumented Internal) TUInt32), FieldDefinition "tv_usec" TUInt32 (buildExpAnn (undocumented Internal) TUInt32)] []),
+    builtinType (Class EmitterClass "Interrupt" [] [] []),
+    builtinType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (TStruct "TimeVal") (buildExpAnn (undocumented Internal) (TStruct "TimeVal")))] [] []),
+    builtinType (Enum "SysPrintBase" [internalVariant "Decimal" [], internalVariant "Hexadecimal" []] []),
+    builtinType (Enum "MutexProtocol" [internalVariant "Ceiling" [TUInt32]] []),
+    builtinType (Enum "Exception" [
       -- | Error sending a message to a message queue
       internalVariant "EMsgQueueSendError" [
         -- | Address of the call to the runtime that sent the message, or 0
@@ -181,14 +201,14 @@ stdlibGlobalEnv outBufSize inBufSize =
         -- | Identifier of the task, or the invalid identifier when the stack
         -- is not of a task of the application
         TUSize]
-      ] [])) Internal),
+      ] []),
     -- | SysTime interface
-    ("SysTime", LocatedElement (GType (Interface SystemInterface "SysTime" [] [
+    builtinType (Interface SystemInterface "SysTime" [] [
       -- | procedure clock_get_uptime (&mut self, current_time : &mut TimeVal)
       InterfaceProcedure Immutable "clock_get_uptime" [builtinParameter "current_time" (TReference Mutable (TStruct "TimeVal"))] [] (buildExpAnn (undocumented Internal) TUnit)
-    ] [])) Internal),
+    ] []),
     -- | SysPrint interface
-    ("SysPrint", LocatedElement (GType (Interface SystemInterface "SysPrint" [] [
+    builtinType (Interface SystemInterface "SysPrint" [] [
       -- | procedure clock_get_uptime (&mut self, current_time : &mut TimeVal)
       InterfaceProcedure Mutable "print" [builtinParameter "str" (TReference Immutable (TArray TChar (Constant (I (TInteger outBufSize DecRepr) (Just (TConstSubtype TUSize))) (buildExpAnn (undocumented Internal) (TConstSubtype TUSize)))))] [] (buildExpAnn (undocumented Internal) TUnit),
       InterfaceProcedure Mutable "println" [builtinParameter "str" (TReference Immutable (TArray TChar (Constant (I (TInteger outBufSize DecRepr) (Just (TConstSubtype TUSize))) (buildExpAnn (undocumented Internal) (TConstSubtype TUSize)))))] [] (buildExpAnn (undocumented Internal) TUnit),
@@ -216,28 +236,28 @@ stdlibGlobalEnv outBufSize inBufSize =
       InterfaceProcedure Mutable "println_f32" [builtinParameter "value" TFloat32] [] (buildExpAnn (undocumented Internal) TUnit),
       InterfaceProcedure Mutable "print_f64" [builtinParameter "value" TFloat64] [] (buildExpAnn (undocumented Internal) TUnit),
       InterfaceProcedure Mutable "println_f64" [builtinParameter "value" TFloat64] [] (buildExpAnn (undocumented Internal) TUnit)
-    ] [])) Internal),
-    ("SysGetChar", LocatedElement (GType (Interface SystemInterface "SysGetChar" [] [
+    ] []),
+    builtinType (Interface SystemInterface "SysGetChar" [] [
       InterfaceProcedure Mutable "read" [ 
           builtinParameter "str" (TReference Mutable (TArray TChar (Constant (I (TInteger inBufSize DecRepr) (Just (TConstSubtype TUSize))) (buildExpAnn (undocumented Internal) (TConstSubtype TUSize))))),
           builtinParameter "read_bytes" (TReference Mutable TUSize)] [] (buildExpAnn (undocumented Internal) TUnit)
-    ] [])) Internal)
+    ] [])
   ]
 
-sysInitGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
+sysInitGlobalEnv :: [GlobalDecl SemanticAnn]
 sysInitGlobalEnv =
-  [("SystemInit", LocatedElement (GType (Class EmitterClass "SystemInit" [] [] [])) Internal),
-   ("system_init", LocatedElement (GGlob (TGlobal EmitterClass "SystemInit")) Internal)]
-  
-sysExceptGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
-sysExceptGlobalEnv =
-  [("SystemExcept", LocatedElement (GType (Class EmitterClass "SystemExcept" [] [] [])) Internal),
-   ("system_except", LocatedElement (GGlob (TGlobal EmitterClass "SystemExcept")) Internal)]
+  [builtinType (Class EmitterClass "SystemInit" [] [] []),
+   builtinEmitter "system_init" "SystemInit"]
 
-systemEntryGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
+sysExceptGlobalEnv :: [GlobalDecl SemanticAnn]
+sysExceptGlobalEnv =
+  [builtinType (Class EmitterClass "SystemExcept" [] [] []),
+   builtinEmitter "system_except" "SystemExcept"]
+
+systemEntryGlobalEnv :: [GlobalDecl SemanticAnn]
 systemEntryGlobalEnv =
-  [("SystemEntry", LocatedElement (GType (Class ResourceClass "SystemEntry" [] ["SystemAPI"] [])) Internal),
-    ("system_entry", LocatedElement (GGlob (TGlobal ResourceClass "SystemEntry")) Internal)
+  [builtinType (Class ResourceClass "SystemEntry" [] ["SystemAPI"] []),
+    builtinResource "system_entry" "SystemEntry"
   ]
 
 -- | The resources of a test. A check records its failure and returns, and the
@@ -245,35 +265,35 @@ systemEntryGlobalEnv =
 -- expected. test_clock only exists in a unit test and test_scenario in a
 -- concurrent one, which the architecture checks, since the level depends on
 -- the whole deployment.
-testGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
+testGlobalEnv :: [GlobalDecl SemanticAnn]
 testGlobalEnv =
-  [("TestChecks", LocatedElement (GType (Interface SystemInterface "TestChecks" [] (
+  [builtinType (Interface SystemInterface "TestChecks" [] (
       [ procedure "check" [builtinParameter "cond" TBool] ]
       ++ [ procedure ("check_eq_" ++ suffix) [builtinParameter "actual" ty, builtinParameter "expected" ty]
          | (suffix, ty) <- checkedTypes ]
       ++ [ procedure "check_elapsed" [builtinParameter "t0" (TStruct "TimeVal"), builtinParameter "max" (TStruct "TimeVal")],
            procedure "fail" [],
-           procedure "step" [builtinParameter "n" TUSize] ]) [])) Internal),
-   ("TestChecksEntry", LocatedElement (GType (Class ResourceClass "TestChecksEntry" [] ["TestChecks"] [])) Internal),
-   ("test_checks", LocatedElement (GGlob (TGlobal ResourceClass "TestChecksEntry")) Internal),
+           procedure "step" [builtinParameter "n" TUSize] ]) []),
+   builtinType (Class ResourceClass "TestChecksEntry" [] ["TestChecks"] []),
+   builtinResource "test_checks" "TestChecksEntry",
    -- | Only a test class reaches the clock
-   ("TestClock", LocatedElement (GType (Interface TestInterface "TestClock" [] [
+   builtinType (Interface TestInterface "TestClock" [] [
       procedure "advance" [builtinParameter "dt" (TStruct "TimeVal")]
-   ] [])) Internal),
-   ("TestClockEntry", LocatedElement (GType (Class ResourceClass "TestClockEntry" [] ["TestClock"] [])) Internal),
-   ("test_clock", LocatedElement (GGlob (TGlobal ResourceClass "TestClockEntry")) Internal),
-   ("TestScenario", LocatedElement (GType (Interface SystemInterface "TestScenario" [] [
+   ] []),
+   builtinType (Class ResourceClass "TestClockEntry" [] ["TestClock"] []),
+   builtinResource "test_clock" "TestClockEntry",
+   builtinType (Interface SystemInterface "TestScenario" [] [
       procedure "finish" []
-   ] [])) Internal),
-   ("TestScenarioEntry", LocatedElement (GType (Class ResourceClass "TestScenarioEntry" [] ["TestScenario"] [])) Internal),
-   ("test_scenario", LocatedElement (GGlob (TGlobal ResourceClass "TestScenarioEntry")) Internal),
+   ] []),
+   builtinType (Class ResourceClass "TestScenarioEntry" [] ["TestScenario"] []),
+   builtinResource "test_scenario" "TestScenarioEntry",
    -- | The interface that a TestPool provides to a case, beside the
    -- Allocator<T> through which the unit reaches it
-   ("TestPoolAccess", LocatedElement (GType (Interface TestInterface "TestPoolAccess" [] [
+   builtinType (Interface TestInterface "TestPoolAccess" [] [
       viewProcedure "in_use" [builtinParameter "n" (TReference Mutable TUSize)],
       viewProcedure "max_in_use" [builtinParameter "n" (TReference Mutable TUSize)],
       procedure "fail_allocs" [builtinParameter "n" TUSize]
-   ] [])) Internal)]
+   ] [])]
 
   where
 
@@ -288,10 +308,10 @@ testGlobalEnv =
 -- | The system emitters and the system resource are declared in every
 -- program; the ones the application does not connect are dropped from the
 -- architecture.
-systemGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
+systemGlobalEnv :: [GlobalDecl SemanticAnn]
 systemGlobalEnv = sysInitGlobalEnv ++ systemEntryGlobalEnv ++ sysExceptGlobalEnv
 
-makeInitialGlobalEnv :: Maybe TerminaConfig -> Platform -> [(Identifier, LocatedElement (GEntry SemanticAnn))] -> Environment
+makeInitialGlobalEnv :: Maybe TerminaConfig -> Platform -> [GlobalDecl SemanticAnn] -> Environment
 makeInitialGlobalEnv (Just config) plt pltEnvironment =
   let 
     globalEnv = mconcat [
@@ -302,18 +322,22 @@ makeInitialGlobalEnv (Just config) plt pltEnvironment =
       -- | The test resources only exist in a test
       if isTestBuild config then testGlobalEnv else []]
   in
-  makeEnvironment (M.fromList globalEnv) plt (isTestBuild config)
+  makeEnvironment globalEnv plt (isTestBuild config)
 makeInitialGlobalEnv Nothing plt pltEnvironment =
   let globalEnv = mconcat [stdlibGlobalEnv defaultSysPrintOutputBufferSize defaultSysReadInputBufferSize, pltEnvironment, systemGlobalEnv]
   in
-  makeEnvironment (M.fromList globalEnv) plt False
+  makeEnvironment globalEnv plt False
 
--- | The environment a project starts from, holding the entries that the
+-- | The environment a project starts from, holding the declarations that the
 -- language and the platform provide. Their names go into the declared map as
 -- well: they are as taken as the ones the project declares, and nothing else
 -- fills that map for them.
-makeEnvironment :: GlobalEnv -> Platform -> Bool -> Environment
-makeEnvironment globalEnv plt isTest = ExprST globalEnv M.empty M.empty S.empty (M.map location globalEnv) plt isTest S.empty
+makeEnvironment :: [GlobalDecl SemanticAnn] -> Platform -> Bool -> Environment
+makeEnvironment decls plt isTest = ExprST globalEnv M.empty M.empty S.empty (M.map (getLocation . getAnnotation) globalEnv) plt isTest S.empty
+
+  where
+
+    globalEnv = M.fromList [ (globalDeclName decl, decl) | decl <- decls ]
 
 -- | Take note of the names that the project declares at its top level.
 addDeclaredNames :: DeclaredEnv -> Environment -> Environment
