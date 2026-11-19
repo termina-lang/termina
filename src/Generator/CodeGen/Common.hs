@@ -12,7 +12,9 @@ import Configuration.Platform (Platform)
 import Generator.Monadic
 import qualified Control.Monad.State as ST
 import qualified Data.Set as S
+import qualified Data.Map.Strict as M
 import Data.Maybe (maybeToList)
+import Doc.Facts (DocFact)
 
 newtype CGeneratorError = InternalError String
     deriving (Show)
@@ -23,7 +25,10 @@ data CGeneratorEnv = CGeneratorEnv {
     monadicTypes :: MonadicTypes,
     configParams :: TerminaConfig,
     targetPlatform :: Platform,
-    eventParamUsed :: Bool
+    eventParamUsed :: Bool,
+    -- | The facts of each instance of the deployment, for the documentation
+    -- comments of their declarations
+    deploymentFacts :: M.Map Identifier [DocFact SemanticAnn]
   }
 
 type CGenerator = ExceptT CGeneratorError (ST.State CGeneratorEnv)

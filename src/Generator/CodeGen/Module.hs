@@ -22,6 +22,7 @@ import Configuration.Configuration
 import Generator.Monadic
 import Control.Monad.State
 import qualified Data.Set as S
+import Doc.Facts (DocFact)
 
 
 genModuleDefineLabel :: QualifiedName -> String
@@ -110,7 +111,7 @@ runGenSourceFile ::
     -> AnnotatedProgram SemanticAnn 
     -> Either CGeneratorError CFile
 runGenSourceFile config plt mName program =
-    case runState (runExceptT (genSourceFile mName program)) (CGeneratorEnv mName S.empty emptyMonadicTypes config plt False) of
+    case runState (runExceptT (genSourceFile mName program)) (CGeneratorEnv mName S.empty emptyMonadicTypes config plt False M.empty) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file
 
@@ -119,10 +120,12 @@ runGenHeaderFile ::
     -> Platform
     -> QualifiedName 
     -> [QualifiedName] 
-    -> AnnotatedProgram SemanticAnn 
-    -> MonadicTypes 
+    -> AnnotatedProgram SemanticAnn
+    -> MonadicTypes
+    -- | The facts of the instances of the deployment
+    -> M.Map Identifier [DocFact SemanticAnn]
     -> Either CGeneratorError (CFile, MonadicTypes)
-runGenHeaderFile config plt mName imports program monadicTys = 
+runGenHeaderFile config plt mName imports program monadicTys facts =
     let includeOptionH = not (S.null (S.filter (\case {
             TStruct _ -> False;
             TEnum _ -> False;
@@ -140,6 +143,6 @@ runGenHeaderFile config plt mName imports program monadicTys =
             }) $ resultTypes monadicTys))
     in
     case runState (runExceptT (genHeaderFile includeOptionH includeStatusH includeResultH mName imports program)) 
-        (CGeneratorEnv mName S.empty monadicTys config plt False) of
+        (CGeneratorEnv mName S.empty monadicTys config plt False facts) of
     (Left err, _) -> Left err
     (Right file, env) -> Right (file, monadicTypes env)

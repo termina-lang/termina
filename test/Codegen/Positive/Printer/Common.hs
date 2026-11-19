@@ -15,6 +15,7 @@ import Control.Monad.Except
 import Generator.CodeGen.Expression
 import Configuration.Configuration
 import Configuration.Platform
+import qualified Data.Map.Strict as M
 import Generator.CodeGen.Common
 import Generator.LanguageC.Printer
 import qualified Data.Set as S
@@ -194,7 +195,7 @@ funSemAnn params ts = SemanticAnn (ETy (AppType params ts)) (undocumented Intern
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
   let config = defaultConfig "test" TestPlatform in
-  case runState (runExceptT (genExpression (elaborateExpression (foldingProofs (foldExpression expr)) expr))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
+  case runState (runExceptT (genExpression (elaborateExpression (foldingProofs (foldExpression expr)) expr))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False M.empty) of
     (Left err, _) -> pack $ show err
     (Right cExpr, _) -> render $ runReader (pprint cExpr) (CPrinterConfig False False False)
 
@@ -205,7 +206,7 @@ renderStatement stmt =
     Right bBlocks ->
       let config = defaultConfig "test" TestPlatform
           body = LAST.Block bBlocks stmtSemAnn in
-      case runState (runExceptT (Prelude.concat <$> traverse genBlocks (EAST.blockBody (elaborateBody (foldingProofs (foldBasicBlocks body)) body)))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
+      case runState (runExceptT (Prelude.concat <$> traverse genBlocks (EAST.blockBody (elaborateBody (foldingProofs (foldBasicBlocks body)) body)))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False M.empty) of
         (Left err, _) -> pack $ show err
         (Right cStmts, _) -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False False)
 
@@ -215,7 +216,7 @@ renderTypeDefinitionDecl monTypes decl =
     Left err -> pack $ show err
     Right bbDecl ->
       let config = defaultConfig "test" TestPlatform in
-      case runState (runExceptT (genTypeDefinitionDecl (elaborateElement bbDecl))) (CGeneratorEnv "test" S.empty monTypes config TestPlatform False) of
+      case runState (runExceptT (genTypeDefinitionDecl (elaborateElement bbDecl))) (CGeneratorEnv "test" S.empty monTypes config TestPlatform False M.empty) of
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False False)
 
@@ -225,7 +226,7 @@ renderFunctionDecl monTypes decl =
     Left err -> pack $ show err
     Right bbAST -> 
       let config = defaultConfig "test" TestPlatform in
-      case runState (runExceptT (genFunctionDecl (elaborateElement bbAST))) (CGeneratorEnv "test" S.empty monTypes config TestPlatform False) of
+      case runState (runExceptT (genFunctionDecl (elaborateElement bbAST))) (CGeneratorEnv "test" S.empty monTypes config TestPlatform False M.empty) of
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False False) 
 
@@ -235,7 +236,7 @@ renderFunction func =
     Left err -> pack $ show err
     Right bbAST -> 
       let config = defaultConfig "test" TestPlatform in
-      case runState (runExceptT (genFunction (elaborateElement bbAST))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
+      case runState (runExceptT (genFunction (elaborateElement bbAST))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False M.empty) of
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False False)
 -- | Elaborates a single lowered element with the proofs of the constant folding.

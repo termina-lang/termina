@@ -33,6 +33,7 @@ import qualified Data.Text.Encoding as TE
 import Data.Text (Text, pack)
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
+import Doc.Facts (instanceFacts)
 import qualified Data.Set as S
 
 import Parser.Parsing (parseTerminaModule)
@@ -42,7 +43,7 @@ import Semantic.Environment (makeInitialGlobalEnv, Environment)
 import Semantic.Types (SemanticAnn)
 
 import Configuration.Configuration (defaultConfig, TerminaConfig (..), DeploymentKind (..))
-import Configuration.Platform (Platform(..))
+import Configuration.Platform (Platform(..), defaultStackSize)
 import Generator.Environment (getPlatformInitialGlobalEnv)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Generator.Monadic (MonadicTypes)
@@ -148,7 +149,8 @@ renderDocumentedFiles target sources = either (Left . failMessage) Right $ do
       printed = runCPrinterWith (CPrinterConfig False False True)
       generatorError err = Failure (T.pack (show err)) (T.pack (show err))
   (cHeaderFile, _) <- either (Left . generatorError) Right
-    (runGenHeaderFile configParams TestPlatform target deps program (pipelineMonadicTypes result))
+    (runGenHeaderFile configParams TestPlatform target deps program (pipelineMonadicTypes result)
+      (instanceFacts (defaultStackSize TestPlatform) (programArch result)))
   cSourceFile <- either (Left . generatorError) Right
     (runGenSourceFile configParams TestPlatform target program)
   return (printed cHeaderFile, printed cSourceFile)

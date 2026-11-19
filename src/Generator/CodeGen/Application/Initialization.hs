@@ -15,6 +15,7 @@ import Generator.LanguageC.Embedded
 import Generator.Monadic (emptyMonadicTypes)
 import Control.Monad.State
 import qualified Data.Set as S
+import qualified Data.Map.Strict as M
 import Utils.Annotations
 import Generator.CodeGen.Types
 import Generator.CodeGen.Expression
@@ -124,6 +125,6 @@ runGenInitFile ::
     -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either CGeneratorError CFile 
 runGenInitFile config plt initFilePath prjprogs = 
     case runState (runExceptT (genInitFile initFilePath prjprogs)) 
-        (CGeneratorEnv initFilePath S.empty emptyMonadicTypes config plt False) of
+        (CGeneratorEnv initFilePath S.empty emptyMonadicTypes config plt False M.empty) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file

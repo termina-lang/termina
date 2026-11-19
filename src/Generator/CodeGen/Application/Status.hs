@@ -8,6 +8,7 @@ import Configuration.Platform (Platform)
 import System.FilePath
 import Generator.CodeGen.TypeDefinition
 import qualified Data.Set as S
+import qualified Data.Map.Strict as M
 import Elaboration.AST
 import Utils.Annotations
 import Control.Monad.Except
@@ -45,6 +46,6 @@ runGenStatusHeaderFile ::
     -> Either CGeneratorError CFile
 runGenStatusHeaderFile config plt optionFileName opts =
     case runState (runExceptT genStatusHeaderFile)
-        (CGeneratorEnv optionFileName S.empty opts config plt False) of
+        (CGeneratorEnv optionFileName S.empty opts config plt False M.empty) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file

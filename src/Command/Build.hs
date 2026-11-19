@@ -33,12 +33,14 @@ import Modules.Modules
 import Generator.Monadic
 import Data.List (nub)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
+import Doc.Facts (DocFact, instanceFacts)
+import Semantic.Types (SemanticAnn)
 import Generator.LanguageC.Printer (runCPrinter)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
 import Generator.CodeGen.Application.Option (runGenOptionHeaderFile, genOptionPathName)
 import Generator.CodeGen.Application.Config (genConfigPathName)
 import Core.AST
-    ( TerminaType'(TEnum, TStruct) )
+    ( Identifier, TerminaType'(TEnum, TStruct) )
 import Generator.CodeGen.Platform
 import Configuration.Platform
 import Utils.Annotations
@@ -237,9 +239,11 @@ genModules ::
   -> Platform
   -- | The map with the option types to generate from defined types 
   -> MonadicTypes
+  -- | The facts of the instances of the deployment
+  -> M.Map Identifier [DocFact SemanticAnn]
   -- | The project to generate the code from
   -> ElaboratedProject -> IO ()
-genModules params plt initialMonadicTypes loweredProject =
+genModules params plt initialMonadicTypes facts loweredProject =
   foldM_ printModule initialMonadicTypes (M.elems loweredProject)
 
   where
@@ -263,7 +267,7 @@ genModules params plt initialMonadicTypes loweredProject =
       let destinationPath = outputFolder params
           tAST = elaboratedAST . metadata $ bbModule
           moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
-      case runGenHeaderFile params plt (qualifiedName bbModule) moduleDeps tAST currentMonadicTypes of
+      case runGenHeaderFile params plt (qualifiedName bbModule) moduleDeps tAST currentMonadicTypes facts of
         Left err -> dieWithError $ show err
         Right (cHeaderFile, newMonadicTypes) -> do
           let headerFile = destinationPath </> "include" </> qualifiedName bbModule <.> "h"
@@ -524,7 +528,7 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
     externs <- prepareExtern config (map outputFolder outConfigs) parsedProject sources (deploymentExterns deployment)
     forM_ outConfigs $ \outConfig -> do
       when chatty (putStrLn . debugMessage $ "Generating code into \"" ++ outputFolder outConfig ++ "\"")
-      genModules outConfig plt monadicTypes elaboratedProject
+      genModules outConfig plt monadicTypes (instanceFacts (defaultStackSize plt) programArchitecture) elaboratedProject
       genInitFile outConfig plt elaboratedProject
       genPlatformCode outConfig plt loweredProject programArchitecture externs
       monadicHeaders <- genMonadicHeaderFiles outConfig plt monadicTypes

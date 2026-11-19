@@ -109,7 +109,7 @@ printHeaderModule debugBuild eModule = do
     let tAST = elaboratedAST . metadata $ eModule
         configParams = defaultConfig "test" TestPlatform
         moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules eModule
-    case runGenHeaderFile configParams TestPlatform (qualifiedName eModule) moduleDeps tAST emptyMonadicTypes of
+    case runGenHeaderFile configParams TestPlatform (qualifiedName eModule) moduleDeps tAST emptyMonadicTypes M.empty of
         Left err -> dieWithError $ show err
         Right (cHeaderFile, _) -> TIO.putStrLn $ runCPrinter debugBuild cHeaderFile
 
