@@ -18,8 +18,16 @@ import qualified Data.Map.Strict as M
 ----------------------------------------
 
 data FieldSeman a
-  = SimpleField 
+  = SimpleField
   | AccessPortField (M.Map Identifier (InterfaceMember a))
+  deriving (Show, Functor)
+
+-- | Semantic information of a type definition
+data TypeDefSeman a
+  = SimpleTypeDef
+  -- | A resource class, with the declarations of the interfaces it provides
+  -- and of the ones they extend, each one once
+  | ResourceClassTypeDef [GlobalDecl a]
   deriving (Show, Functor)
 
 -- | Semantic type information
@@ -101,7 +109,9 @@ data SemanticElems a
   -- | Global objects
   | GTy (TerminaType a)
   -- | Type definitions 
-  | TTy 
+  | TTy (TypeDefSeman a)
+  -- | Variants of an enum
+  | VTy
   -- | Function type
   | FnTy (FunctionSeman a)
   deriving Show
@@ -254,10 +264,13 @@ buildGlobalAnn :: ParserAnn -> TerminaType SemanticAnn -> SemanticAnn
 buildGlobalAnn src ty = SemanticAnn (GTy ty) src
 
 buildTypeAnn :: ParserAnn -> SemanticAnn
-buildTypeAnn = SemanticAnn TTy
+buildTypeAnn = SemanticAnn (TTy SimpleTypeDef)
+
+buildResourceClassAnn :: ParserAnn -> [GlobalDecl SemanticAnn] -> SemanticAnn
+buildResourceClassAnn ann ifaces = SemanticAnn (TTy (ResourceClassTypeDef ifaces)) ann
 
 buildEnumVariantAnn :: ParserAnn -> SemanticAnn
-buildEnumVariantAnn = SemanticAnn TTy
+buildEnumVariantAnn = SemanticAnn VTy
 
 -- Elements that no source file declares, such as the variants of the enums of
 -- the environment and of Option, Status and Result, or the elements that a
@@ -266,7 +279,18 @@ buildEnumVariantAnn = SemanticAnn TTy
 internalVariant :: Identifier -> [TerminaType SemanticAnn] -> EnumVariant SemanticAnn
 internalVariant ident params = EnumVariant ident params (buildEnumVariantAnn (undocumented Internal))
 
+-- | A type definition with the annotation that the type checker gives it. A
+-- resource class built by hand is taken to provide one interface, the first
+-- it names, that declares exactly its procedures, without comments.
 internalTypeDefinition :: TypeDef SemanticAnn -> AnnASTElement SemanticAnn
+internalTypeDefinition tydef@(Class ResourceClass _ members provides _) =
+  TypeDefinition tydef (buildResourceClassAnn (undocumented Internal) [ internalInterface iface | iface <- take 1 provides ])
+
+  where
+
+    internalInterface iface = TypeDefinition (Interface RegularInterface iface [] procs []) (buildTypeAnn (undocumented Internal))
+    procs = [ InterfaceProcedure ak name params [] (buildExpAnn (undocumented Internal) TUnit)
+            | ClassProcedure ak name params _ _ <- members ]
 internalTypeDefinition tydef = TypeDefinition tydef (buildTypeAnn (undocumented Internal))
 
 internalField :: Identifier -> TerminaType SemanticAnn -> FieldDefinition SemanticAnn

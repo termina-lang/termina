@@ -4,6 +4,7 @@
 module Doc.ModelSpec (spec) where
 
 import Data.List (intercalate)
+import qualified Data.Text as T
 import Text.Parsec.Pos (initialPos, newPos)
 
 import Core.AST (DocComment(..), DocForm(..), DocPlacement(..))
@@ -70,8 +71,47 @@ model ls =
 bodyOf :: [String] -> Maybe [DocBlock]
 bodyOf ls = (\(_, body, _) -> body) <$> model ("" : " * Summary." : " *" : map (" * " ++) ls ++ [" "])
 
+-- | The model of a block comment, given its lines between the delimiters.
+modelOf :: [String] -> Maybe DocModel
+modelOf ls = either (const Nothing) Just
+  (docModel (DocComment DocBefore BlockDoc (intercalate "\n" ls) (Position "test" (newPos "test" 1 1) (newPos "test" 1 1))))
+
+-- | The summary and the tags of a model, with the first paragraph of each
+-- tag as its text.
+outline :: Maybe DocModel -> Maybe ([DocInline], [(TagKind, [DocBlock])])
+outline = fmap (\m -> (docSummary m, [ (tagKind t, tagText t) | t <- docTags m ]))
+
+-- | The comment of ISPIBus::end, shortened, whose parameter is status.
+ifaceEnd :: Maybe DocModel
+ifaceEnd = modelOf
+  [ "", " * Ends the transaction.", " *", " * @param[out] status Error seen, if any."
+  , " * @error NotStarted No transaction.", " * @error Overrun Lost bytes.", " * @note Polled.", " " ]
+
+para :: T.Text -> [DocBlock]
+para t = [DPara [DText t]]
+
 spec :: Spec
 spec = describe "Documentation model" $ do
+
+  describe "the inheritance of the comment of an interface procedure" $ do
+    it "takes the whole comment, with the names of the class, when the class writes none" $
+      outline (inheritDoc ["st"] ["status"] Nothing ifaceEnd) `shouldBe` Just
+        ( [DText "Ends the transaction."]
+        , [ (TagParam ParamOut "st", para "Error seen, if any."), (TagError "NotStarted", para "No transaction.")
+          , (TagError "Overrun", para "Lost bytes."), (TagNote, para "Polled.") ] )
+    it "keeps the summary and the tags of the class and takes the rest" $
+      outline (inheritDoc ["st"] ["status"] (modelOf ["", " * Ends it as slave.", " *", " * @error Overrun Lost bytes.", " "]) ifaceEnd)
+        `shouldBe` Just
+          ( [DText "Ends it as slave."]
+          , [ (TagParam ParamOut "st", para "Error seen, if any."), (TagError "Overrun", para "Lost bytes.")
+            , (TagNote, para "Polled.") ] )
+    it "takes the summary of the interface when the class writes only tags" $
+      outline (inheritDoc ["st"] ["status"] (modelOf [" @param[out] st Outcome. "]) ifaceEnd) `shouldBe` Just
+        ( [DText "Ends the transaction."]
+        , [ (TagParam ParamOut "st", para "Outcome."), (TagError "NotStarted", para "No transaction.")
+          , (TagError "Overrun", para "Lost bytes."), (TagNote, para "Polled.") ] )
+    it "keeps the comment of the class when the interface has none" $
+      outline (inheritDoc ["st"] ["status"] (modelOf [" Ends it. "]) Nothing) `shouldBe` Just ([DText "Ends it."], [])
 
   describe "the Markdown" $ do
     it "builds the model of the comment of ISPIBus::end" $

@@ -21,6 +21,7 @@ module Doc.Model
   , commentLines
   , splitDoc
   , docModel
+  , inheritDoc
   , markdown
   ) where
 
@@ -29,10 +30,11 @@ import Commonmark.Extensions (HasMath(..), HasPipeTable(..), ColAlignment(..), m
 import Data.Char (isAlpha, isAlphaNum, isSpace)
 import Data.Functor.Identity (runIdentity)
 import Data.List (dropWhileEnd, isPrefixOf)
+import qualified Data.List as L
 import qualified Data.Text as T
 import Text.Parsec.Pos (SourcePos, updatePosString, incSourceLine, incSourceColumn, initialPos)
 
-import Core.AST (DocComment(..), DocForm(..), DocPlacement(..))
+import Core.AST (DocComment(..), DocForm(..), DocPlacement(..), Identifier)
 import Utils.Annotations (Location(..))
 
 -- | A line of a comment and the position of its first character.
@@ -181,6 +183,58 @@ docModel doc = do
         DPara inlines : more -> (inlines, more)
         blocks -> ([], blocks)
   return (DocModel summary rest [ t { tagText = markdown (tagText t) } | t <- tags ] doc)
+
+-- | The documentation of a procedure of a class, which inherits from the
+-- procedure of its interface each part that its own comment does not write:
+-- the summary and the body, each @\@param@, @\@return@ and each other kind of
+-- tag. The @\@error@ tags go as a whole, since the ones of the class are the
+-- subset of the errors that it returns. An inherited @\@param@ is matched by
+-- the position of its parameter, since the class may give it another name.
+-- The parameters are the names in the class and in the interface.
+inheritDoc :: [Identifier] -> [Identifier] -> Maybe DocModel -> Maybe DocModel -> Maybe DocModel
+inheritDoc _ _ own Nothing = own
+inheritDoc classParams ifaceParams Nothing (Just iface) = Just (renamed classParams ifaceParams iface)
+inheritDoc classParams ifaceParams (Just own) (Just iface) =
+    Just own { docSummary = summary, docBody = body, docTags = params ++ others }
+
+  where
+
+    inherited = renamed classParams ifaceParams iface
+
+    (summary, body)
+      | null (docSummary own) && null (docBody own) = (docSummary inherited, docBody inherited)
+      | otherwise = (docSummary own, docBody own)
+
+    -- The parameters in the order of the signature, each with the tag of the
+    -- class or, if it has none, the one of the interface.
+    params = concat [ take 1 (paramTags own p ++ paramTags inherited p) | p <- classParams ]
+    paramTags model p = [ t | t@(DocTag _ (TagParam _ name) _) <- docTags model, name == p ]
+
+    -- The other tags, kind by kind.
+    others = concat [ if null (ofKind own k) then ofKind inherited k else ofKind own k | k <- kinds ]
+    kinds = L.nub [ kind t | t <- docTags own ++ docTags inherited, not (isParam t) ]
+    ofKind model k = [ t | t <- docTags model, not (isParam t), kind t == k ]
+    isParam (DocTag _ (TagParam _ _) _) = True
+    isParam _ = False
+
+    -- The kind of a tag without its argument: all the errors are one kind.
+    kind (DocTag _ k _) = case k of
+      TagError _ -> TagError ""
+      TagSatisfies _ -> TagSatisfies ""
+      TagVerifies _ -> TagVerifies ""
+      other -> other
+
+-- | The model of a procedure of an interface with the names of the parameters
+-- of the class.
+renamed :: [Identifier] -> [Identifier] -> DocModel -> DocModel
+renamed classParams ifaceParams model = model { docTags = map rename (docTags model) }
+
+  where
+
+    names = zip ifaceParams classParams
+    rename (DocTag pos (TagParam mode name) text) =
+      DocTag pos (TagParam mode (maybe name id (lookup name names))) text
+    rename t = t
 
 -- | The lines of a comment as written, each with its position. The parser
 -- keeps the text without the delimiters and the position of the first one; a

@@ -215,7 +215,18 @@ foldAnnotation (SemanticAnn (STy (PortConnection (OutPConnTy ty))) src) = do
 foldAnnotation (SemanticAnn (GTy ty) src) = do
   ty' <- foldType (getLocation src) ty
   return $ SemanticAnn (GTy ty') src
-foldAnnotation ann@(SemanticAnn TTy _) = return ann
+foldAnnotation ann@(SemanticAnn (TTy SimpleTypeDef) _) = return ann
+foldAnnotation (SemanticAnn (TTy (ResourceClassTypeDef ifaces)) src) = do
+  ifaces' <- mapM foldInterface ifaces
+  return $ SemanticAnn (TTy (ResourceClassTypeDef ifaces')) src
+
+  where
+
+    foldInterface (TypeDefinition (Interface kind iface extends procs mods) ann) = do
+      procs' <- mapM foldInterfaceMember procs
+      return $ TypeDefinition (Interface kind iface extends procs' mods) ann
+    foldInterface decl = return decl
+foldAnnotation ann@(SemanticAnn VTy _) = return ann
 foldAnnotation (SemanticAnn (FnTy (FunctionSeman params rty mode)) src) = do
   rty' <- foldType (getLocation src) rty
   params' <- mapM (foldParam (getLocation src)) params

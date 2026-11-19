@@ -3,30 +3,91 @@
 -- Termina element translated into the Doxygen comment of its C declaration.
 module Generator.CodeGen.Doc
   ( genDoc
+  , genProcedureDoc
+  , genBriefDoc
   , generatedDoc
+  , withGeneratedParams
+  , withProvides
+  , eventParamDoc
+  , instanceParamDoc
   ) where
 
 import Control.Monad.Except (throwError)
 import Data.List (intercalate)
 import qualified Data.Text as T
 
-import Core.AST (AccessKind(..), Parameter'(..), TerminaType'(..))
+import Core.AST (AccessKind(..), DocComment, Parameter'(..), TerminaType'(..))
 import Doc.Model
 import Generator.CodeGen.Common
 import Generator.LanguageC.AST
 import Parser.Types (ParserAnn(..))
 import Semantic.AST (Parameter)
-import Semantic.Types (SemanticAnn, sourceOf)
+import Semantic.Types (GlobalDecl, SemanticAnn, globalDeclName, sourceOf)
+import Utils.Annotations (Annotated(..))
 
 -- | The Doxygen comment of the C declaration of an element, from the comment
 -- of the element, given the parameters of its signature, if it has any.
 genDoc :: SemanticAnn -> [Parameter SemanticAnn] -> CGenerator (Maybe CDoc)
-genDoc ann params =
-    case sourceOf ann of
-        ParserAnn _ (Just doc) -> case docModel doc of
-            Right model -> return (Just (cDoc params model))
-            Left _ -> throwError $ InternalError "A documentation comment with an error in its tags reached the generator"
-        _ -> return Nothing
+genDoc ann params = fmap (cDoc params) <$> docModelOf ann
+
+-- | The Doxygen comment of a procedure of a class, given its parameters and
+-- the procedure of the interface it implements with its parameters, from
+-- which it inherits what its own comment does not write.
+genProcedureDoc :: SemanticAnn -> [Parameter SemanticAnn] -> (SemanticAnn, [Parameter SemanticAnn]) -> CGenerator (Maybe CDoc)
+genProcedureDoc ann params (ifaceAnn, ifaceParams) = do
+    own <- docModelOf ann
+    inherited <- docModelOf ifaceAnn
+    return $ cDoc params <$> inheritDoc (names params) (names ifaceParams) own inherited
+
+    where
+
+        names = map paramIdentifier
+
+-- | The brief of the Doxygen comment of an element, alone.
+genBriefDoc :: SemanticAnn -> CGenerator (Maybe CDoc)
+genBriefDoc ann = fmap (\doc -> doc { cdocBody = [], cdocTags = [] }) <$> genDoc ann []
+
+-- | The model of the comment of an element, if it has one.
+docModelOf :: SemanticAnn -> CGenerator (Maybe DocModel)
+docModelOf = traverse modelOf . parsedDoc . sourceOf
+
+-- | The model of a comment. Its tags were checked when it was parsed.
+modelOf :: DocComment -> CGenerator DocModel
+modelOf comment = case docModel comment of
+    Right model -> return model
+    Left _ -> throwError $ InternalError "A documentation comment with an error in its tags reached the generator"
+
+-- | The comment of a resource class with a section of the interfaces it
+-- provides, each one with its summary. A class without a comment stays
+-- without one.
+withProvides :: [GlobalDecl SemanticAnn] -> Maybe CDoc -> CGenerator (Maybe CDoc)
+withProvides _ Nothing = return Nothing
+withProvides [] doc = return doc
+withProvides ifaces (Just doc) = do
+    items <- mapM item ifaces
+    return $ Just doc { cdocTags = cdocTags doc ++ [CDocSection "Provides" [DList DBullets items]] }
+
+    where
+
+        item iface = do
+            summary <- maybe [] (map (fmap cName) . docSummary) <$> docModelOf (getAnnotation iface)
+            return [DPara (DCode (T.pack (globalDeclName iface)) : if null summary then [] else DText ": " : summary)]
+
+-- | A comment with the parameters that the generator adds, before the ones
+-- of the author. An element without a comment stays without one.
+withGeneratedParams :: [CDocTag] -> Maybe CDoc -> Maybe CDoc
+withGeneratedParams tags = fmap (\doc -> doc { cdocTags = tags ++ cdocTags doc })
+
+-- | The parameter of the event that every member function of a class takes.
+eventParamDoc :: CDocTag
+eventParamDoc = CDocParam CParamIn eventParam
+    [DPara [ DText "Event that started the current activation. It carries the task or handler that processes it, on whose behalf resources are locked." ]]
+
+-- | The parameter of the instance of a class on which a member function runs,
+-- given its name, its direction, the class and the text after the class.
+instanceParamDoc :: Ident -> CParamDirection -> Ident -> String -> CDocTag
+instanceParamDoc name dir cls after = CDocParam dir name
+    [DPara [DText "Instance of ", DCode (T.pack cls), DText (T.pack after)]]
 
 -- | A brief written by the generator, for what has no element of Termina
 -- behind it: a text, a name as code and a text after it.
@@ -85,4 +146,6 @@ cDoc params (DocModel summary body tags _) =
                 TReference Mutable _ : _ -> CParamInOut
                 _ -> CParamIn
 
-        cName (DocRef parts) = intercalate "__" (map T.unpack parts)
+-- | The C identifier of a name of Termina, not resolved yet.
+cName :: DocRef -> Ident
+cName (DocRef parts) = intercalate "__" (map T.unpack parts)

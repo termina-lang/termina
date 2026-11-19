@@ -371,22 +371,33 @@ collectExtendedInterfaces loc ident = do
         _ -> throwError $ annotateError loc (EGlobalNotInterface ident)
     }
 
+-- | The procedures of an interface and of the ones it extends.
 collectInterfaceProcedures :: Location -> Identifier -> SemanticMonad (M.Map Identifier (SAST.InterfaceMember SemanticAnn))
 collectInterfaceProcedures loc ident = do
-  catchError (getGlobalTypeDef loc ident)
-    -- If the interface does not exist, we throw an error.
-    (\_ -> throwError $ annotateError loc (EInterfaceNotFound ident)) >>= \case {
-        -- If the global type is an interface, we return the procedures.
-        (TypeDefinition (Interface _ _ extends iface_prcs _) _) -> (do
-          -- If the interface is well-typed, this should not fail:
-          extededProcs <- mapM (collectInterfaceProcedures loc) extends
-          procs <- mapM (\procedure@(InterfaceProcedure _ procId _ _ _) -> do
-              return (procId, procedure)
-            ) iface_prcs
-          return (M.fromList procs `M.union` M.unions extededProcs));
-        -- If the global type is not an interface, we throw an error.
-        _ -> throwError $ annotateError loc (EGlobalNotInterface ident)
-    }
+  ifaces <- collectProvidedInterfaces loc [ident]
+  return $ M.fromList
+    [ (procId, procedure)
+    | TypeDefinition (Interface _ _ _ procs _) _ <- ifaces
+    , procedure@(InterfaceProcedure _ procId _ _ _) <- procs ]
+
+-- | The declarations of some interfaces and of the ones they extend, each one
+-- once, in the order in which they are named and every interface before the
+-- ones it extends.
+collectProvidedInterfaces :: Location -> [Identifier] -> SemanticMonad [GlobalDecl SemanticAnn]
+collectProvidedInterfaces loc = fmap reverse . foldM visit []
+
+  where
+
+    visit acc ident
+      | any ((ident ==) . globalDeclName) acc = return acc
+      | otherwise =
+          catchError (getGlobalTypeDef loc ident)
+            -- If the interface does not exist, we throw an error.
+            (\_ -> throwError $ annotateError loc (EInterfaceNotFound ident)) >>= \case {
+              iface@(TypeDefinition (Interface _ _ extends _ _) _) -> foldM visit (iface : acc) extends;
+              -- If the global type is not an interface, we throw an error.
+              _ -> throwError $ annotateError loc (EGlobalNotInterface ident)
+            }
 
 
 getMemberField :: Location 

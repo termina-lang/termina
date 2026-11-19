@@ -71,7 +71,12 @@ typeElement (ExternFunction ident ps_ts mts mode mds_ts anns) = do
 typeElement (GlobalDeclaration gbl) = GlobalDeclaration <$> typeGlobal gbl
 typeElement (TypeDefinition tydef ann) = do
   typed_tydef <- typeTypeDefinition (getLocation ann) tydef
-  return (TypeDefinition typed_tydef (buildTypeAnn ann))
+  TypeDefinition typed_tydef <$> case typed_tydef of
+    -- The interfaces it provides and the ones they extend, from which its
+    -- procedures inherit their comments
+    Class ResourceClass _ _ provides _ ->
+      buildResourceClassAnn ann <$> collectProvidedInterfaces (getLocation ann) provides
+    _ -> return (buildTypeAnn ann)
 
 -- | Add a typed element to the global environment, as its declaration.
 addElement :: SAST.AnnASTElement SemanticAnn -> SemanticMonad ()
