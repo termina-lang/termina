@@ -45,7 +45,6 @@ data DeliverCmdArgs =
         Bool -- ^ Verbose mode
         Bool -- ^ Deliver the tests as well
         Bool -- ^ Pack each deliverable into a .tar.gz
-        Bool -- ^ Add to the archive the binary built from the C with the #line pragmas
     deriving Show
 
 -- | Parser for the "deliver" command arguments
@@ -58,14 +57,10 @@ deliverCmdArgsParser = DeliverCmdArgs
         <> O.help "Deliver every test as well, on every platform of its list")
     <*> O.switch (O.long "archive"
         <> O.help "Pack each deliverable into a .tar.gz")
-    <*> O.switch (O.long "with-trace"
-        <> O.help "Add to the archive the binary built from the C with the #line pragmas")
 
 -- | Command handler for the "deliver" command
 deliverCommand :: DeliverCmdArgs -> IO ()
-deliverCommand (DeliverCmdArgs chatty withTests archive withTrace) = do
-    when (withTrace && not archive) $
-      dieWithError $ "--with-trace adds a binary to the archive: use it with --archive"
+deliverCommand (DeliverCmdArgs chatty withTests archive) = do
     -- A deliverable is built from the state in git, with termina.lock and
     -- vendor/ as they are.
     loaded <- loadProject Frozen
@@ -84,7 +79,7 @@ deliverCommand (DeliverCmdArgs chatty withTests archive withTrace) = do
     when (null deployments) (putStrLn . infoMessage $ nothingSelected manifest selection Nothing)
     forM_ deployments $ \deployment -> do
       announce deployments ("Delivering " ++ deploymentLabel deployment)
-      deliverDeployment chatty loaded archive withTrace (deliverableFolder (deploymentConfig deployment)) (releaseBuild deployment)
+      deliverDeployment chatty loaded archive (deliverableFolder (deploymentConfig deployment)) (releaseBuild deployment)
 
 -- | The folder of the deliverable of a deployment: "deliverable/app",
 -- "deliverable/tests/<name>/<platform>".
@@ -109,8 +104,8 @@ releaseBuild deployment = deployment {
 
 -- | Build a deployment and its deliverable in the given folder, and compare
 -- their binaries.
-deliverDeployment :: Bool -> LoadedProject -> Bool -> Bool -> FilePath -> Deployment -> IO ()
-deliverDeployment chatty loaded archive withTrace folder deployment = do
+deliverDeployment :: Bool -> LoadedProject -> Bool -> FilePath -> Deployment -> IO ()
+deliverDeployment chatty loaded archive folder deployment = do
     let config = deploymentConfig deployment
         label = deploymentLabel deployment
         built = outputFolder config
@@ -199,7 +194,6 @@ deliverDeployment chatty loaded archive withTrace folder deployment = do
       let contents = map (\f -> (f, folder </> f)) ("provenance.json" : delivered)
             ++ [(binary, folder </> binary)]
             ++ [(mapFile, folder </> mapFile) | hasMap]
-            ++ [("trace" </> T.unpack (name config), built </> binary) | withTrace]
       writeArchive archiveFile archiveName contents
       when chatty (putStrLn . debugMessage $ "Archive written to \"" ++ archiveFile ++ "\"")
 
