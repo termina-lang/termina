@@ -244,6 +244,10 @@ internalField ident ty = FieldDefinition ident ty (buildFieldAnn (undocumented I
 internalAccessPortField :: Identifier -> TerminaType SemanticAnn -> M.Map Identifier (InterfaceMember SemanticAnn) -> FieldDefinition SemanticAnn
 internalAccessPortField ident ty procs = FieldDefinition ident ty (buildAccessPortFieldAnn (undocumented Internal) procs)
 
+-- | The annotation of a procedure of a class, as the type checker gives it.
+internalProcedureAnn :: SemanticAnn
+internalProcedureAnn = buildExpAnn (undocumented Internal) TUnit
+
 buildStmtAnn :: ParserAnn -> SemanticAnn
 buildStmtAnn = SemanticAnn (STy SimpleStmtType)
 

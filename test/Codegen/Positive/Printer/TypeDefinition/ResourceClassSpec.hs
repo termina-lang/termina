@@ -23,7 +23,7 @@ classWithOneProcedureAndZeroFields = internalTypeDefinition (Class ResourceClass
       builtinParameter "param5" TInt16,
       builtinParameter "param6" TInt32,
       builtinParameter "param7" TInt64
-    ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
+    ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) internalProcedureAnn
   ] ["Interface0"] [])
 
 classWithTwoProceduresAndZeroFields :: AnnASTElement SemanticAnn
@@ -31,16 +31,16 @@ classWithTwoProceduresAndZeroFields = internalTypeDefinition (Class ResourceClas
     ClassProcedure Mutable "procedure0" [
       builtinParameter "param0" TUInt8,
       builtinParameter "param1" (TOption (TBoxSubtype (TStruct "TMPacket")))
-    ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined,
+    ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) internalProcedureAnn,
     ClassProcedure Mutable "procedure1" [
       builtinParameter "param0" TUInt8,
       builtinParameter "param1" (TReference Mutable (TArray TUInt8 (buildConstExprTUSize 32)))
-    ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
+    ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) internalProcedureAnn
   ] ["Interface0"] [])
 
 noHandlerClassWithoutOneProcedureAndZeroFields :: AnnASTElement SemanticAnn
 noHandlerClassWithoutOneProcedureAndZeroFields = internalTypeDefinition (Class ResourceClass "Class0" [
-    ClassProcedure Mutable "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
+    ClassProcedure Mutable "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) internalProcedureAnn
   ] ["Interface0"] [])
 
 classWithOneProcedureAndTwoFields :: AnnASTElement SemanticAnn
@@ -48,7 +48,7 @@ classWithOneProcedureAndTwoFields = internalTypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (internalField "field0" TUInt8),
     ClassField (internalField "field1" (TArray TUInt64 (buildConstExprTUSize 24))),
-    ClassProcedure Mutable "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
+    ClassProcedure Mutable "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) internalProcedureAnn
   ] ["Interface0"] [])
 
 noHandlerClassWithOneEmptyProcedure :: AnnASTElement SemanticAnn
@@ -56,7 +56,7 @@ noHandlerClassWithOneEmptyProcedure = internalTypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (internalField "field0" TUInt8),
     ClassField (internalField "field1" (TArray TUInt64 (buildConstExprTUSize 24))),
-    ClassProcedure Mutable "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
+    ClassProcedure Mutable "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) internalProcedureAnn
   ] ["Interface0"] [Modifier "no_handler" Nothing])
 
 packedClass :: AnnASTElement SemanticAnn
@@ -68,7 +68,7 @@ packedClass = internalTypeDefinition
     ClassProcedure Mutable "procedure0" [
       builtinParameter "param0" TChar,
       builtinParameter "param1" (TReference Mutable (TArray TUInt8 (buildConstExprTUSize 16)))
-    ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
+    ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) internalProcedureAnn
   ] ["Interface0"] [Modifier "packed" Nothing])
 
 classWithFixedLocationField :: AnnASTElement SemanticAnn
@@ -78,7 +78,7 @@ classWithFixedLocationField = internalTypeDefinition
     ClassField (internalField "field1" (TFixedLocation TUInt32)),
     ClassField (internalField "field2" (TFixedLocation (TArray TUInt32 (buildConstExprTUSize 32)))),
     ClassField (internalField "field3" (TFixedLocation (TArray (TArray TUInt32 (buildConstExprTUSize 32)) (buildConstExprTUSize 8)))),
-    ClassProcedure Mutable "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
+    ClassProcedure Mutable "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) internalProcedureAnn
   ] ["Interface0"] [])
 
 classWithAccessPortField :: AnnASTElement SemanticAnn
@@ -87,7 +87,7 @@ classWithAccessPortField = internalTypeDefinition
     ClassField (internalField "field0" TUInt32),
     ClassField (internalAccessPortField "field1" (TAccessPort (TInterface RegularInterface "Interface1"))
       (M.fromList [("test0", InterfaceProcedure Mutable "test0" [] [] (buildExpAnn (undocumented Internal) TUnit))])),
-    ClassProcedure Mutable "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
+    ClassProcedure Mutable "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) internalProcedureAnn
   ] ["Interface0"] [])
 
 spec :: Spec

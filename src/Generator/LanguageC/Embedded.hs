@@ -16,7 +16,8 @@ module Generator.LanguageC.Embedded (
     uint8_t, uint16_t, uint32_t, uint64_t,
     int8_t, int16_t, int32_t, int64_t,
     dec, indent, trail_cr, pre_cr, no_cr,
-    block, var, field, struct, undocumentedMember, undocumentedEnumerator, _const,
+    block, var, field, struct, documentedStruct, documentedMember, undocumentedMember,
+    documentedEnumerator, undocumentedEnumerator, documented, _const,
     function, static_function,
     global, static_global, extern,
     _if, _if_else, _break, _switch, _case, 
@@ -588,18 +589,30 @@ instance Alignment CFileItem CFileItem where
 -- | An item of a file with or without a blank line before it. The rest of
 -- its annotation, its documentation comment included, is kept.
 newLineBefore :: Bool -> CFileItem -> CFileItem
-newLineBefore before item = case item of
-    CFunctionDef storage func (LocatedElement ann loc) -> CFunctionDef storage func (LocatedElement (declaration ann) loc)
-    CExtDecl decl (LocatedElement ann loc) -> CExtDecl decl (LocatedElement (declaration ann) loc)
-    CPPDirective directive (LocatedElement ann loc) -> CPPDirective directive (LocatedElement (directiveAnn ann) loc)
+newLineBefore before item = withItemAnn newLine item
 
     where
 
-        declaration ann = CDeclarationAnn before (itemDoc ann)
-        directiveAnn ann = CPPDirectiveAnn before (itemDoc ann)
+        newLine ann = case item of
+            CPPDirective {} -> CPPDirectiveAnn before (itemDoc ann)
+            _ -> CDeclarationAnn before (itemDoc ann)
         itemDoc (CDeclarationAnn _ doc) = doc
         itemDoc (CPPDirectiveAnn _ doc) = doc
         itemDoc _ = Nothing
+
+-- | An item of a file with a documentation comment in its annotation.
+documented :: Maybe CDoc -> CFileItem -> CFileItem
+documented doc = withItemAnn $ \case
+    CDeclarationAnn before _ -> CDeclarationAnn before doc
+    CPPDirectiveAnn before _ -> CPPDirectiveAnn before doc
+    other -> other
+
+-- | An item of a file with its annotation changed, and its location kept.
+withItemAnn :: (CItemAnn -> CItemAnn) -> CFileItem -> CFileItem
+withItemAnn f item = case item of
+    CFunctionDef storage func (LocatedElement ann loc) -> CFunctionDef storage func (LocatedElement (f ann) loc)
+    CExtDecl decl (LocatedElement ann loc) -> CExtDecl decl (LocatedElement (f ann) loc)
+    CPPDirective directive (LocatedElement ann loc) -> CPPDirective directive (LocatedElement (f ann) loc)
 
 _include :: Bool -> FilePath -> CFileItem
 _include system filePath =
@@ -624,12 +637,24 @@ _endif =
 struct :: Ident 
     -> [CDeclaration]  -- member declarations
     -> [CAttribute] -> CFileItem
-struct ident flds attrs = CExtDecl (CEDStructUnion (Just ident) (CStruct CStructTag Nothing (map undocumentedMember flds) attrs)) (internalAnn (CDeclarationAnn False Nothing))
+struct ident flds = documentedStruct ident (map undocumentedMember flds)
+
+-- | A struct whose members carry their own documentation comments.
+documentedStruct :: Ident -> [CMember] -> [CAttribute] -> CFileItem
+documentedStruct ident members attrs = CExtDecl (CEDStructUnion (Just ident) (CStruct CStructTag Nothing members attrs)) (internalAnn (CDeclarationAnn False Nothing))
+
+-- | A member of a struct or a union with a documentation comment.
+documentedMember :: Maybe CDoc -> CDeclaration -> CMember
+documentedMember doc decl = CMember decl (internalAnn (CMemberAnn doc))
 
 -- | A member of a struct or a union without a documentation comment.
 undocumentedMember :: CDeclaration -> CMember
-undocumentedMember decl = CMember decl (internalAnn (CMemberAnn Nothing))
+undocumentedMember = documentedMember Nothing
+
+-- | An enumerator without a value and with a documentation comment.
+documentedEnumerator :: Maybe CDoc -> Ident -> CEnumerator
+documentedEnumerator doc ident = CEnumerator ident Nothing (internalAnn (CMemberAnn doc))
 
 -- | An enumerator without a value and without a documentation comment.
 undocumentedEnumerator :: Ident -> CEnumerator
-undocumentedEnumerator ident = CEnumerator ident Nothing (internalAnn (CMemberAnn Nothing))
+undocumentedEnumerator = documentedEnumerator Nothing

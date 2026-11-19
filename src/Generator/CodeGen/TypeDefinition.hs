@@ -20,11 +20,20 @@ import Generator.Monadic
 import qualified Data.Set as S
 import Control.Monad.State
 import Core.Utils
+import Generator.CodeGen.Doc (genDoc, generatedDoc)
 
 filterStructModifiers :: [Modifier SemanticAnn] -> [Modifier SemanticAnn]
 filterStructModifiers = filter (\case
       Modifier "packed" Nothing -> True
       _ -> False)
+
+-- | The members of a struct or a class that a field gives, with the
+-- documentation comment of the field.
+genFieldMembers :: FieldDefinition SemanticAnn -> CGenerator [CMember]
+genFieldMembers fld@(FieldDefinition _ _ ann) = do
+    decls <- genFieldDeclaration fld
+    doc <- genDoc ann []
+    return $ map (documentedMember doc) decls
 
 genFieldDeclaration :: FieldDefinition SemanticAnn -> CGenerator [CDeclaration]
 genFieldDeclaration (FieldDefinition identifier ts@(TFixedLocation {}) _) = do
@@ -219,7 +228,8 @@ genEnumVariantParameterStruct ann identifier (EnumVariant this_variant params _)
     let cAnn = buildDeclarationAnn ann True
     pParams <- zipWithM genEnumVariantParameter params [0..]
     paramsStructName <- genEnumParameterStructName identifier this_variant
-    return $ CExtDecl (CEDStructUnion (Just paramsStructName) (CStruct CStructTag Nothing (map undocumentedMember pParams) [])) cAnn
+    let doc = generatedDoc "Data of " (identifier ++ "::" ++ this_variant) "."
+    return $ documented (Just doc) $ CExtDecl (CEDStructUnion (Just paramsStructName) (CStruct CStructTag Nothing (map undocumentedMember pParams) [])) cAnn
     where
         genEnumVariantParameter :: TerminaType SemanticAnn -> Integer -> CGenerator CDeclaration
         genEnumVariantParameter ts index = do
@@ -297,8 +307,9 @@ genResourceUnlockStmt ann identifier = do
 genTypeDefinitionDecl :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genTypeDefinitionDecl (TypeDefinition (Struct identifier fls modifiers) ann) = do
     let cAnn = buildDeclarationAnn ann True
+    doc <- genDoc ann []
     structModifiers <- mapM genAttribute (filterStructModifiers modifiers)
-    cFields <- concat <$> traverse genFieldDeclaration fls
+    cFields <- concat <$> traverse genFieldMembers fls
     opts <- gets (optionTypes . monadicTypes)
     optsDeclExt <- if S.member (TStruct identifier) opts then
         genOptionStruct (TStruct identifier)
@@ -317,14 +328,19 @@ genTypeDefinitionDecl (TypeDefinition (Struct identifier fls modifiers) ann) = d
                 generatedTypes = M.insert (TStruct identifier) currModule (generatedTypes . monadicTypes $ st)
             }
         }
-    return $ CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing (map undocumentedMember cFields) structModifiers)) cAnn : (optsDeclExt ++ statusDeclExt ++ resultsDeclExt)
+    return $ documented doc (CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing cFields structModifiers)) cAnn) : (optsDeclExt ++ statusDeclExt ++ resultsDeclExt)
 genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
     let cAnn = buildDeclarationAnn ann True
         variantsWithParams = filter (not . null . assocData) variants
+        enumDoc = generatedDoc "Variants of " identifier "."
     enumName <- genEnumStructName identifier
-    pEnumVariants <- mapM (\(EnumVariant this_variant _ _) -> genEnumVariantName identifier this_variant) variants
+    pEnumVariants <- mapM (\(EnumVariant this_variant _ variantAnn) -> do
+        name <- genEnumVariantName identifier this_variant
+        doc <- genDoc variantAnn []
+        return (documentedEnumerator doc name)) variants
     pEnumParameterStructs <- mapM (genEnumVariantParameterStruct ann identifier) variantsWithParams
-    enumStruct <- genEnumStruct enumName variantsWithParams
+    doc <- genDoc ann []
+    enumStruct <- documented doc <$> genEnumStruct enumName variantsWithParams
     opts <- gets (optionTypes . monadicTypes)
     optsDeclExt <- if S.member (TEnum identifier) opts then
         genOptionStruct (TStruct identifier)
@@ -333,7 +349,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
     statusDeclExt <- if S.member (TEnum identifier) stats then
         genStatusStruct (TStruct identifier)
         else return []
-    return $ CExtDecl (CEDEnum (Just enumName) (CEnum Nothing (map undocumentedEnumerator pEnumVariants) [])) cAnn
+    return $ documented (Just enumDoc) (CExtDecl (CEDEnum (Just enumName) (CEnum Nothing pEnumVariants [])) cAnn)
                 : pEnumParameterStructs ++ (enumStruct : optsDeclExt ++ statusDeclExt)
 
         where
@@ -375,27 +391,24 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier membe
             _ -> True}) fields
     cFields <- concat <$> traverse genClassField fields'
     cFunctions <- traverse (genClassFunctionDeclaration clsdef) (filter (not . isPrivateClassMember) functions)
-    let structFields = case clsKind of
+    doc <- genDoc ann []
+    let generatedFields = case clsKind of
             TaskClass ->
-                let cMsgQueueIDField = field taskMsgQueueIDField (typeDef terminaID) 
+                let cMsgQueueIDField = field taskMsgQueueIDField (typeDef terminaID)
                     cTaskIDField = field taskIDField (typeDef terminaID) in
-                [cTaskIDField, cMsgQueueIDField] ++ cFields
-            HandlerClass ->
-                let cIDField = field handlerIDField (typeDef terminaID) in
-                cIDField : cFields
-            ResourceClass ->
-                let cIDField = field resourceLockTypeField termina__resource_lock_type_t in
-                cIDField : cFields
-            _ -> cFields
+                [cTaskIDField, cMsgQueueIDField]
+            HandlerClass -> [field handlerIDField (typeDef terminaID)]
+            ResourceClass -> [field resourceLockTypeField termina__resource_lock_type_t]
+            _ -> []
+        structFields = map undocumentedMember generatedFields ++ cFields
+        cStruct = documented doc $ pre_cr (documentedStruct identifier structFields structModifiers |>> getLocation ann)
     case clsKind of
         TaskClass -> do
             cTaskFunction <- genTaskFunctionDeclaration
             cPortDefines <- genPortDefines
-            return $ cPortDefines ++ [pre_cr (struct identifier structFields structModifiers |>> getLocation ann), cTaskFunction]
-                ++ cFunctions
+            return $ cPortDefines ++ [cStruct, cTaskFunction] ++ cFunctions
         _ ->
-            return $ pre_cr (struct identifier structFields structModifiers |>> getLocation ann)
-                : cFunctions
+            return $ cStruct : cFunctions
 
     where
 
@@ -418,8 +431,8 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier membe
                     CDecl (CTypeSpec (_const . ptr $ void)) (Just "arg") Nothing
                 ]) (buildDeclarationAnn ann True)
 
-        genClassField :: ClassMember SemanticAnn -> CGenerator [CDeclaration]
-        genClassField (ClassField fld) = genFieldDeclaration fld
+        genClassField :: ClassMember SemanticAnn -> CGenerator [CMember]
+        genClassField (ClassField fld) = genFieldMembers fld
         genClassField member = throwError $ InternalError $ "invalid class member. Not a field: " ++ show member
 
 genTypeDefinitionDecl ts = throwError $ InternalError $ "Unsupported type definition: " ++ show ts
@@ -435,8 +448,21 @@ isPrivateClassMember _ = False
 -- | Declaration of a class member function. The declarations of the private
 -- member functions carry the static storage class specifier.
 genClassFunctionDeclaration :: AnnASTElement SemanticAnn -> ClassMember SemanticAnn -> CGenerator CFileItem
-genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier _ _ _) ann) member =
-    case member of
+genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier _ _ _) ann) member = do
+    -- The comment is the one of the member, with its own parameters.
+    doc <- genDoc (getAnnotation member) memberParams
+    documented doc <$> declaration
+
+  where
+
+    memberParams = case member of
+        ClassViewer _ params _ _ _ -> params
+        ClassProcedure _ _ params _ _ -> params
+        ClassMethod _ _ params _ _ _ -> params
+        ClassAction _ _ param _ _ -> maybe [] pure param
+        _ -> []
+
+    declaration = case member of
         ClassViewer viewer params rts _ _ -> do
             retType <- maybe (return void) (genType noqual) rts
             cParamDecls <- mapM genParameterDeclaration params
@@ -484,10 +510,8 @@ genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier _ _ _) an
             return $ CExtDecl (CEDFunction storage [] void clsFuncName [cEventParam, cThisParam]) (buildDeclarationAnn ann True)
         _ -> throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
 
-    where
-
-        storage :: Maybe CStorageSpecifier
-        storage = if isPrivateClassMember member then Just CStatic else Nothing
+    storage :: Maybe CStorageSpecifier
+    storage = if isPrivateClassMember member then Just CStatic else Nothing
 
 genClassFunctionDeclaration _ member = throwError $ InternalError $ "invalid class definition for member: " ++ show member
 

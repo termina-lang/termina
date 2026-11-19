@@ -730,6 +730,10 @@ instance CPrint CFile where
         return $ vsep pItems <> line
 
 runCPrinter :: Bool -> CFile -> Text
-runCPrinter dbg cFile = render' $ runReader (pprint cFile) (CPrinterConfig dbg False False)
+runCPrinter dbg = runCPrinterWith (CPrinterConfig dbg False False)
+
+-- | A file printed with a configuration. The debug lines are not wrapped.
+runCPrinterWith :: CPrinterConfig -> CFile -> Text
+runCPrinterWith config cFile = render' $ runReader (pprint cFile) config
     where
-        render' = if dbg then unboundedRender else render
+        render' = if debug config then unboundedRender else render

@@ -11,6 +11,7 @@ module Pipeline.Common
   , renderConfigFile
   , renderTestConfigFile
   , buildAndRenderModule
+  , renderDocumentedFiles
   , compileErrorCode
   , compileTestErrorCode
   , compileTestProjectErrorCode
@@ -43,14 +44,15 @@ import Semantic.Types (SemanticAnn)
 import Configuration.Configuration (defaultConfig, TerminaConfig (..), DeploymentKind (..))
 import Configuration.Platform (Platform(..))
 import Generator.Environment (getPlatformInitialGlobalEnv)
-import Generator.CodeGen.Module (runGenSourceFile)
+import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
+import Generator.Monadic (MonadicTypes)
 import Generator.CodeGen.Application.Glue (runGenMainFile)
 import Generator.TestDescriptor (genTestDescriptor)
 import Core.TestCases (NumberedCase, typedCases)
 import Data.Word (Word32)
 import Generator.CodeGen.Application.Config (runGenConfigFile)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
-import Generator.LanguageC.Printer (runCPrinter)
+import Generator.LanguageC.Printer (CPrinterConfig(..), runCPrinter, runCPrinterWith)
 import Lowering.AST (AnnotatedProgram)
 import qualified Semantic.AST as SAST
 
@@ -131,7 +133,25 @@ data PipelineResult = PipelineResult
   , programArch :: TerminaProgArch SemanticAnn
   , elaboratedModules :: ElaboratedProject
   , checksReports :: M.Map QualifiedName ElaborationReport
+  , pipelineMonadicTypes :: MonadicTypes
   }
+
+-- | The header and the source file of a module of a project, printed with
+-- their documentation comments, as @termina deliver --docs@ writes them, or
+-- the message of the error that stops the build.
+renderDocumentedFiles :: QualifiedName -> [(QualifiedName, String)] -> Either Text (Text, Text)
+renderDocumentedFiles target sources = either (Left . failMessage) Right $ do
+  result <- runProjectPipeline configParams sources
+  let eModule = elaboratedModules result M.! target
+      program = elaboratedAST . metadata $ eModule
+      deps = [ qname | ModuleDependency qname _ <- importedModules eModule ]
+      printed = runCPrinterWith (CPrinterConfig False False True)
+      generatorError err = Failure (T.pack (show err)) (T.pack (show err))
+  (cHeaderFile, _) <- either (Left . generatorError) Right
+    (runGenHeaderFile configParams TestPlatform target deps program (pipelineMonadicTypes result))
+  cSourceFile <- either (Left . generatorError) Right
+    (runGenSourceFile configParams TestPlatform target program)
+  return (printed cHeaderFile, printed cSourceFile)
 
 -- | The full pipeline up to (and including) the architecture checks, shared by
 -- 'runFullProjectBuild' (which renders each source module) and
@@ -146,7 +166,7 @@ runProjectPipeline cfg sources = do
   ordered <- orderModules parsedProject
   checked <- checkedOrFailure files (snd (checkModules cfg TestPlatform S.empty parsedProject ordered))
   pure (PipelineResult (checkedLowered checked) ordered (checkedArchitecture checked)
-    (checkedElaborated checked) (checkedReports checked))
+    (checkedElaborated checked) (checkedReports checked) (checkedMonadicTypes checked))
 
 -- | The modules of a project that keep their types after its checks, and the
 -- code of the error that stops them.
