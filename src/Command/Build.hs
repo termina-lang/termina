@@ -120,11 +120,6 @@ buildCmdArgsParser = BuildCmdArgs
       O.<|> O.flag' SelectAll (O.long "all" <> O.help "The application and every test")
       O.<|> pure SelectApp
 
-    readProfile :: String -> Either String ProjectProfile
-    readProfile "debug" = Right Debug
-    readProfile "release" = Right Release
-    readProfile other = Left $ "Unknown profile: " ++ other ++ " (use debug or release)"
-
     paramParser :: O.Parser CmpDiagramParam
     paramParser =
       paramFlagOnly

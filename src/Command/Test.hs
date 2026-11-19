@@ -118,15 +118,6 @@ testCmdArgsParser = TestCmdArgs
     <*> O.switch (O.long "json"
         <> O.help "Write the list in JSON")
 
-  where
-
-    readProfile :: String -> Either String ProjectProfile
-    readProfile profileName =
-        case profileName of
-            "debug" -> Right Debug
-            "release" -> Right Release
-            other -> Left $ "Unknown profile: " ++ other ++ " (use debug or release)"
-
 -- | A case of a test, named by its test instance
 data TestCase = TestCase {
     caseInstance :: Identifier,
