@@ -88,7 +88,10 @@ lowerStatements acc (stmt : xs) =
         -- operation that is being called
         SAST.SingleExpStmt expr ann ->
             case expr of
-                SAST.MemberFunctionCall obj funcName args ann' -> do
+                SAST.MemberFunctionCall obj funcName args callAnn -> do
+                    -- The block keeps the annotation of the call, with the
+                    -- comment of the statement
+                    let ann' = withDocOf ann callAnn
                     obj_ty <- getObjType obj
                     case obj_ty of
                         -- | If the object is of a defined type, it means that

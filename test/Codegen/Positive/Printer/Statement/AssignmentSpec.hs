@@ -49,8 +49,8 @@ foo1 = Variable "foo1" (objSemAnn Mutable TUInt32)
 foo2 = Variable "foo2" (objSemAnn Mutable TUInt32)
 
 foo1Assign, foo2Assign :: Statement SemanticAnn
-foo1Assign = AssignmentStmt foo1 (AccessObject (Variable "foo0" (objSemAnn Mutable TUInt32))) undefined
-foo2Assign = AssignmentStmt foo2 uint32Const0 undefined
+foo1Assign = AssignmentStmt foo1 (AccessObject (Variable "foo0" (objSemAnn Mutable TUInt32))) stmtSemAnn
+foo2Assign = AssignmentStmt foo2 uint32Const0 stmtSemAnn
 
 tmDescriptorObjSemAnn, messageObjSemAnn :: SemanticAnn
 tmDescriptorObjSemAnn = structObjSemAnn Mutable "TMDescriptor"

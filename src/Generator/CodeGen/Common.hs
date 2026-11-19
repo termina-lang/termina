@@ -432,13 +432,13 @@ buildGenericAnn :: SemanticAnn -> CAnns
 buildGenericAnn ann = LocatedElement CGenericAnn (getLocation ann)
 
 buildStatementAnn :: SemanticAnn -> Bool -> CAnns
-buildStatementAnn ann before = LocatedElement (CStatementAnn before False) (getLocation ann)
+buildStatementAnn ann before = LocatedElement (CStatementAnn before False Nothing) (getLocation ann)
 
 buildDeclarationAnn :: SemanticAnn -> Bool -> CAnns
 buildDeclarationAnn ann before = LocatedElement (CDeclarationAnn before Nothing) (getLocation ann)
 
 buildCompoundAnn :: SemanticAnn -> Bool -> Bool -> CAnns
-buildCompoundAnn ann before trailing = LocatedElement (CCompoundAnn before trailing) (getLocation ann)
+buildCompoundAnn ann before trailing = LocatedElement (CCompoundAnn before trailing Nothing) (getLocation ann)
 
 buildCPPDirectiveAnn :: SemanticAnn -> Bool -> CAnns
 buildCPPDirectiveAnn ann before = LocatedElement (CPPDirectiveAnn before Nothing) (getLocation ann)
@@ -494,4 +494,4 @@ genDiscardedParameters params =
             let cAnn = internalAnn CGenericAnn in
             CBlockStmt $ CSDo
                 (CExprCast (CExprValOf (CVar identifier cType) cType cAnn) (CTVoid noqual) cAnn)
-                (internalAnn (CStatementAnn before False))
+                (internalAnn (CStatementAnn before False Nothing))

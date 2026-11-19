@@ -5,6 +5,7 @@
 -- another one.
 module Generator.LanguageC.DocPrinter
   ( pprintCDoc
+  , pprintComment
   , pprintTrailingCDoc
   , cDocLines
   , escapeDoxygen
@@ -31,6 +32,18 @@ pprintCDoc doc = column $ \c ->
     where
 
         commentLine l = pretty (if T.null l then " *" else " * " <> l)
+
+-- | The comment of a statement, on one line when it has one and as a block
+-- with a star on each line otherwise. Doxygen does not read it, so only the
+-- escaping of C applies.
+pprintComment :: CComment -> DocStyle
+pprintComment (CComment [l]) = pretty ("/* " <> escapeComment l <> " */")
+pprintComment (CComment ls) =
+    align (concatWith (\a b -> a <> hardline <> b) ("/*" : map commentLine ls ++ [" */"]))
+
+    where
+
+        commentLine l = pretty (if T.null l then " *" else " * " <> escapeComment l)
 
 -- | A documentation comment after a member or an enumerator, @/**< ... */@,
 -- when it is only a brief of at most 60 characters on one line.

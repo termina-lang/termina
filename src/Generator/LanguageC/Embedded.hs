@@ -17,7 +17,7 @@ module Generator.LanguageC.Embedded (
     int8_t, int16_t, int32_t, int64_t,
     dec, indent, trail_cr, pre_cr, no_cr,
     block, var, field, struct, documentedStruct, documentedMember, undocumentedMember,
-    documentedEnumerator, undocumentedEnumerator, documented, _const,
+    documentedEnumerator, undocumentedEnumerator, documented, commented, commentedStatement, _const,
     function, static_function,
     global, static_global, extern,
     _if, _if_else, _break, _switch, _case, 
@@ -323,54 +323,25 @@ class Indentation a where
     indent :: a -> a
 
 instance Indentation CCompoundBlockItem where
-    indent (CBlockStmt (CSCase expr stmt (LocatedElement (CStatementAnn pre _) loc))) =
-        CBlockStmt $ CSCase expr stmt (LocatedElement (CStatementAnn pre True) loc)
-    indent (CBlockStmt (CSDefault stmt (LocatedElement (CStatementAnn pre _) loc))) =
-        CBlockStmt $ CSDefault stmt (LocatedElement (CStatementAnn pre True) loc)
-    indent (CBlockStmt (CSDo expr (LocatedElement (CStatementAnn pre _) loc))) =
-        CBlockStmt $ CSDo expr (LocatedElement (CStatementAnn pre True) loc)
-    indent (CBlockStmt (CSIfThenElse expr stmt maybeStmt (LocatedElement (CStatementAnn pre _) loc))) =
-        CBlockStmt $ CSIfThenElse expr stmt maybeStmt (LocatedElement (CStatementAnn pre True) loc)
-    indent (CBlockStmt (CSFor expr1 expr2 expr3 stmt (LocatedElement (CStatementAnn pre _) loc))) =
-        CBlockStmt $ CSFor expr1 expr2 expr3 stmt (LocatedElement (CStatementAnn pre True) loc)
-    indent (CBlockStmt (CSReturn maybeExpr (LocatedElement (CStatementAnn pre _) loc))) =
-        CBlockStmt $ CSReturn maybeExpr (LocatedElement (CStatementAnn pre True) loc)
-    indent (CBlockStmt (CSSwitch expr stmt (LocatedElement (CStatementAnn pre _) loc))) =
-        CBlockStmt $ CSSwitch expr stmt (LocatedElement (CStatementAnn pre True) loc)
-    indent (CBlockStmt (CSBreak (LocatedElement (CStatementAnn pre _) loc))) =
-        CBlockStmt $ CSBreak (LocatedElement (CStatementAnn pre True) loc)
-    indent stmt = stmt
+    indent (CBlockStmt stmt) = CBlockStmt (indent stmt)
+    indent item = item
 
 instance Indentation CStatement where
-    indent (CSCase expr stmt (LocatedElement (CStatementAnn pre _) loc)) =
-        CSCase expr stmt (LocatedElement (CStatementAnn pre True) loc)
-    indent (CSDefault stmt (LocatedElement (CStatementAnn pre _) loc)) =
-        CSDefault stmt (LocatedElement (CStatementAnn pre True) loc)
-    indent (CSDo expr (LocatedElement (CStatementAnn pre _) loc)) =
-        CSDo expr (LocatedElement (CStatementAnn pre True) loc)
-    indent (CSIfThenElse expr stmt maybeStmt (LocatedElement (CStatementAnn pre _) loc)) =
-        CSIfThenElse expr stmt maybeStmt (LocatedElement (CStatementAnn pre True) loc)
-    indent (CSFor expr1 expr2 expr3 stmt (LocatedElement (CStatementAnn pre _) loc)) =
-        CSFor expr1 expr2 expr3 stmt (LocatedElement (CStatementAnn pre True) loc)
-    indent (CSReturn maybeExpr (LocatedElement (CStatementAnn pre _) loc)) =
-        CSReturn maybeExpr (LocatedElement (CStatementAnn pre True) loc)
-    indent (CSSwitch expr stmt (LocatedElement (CStatementAnn pre _) loc)) =
-        CSSwitch expr stmt (LocatedElement (CStatementAnn pre True) loc)
-    indent (CSBreak (LocatedElement (CStatementAnn pre _) loc)) =
-        CSBreak (LocatedElement (CStatementAnn pre True) loc)
-    indent stmt = stmt
+    indent = withStatementAnn $ \case
+        CStatementAnn before _ comment -> CStatementAnn before True comment
+        other -> other
 
 class Trailing a where
     trail_cr :: a -> a
 
 instance Trailing CCompoundBlockItem where
-    trail_cr (CBlockStmt (CSCompound stmts (LocatedElement (CCompoundAnn pre _) loc))) =
-        CBlockStmt $ CSCompound stmts (LocatedElement (CCompoundAnn pre True) loc)
+    trail_cr (CBlockStmt stmt@(CSCompound {})) = CBlockStmt (trail_cr stmt)
     trail_cr stmt = error $ "Invalid statement for trailing CR: " ++ show stmt
 
 instance Trailing CStatement where
-    trail_cr (CSCompound stmts (LocatedElement (CCompoundAnn pre _) loc)) =
-        CSCompound stmts (LocatedElement (CCompoundAnn pre True) loc)
+    trail_cr stmt@(CSCompound {}) = flip withStatementAnn stmt $ \case
+        CCompoundAnn before _ comment -> CCompoundAnn before True comment
+        other -> other
     trail_cr stmt = error $ "Invalid statement for trailing CR: " ++ show stmt
 
 class Alignment a b where
@@ -378,104 +349,99 @@ class Alignment a b where
     no_cr :: a -> b
 
 instance Alignment CStatement CCompoundBlockItem where
-    pre_cr CSSkip = CBlockStmt CSSkip
-    pre_cr (CSCase expr stmt (LocatedElement (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSCase expr stmt (LocatedElement (CStatementAnn True ind) loc)
-    pre_cr (CSDefault stmt (LocatedElement (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSDefault stmt (LocatedElement (CStatementAnn True ind) loc)
-    pre_cr (CSDo expr (LocatedElement (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSDo expr (LocatedElement (CStatementAnn True ind) loc)
-    pre_cr (CSCompound stmts (LocatedElement (CCompoundAnn _ ind) loc)) =
-        CBlockStmt $ CSCompound stmts (LocatedElement (CCompoundAnn True ind) loc)
-    pre_cr (CSIfThenElse expr stmt maybeStmt (LocatedElement (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSIfThenElse expr stmt maybeStmt (LocatedElement (CStatementAnn True ind) loc)
-    pre_cr (CSFor expr1 expr2 expr3 stmt (LocatedElement (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSFor expr1 expr2 expr3 stmt (LocatedElement (CStatementAnn True ind) loc)
-    pre_cr (CSReturn maybeExpr (LocatedElement (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSReturn maybeExpr (LocatedElement (CStatementAnn True ind) loc)
-    pre_cr (CSSwitch expr stmt (LocatedElement (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSSwitch expr stmt (LocatedElement (CStatementAnn True ind) loc)
-    pre_cr (CSBreak (LocatedElement (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSBreak (LocatedElement (CStatementAnn True ind) loc)
-    pre_cr stmt = error $ "pre_cr: invalid annotation: " ++ show stmt
-
-    no_cr CSSkip = CBlockStmt CSSkip
-    no_cr (CSCase expr stmt (LocatedElement (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSCase expr stmt (LocatedElement (CStatementAnn False ind) loc)
-    no_cr (CSDefault stmt (LocatedElement (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSDefault stmt (LocatedElement (CStatementAnn False ind) loc)
-    no_cr (CSDo expr (LocatedElement (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSDo expr (LocatedElement (CStatementAnn False ind) loc)
-    no_cr (CSCompound stmts (LocatedElement (CCompoundAnn _ ind) loc)) =
-        CBlockStmt $ CSCompound stmts (LocatedElement (CCompoundAnn False ind) loc)
-    no_cr (CSIfThenElse expr stmt maybeStmt (LocatedElement (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSIfThenElse expr stmt maybeStmt (LocatedElement (CStatementAnn False ind) loc)
-    no_cr (CSFor expr1 expr2 expr3 stmt (LocatedElement (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSFor expr1 expr2 expr3 stmt (LocatedElement (CStatementAnn False ind) loc)
-    no_cr (CSReturn maybeExpr (LocatedElement (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSReturn maybeExpr (LocatedElement (CStatementAnn False ind) loc)
-    no_cr (CSSwitch expr stmt (LocatedElement (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSSwitch expr stmt (LocatedElement (CStatementAnn False ind) loc)
-    no_cr (CSBreak (LocatedElement (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSBreak (LocatedElement (CStatementAnn False ind) loc)
-    no_cr stmt = error $ "no_cr: invalid annotation: " ++ show stmt
+    pre_cr = CBlockStmt . statementLineBefore True
+    no_cr = CBlockStmt . statementLineBefore False
 
 instance Alignment CExpression CCompoundBlockItem where
-    pre_cr expr = CBlockStmt $ CSDo expr (internalAnn (CStatementAnn True False))
-    no_cr expr = CBlockStmt $ CSDo expr (internalAnn (CStatementAnn False False))
+    pre_cr expr = CBlockStmt $ CSDo expr (internalStatementAnn True)
+    no_cr expr = CBlockStmt $ CSDo expr (internalStatementAnn False)
 
 instance Alignment CExpression CStatement where
-    pre_cr expr = CSDo expr (internalAnn (CStatementAnn True False))
-    no_cr expr = CSDo expr (internalAnn (CStatementAnn False False))
+    pre_cr expr = CSDo expr (internalStatementAnn True)
+    no_cr expr = CSDo expr (internalStatementAnn False)
 
 instance Alignment ForLoop CStatement where
     pre_cr (ForLoop expr1 expr2 expr3 stmt) =
-        CSFor expr1 expr2 expr3 stmt (internalAnn (CStatementAnn True False))
+        CSFor expr1 expr2 expr3 stmt (internalStatementAnn True)
     no_cr (ForLoop expr1 expr2 expr3 stmt) =
-        CSFor expr1 expr2 expr3 stmt (internalAnn (CStatementAnn False False))
+        CSFor expr1 expr2 expr3 stmt (internalStatementAnn False)
 
 instance Alignment ForLoop CCompoundBlockItem where
     pre_cr (ForLoop expr1 expr2 expr3 stmt) =
-        CBlockStmt $ CSFor expr1 expr2 expr3 stmt (internalAnn (CStatementAnn True False))
+        CBlockStmt $ CSFor expr1 expr2 expr3 stmt (internalStatementAnn True)
     no_cr (ForLoop expr1 expr2 expr3 stmt) =
-        CBlockStmt $ CSFor expr1 expr2 expr3 stmt (internalAnn (CStatementAnn False False))
+        CBlockStmt $ CSFor expr1 expr2 expr3 stmt (internalStatementAnn False)
+
+-- | The annotation of a statement that the generator adds, without a comment,
+-- given whether a blank line goes before it.
+internalStatementAnn :: Bool -> CAnns
+internalStatementAnn before = internalAnn (CStatementAnn before False Nothing)
+
+-- | A statement with its annotation changed, and its location kept.
+withStatementAnn :: (CItemAnn -> CItemAnn) -> CStatement -> CStatement
+withStatementAnn _ CSSkip = CSSkip
+withStatementAnn f stmt = updateAnnotation stmt (ann { element = f (element ann) })
+
+    where
+
+        ann = getAnnotation stmt
+
+-- | A statement with a blank line before it or without one.
+statementLineBefore :: Bool -> CStatement -> CStatement
+statementLineBefore before = withStatementAnn $ \case
+    CStatementAnn _ ind comment -> CStatementAnn before ind comment
+    CCompoundAnn _ trailing comment -> CCompoundAnn before trailing comment
+    other -> error $ "Invalid annotation of a statement: " ++ show other
+
+-- | An item of a body with the comment of the statement it starts.
+commented :: Maybe CComment -> CCompoundBlockItem -> CCompoundBlockItem
+commented Nothing item = item
+commented comment (CBlockStmt stmt) = CBlockStmt (commentedStatement comment stmt)
+commented comment (CBlockDecl decl (LocatedElement (CLocalDeclarationAnn before inner) loc)) =
+    CBlockDecl decl (LocatedElement (CLocalDeclarationAnn before (joinComments comment inner)) loc)
+commented _ item = error $ "Invalid annotation of an item of a body: " ++ show item
+
+-- | A statement with a comment before it. The comment of a block goes before
+-- its first item, and on its own line when the block is empty.
+commentedStatement :: Maybe CComment -> CStatement -> CStatement
+commentedStatement Nothing stmt = stmt
+commentedStatement comment (CSCompound (item : items) ann) = CSCompound (commented comment item : items) ann
+commentedStatement comment stmt = flip withStatementAnn stmt $ \case
+    CStatementAnn before ind inner -> CStatementAnn before ind (joinComments comment inner)
+    CCompoundAnn before trailing inner -> CCompoundAnn before trailing (joinComments comment inner)
+    other -> error $ "Invalid annotation of a statement: " ++ show other
+
+-- | Two comments that fall on the same item, the outer one first: the one of
+-- a match and the one of its only case, which has no block of its own.
+joinComments :: Maybe CComment -> Maybe CComment -> Maybe CComment
+joinComments (Just (CComment outer)) (Just (CComment inner)) = Just (CComment (outer ++ [mempty] ++ inner))
+joinComments outer Nothing = outer
+joinComments Nothing inner = inner
 
 _if :: CExpression -> CStatement -> CStatement
-_if expr stmt1 =
-    let cAnn = internalAnn (CStatementAnn False False) in
-    CSIfThenElse expr stmt1 Nothing cAnn
+_if expr stmt1 = CSIfThenElse expr stmt1 Nothing (internalStatementAnn False)
 
 _if_else :: CExpression -> CStatement -> CStatement -> CStatement
-_if_else expr stmt1 stmt2 =
-    let cAnn = internalAnn (CStatementAnn False False) in
-    CSIfThenElse expr stmt1 (Just stmt2) cAnn
+_if_else expr stmt1 stmt2 = CSIfThenElse expr stmt1 (Just stmt2) (internalStatementAnn False)
 
 block :: [CCompoundBlockItem] -> CStatement
 block items =
-    CSCompound items (internalAnn (CCompoundAnn False False))
+    CSCompound items (internalAnn (CCompoundAnn False False Nothing))
 
 _break :: CStatement
-_break = CSBreak (internalAnn (CStatementAnn False False))
+_break = CSBreak (internalStatementAnn False)
 
 _switch :: CExpression -> CStatement -> CStatement
-_switch expr stmt =
-    let cAnn = internalAnn (CStatementAnn False False) in
-    CSSwitch expr stmt cAnn
+_switch expr stmt = CSSwitch expr stmt (internalStatementAnn False)
 
 _case :: CExpression -> CStatement -> CStatement
-_case expr stmt =
-    let cAnn = internalAnn (CStatementAnn False False) in
-    CSCase expr stmt cAnn
+_case expr stmt = CSCase expr stmt (internalStatementAnn False)
 
 _default :: CStatement -> CStatement
-_default stmt =
-    let cAnn = internalAnn (CStatementAnn False False) in
-    CSDefault stmt cAnn
+_default stmt = CSDefault stmt (internalStatementAnn False)
 
 _return :: Maybe CExpression -> CStatement
-_return expr =
-    let cAnn = internalAnn (CStatementAnn False False) in
-    CSReturn expr cAnn
+_return expr = CSReturn expr (internalStatementAnn False)
 
 data ForLoop =
     ForLoop (Either (Maybe CExpression) CDeclaration)
@@ -510,19 +476,17 @@ field ident cType = CDecl (CTypeSpec cType) (Just ident) Nothing
 
 instance Alignment Declaration CCompoundBlockItem where
     pre_cr (Declaration ident ts) =
-        let declAnn = internalAnn (CDeclarationAnn True Nothing) in
-        CBlockDecl (CDecl ts (Just ident) Nothing) declAnn
+        CBlockDecl (CDecl ts (Just ident) Nothing) (internalAnn (CLocalDeclarationAnn True Nothing))
     no_cr (Declaration ident ts) =
-        let declAnn = internalAnn (CDeclarationAnn False Nothing) in
-        CBlockDecl (CDecl ts (Just ident) Nothing) declAnn
+        CBlockDecl (CDecl ts (Just ident) Nothing) (internalAnn (CLocalDeclarationAnn False Nothing))
     
 (@:=) :: Declaration -> CExpression -> CDeclaration
 (@:=) (Declaration ident ts) expr =
     CDecl ts (Just ident) (Just expr)
 
 instance Alignment CDeclaration CCompoundBlockItem where
-    pre_cr decl = CBlockDecl decl (internalAnn (CDeclarationAnn True Nothing))
-    no_cr decl = CBlockDecl decl (internalAnn (CDeclarationAnn False Nothing))
+    pre_cr decl = CBlockDecl decl (internalAnn (CLocalDeclarationAnn True Nothing))
+    no_cr decl = CBlockDecl decl (internalAnn (CLocalDeclarationAnn False Nothing))
 
 data FunctionPrototype = 
     FunctionPrototype Ident [Declaration]

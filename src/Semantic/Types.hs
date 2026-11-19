@@ -6,7 +6,7 @@ module Semantic.Types where
 import Semantic.AST
 import Core.Utils
 import Utils.Annotations
-import Parser.Types (ParserAnn, undocumented)
+import Parser.Types (ParserAnn(..), undocumented)
 import Data.Maybe
 import qualified Data.Map.Strict as M
 
@@ -349,6 +349,11 @@ getSemanticAnn (SemanticAnn ann _src) = ann
 -- | The annotation of the parser that a semantic annotation keeps.
 sourceOf :: SemanticAnn -> ParserAnn
 sourceOf (SemanticAnn _ src) = src
+
+-- | An annotation with the documentation comment of another one: the one of
+-- a call with the comment of the statement that makes it.
+withDocOf :: SemanticAnn -> SemanticAnn -> SemanticAnn
+withDocOf from (SemanticAnn elems src) = SemanticAnn elems src { parsedDoc = parsedDoc (sourceOf from) }
 
 forgetSemAnn :: SemanticAnn -> Location
 forgetSemAnn = getLocation

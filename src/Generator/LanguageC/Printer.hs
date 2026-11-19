@@ -3,7 +3,7 @@
 module Generator.LanguageC.Printer where
 
 import Generator.LanguageC.AST
-import Generator.LanguageC.DocPrinter (pprintCDoc, pprintTrailingCDoc)
+import Generator.LanguageC.DocPrinter (pprintCDoc, pprintComment, pprintTrailingCDoc)
 import Prettyprinter
 import Data.Text (Text)
 import Control.Monad.Reader
@@ -515,124 +515,99 @@ instance CPrint CDeclaration where
 
 instance CPrint CStatement where
     pprint CSSkip = return emptyDoc
-    pprint s@(CSCase expr stat ann) = do
-        case itemAnnotation ann of
-            CStatementAnn before expand -> do
-                pexpr <- pprint expr
-                pstat <- pprint stat
-                return $ prependLine before $ indentStmt expand $ pretty "case" <+> pexpr <> pretty ":" <> line <> pstat
-            _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CSDefault stat ann) = do
-        case itemAnnotation ann of
-            CStatementAnn before expand -> do
-                pstat <- pprint stat
-                return $ prependLine before $ indentStmt expand $ pretty "default:" <> line <> pstat
-            _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CSDo expr ann) = do
-        case itemAnnotation ann of
-            CStatementAnn before expand -> do
-                debugLines <- asks debug
-                pexpr <- pprint expr
-                return $ 
-                    prependLine before . indentStmt expand . addDebugLine debugLines (location ann) 
-                    $ pexpr <> semi
-            _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CSIfThenElse expr stat mestat ann) = do
-        case itemAnnotation ann of
-            CStatementAnn before expand -> do
-                debugLines <- asks debug
-                pexpr <- pprint expr
-                pstat <- pprint stat
-                pestat <- case mestat of
-                    Nothing -> return emptyDoc
-                    Just estat -> do
-                        palt <- pprint estat
-                        if debugLines then
-                            return $ pretty " else" <> line <> palt
-                        else
-                            return $ pretty " else" <+> palt
-                return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
-                    pretty "if" <+> parens pexpr
-                    <+> pstat
-                    <> pestat
-            _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CSSwitch expr stat ann) = do
-        case itemAnnotation ann of
-            CStatementAnn before expand -> do
-                debugLines <- asks debug
-                pexpr <- pprint expr
-                pstat <- pprint stat
-                return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
-                    pretty "switch" <+> parens pexpr
-                    <+> pstat
-            _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CSFor for_init cond step stat ann) = do
-        case itemAnnotation ann of
-            CStatementAnn before expand -> do
-                debugLines <- asks debug
-                pfor_init <- either (maybe (return emptyDoc) pprint) pprint for_init
-                pstat <- pprint stat
-                case (cond, step) of
-                    (Nothing, Nothing) ->
-                        return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
-                            pretty "for" <+> parens (pfor_init <> semi <> semi) <+> pstat
-                    (Just cond', Nothing) -> do
-                        pcond <- pprint cond'
-                        return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
-                            pretty "for" <+> parens (pfor_init <> semi <+> align (pcond <> semi)) <+> pstat
-                    (Nothing, Just step') -> do
-                        pstep <- pprint step'
-                        return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
-                            pretty "for" <+> parens (pfor_init <> semi <> semi <+> align pstep) <+> pstat
-                    (Just cond', Just step') -> do
-                        pcond <- pprint cond'
-                        pstep <- pprint step'
-                        return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
-                            pretty "for" <+> parens (align (sep [pfor_init <> semi, pcond <> semi, pstep])) <+> pstat
-            _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CSReturn Nothing ann) =
-        case itemAnnotation ann of
-            CStatementAnn before expand -> do
-                debugLines <- asks debug
-                return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
-                    pretty "return" <> semi
-            _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CSReturn (Just e) ann) =
-        case itemAnnotation ann of
-            CStatementAnn before expand -> do
-                debugLines <- asks debug
-                pe <- pprint e
-                return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
-                    pretty "return" <+> pe <> semi
-            _ -> error $ "Invalid annotation: " ++ show s
+    pprint (CSCase expr stat ann) = do
+        pexpr <- pprint expr
+        pstat <- pprint stat
+        layoutStatement False ann $ pretty "case" <+> pexpr <> pretty ":" <> line <> pstat
+    pprint (CSDefault stat ann) = do
+        pstat <- pprint stat
+        layoutStatement False ann $ pretty "default:" <> line <> pstat
+    pprint (CSDo expr ann) = do
+        pexpr <- pprint expr
+        layoutStatement True ann $ pexpr <> semi
+    pprint (CSIfThenElse expr stat mestat ann) = do
+        debugLines <- asks debug
+        pexpr <- pprint expr
+        pstat <- pprint stat
+        pestat <- case mestat of
+            Nothing -> return emptyDoc
+            Just estat -> do
+                palt <- pprint estat
+                if debugLines then
+                    return $ pretty " else" <> line <> palt
+                else
+                    return $ pretty " else" <+> palt
+        layoutStatement True ann $ pretty "if" <+> parens pexpr <+> pstat <> pestat
+    pprint (CSSwitch expr stat ann) = do
+        pexpr <- pprint expr
+        pstat <- pprint stat
+        layoutStatement True ann $ pretty "switch" <+> parens pexpr <+> pstat
+    pprint (CSFor for_init cond step stat ann) = do
+        pfor_init <- either (maybe (return emptyDoc) pprint) pprint for_init
+        pstat <- pprint stat
+        header <- case (cond, step) of
+            (Nothing, Nothing) -> return $ pfor_init <> semi <> semi
+            (Just cond', Nothing) -> do
+                pcond <- pprint cond'
+                return $ pfor_init <> semi <+> align (pcond <> semi)
+            (Nothing, Just step') -> do
+                pstep <- pprint step'
+                return $ pfor_init <> semi <> semi <+> align pstep
+            (Just cond', Just step') -> do
+                pcond <- pprint cond'
+                pstep <- pprint step'
+                return $ align (sep [pfor_init <> semi, pcond <> semi, pstep])
+        layoutStatement True ann $ pretty "for" <+> parens header <+> pstat
+    pprint (CSReturn Nothing ann) =
+        layoutStatement True ann $ pretty "return" <> semi
+    pprint (CSReturn (Just e) ann) = do
+        pe <- pprint e
+        layoutStatement True ann $ pretty "return" <+> pe <> semi
     pprint s@(CSCompound items ann) =
         case itemAnnotation ann of
-            CCompoundAnn before trailing -> do
+            CCompoundAnn before trailing comment -> do
+                pComment <- maybe [] (\c -> [line <> c]) <$> commentDoc comment
                 pItems <- mapM pprint items
                 return $ prependLine before $
                     if trailing then
-                        braces' ((indentTab . align) (vsep pItems <> line))
+                        braces' ((indentTab . align) (vsep (pComment ++ pItems) <> line))
                     else
-                        braces' ((indentTab . align) (vsep pItems))
+                        braces' ((indentTab . align) (vsep (pComment ++ pItems)))
             _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CSBreak ann) =
-        case itemAnnotation ann of
-            CStatementAnn before expand -> do
-                debugLines <- asks debug
-                return $ 
-                    prependLine before . indentStmt expand . addDebugLine debugLines (location ann) 
-                    $ pretty "break" <> semi
-            _ -> error $ "Invalid annotation: " ++ show s
+    pprint (CSBreak ann) =
+        layoutStatement True ann $ pretty "break" <> semi
 
 instance CPrint CCompoundBlockItem where
     pprint (CBlockStmt stat) = pprint stat
     pprint (CBlockDecl decl ann) = do
-        case itemAnnotation ann of 
-            CDeclarationAnn before _ -> do
+        case itemAnnotation ann of
+            CLocalDeclarationAnn before comment -> do
                 debugLines <- asks debug
                 pdecl <- pprint decl
-                return $ prependLine before . addDebugLine debugLines (location ann) $ pdecl <> semi
+                prependLine before <$> withComment comment (addDebugLine debugLines (location ann) (pdecl <> semi))
             _ -> error $ "Invalid annotation: " ++ show ann
+
+-- | A statement already printed, with its @#line@ when it takes one and the
+-- printer prints them, its comment before it, its indentation and the blank
+-- line before it.
+layoutStatement :: Bool -> CAnns -> DocStyle -> CPrinter
+layoutStatement withLine ann pstmt =
+    case itemAnnotation ann of
+        CStatementAnn before expand comment -> do
+            debugLines <- asks debug
+            pcommented <- withComment comment (addDebugLine (withLine && debugLines) (location ann) pstmt)
+            return $ prependLine before . indentStmt expand $ pcommented
+        _ -> error $ "Invalid annotation: " ++ show ann
+
+-- | The comment of a statement, when the comments are printed.
+commentDoc :: Maybe CComment -> Reader CPrinterConfig (Maybe DocStyle)
+commentDoc comment = do
+    docs <- asks printDocs
+    return $ if docs then pprintComment <$> comment else Nothing
+
+-- | A statement with its comment before it, when the comments are printed.
+withComment :: Maybe CComment -> DocStyle -> CPrinter
+withComment comment pstmt = maybe pstmt (\c -> c <> hardline <> pstmt) <$> commentDoc comment
 
 instance CPrint CPreprocessorDirective where
     pprint (CPPDefine ident Nothing) =

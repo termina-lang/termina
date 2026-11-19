@@ -10,6 +10,11 @@ import Doc.Model (DocInline', DocBlock')
 
 type Ident = String
 
+-- | The comment of a statement inside a body, printed as an ordinary block
+-- comment: its lines as the author wrote them.
+newtype CComment = CComment [T.Text]
+  deriving Show
+
 -- | The documentation comment of a C declaration, printed as a Doxygen block:
 -- its brief, its body and its tags. Its links name C identifiers.
 data CDoc = CDoc
@@ -455,15 +460,21 @@ data CItemAnn =
     -- | Generic annotation
     CGenericAnn
     -- | C Statement annotation
-    | CStatementAnn 
+    | CStatementAnn
       Bool -- ^ Add new line before statement
       Bool -- ^ Indent statement
+      (Maybe CComment) -- ^ Comment before the statement
     | CCompoundAnn
       Bool -- ^ Add new line before the compound block
       Bool -- ^ Add trailing line inside the compound block
+      (Maybe CComment) -- ^ Comment inside the block, when it has no items to carry it
     | CDeclarationAnn
       Bool -- ^ Add new line before declaration
       (Maybe CDoc) -- ^ Documentation comment
+    -- | Annotation of a declaration inside a body
+    | CLocalDeclarationAnn
+      Bool -- ^ Add new line before declaration
+      (Maybe CComment) -- ^ Comment before the declaration
     | CPPDirectiveAnn
       Bool -- ^ Add new line before directive
       (Maybe CDoc) -- ^ Documentation comment

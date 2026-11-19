@@ -19,6 +19,7 @@ module Doc.Model
   , DocRef(..)
   , linesAt
   , commentLines
+  , docLines
   , splitDoc
   , docModel
   , inheritDoc
@@ -173,12 +174,16 @@ commentLines form raw = trimBlank (map trimEnd (margin form raw))
 
     trimEnd l = l { lineText = dropWhileEnd isSpace (lineText l) }
 
+-- | The lines of a comment as written, without its margin.
+docLines :: DocComment -> [DocLine]
+docLines doc = commentLines (docForm doc) (writtenLines doc)
+
 -- | The documentation model of a comment. The tags were already checked when
 -- the comment was parsed, so the error is only reached by a comment built by
 -- hand.
 docModel :: DocComment -> Either (SourcePos, DocError) DocModel
 docModel doc = do
-  (body, tags) <- splitDoc (commentLines (docForm doc) (writtenLines doc))
+  (body, tags) <- splitDoc (docLines doc)
   let (summary, rest) = case markdown body of
         DPara inlines : more -> (inlines, more)
         blocks -> ([], blocks)
