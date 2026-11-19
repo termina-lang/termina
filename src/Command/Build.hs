@@ -528,7 +528,7 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
     externs <- prepareExtern config (map outputFolder outConfigs) parsedProject sources (deploymentExterns deployment)
     forM_ outConfigs $ \outConfig -> do
       when chatty (putStrLn . debugMessage $ "Generating code into \"" ++ outputFolder outConfig ++ "\"")
-      genModules outConfig plt monadicTypes (instanceFacts (defaultStackSize plt) programArchitecture) elaboratedProject
+      genModules outConfig plt monadicTypes (instanceFacts plt programArchitecture) elaboratedProject
       genInitFile outConfig plt elaboratedProject
       genPlatformCode outConfig plt loweredProject programArchitecture externs
       monadicHeaders <- genMonadicHeaderFiles outConfig plt monadicTypes

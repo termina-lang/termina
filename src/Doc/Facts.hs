@@ -10,6 +10,7 @@ module Doc.Facts
 
 import qualified Data.Map.Strict as M
 
+import Configuration.Platform (Platform, defaultStackSize, getPlatformInterruptMap)
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.Utils (genResourceLockings, getPriority, getStackSize, reachableResources)
 import Core.AST (ClassKind(..), FieldAssignment'(..), Identifier, TInteger)
@@ -22,6 +23,7 @@ data Endpoint = Endpoint Identifier Identifier
 -- | The kinds of components that a port connects to.
 data ComponentKind
   = EmitterComponent
+  | InterruptComponent Integer -- ^ An emitter of an interrupt and its vector
   | ChannelComponent
   | ResourceComponent
   | PoolComponent
@@ -46,14 +48,13 @@ data DocFact a
   | AtomicOf (TerminaType a) (Maybe (Expression a)) -- ^ The value of an atomic, and the size of an atomic array
   | DequeOf (TerminaType a) (Expression a) -- ^ The boxes of a deque and its capacity
   | PeriodicTimerOf (Expression a) -- ^ The period of a periodic timer
-  | InterruptOf -- ^ An emitter of an interrupt
+  | InterruptOf Integer -- ^ An emitter of an interrupt and its vector
   | Triggers Endpoint -- ^ The port that an emitter triggers
   deriving Show
 
--- | The facts of each instance of a deployment, by its name, given the size
--- of the stack of a task without one.
-instanceFacts :: Integer -> TerminaProgArch a -> M.Map Identifier [DocFact a]
-instanceFacts defaultStack arch = M.unions
+-- | The facts of each instance of a deployment on a platform, by its name.
+instanceFacts :: Platform -> TerminaProgArch a -> M.Map Identifier [DocFact a]
+instanceFacts plt arch = M.unions
   [ M.map taskFacts (tasks arch)
   , M.map handlerFacts (handlers arch)
   , M.map resourceFacts (resources arch)
@@ -68,17 +69,18 @@ instanceFacts defaultStack arch = M.unions
   where
 
     lockings = genResourceLockings arch
+    vectors = getPlatformInterruptMap plt
 
     taskFacts tsk =
-      [ InstanceOf TaskClass (taskClass tsk), Priority (getPriority tsk), StackSize (getStackSize defaultStack tsk) ]
-      ++ ports EmitterComponent (taskSinkPortConns tsk)
+      [ InstanceOf TaskClass (taskClass tsk), Priority (getPriority tsk), StackSize (getStackSize (defaultStackSize plt) tsk) ]
+      ++ [ ConnectedTo port (emitterKind emitter) emitter | (port, (emitter, _)) <- M.toList (taskSinkPortConns tsk) ]
       ++ ports ChannelComponent (taskInputPortConns tsk)
       ++ ports ChannelComponent (taskOutputPortConns tsk)
       ++ accessConnections (taskAPConnections tsk)
 
     handlerFacts hdl =
       let (port, emitter, _) = handlerSinkPortConn hdl in
-      [ InstanceOf HandlerClass (handlerClass hdl), ConnectedTo port EmitterComponent emitter ]
+      [ InstanceOf HandlerClass (handlerClass hdl), ConnectedTo port (emitterKind emitter) emitter ]
       ++ ports ChannelComponent (handlerOutputPortConns hdl)
       ++ accessConnections (handlerAPConnections hdl)
       ++ [ Reaches reached
@@ -111,7 +113,7 @@ instanceFacts defaultStack arch = M.unions
         kind = case emitter of
           TPPeriodicTimerEmitter _ (StructInitializer fields _) _ _ ->
             [ PeriodicTimerOf period | FieldValueAssignment "period" period _ <- fields ]
-          TPInterruptEmitter {} -> [InterruptOf]
+          TPInterruptEmitter {} -> [ InterruptOf vector | Just vector <- [M.lookup name vectors] ]
           _ -> []
 
     ports kind conns = [ ConnectedTo port kind target | (port, (target, _)) <- M.toList conns ]
@@ -119,6 +121,9 @@ instanceFacts defaultStack arch = M.unions
     protection name = [ ProtectedBy lock | Just lock <- [M.lookup name lockings] ]
     users name = [ UsedBy [ Endpoint component port | (component, port, _) <- sources ]
                  | Just sources <- [M.lookup name (resourceSources arch)], not (null sources) ]
+
+    -- An emitter of an interrupt comes with its vector
+    emitterKind emitter = maybe EmitterComponent InterruptComponent (M.lookup emitter vectors)
 
     -- The kind of a component of the deployment that an access port reaches
     componentKind target

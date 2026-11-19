@@ -12,6 +12,7 @@ module Pipeline.Common
   , renderTestConfigFile
   , buildAndRenderModule
   , renderDocumentedFiles
+  , renderDocumentedFilesOn
   , compileErrorCode
   , compileTestErrorCode
   , compileTestProjectErrorCode
@@ -43,7 +44,7 @@ import Semantic.Environment (makeInitialGlobalEnv, Environment)
 import Semantic.Types (SemanticAnn)
 
 import Configuration.Configuration (defaultConfig, TerminaConfig (..), DeploymentKind (..))
-import Configuration.Platform (Platform(..), defaultStackSize)
+import Configuration.Platform (Platform(..))
 import Generator.Environment (getPlatformInitialGlobalEnv)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Generator.Monadic (MonadicTypes)
@@ -141,18 +142,22 @@ data PipelineResult = PipelineResult
 -- their documentation comments, as @termina deliver --docs@ writes them, or
 -- the message of the error that stops the build.
 renderDocumentedFiles :: QualifiedName -> [(QualifiedName, String)] -> Either Text (Text, Text)
-renderDocumentedFiles target sources = either (Left . failMessage) Right $ do
-  result <- runProjectPipeline configParams sources
+renderDocumentedFiles = renderDocumentedFilesOn TestPlatform
+
+-- | 'renderDocumentedFiles' on a given platform.
+renderDocumentedFilesOn :: Platform -> QualifiedName -> [(QualifiedName, String)] -> Either Text (Text, Text)
+renderDocumentedFilesOn plt target sources = either (Left . failMessage) Right $ do
+  result <- runProjectPipelineOn plt configParams sources
   let eModule = elaboratedModules result M.! target
       program = elaboratedAST . metadata $ eModule
       deps = [ qname | ModuleDependency qname _ <- importedModules eModule ]
       printed = runCPrinterWith (CPrinterConfig False False True)
       generatorError err = Failure (T.pack (show err)) (T.pack (show err))
   (cHeaderFile, _) <- either (Left . generatorError) Right
-    (runGenHeaderFile configParams TestPlatform target deps program (pipelineMonadicTypes result)
-      (instanceFacts (defaultStackSize TestPlatform) (programArch result)))
+    (runGenHeaderFile configParams plt target deps program (pipelineMonadicTypes result)
+      (instanceFacts plt (programArch result)))
   cSourceFile <- either (Left . generatorError) Right
-    (runGenSourceFile configParams TestPlatform target program)
+    (runGenSourceFile configParams plt target program)
   return (printed cHeaderFile, printed cSourceFile)
 
 -- | The full pipeline up to (and including) the architecture checks, shared by
@@ -162,11 +167,19 @@ runProjectPipeline ::
   TerminaConfig
   -> [(QualifiedName, String)]
   -> Either Failure PipelineResult
-runProjectPipeline cfg sources = do
+runProjectPipeline = runProjectPipelineOn TestPlatform
+
+-- | 'runProjectPipeline' on a given platform.
+runProjectPipelineOn ::
+  Platform
+  -> TerminaConfig
+  -> [(QualifiedName, String)]
+  -> Either Failure PipelineResult
+runProjectPipelineOn plt cfg sources = do
   let files = M.fromList [ (qname, pack src) | (qname, src) <- sources ]
   parsedProject <- M.fromList <$> mapM parseModule sources
   ordered <- orderModules parsedProject
-  checked <- checkedOrFailure files (snd (checkModules cfg TestPlatform S.empty parsedProject ordered))
+  checked <- checkedOrFailure files (snd (checkModules cfg plt S.empty parsedProject ordered))
   pure (PipelineResult (checkedLowered checked) ordered (checkedArchitecture checked)
     (checkedElaborated checked) (checkedReports checked) (checkedMonadicTypes checked))
 

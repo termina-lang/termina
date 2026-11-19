@@ -98,6 +98,8 @@ factInlines fact = case fact of
     InstanceOf kind cls -> [text ("Instance of " ++ classKind kind ++ " class "), code cls, text "."]
     Priority p -> [text ("Priority " ++ integer p ++ ".")]
     StackSize s -> [text ("Stack of " ++ integer s ++ " bytes.")]
+    ConnectedTo port (InterruptComponent vector) target ->
+        [text "Port ", code port, text " connected to emitter ", code target, text (" (interrupt vector " ++ show vector ++ ").")]
     ConnectedTo port kind target -> [text "Port ", code port, text (" connected to " ++ componentKind kind ++ " "), code target, text "."]
     ProtectedBy lock -> [text (protection lock)]
     UsedBy users -> text "Used by " : endpoints users ++ [text "."]
@@ -110,7 +112,7 @@ factInlines fact = case fact of
     AtomicOf ty (Just size) -> [text ("Atomic array of " ++ expression size ++ " values of "), typeCode ty, text "."]
     DequeOf ty capacity -> [text "Deque of boxes of ", typeCode ty, text (", capacity " ++ expression capacity ++ ".")]
     PeriodicTimerOf period -> [text ("Periodic timer, period " ++ timeVal period ++ ".")]
-    InterruptOf -> [text "Emitter of an interrupt."]
+    InterruptOf vector -> [text ("Interrupt vector " ++ show vector ++ ".")]
     Triggers (Endpoint component port) -> [text "Triggers port ", code port, text " of ", code component, text "."]
 
     where
@@ -127,6 +129,7 @@ factInlines fact = case fact of
         classKind TestClass = "test"
 
         componentKind EmitterComponent = "emitter"
+        componentKind (InterruptComponent _) = "emitter"
         componentKind ChannelComponent = "channel"
         componentKind ResourceComponent = "resource"
         componentKind PoolComponent = "pool"
