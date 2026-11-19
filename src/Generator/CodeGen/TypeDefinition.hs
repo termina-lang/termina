@@ -12,7 +12,7 @@ import qualified Data.Map.Strict as M
 import Utils.Annotations
 import Generator.LanguageC.Embedded
 import Control.Monad (zipWithM, foldM)
-import Data.List (sort)
+import Data.List (sortOn)
 import Generator.CodeGen.Application.Utils
 import Generator.CodeGen.Types
 import Generator.CodeGen.Expression
@@ -232,7 +232,7 @@ genEnumVariantParameterStruct ann identifier (EnumVariant this_variant params _)
     paramsStructName <- genEnumParameterStructName identifier this_variant
     -- Generated text only for an enum that the author documents
     enumDoc <- genDoc ann []
-    let doc = generatedDoc "Data of " (identifier ++ "::" ++ this_variant) "." <$ enumDoc
+    let doc = generatedDoc [textInline "Data of ", codeInline (identifier ++ "::" ++ this_variant), textInline "."] <$ enumDoc
     return $ documented doc $ CExtDecl (CEDStructUnion (Just paramsStructName) (CStruct CStructTag Nothing (map undocumentedMember pParams) [])) cAnn
     where
         genEnumVariantParameter :: TerminaType SemanticAnn -> Integer -> CGenerator CDeclaration
@@ -353,7 +353,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
         genStatusStruct (TStruct identifier)
         else return []
     -- Generated text only for an enum that the author documents
-    let tagDoc = generatedDoc "Variants of " identifier "." <$ doc
+    let tagDoc = generatedDoc [textInline "Variants of ", codeInline identifier, textInline "."] <$ doc
     return $ documented tagDoc (CExtDecl (CEDEnum (Just enumName) (CEnum Nothing pEnumVariants [])) cAnn)
                 : pEnumParameterStructs ++ (enumStruct : optsDeclExt ++ statusDeclExt)
 
@@ -425,16 +425,22 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier membe
         -- of a module does not depend on the deployment.
         genPortDefines :: CGenerator [CFileItem]
         genPortDefines = do
-            let ports = sort [port | ClassField (FieldDefinition port (TSinkPort {}) _) <- members]
-                    ++ sort [port | ClassField (FieldDefinition port (TInPort {}) _) <- members]
+            let ports = map fst (triggeringPorts members)
             variants <- mapM (genVariantForPort identifier) ports
-            return $ case zipWith (\v idx -> _define v (Just [show idx])) variants [0 :: Integer ..] of
+            let define port v idx = documented (Just (portDoc port)) (_define v (Just [show idx]))
+            return $ case zipWith3 define ports variants [0 :: Integer ..] of
                 [] -> []
                 (first : rest) -> pre_cr first : rest
 
+        portDoc port = generatedDoc [textInline "Identifier of port ", codeInline port, textInline " of class ", codeInline identifier, textInline "."]
+
         genTaskFunctionDeclaration :: CGenerator CFileItem
         genTaskFunctionDeclaration = do
-            return $ CExtDecl (CEDFunction Nothing [] void (terminafy ("task_entry" <::> identifier)) [
+            let brief = generatedDoc [textInline "Body of the tasks of class ", codeInline identifier,
+                    textInline ": it waits for the events of its ports and runs the action that each one triggers."]
+                facts = [ [textInline "Port ", codeInline port, textInline " triggers ", codeInline action, textInline "."]
+                        | (port, action) <- triggeringPorts members ]
+            return $ documented (withFacts facts (Just brief)) $ CExtDecl (CEDFunction Nothing [] void (terminafy ("task_entry" <::> identifier)) [
                     CDecl (CTypeSpec (_const . ptr $ void)) (Just "arg") Nothing
                 ]) (buildDeclarationAnn ann True)
 
@@ -443,6 +449,14 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier membe
         genClassField member = throwError $ InternalError $ "invalid class member. Not a field: " ++ show member
 
 genTypeDefinitionDecl ts = throwError $ InternalError $ "Unsupported type definition: " ++ show ts
+
+-- | The ports of a class that trigger its actions, each with the action it
+-- triggers: the sink ports first, then the in ports, each group by name, which
+-- is the order of the identifiers of the ports of a task class.
+triggeringPorts :: [ClassMember SemanticAnn] -> [(Identifier, Identifier)]
+triggeringPorts members =
+    sortOn fst [ (port, action) | ClassField (FieldDefinition port (TSinkPort _ action) _) <- members ]
+    ++ sortOn fst [ (port, action) | ClassField (FieldDefinition port (TInPort _ action) _) <- members ]
 
 -- | Methods and viewers can only be called from the members of their own
 -- class, which are all defined in the same source file. They have internal
@@ -455,7 +469,7 @@ isPrivateClassMember _ = False
 -- | Declaration of a class member function. The declarations of the private
 -- member functions carry the static storage class specifier.
 genClassFunctionDeclaration :: AnnASTElement SemanticAnn -> ClassMember SemanticAnn -> CGenerator CFileItem
-genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier _ _ _) ann) member = do
+genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier classMembers _ _) ann) member = do
     -- The comment is the one of the member, with its own parameters; a
     -- procedure inherits from its interface what it does not write.
     doc <- case member of
@@ -463,7 +477,7 @@ genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier _ _ _) an
             iface <- interfaceProcedure procedure
             genProcedureDoc procAnn params iface
         _ -> genDoc (getAnnotation member) memberParams
-    documented (withGeneratedParams (eventParamDoc : generatedParams) doc) <$> declaration
+    documented (withFacts facts (withGeneratedParams (eventParamDoc : generatedParams) doc)) <$> declaration
 
   where
 
@@ -483,6 +497,13 @@ genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier _ _ _) an
                 inherited : _ -> return inherited
                 [] -> throwError $ InternalError $ "procedure of no provided interface: " ++ procedure
         _ -> throwError $ InternalError $ "resource class without its provided interfaces: " ++ identifier
+
+    -- The ports that trigger an action.
+    facts = case member of
+        ClassAction _ action _ _ _ ->
+            [ [textInline "Triggered by port ", codeInline port, textInline "."]
+            | (port, triggered) <- triggeringPorts classMembers, triggered == action ]
+        _ -> []
 
     -- The parameter of the instance that the generator adds after the event.
     generatedParams = case member of
