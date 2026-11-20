@@ -92,7 +92,8 @@ deliverableFolder config = outputFolderName </> "deliverable" </> makeRelative o
 
 -- | The Doxyfile of a deliverable, which documents its C from its root with
 -- nothing else: the name and the version of the project, the folders of the
--- C, and the settings that the generated C needs. Doxygen lists the static
+-- C but the third-party files of the OSAL, and the settings that the
+-- generated C needs. Doxygen lists the static
 -- functions, where the methods and viewers of the classes go, only with
 -- EXTRACT_STATIC. What is not documented is reported by the transpiler, so
 -- Doxygen does not warn about it.
@@ -103,6 +104,7 @@ genDoxyfile project config externFolders = T.unlines
     , "OUTPUT_DIRECTORY      = doc"
     , "INPUT                 = " <> T.unwords (map T.pack (["include", "src", "osal"] ++ nub externFolders))
     , "RECURSIVE             = YES"
+    , "EXCLUDE               = osal/vendor"
     , "FILE_PATTERNS         = *.h *.c"
     , "OPTIMIZE_OUTPUT_FOR_C = YES"
     , "EXTRACT_STATIC        = YES"

@@ -109,13 +109,14 @@ spec = describe "termina deliver" $ do
 
     let info = ProjectInfo { projectName = "icu-asw", projectVersion = "1.2.0", projectManifestVersion = 1, projectAssurance = [] }
 
-    it "documents the C of the deliverable from its root, with the folders of the extern C" $
+    it "documents the C of the deliverable from its root, with the folders of the extern C and without the vendored files of the OSAL" $
       genDoxyfile info (defaultConfig "icu-asw" POSIXGCC) ["extern/icu"] `shouldBe` T.unlines
         [ "PROJECT_NAME          = \"icu-asw\""
         , "PROJECT_NUMBER        = 1.2.0"
         , "OUTPUT_DIRECTORY      = doc"
         , "INPUT                 = include src osal extern/icu"
         , "RECURSIVE             = YES"
+        , "EXCLUDE               = osal/vendor"
         , "FILE_PATTERNS         = *.h *.c"
         , "OPTIMIZE_OUTPUT_FOR_C = YES"
         , "EXTRACT_STATIC        = YES"
