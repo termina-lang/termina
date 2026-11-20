@@ -260,9 +260,11 @@ cDoc params (DocModel summary body tags _) =
 
         variantName = T.intercalate "__" . T.splitOn "::" . T.pack
 
-        -- A parameter is an input, except a &mut, which is also an output,
-        -- or only an output when the comment says so.
+        -- The direction written in the comment, or else an input, except a
+        -- &mut, which is also an output.
+        direction ParamIn _ = CParamIn
         direction ParamOut _ = CParamOut
+        direction ParamInOut _ = CParamInOut
         direction ParamPlain name =
             case [ ts | Parameter pid ts _ <- params, pid == name ] of
                 TReference Mutable _ : _ -> CParamInOut

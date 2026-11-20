@@ -11,7 +11,7 @@ import Core.AST
 import Doc.Errors
 import Doc.Model
 import Parser.Types (ParserAnn(..))
-import Semantic.AST (AnnotatedProgram)
+import Semantic.AST (AnnotatedProgram, Parameter)
 import Semantic.Types (SemanticAnn, sourceOf)
 import Utils.Annotations
 
@@ -41,20 +41,33 @@ runDocCheck = listToMaybe . concatMap declaration
         qualified name = cls ++ "::" ++ name
 
 -- | The @\@param@ tags of the comment of an element that name no parameter of
--- its signature.
-params :: Identifier -> [Parameter' ty SemanticAnn] -> SemanticAnn -> [DocCheckError]
+-- its signature, or that give an output direction to a parameter that is only
+-- read.
+params :: Identifier -> [Parameter SemanticAnn] -> SemanticAnn -> [DocCheckError]
 params name ps ann =
   case sourceOf ann of
     ParserAnn _ (Just doc) | Right model <- docModel doc ->
-      [ annotateError (tagLocation doc tag) (EUnknownDocParam name param names)
-      | tag@(DocTag _ (TagParam _ param) _) <- docTags model, param `notElem` names ]
+      [ annotateError (tagLocation doc tag) err
+      | tag@(DocTag _ (TagParam mode param) _) <- docTags model
+      , Just err <- [paramError mode param] ]
     _ -> []
 
   where
 
     names = map paramIdentifier ps
 
+    paramError mode param =
+      case [ paramType p | p <- ps, paramIdentifier p == param ] of
+        [] -> Just (EUnknownDocParam name param names)
+        ty : _ | mode `elem` [ParamOut, ParamInOut] -> EDocParamDirection param <$> inputKind ty
+        _ -> Nothing
+
+    inputKind (TReference Mutable _) = Nothing
+    inputKind (TReference _ _) = Just ByReference
+    inputKind _ = Just ByValue
+
 -- | The location of a @\@param@ tag, from its @\@@ to the end of its name.
+-- The direction is written as the parser accepts it, with no spaces.
 tagLocation :: DocComment -> DocTag a -> Location
 tagLocation doc (DocTag pos kind _) =
   case docLocation doc of
@@ -63,6 +76,5 @@ tagLocation doc (DocTag pos kind _) =
 
   where
 
-    tagLength (TagParam ParamOut param) = length ("@param[out] " ++ param)
-    tagLength (TagParam ParamPlain param) = length ("@param " ++ param)
+    tagLength (TagParam mode param) = length ("@param" ++ paramModeText mode ++ " " ++ param)
     tagLength _ = 1

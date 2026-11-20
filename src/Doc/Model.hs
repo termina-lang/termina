@@ -6,6 +6,7 @@
 module Doc.Model
   ( DocLine(..)
   , ParamMode(..)
+  , paramModeText
   , TagKind(..)
   , DocTag(..)
   , DocError(..)
@@ -44,9 +45,17 @@ data DocLine = DocLine
   , lineText :: String
   } deriving (Show, Eq)
 
--- | Whether a parameter is marked as only written by @[out]@.
-data ParamMode = ParamPlain | ParamOut
+-- | The direction written after @\@param@, if any: @[in]@, @[out]@ or
+-- @[in,out]@.
+data ParamMode = ParamPlain | ParamIn | ParamOut | ParamInOut
   deriving (Show, Eq)
+
+-- | The direction of a mode as written in a comment, empty for none.
+paramModeText :: ParamMode -> String
+paramModeText ParamPlain = ""
+paramModeText ParamIn = "[in]"
+paramModeText ParamOut = "[out]"
+paramModeText ParamInOut = "[in,out]"
 
 -- | The kind of a tag, with the arguments that come before its text.
 data TagKind
@@ -134,7 +143,7 @@ newtype DocRef = DocRef [T.Text]
 data DocError
   = UnknownTag String -- ^ A tag that does not exist, as written after the @\@@
   | MissingArgument String -- ^ A tag without the argument that it takes
-  | OutOnOtherTag String -- ^ @[out]@ on a tag other than @\@param@
+  | DirectionOnOtherTag String String -- ^ A direction on a tag other than @\@param@: the direction and the tag
   | TextAfterTags -- ^ Text that belongs to no tag after the first tag
   deriving (Show, Read, Eq)
 
@@ -481,15 +490,17 @@ tagLine l = do
     classify
       | name `notElem` map fst simpleTags ++ ["param", "error", "satisfies", "verifies"] =
           Left (pos, UnknownTag (name ++ bracket))
-      | bracket == "[out]" && name /= "param" = Left (pos, OutOnOtherTag name)
-      | not (null bracket) && bracket /= "[out]" = Left (pos, UnknownTag (name ++ bracket))
-      | name == "param" =
-          withArgument isIdentifier (TagParam (if null bracket then ParamPlain else ParamOut))
+      | Just _ <- direction, name /= "param" = Left (pos, DirectionOnOtherTag bracket name)
+      | not (null bracket), Nothing <- direction = Left (pos, UnknownTag (name ++ bracket))
+      | name == "param", Just mode <- direction = withArgument isIdentifier (TagParam mode)
+      | name == "param" = withArgument isIdentifier (TagParam ParamPlain)
       | name == "error" = withArgument isVariantName TagError
       | name == "satisfies" = withArgument (not . null) TagSatisfies
       | name == "verifies" = withArgument (not . null) TagVerifies
       | Just kind <- lookup name simpleTags = Right (kind, False)
       | otherwise = Left (pos, UnknownTag name)
+
+    direction = lookup bracket [ (paramModeText m, m) | m <- [ParamIn, ParamOut, ParamInOut] ]
 
     withArgument valid kind
       | valid token = Right (kind token, True)

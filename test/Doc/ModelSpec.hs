@@ -195,6 +195,10 @@ spec = describe "Documentation model" $ do
             , " * @satisfies REQ-SPI-1 The first.", " * @verifies REQ-SPI-2", " " ] `shouldBe` Right
         ( [], [ (TagParam ParamPlain "device", ["Index."]), (TagError "SPIError::Busy", ["Busy."])
               , (TagSatisfies "REQ-SPI-1", ["The first."]), (TagVerifies "REQ-SPI-2", []) ] )
+    it "reads the three directions of @param" $
+      split ["", " * @param[in] a A.", " * @param[out] b B.", " * @param[in,out] c C.", " "] `shouldBe` Right
+        ( [], [ (TagParam ParamIn "a", ["A."]), (TagParam ParamOut "b", ["B."])
+              , (TagParam ParamInOut "c", ["C."]) ] )
     it "continues a tag after a blank line on indented lines, without their indentation" $
       split ["", " * @note First paragraph", " * of the note.", " *", " *     Second paragraph.", " *", " *     - an item", " "]
         `shouldBe` Right ([], [(TagNote, ["First paragraph", "of the note.", "", "Second paragraph.", "", "- an item"])])
@@ -212,10 +216,14 @@ spec = describe "Documentation model" $ do
   describe "the errors of the tags" $ do
     it "rejects an unknown tag" $
       tagError [" @brief Summary."] `shouldBe` Just (UnknownTag "brief")
-    it "rejects a direction other than [out]" $
-      tagError [" @param[in] x Input."] `shouldBe` Just (UnknownTag "param[in]")
+    it "rejects a direction other than [in], [out] and [in,out]" $
+      tagError [" @param[inout] x Input."] `shouldBe` Just (UnknownTag "param[inout]")
+    it "rejects [in, out] with a space" $
+      tagError [" @param[in, out] x Input."] `shouldBe` Just (UnknownTag "param[in, out]")
     it "rejects [out] on another tag" $
-      tagError [" @return[out] Value."] `shouldBe` Just (OutOnOtherTag "return")
+      tagError [" @return[out] Value."] `shouldBe` Just (DirectionOnOtherTag "[out]" "return")
+    it "rejects [in] on another tag" $
+      tagError [" @return[in] Value."] `shouldBe` Just (DirectionOnOtherTag "[in]" "return")
     it "rejects @param without a name" $
       tagError [" @param"] `shouldBe` Just (MissingArgument "param")
     it "rejects @error with something that is not a variant" $

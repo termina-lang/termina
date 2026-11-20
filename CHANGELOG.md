@@ -56,6 +56,8 @@ Patch versions on either side are interchangeable.
   element with a comment before it and another after it (PE-010), an
   unknown tag (PE-011), a tag without its argument or text after the tags
   (PE-012), and a `@param` that is not in the signature (DE-001) are errors.
+  `@param` takes a direction, `[in]`, `[out]` or `[in,out]`, and `[out]` or
+  `[in,out]` on a parameter that is not `&mut` is an error (DE-002).
 - `termina deliver --docs`. The plain C of the deliverable carries the
   documentation comments as Doxygen blocks, each header starts with `@file`
   and the comment of its module, and the transpiler adds what it knows of

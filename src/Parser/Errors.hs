@@ -131,8 +131,8 @@ instance Diagnosable Error where
             hint
                 | name == "brief" = "\nThe first paragraph of the comment is its summary."
                 | "param[" `T.isPrefixOf` T.pack name =
-                    "\nThe direction of a parameter comes from its type; " <> emph "@param[out]"
-                        <> " marks a " <> emph "&mut" <> " parameter that is only written."
+                    "\nThe directions of " <> emph "@param" <> " are " <> emph "[in]" <> ", "
+                        <> emph "[out]" <> " and " <> emph "[in,out]" <> "."
                 | otherwise = "\nA line of text that starts with " <> emph "@" <> " is written "
                     <> emph "\\@" <> "."
     describe (EMalformedDocTag docError) =
@@ -142,8 +142,8 @@ instance Diagnosable Error where
 
             detail (MissingArgument tag) =
                 emph (T.pack ('@' : tag)) <> " is followed by " <> argumentOf tag <> "."
-            detail (OutOnOtherTag tag) =
-                emph "[out]" <> " goes only on " <> emph "@param" <> ", not on "
+            detail (DirectionOnOtherTag dir tag) =
+                emph (T.pack dir) <> " goes only on " <> emph "@param" <> ", not on "
                     <> emph (T.pack ('@' : tag)) <> "."
             detail TextAfterTags =
                 "The tags go at the end of the comment, and this text follows them. A tag"

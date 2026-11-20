@@ -25,7 +25,7 @@ pointAndDistance = unlines
   , "/**"
   , " * Distance between two points along the axes."
   , " *"
-  , " * @param a First point."
+  , " * @param[in] a First point."
   , " * @param b Second point."
   , " * @param[out] d The distance, in pixels."
   , " */"
