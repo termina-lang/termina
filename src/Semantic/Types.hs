@@ -6,6 +6,7 @@ module Semantic.Types where
 import Semantic.AST
 import Core.Utils
 import Utils.Annotations
+import Parser.Types (ParserAnn(..), undocumented)
 import Data.Maybe
 import qualified Data.Map.Strict as M
 
@@ -17,8 +18,16 @@ import qualified Data.Map.Strict as M
 ----------------------------------------
 
 data FieldSeman a
-  = SimpleField 
+  = SimpleField
   | AccessPortField (M.Map Identifier (InterfaceMember a))
+  deriving (Show, Functor)
+
+-- | Semantic information of a type definition
+data TypeDefSeman a
+  = SimpleTypeDef
+  -- | A resource class, with the declarations of the interfaces it provides
+  -- and of the ones they extend, each one once
+  | ResourceClassTypeDef [GlobalDecl a]
   deriving (Show, Functor)
 
 -- | Semantic type information
@@ -100,35 +109,62 @@ data SemanticElems a
   -- | Global objects
   | GTy (TerminaType a)
   -- | Type definitions 
-  | TTy 
+  | TTy (TypeDefSeman a)
+  -- | Variants of an enum
+  | VTy
   -- | Function type
   | FnTy (FunctionSeman a)
   deriving Show
 
--- | Expression Semantic Annotations
-data SemanticAnn = 
-  SemanticAnn (SemanticElems SemanticAnn) Location
+-- | Semantic annotations: what the type checker knows of an element, and the
+-- annotation of the parser, with its location and its documentation comment.
+data SemanticAnn =
+  SemanticAnn (SemanticElems SemanticAnn) ParserAnn
   deriving Show
 
 instance Located SemanticAnn where
-  getLocation (SemanticAnn _ loc) = loc
-  updateLocation (SemanticAnn ann _) = SemanticAnn ann 
+  getLocation (SemanticAnn _ src) = getLocation src
+  updateLocation (SemanticAnn ann src) loc = SemanticAnn ann (updateLocation src loc)
 
 ----------------------------------------
 
--- | General global entities
-data GEntry a
-  = GFun (FunctionSeman a)
-  -- ^ Functions
-  | GGlob (TerminaType a)
-  -- ^ Globals
-  | GConst (TerminaType a) (Expression a)
-  -- ^ Constants
-  | GConstExpr (TerminaType a) (Expression a)
-  -- ^ Constant Expressions
-  | GType (SemanTypeDef a)
-  -- ^ Types
-  deriving (Show, Functor)
+-- | A declaration of the program as the global environment keeps it: as in the
+-- AST, without the bodies of its functions and of the members of its classes,
+-- and with its annotation, which holds its location and its documentation
+-- comment.
+type GlobalDecl a = AnnASTElement' TerminaType Expression EmptyBlock a
+
+-- | The declaration that the global environment keeps of an element of the
+-- typed AST.
+globalDecl :: AnnASTElement a -> GlobalDecl a
+globalDecl (Function ident ps ty _ mods ann) = Function ident ps ty EmptyBlock mods ann
+globalDecl (ExternFunction ident ps ty mode mods ann) = ExternFunction ident ps ty mode mods ann
+globalDecl (GlobalDeclaration glb) = GlobalDeclaration glb
+globalDecl (TypeDefinition tydef ann) = TypeDefinition (semanTypeDef tydef) ann
+
+-- | The name that a declaration takes in the global environment.
+globalDeclName :: AnnASTElement' ty expr blk a -> Identifier
+globalDeclName (Function ident _ _ _ _ _) = ident
+globalDeclName (ExternFunction ident _ _ _ _ _) = ident
+globalDeclName (GlobalDeclaration glb) = getGlobalIdentifier glb
+globalDeclName (TypeDefinition tydef _) = getTypeIdentifier tydef
+
+-- | The type of a global object of the environment, which is a task, a
+-- handler, a resource, a channel, an emitter or a test; nothing for a
+-- constant, a function or a type.
+globalObjectType :: GlobalDecl a -> Maybe (TerminaType a)
+globalObjectType (GlobalDeclaration glb) = case glb of
+  Const {} -> Nothing
+  ConstExpr {} -> Nothing
+  _ -> Just (getGlobalType glb)
+globalObjectType _ = Nothing
+
+-- | The signature of a function of the environment, which its annotation
+-- holds; nothing for any other declaration.
+globalFunctionSeman :: GlobalDecl SemanticAnn -> Maybe (FunctionSeman SemanticAnn)
+globalFunctionSeman (Function _ _ _ _ _ (SemanticAnn (FnTy fs) _)) = Just fs
+globalFunctionSeman (ExternFunction _ _ _ _ _ (SemanticAnn (FnTy fs) _)) = Just fs
+globalFunctionSeman _ = Nothing
 
 -- Simple TypeDef
 -- It only has type information.
@@ -136,6 +172,13 @@ data GEntry a
 data EmptyBlock a = EmptyBlock
   deriving (Show, Functor)
 type SemanTypeDef a = TypeDef' TerminaType Expression EmptyBlock a
+
+-- | A type definition without the bodies of the members of its classes.
+semanTypeDef :: TypeDef a -> SemanTypeDef a
+semanTypeDef (Struct i f m) = Struct i f m
+semanTypeDef (Enum i e m) = Enum i e m
+semanTypeDef (Class kind i cls ps m) = Class kind i (map kClassMember cls) ps m
+semanTypeDef (Interface kind i extends cls m) = Interface kind i extends cls m
 
 -- Forgetfull Class member map
 kClassMember :: ClassMember' ty blk a -> ClassMember' ty EmptyBlock a
@@ -195,76 +238,125 @@ getMatchCaseTypes _                           = Nothing
 isResultFromApp :: SemanticElems a -> Bool
 isResultFromApp = isJust . getArgumentsType
 
-buildFieldAnn :: Location -> SemanticAnn
+-- The semantic annotation of an element is built from the annotation of the
+-- parser, which it keeps whole.
+
+buildFieldAnn :: ParserAnn -> SemanticAnn
 buildFieldAnn = SemanticAnn (FTy SimpleField)
 
-buildAccessPortFieldAnn :: Location -> M.Map Identifier (InterfaceMember SemanticAnn) -> SemanticAnn
-buildAccessPortFieldAnn = flip $ SemanticAnn . FTy . AccessPortField
+buildAccessPortFieldAnn :: ParserAnn -> M.Map Identifier (InterfaceMember SemanticAnn) -> SemanticAnn
+buildAccessPortFieldAnn src procs = SemanticAnn (FTy (AccessPortField procs)) src
 
-buildExpAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
+buildExpAnn :: ParserAnn -> TerminaType SemanticAnn -> SemanticAnn
 buildExpAnn = flip $ SemanticAnn . ETy . SimpleType
 
-buildExpAnnObj :: Location -> AccessKind -> TerminaType SemanticAnn -> SemanticAnn
-buildExpAnnObj loc ak ty = SemanticAnn (ETy (ObjectType ak ty)) loc
+buildExpAnnObj :: ParserAnn -> AccessKind -> TerminaType SemanticAnn -> SemanticAnn
+buildExpAnnObj src ak ty = SemanticAnn (ETy (ObjectType ak ty)) src
 
-buildExpAnnAccessPortObj :: Location -> AccessKind -> M.Map Identifier (InterfaceMember SemanticAnn) -> TerminaType SemanticAnn -> SemanticAnn
-buildExpAnnAccessPortObj loc ak ifaces pty = SemanticAnn (ETy (AccessPortObjType ak ifaces pty)) loc
+buildExpAnnAccessPortObj :: ParserAnn -> AccessKind -> M.Map Identifier (InterfaceMember SemanticAnn) -> TerminaType SemanticAnn -> SemanticAnn
+buildExpAnnAccessPortObj src ak ifaces pty = SemanticAnn (ETy (AccessPortObjType ak ifaces pty)) src
 
-buildExpAnnApp :: Location -> [Parameter SemanticAnn] -> TerminaType SemanticAnn -> SemanticAnn
-buildExpAnnApp loc params rty = SemanticAnn (ETy (AppType params rty)) loc
+buildExpAnnApp :: ParserAnn -> [Parameter SemanticAnn] -> TerminaType SemanticAnn -> SemanticAnn
+buildExpAnnApp src params rty = SemanticAnn (ETy (AppType params rty)) src
 
 -- | Build annotations for global objects (tasks, handlers, resources, channels or emitters)
-buildGlobalAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
-buildGlobalAnn = flip $ SemanticAnn . GTy 
+buildGlobalAnn :: ParserAnn -> TerminaType SemanticAnn -> SemanticAnn
+buildGlobalAnn src ty = SemanticAnn (GTy ty) src
 
-buildTypeAnn :: Location -> SemanticAnn
-buildTypeAnn = SemanticAnn TTy
+buildTypeAnn :: ParserAnn -> SemanticAnn
+buildTypeAnn = SemanticAnn (TTy SimpleTypeDef)
 
-buildStmtAnn :: Location -> SemanticAnn
+buildResourceClassAnn :: ParserAnn -> [GlobalDecl SemanticAnn] -> SemanticAnn
+buildResourceClassAnn ann ifaces = SemanticAnn (TTy (ResourceClassTypeDef ifaces)) ann
+
+buildEnumVariantAnn :: ParserAnn -> SemanticAnn
+buildEnumVariantAnn = SemanticAnn VTy
+
+-- Elements that no source file declares, such as the variants of the enums of
+-- the environment and of Option, Status and Result, or the elements that a
+-- test builds by hand.
+
+internalVariant :: Identifier -> [TerminaType SemanticAnn] -> EnumVariant SemanticAnn
+internalVariant ident params = EnumVariant ident params (buildEnumVariantAnn (undocumented Internal))
+
+-- | A type definition with the annotation that the type checker gives it. A
+-- resource class built by hand is taken to provide one interface, the first
+-- it names, that declares exactly its procedures, without comments.
+internalTypeDefinition :: TypeDef SemanticAnn -> AnnASTElement SemanticAnn
+internalTypeDefinition tydef@(Class ResourceClass _ members provides _) =
+  TypeDefinition tydef (buildResourceClassAnn (undocumented Internal) [ internalInterface iface | iface <- take 1 provides ])
+
+  where
+
+    internalInterface iface = TypeDefinition (Interface RegularInterface iface [] procs []) (buildTypeAnn (undocumented Internal))
+    procs = [ InterfaceProcedure ak name params [] (buildExpAnn (undocumented Internal) TUnit)
+            | ClassProcedure ak name params _ _ <- members ]
+internalTypeDefinition tydef = TypeDefinition tydef (buildTypeAnn (undocumented Internal))
+
+internalField :: Identifier -> TerminaType SemanticAnn -> FieldDefinition SemanticAnn
+internalField ident ty = FieldDefinition ident ty (buildFieldAnn (undocumented Internal))
+
+internalAccessPortField :: Identifier -> TerminaType SemanticAnn -> M.Map Identifier (InterfaceMember SemanticAnn) -> FieldDefinition SemanticAnn
+internalAccessPortField ident ty procs = FieldDefinition ident ty (buildAccessPortFieldAnn (undocumented Internal) procs)
+
+-- | The annotation of a procedure of a class, as the type checker gives it.
+internalProcedureAnn :: SemanticAnn
+internalProcedureAnn = buildExpAnn (undocumented Internal) TUnit
+
+buildStmtAnn :: ParserAnn -> SemanticAnn
 buildStmtAnn = SemanticAnn (STy SimpleStmtType)
 
-buildNoReturnCallStmtAnn :: Location -> SemanticAnn
+buildNoReturnCallStmtAnn :: ParserAnn -> SemanticAnn
 buildNoReturnCallStmtAnn = SemanticAnn (STy NoReturnCallStmtType)
 
-buildStmtMatchCaseAnn :: Location -> [TerminaType SemanticAnn] -> SemanticAnn
-buildStmtMatchCaseAnn loc ts = SemanticAnn (STy (MatchCaseStmtType ts)) loc
+buildStmtMatchCaseAnn :: ParserAnn -> [TerminaType SemanticAnn] -> SemanticAnn
+buildStmtMatchCaseAnn src ts = SemanticAnn (STy (MatchCaseStmtType ts)) src
 
-buildOutPortConnAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
-buildOutPortConnAnn loc ts = SemanticAnn (STy (PortConnection (OutPConnTy ts))) loc
+buildOutPortConnAnn :: ParserAnn -> TerminaType SemanticAnn -> SemanticAnn
+buildOutPortConnAnn src ts = SemanticAnn (STy (PortConnection (OutPConnTy ts))) src
 
-buildAccessPortConnAnn :: Location -> TerminaType SemanticAnn -> TerminaType SemanticAnn -> [ProcedureSeman SemanticAnn] -> SemanticAnn
-buildAccessPortConnAnn loc ifaceTy ts procs = SemanticAnn (STy (PortConnection (APConnTy ifaceTy ts procs))) loc
+buildAccessPortConnAnn :: ParserAnn -> TerminaType SemanticAnn -> TerminaType SemanticAnn -> [ProcedureSeman SemanticAnn] -> SemanticAnn
+buildAccessPortConnAnn src ifaceTy ts procs = SemanticAnn (STy (PortConnection (APConnTy ifaceTy ts procs))) src
 
-buildPoolConnAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
-buildPoolConnAnn loc ts = SemanticAnn (STy (PortConnection (APPoolConnTy ts))) loc
+buildPoolConnAnn :: ParserAnn -> TerminaType SemanticAnn -> SemanticAnn
+buildPoolConnAnn src ts = SemanticAnn (STy (PortConnection (APPoolConnTy ts))) src
 
-buildTestPoolConnAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
-buildTestPoolConnAnn loc ts = SemanticAnn (STy (PortConnection (APTestPoolConnTy ts))) loc
+buildTestPoolConnAnn :: ParserAnn -> TerminaType SemanticAnn -> SemanticAnn
+buildTestPoolConnAnn src ts = SemanticAnn (STy (PortConnection (APTestPoolConnTy ts))) src
 
-buildDequeConnAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
-buildDequeConnAnn loc ts = SemanticAnn (STy (PortConnection (APDequeConnTy ts))) loc
+buildDequeConnAnn :: ParserAnn -> TerminaType SemanticAnn -> SemanticAnn
+buildDequeConnAnn src ts = SemanticAnn (STy (PortConnection (APDequeConnTy ts))) src
 
-buildAtomicConnAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
-buildAtomicConnAnn loc ts = SemanticAnn (STy (PortConnection (APAtomicConnTy ts))) loc
+buildAtomicConnAnn :: ParserAnn -> TerminaType SemanticAnn -> SemanticAnn
+buildAtomicConnAnn src ts = SemanticAnn (STy (PortConnection (APAtomicConnTy ts))) src
 
-buildAtomicArrayConnAnn :: Location 
-  -> TerminaType SemanticAnn 
-  -> Expression SemanticAnn 
-  -> Expression SemanticAnn 
+buildAtomicArrayConnAnn :: ParserAnn
+  -> TerminaType SemanticAnn
+  -> Expression SemanticAnn
+  -> Expression SemanticAnn
   -> SemanticAnn
-buildAtomicArrayConnAnn loc ts portSize glbSize = SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ts portSize glbSize))) loc
+buildAtomicArrayConnAnn src ts portSize glbSize = SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ts portSize glbSize))) src
 
-buildSinkPortConnAnn :: Location -> TerminaType SemanticAnn -> Identifier -> SemanticAnn
-buildSinkPortConnAnn loc ts action = SemanticAnn (STy (PortConnection (SPConnTy ts action))) loc
+buildSinkPortConnAnn :: ParserAnn -> TerminaType SemanticAnn -> Identifier -> SemanticAnn
+buildSinkPortConnAnn src ts action = SemanticAnn (STy (PortConnection (SPConnTy ts action))) src
 
-buildInPortConnAnn :: Location -> TerminaType SemanticAnn -> Identifier -> SemanticAnn
-buildInPortConnAnn loc ts action = SemanticAnn (STy (PortConnection (InPConnTy ts action))) loc
+buildInPortConnAnn :: ParserAnn -> TerminaType SemanticAnn -> Identifier -> SemanticAnn
+buildInPortConnAnn src ts action = SemanticAnn (STy (PortConnection (InPConnTy ts action))) src
 
 getSemanticAnn :: SemanticAnn -> SemanticElems SemanticAnn
-getSemanticAnn (SemanticAnn ann _loc) = ann
+getSemanticAnn (SemanticAnn ann _src) = ann
+
+-- | The annotation of the parser that a semantic annotation keeps.
+sourceOf :: SemanticAnn -> ParserAnn
+sourceOf (SemanticAnn _ src) = src
+
+-- | An annotation with the documentation comment of another one: the one of
+-- a call with the comment of the statement that makes it.
+withDocOf :: SemanticAnn -> SemanticAnn -> SemanticAnn
+withDocOf from (SemanticAnn elems src) = SemanticAnn elems src { parsedDoc = parsedDoc (sourceOf from) }
 
 forgetSemAnn :: SemanticAnn -> Location
-forgetSemAnn (SemanticAnn _ann loc) = loc
+forgetSemAnn = getLocation
 
 getTypeSemAnn :: SemanticAnn -> Maybe (TerminaType SemanticAnn)
 getTypeSemAnn  = getResultingType . getSemanticAnn

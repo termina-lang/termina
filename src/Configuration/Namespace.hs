@@ -78,7 +78,7 @@ checkExports root parsed manifest =
                 Just ast -> importErrors prefixes names m ast ++ testClassErrors m ast ++ instanceErrors m ast
 
     importErrors prefixes names m ast =
-        [ at m (locationLine ann) ++ "the exported module " ++ dottedName (moduleSegments m) ++ " imports "
+        [ at m (locationLine (getLocation ann)) ++ "the exported module " ++ dottedName (moduleSegments m) ++ " imports "
             ++ dottedName imported ++ ", which is not exported"
         | ModuleImport imported ann <- modules ast
         , imported `S.member` S.fromList names
@@ -86,14 +86,14 @@ checkExports root parsed manifest =
 
     -- | An exported module declares no test class.
     testClassErrors m ast =
-        [ at m (locationLine loc) ++ "the exported module " ++ dottedName (moduleSegments m) ++ " declares the test class "
+        [ at m (locationLine (getLocation loc)) ++ "the exported module " ++ dottedName (moduleSegments m) ++ " declares the test class "
             ++ ident ++ ", which only a test or a module that is not exported may hold"
         | TypeDefinition (Class TestClass ident _ _ _) loc <- frags ast ]
 
     -- | An exported module declares no instance, which a deployment only
     -- takes from its main module (AE-023).
     instanceErrors m ast =
-        [ at m (locationLine loc) ++ "the exported module " ++ dottedName (moduleSegments m) ++ " declares the instance "
+        [ at m (locationLine (getLocation loc)) ++ "the exported module " ++ dottedName (moduleSegments m) ++ " declares the instance "
             ++ ident ++ ", which only the app.fin of an application or the test.fin of a test may hold"
         | GlobalDeclaration g <- frags ast, Just (ident, loc) <- [instanceOf g] ]
 

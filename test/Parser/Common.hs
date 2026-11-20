@@ -18,13 +18,13 @@ module Parser.Common
 import qualified Data.Map.Strict as M
 import Data.Text (Text)
 
-import Parser.Parsing (TerminaParser, terminaModuleParser)
-import Parser.Errors (Error(..), ParsingErrors)
+import Parser.Parsing (TerminaParser, parseTerminaModule)
+import Parser.Errors (Error(..), ParsingErrors, parseError)
 import Core.AST (TerminaModule'(..), ModuleImport'(..))
 import Modules.Modules (ModuleDependency(..))
 import Modules.Utils (buildModuleName)
 import Command.Utils (sortProjectDepsOrLoop)
-import Utils.Annotations (annotateError, Location(Internal), QualifiedName)
+import Utils.Annotations (annotateError, Location(Internal), Located(..), QualifiedName)
 import Utils.Errors (ErrorMessage(errorIdent))
 
 import Text.Parsec (runParser, eof, ParseError)
@@ -65,11 +65,11 @@ parserStageError sources =
     parseOne (qname, src) =
       -- | As in a real build, every position carries the name of its module, so
       -- that a rendered message finds the source it quotes.
-      case runParser terminaModuleParser qname qname src of
-        Left err -> Left (annotateError Internal (EParseError err))
-        Right (Termina imports _) -> (qname,) <$> mapM toDep imports
+      case parseTerminaModule qname qname src of
+        Left err -> Left (annotateError Internal (parseError err))
+        Right (Termina _ imports _) -> (qname,) <$> mapM toDep imports
     toDep (ModuleImport ident ann) =
-      (`ModuleDependency` ann) <$> buildModuleName ann ident
+      (`ModuleDependency` getLocation ann) <$> buildModuleName (getLocation ann) ident
 
 -- | The 'errorIdent' (@"PE-NNN"@) of the first parser-stage error.
 parserStageErrorCode :: [(QualifiedName, String)] -> Maybe Text

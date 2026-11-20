@@ -63,6 +63,9 @@ dependencies:
 - file-embed
 # The symbol table of the binaries that the runner reads
 - elf
+# Markdown of the documentation comments
+- commonmark
+- commonmark-extensions
 
 ghc-options:
 - -Wall

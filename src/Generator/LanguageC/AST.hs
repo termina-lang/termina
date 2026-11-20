@@ -4,9 +4,44 @@ module Generator.LanguageC.AST where
 import Prettyprinter
 import Numeric
 import Data.Char
+import qualified Data.Text as T
 import Utils.Annotations
+import Doc.Model (DocInline', DocBlock')
 
 type Ident = String
+
+-- | The comment of a statement inside a body, printed as an ordinary block
+-- comment: its lines as the author wrote them.
+newtype CComment = CComment [T.Text]
+  deriving Show
+
+-- | The documentation comment of a C declaration, printed as a Doxygen block:
+-- its brief, its body and its tags. Its links name C identifiers.
+data CDoc = CDoc
+  { cdocBrief :: [DocInline' Ident]
+  , cdocBody :: [DocBlock' Ident]
+  , cdocTags :: [CDocTag]
+  } deriving Show
+
+-- | A tag of a Doxygen comment and its text.
+data CDocTag
+  = CDocParam CParamDirection Ident [DocBlock' Ident]
+  | CDocReturn [DocBlock' Ident]
+  | CDocPre [DocBlock' Ident]
+  | CDocPost [DocBlock' Ident]
+  | CDocInvariant [DocBlock' Ident]
+  | CDocNote [DocBlock' Ident]
+  | CDocWarning [DocBlock' Ident]
+  | CDocSee [DocBlock' Ident]
+  | CDocDeprecated [DocBlock' Ident]
+  | CDocSince [DocBlock' Ident]
+  | CDocSection T.Text [DocBlock' Ident] -- ^ A section with a title, printed @\@par@
+  | CDocFile -- ^ The comment of a file, without which Doxygen lists none of its members
+  deriving Show
+
+-- | The direction of a parameter in the C, from the reader's side.
+data CParamDirection = CParamIn | CParamOut | CParamInOut
+  deriving Show
 
 data CFile' a
     = CSourceFile FilePath [CFileItem' a]
@@ -31,8 +66,13 @@ data CStructureUnion' a
   = CStruct
     CStructTag
     (Maybe Ident)      -- struct/union name (optional)
-    [CDeclaration' a]  -- member declarations
+    [CMember' a]       -- member declarations
     [CAttribute' a]    -- __attribute__s
+    deriving Show
+
+-- | A member of a struct or a union, with its annotation, which holds its
+-- documentation comment.
+data CMember' a = CMember (CDeclaration' a) a
     deriving Show
 
 data CStructTag = CStructTag
@@ -43,11 +83,16 @@ instance Pretty CStructTag where
   pretty CStructTag = pretty "struct"
   pretty CUnionTag = pretty "union"
 
-data CEnum' a = 
-    CEnum 
+data CEnum' a =
+    CEnum
     (Maybe Ident) -- ^ enum name (optional)
-    [(Ident, Maybe (CExpression' a))] -- ^ enum constants
+    [CEnumerator' a] -- ^ enumerators, one per variant
     [CAttribute' a] -- ^ __attribute__s
+    deriving Show
+
+-- | An enumerator of an enum, its value if it has one, and its annotation,
+-- which holds its documentation comment.
+data CEnumerator' a = CEnumerator Ident (Maybe (CExpression' a)) a
     deriving Show
 
 data CTerminaType' a = 
@@ -418,16 +463,27 @@ data CItemAnn =
     -- | Generic annotation
     CGenericAnn
     -- | C Statement annotation
-    | CStatementAnn 
+    | CStatementAnn
       Bool -- ^ Add new line before statement
       Bool -- ^ Indent statement
+      (Maybe CComment) -- ^ Comment before the statement
     | CCompoundAnn
       Bool -- ^ Add new line before the compound block
       Bool -- ^ Add trailing line inside the compound block
+      (Maybe CComment) -- ^ Comment inside the block, when it has no items to carry it
     | CDeclarationAnn
-      Bool -- ^ Add new line before declaration 
+      Bool -- ^ Add new line before declaration
+      (Maybe CDoc) -- ^ Documentation comment
+    -- | Annotation of a declaration inside a body
+    | CLocalDeclarationAnn
+      Bool -- ^ Add new line before declaration
+      (Maybe CComment) -- ^ Comment before the declaration
     | CPPDirectiveAnn
       Bool -- ^ Add new line before directive
+      (Maybe CDoc) -- ^ Documentation comment
+    -- | Annotation of a member of a struct or a union, or of an enumerator
+    | CMemberAnn
+      (Maybe CDoc) -- ^ Documentation comment
     deriving Show
 
 type CAnns = LocatedElement CItemAnn
@@ -447,7 +503,9 @@ type CDeclaration = CDeclaration' CAnns
 type CTerminaType = CTerminaType' CAnns
 type CAttribute = CAttribute' CAnns
 type CStructureUnion = CStructureUnion' CAnns
+type CMember = CMember' CAnns
 type CEnum = CEnum' CAnns
+type CEnumerator = CEnumerator' CAnns
 
 instance Located (CExpression' CAnns) where
   getLocation = getLocation . getAnnotation 

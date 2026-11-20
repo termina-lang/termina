@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor  #-}
+{-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -31,7 +32,7 @@ data Object a
   | DereferenceMemberAccess (Object a) Identifier a
   -- ^ Dereference member access | eI->name |, same as before |ei :: exprI a| is an
   | Unbox (Object a) a
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 instance ShowText (Object a) where
     showText (Variable ident _) = T.pack ident
@@ -85,7 +86,7 @@ data Expression
     a
   | ArraySliceExpression AccessKind (Object a) (Expression a) (Expression a) a
   -- ^ TArray slice. This is a reference to an slisce of an array.
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 instance ShowText (Expression a) where
     showText (AccessObject obj) = showText obj
@@ -210,32 +211,32 @@ data MatchCase a = MatchCase
   , matchBVars      :: [(Identifier, a)] -- ^ variables the variant binds, each with its own position
   , matchBody       :: Block a
   , matchAnnotation :: a
-  } deriving (Show, Functor)
+  } deriving (Show, Functor, Foldable)
 
 data DefaultCase a = DefaultCase
   (Block a)
   a
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 data CondIf a = CondIf
   {
     condIfCond       :: Expression a
   , condIfBody       :: Block a
   , condIfAnnotation :: a
-  } deriving (Show, Functor)
+  } deriving (Show, Functor, Foldable)
 
 data CondElse a = CondElse
   {
     condElseBody       :: Block a
   , condElseAnnotation :: a
-  } deriving (Show, Functor)
+  } deriving (Show, Functor, Foldable)
 
 data CondElseIf a = CondElseIf
   {
     condElseIfCond       :: Expression a
   , condElseIfBody       :: Block a
   , condElseIfAnnotation :: a
-  } deriving (Show, Functor)
+  } deriving (Show, Functor, Foldable)
 
 data Statement a =
   -- | Declaration statement
@@ -278,7 +279,7 @@ data Statement a =
     (Expression a)
     a
   | RebootStmt a
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 -- | |BlockRet| represent a body block with its return statement
 data Block a
@@ -287,7 +288,7 @@ data Block a
     blockBody :: [Statement a],
     blockAnnotation :: a
   }
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 ----------------------------------------
 type TerminaType = TerminaType' Expression

@@ -112,7 +112,7 @@ coverageItems = do
         Just cov -> do
             let placed name cType =
                     CExtDecl (CEDMacroVariable placementMacro (CDecl (CTypeSpec cType) (Just name) Nothing))
-                        (internalAnn (CDeclarationAnn False))
+                        (internalAnn (CDeclarationAnn False Nothing))
                 statements = placed (statementsArrayName mName)
                     (CTArray flagType (dec (nextStatement cov) @: size_t))
                 witnesses = placed (witnessesArrayName mName)

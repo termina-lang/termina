@@ -18,10 +18,10 @@ import qualified Data.Map.Lazy as ML
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import System.FilePath
-import Text.Parsec (ParseError, runParser)
+import Text.Parsec (ParseError)
 
 import Parser.AST (TerminaModule)
-import Parser.Parsing (terminaModuleParser)
+import Parser.Parsing (parseTerminaModule)
 import Parser.Types (ParserAnn)
 import Utils.Annotations (QualifiedName)
 
@@ -50,7 +50,7 @@ parseFile qname file bytes =
 parseText :: QualifiedName -> FilePath -> T.Text -> ParsedFile
 parseText qname file text =
     either (Left . InvalidSyntax text) (\ast -> Right (text, ast))
-        (runParser terminaModuleParser qname file (T.unpack text))
+        (parseTerminaModule qname file (T.unpack text))
 
 -- | The modules of a source folder by their path from the project folder,
 -- given the files of the source folder by their path in it.

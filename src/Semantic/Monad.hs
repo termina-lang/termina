@@ -17,13 +17,13 @@ import Semantic.Errors
 import Semantic.Reserved
 import Semantic.Types
 import Semantic.Environment
+import Parser.Types (undocumented)
 import Core.Utils
 
 -- Monads
 import Control.Monad
 import Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
-import qualified Parser.Types as Parser
 import Utils.Monad
 
 import Control.Monad.State
@@ -45,25 +45,30 @@ withInState tempState comp = localScope (put tempState >> comp)
 ----------------------------------------
 -- Some helper functions to bring information from the environment.
 
--- | Get global definition of a Type
-getGlobalTypeDef :: Location -> Identifier -> SemanticMonad (LocatedElement (SemanTypeDef SemanticAnn))
+-- | The location of a declaration of the global environment.
+declLocation :: GlobalDecl SemanticAnn -> Location
+declLocation = getLocation . getAnnotation
+
+-- | Get the declaration of a type
+getGlobalTypeDef :: Location -> Identifier -> SemanticMonad (GlobalDecl SemanticAnn)
 getGlobalTypeDef loc tid  = gets global >>=
   maybe
   -- if there is no varialbe name |tid|
   (throwError $ annotateError loc (ENoTypeFound tid))
-  -- if so, return its type
+  -- if so, return its declaration
   (\case {
-      LocatedElement (GType tydef) tyloc -> return (LocatedElement tydef tyloc);
-      LocatedElement _ entryLoc -> throwError $ annotateError loc (EGlobalNotType (tid, entryLoc))
+      decl@(TypeDefinition {}) -> return decl;
+      decl -> throwError $ annotateError loc (EGlobalNotType (tid, declLocation decl))
       }) . M.lookup tid
 
-getFunctionTy :: Location 
-  -> Identifier 
+getFunctionTy :: Location
+  -> Identifier
   -> SemanticMonad ([Parameter SemanticAnn], TerminaType SemanticAnn, ReturnMode, Location)
 getFunctionTy loc iden =
   catchError (getGlobalEntry loc iden) (\_ -> throwError $ annotateError loc (EFunctionNotFound iden))
   >>= \case
-    LocatedElement (GFun (FunctionSeman args retty mode)) entryLoc -> do
+    decl | Just (FunctionSeman args retty mode) <- globalFunctionSeman decl -> do
+      let entryLoc = declLocation decl
       case entryLoc of
         Position qualifiedName _ _ -> do
           -- | Check that the type is defined in the current module
@@ -76,16 +81,16 @@ getFunctionTy loc iden =
         _ -> return ()
       
       return (args, retty, mode, entryLoc)
-    LocatedElement _ entryLoc -> throwError $ annotateError loc (EGlobalNotFunction (iden, entryLoc))
+    decl -> throwError $ annotateError loc (EGlobalNotFunction (iden, declLocation decl))
 
--- | Get the type definition of an enum type from the global environment.
+-- | Get the declaration of an enum type from the global environment.
 -- This function is only called for a type that we know is an enum type. If
 -- there is an error it is an internal error.
-getEnumTy :: Location -> Identifier -> SemanticMonad (LocatedElement (SemanTypeDef SemanticAnn))
-getEnumTy loc iden = 
+getEnumTy :: Location -> Identifier -> SemanticMonad (GlobalDecl SemanticAnn)
+getEnumTy loc iden =
   catchError (getGlobalEntry loc iden) (\_ -> throwError $ annotateError Internal EExpectedEnumType) >>=
   (\case {
-      LocatedElement (GType tydef@(Enum {})) entryLoc  -> return (LocatedElement tydef entryLoc);
+      decl@(TypeDefinition (Enum {}) _) -> return decl;
       -- | If we are here, it means that the type was not an enum type.
       -- This should never happen.
       _ -> throwError $ annotateError Internal EExpectedEnumType
@@ -167,28 +172,24 @@ moveObject loc obj =
       moved = M.insert objectHash loc (moved s)
     })
   
+-- | Insert the definition of a class while its members are checked, with the
+-- annotation of a type definition at its location.
 insertGlobalTy :: Location -> SemanTypeDef SemanticAnn -> SemanticMonad ()
 insertGlobalTy loc tydef =
-  insertGlobal type_name (LocatedElement (GType tydef) loc) (EUsedTypeName type_name)
+  insertGlobal type_name (TypeDefinition tydef (buildTypeAnn (undocumented loc))) (EUsedTypeName type_name)
  where
    type_name = getTypeIdentifier tydef
 
-insertGlobalFun :: Location -> Identifier -> [Parameter SemanticAnn] -> TerminaType SemanticAnn -> SemanticMonad ()
-insertGlobalFun loc ident ps rettype =
-  insertGlobal ident (LocatedElement (GFun (FunctionSeman ps rettype Returns)) loc) (EUsedFunName ident)
-
-insertGlobal :: Identifier -> LocatedElement (GEntry SemanticAnn) -> (Location -> Error) -> SemanticMonad ()
-insertGlobal ident entry err =
+insertGlobal :: Identifier -> GlobalDecl SemanticAnn -> (Location -> Error) -> SemanticMonad ()
+insertGlobal ident decl err =
   glbWhereIsDefined ident >>=
   \case
-    { Just l -> throwError (annotateError (location entry) (err l)) ;
+    { Just l -> throwError (annotateError (declLocation decl) (err l)) ;
       Nothing -> do
-        checkReservedName (location entry) ident
-        checkLinkedName (location entry) ident
-        modify (\s -> s{global = M.insert ident entry (global s)}) ;
+        checkReservedName (declLocation decl) ident
+        checkLinkedName (declLocation decl) ident
+        modify (\s -> s{global = M.insert ident decl (global s)}) ;
     }
-  -- if b then throwError (annotateError (location entry) getError)
-  -- else
 
 insertLocalVariables :: Location -> [(Identifier , TerminaType SemanticAnn)] -> SemanticMonad ()
 insertLocalVariables loc = mapM_ (\case
@@ -205,8 +206,8 @@ getLocalObjTy loc ident =
       Nothing -> throwError $ annotateError loc (ENotNamedObject ident)
   }) . M.lookup ident
 
--- | Get the Type of a defined entity variable. If it is not defined throw an error.
-getGlobalEntry :: Location -> Identifier -> SemanticMonad (LocatedElement (GEntry SemanticAnn))
+-- | Get the declaration of a global name. If it is not defined throw an error.
+getGlobalEntry :: Location -> Identifier -> SemanticMonad (GlobalDecl SemanticAnn)
 getGlobalEntry loc ident =
   gets global
   -- | Get local variables map and check if |ident| is a member of that map
@@ -231,9 +232,9 @@ getLHSVarTy loc ident =
               _  -> throwError errorGlobal;
             }
           ) >>= (\case{
-                  LocatedElement (GGlob _) _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
-                  LocatedElement (GConst {}) _ -> throwError $ annotateError loc (EConstantIsReadOnly ident);
-                  LocatedElement (GConstExpr {}) _ -> throwError $ annotateError loc (EInvalidAccessToConstExpr ident);
+                  GlobalDeclaration (Const {}) -> throwError $ annotateError loc (EConstantIsReadOnly ident);
+                  GlobalDeclaration (ConstExpr {}) -> throwError $ annotateError loc (EInvalidAccessToConstExpr ident);
+                  GlobalDeclaration _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
                   _ -> throwError $ annotateError loc (ENotNamedObject ident);
                 });
           ;
@@ -253,9 +254,9 @@ getRHSVarTy loc ident =
               _  -> throwError errorGlobal;
             }
           ) >>= (\case{
-                  LocatedElement (GGlob _) _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
-                  LocatedElement (GConst ts _) _ -> return (Immutable, ts);
-                  LocatedElement (GConstExpr {}) _ -> throwError $ annotateError loc (EInvalidAccessToConstExpr ident);
+                  GlobalDeclaration (Const _ ts _ _ _) -> return (Immutable, ts);
+                  GlobalDeclaration (ConstExpr {}) -> throwError $ annotateError loc (EInvalidAccessToConstExpr ident);
+                  GlobalDeclaration _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
                   _ -> throwError $ annotateError loc (ENotNamedObject ident);
                 });
           ;
@@ -273,15 +274,15 @@ getGlobalVarTy loc ident =
                    _  -> throwError errorGlobal;
                 }
               ) >>= (\case {
-                        LocatedElement (GGlob ty@(TGlobal ResourceClass _)) _  -> return (Mutable, ty);
-                        LocatedElement (GConst ts _) _ -> return (Immutable, ts);
-                        LocatedElement (GConstExpr {}) _ -> throwError $ annotateError loc (EInvalidAccessToConstExpr ident);
+                        decl | Just ty@(TGlobal ResourceClass _) <- globalObjectType decl -> return (Mutable, ty);
+                        GlobalDeclaration (Const _ ts _ _ _) -> return (Immutable, ts);
+                        GlobalDeclaration (ConstExpr {}) -> throwError $ annotateError loc (EInvalidAccessToConstExpr ident);
                         _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
                       });
 
 
 glbWhereIsDefined :: Identifier -> SemanticMonad (Maybe Location)
-glbWhereIsDefined i = fmap location . M.lookup i <$> gets global
+glbWhereIsDefined i = fmap declLocation . M.lookup i <$> gets global
 
 -- | Location where an identifier is already taken, if it is. The declared map
 -- covers every name of the top level, the ones of the modules that are still to
@@ -319,7 +320,7 @@ mustBeTy ty expression =
   sameTyOrError loc ty
   >> return expression
   where
-    SemanticAnn _ loc = getAnnotation expression
+    loc = getLocation (getAnnotation expression)
 
 getIntConst :: Const a -> SemanticMonad Integer
 getIntConst (I (TInteger i _) _) = return i
@@ -327,7 +328,7 @@ getIntConst _ = throwError $ annotateError Internal EExpectedIntConstant
 
 catchMismatch :: 
   -- | Location of the error
-  Parser.ParserAnn 
+  Location
   -- | Function to create the error
   -> (TerminaType SemanticAnn -> Error) 
   -- | Action to execute
@@ -353,7 +354,7 @@ enumParamTyOrFail pann ty = unless (fieldTy ty) (throwError (annotateError pann 
 
 catchExpectedCopy ::
   -- | Location of the error
-  Parser.ParserAnn
+  Location
   -- | Function to create the error
   -> (TerminaType SemanticAnn -> Error)
   -- | Action to execute
@@ -366,7 +367,7 @@ catchExpectedCopy ann ferror action = catchError action (\err -> case getError e
 
 catchExpectedNum ::
   -- | Location of the error
-  Parser.ParserAnn
+  Location
   -- | Function to create the error
   -> (TerminaType SemanticAnn -> Error)
   -- | Action to execute

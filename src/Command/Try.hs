@@ -11,8 +11,7 @@ import System.FilePath
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import qualified Data.Map.Strict as M
-import Parser.Parsing (terminaModuleParser)
-import Text.Parsec (runParser)
+import Parser.Parsing (parseTerminaModule)
 import Generator.LanguageC.Printer (runCPrinter)
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
@@ -56,15 +55,15 @@ loadSingleModule filePath = do
     -- read it
     src_code <- TIO.readFile filePath
     -- parse it
-    case runParser terminaModuleParser noExtension filePath (T.unpack src_code) of
+    case parseTerminaModule noExtension filePath (T.unpack src_code) of
         Left err -> 
-            let pErr = annotateError (Position filePath (errorPos err) (errorPos err)) (EParseError err)
+            let pErr = annotateError (Position filePath (errorPos err) (errorPos err)) (parseError err)
                 fileMap = M.singleton filePath src_code
             in
             dieWithReport (toText pErr fileMap)
         Right term -> do
             -- Imported modules are ignored
-            return $ TerminaModuleData noExtension filePath [] [] src_code (ParsingData . frags $ term)
+            return $ TerminaModuleData noExtension filePath [] [] src_code (moduleDoc term) (ParsingData . frags $ term)
 
 typeSingleModule :: ParsedModule -> IO TypedModule
 typeSingleModule parsedModule = do
@@ -80,6 +79,7 @@ typeSingleModule parsedModule = do
                     (fullPath parsedModule)
                     [] []
                     (sourcecode parsedModule)
+                    (moduleComment parsedModule)
                     (SemanticData typedProgram)
 
 -- | Folds the constants of the module, analyses its values, elaborates its
@@ -110,7 +110,7 @@ printHeaderModule debugBuild eModule = do
     let tAST = elaboratedAST . metadata $ eModule
         configParams = defaultConfig "test" TestPlatform
         moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules eModule
-    case runGenHeaderFile configParams TestPlatform (qualifiedName eModule) moduleDeps tAST emptyMonadicTypes of
+    case runGenHeaderFile configParams TestPlatform (qualifiedName eModule) moduleDeps (moduleComment eModule) tAST emptyMonadicTypes M.empty of
         Left err -> dieWithError $ show err
         Right (cHeaderFile, _) -> TIO.putStrLn $ runCPrinter debugBuild cHeaderFile
 

@@ -8,6 +8,7 @@ import Configuration.Platform (Platform)
 import System.FilePath
 import Generator.CodeGen.TypeDefinition
 import qualified Data.Set as S
+import qualified Data.Map.Strict as M
 import Elaboration.AST
 import Utils.Annotations
 import Control.Monad.Except
@@ -29,12 +30,12 @@ genStatusHeaderFile = do
     items <- concat <$> traverse genStatusStruct (S.toList statusSet)
     return $ CHeaderFile genStatusPathName $
         [
-            CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False) Internal),
-            CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False) Internal),
-            CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True) Internal)
+            CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False Nothing) Internal),
+            CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False Nothing) Internal),
+            CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True Nothing) Internal)
         ]
         ++ items ++ [
-            CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) Internal)
+            CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True Nothing) Internal)
         ]
 
 runGenStatusHeaderFile ::
@@ -45,6 +46,6 @@ runGenStatusHeaderFile ::
     -> Either CGeneratorError CFile
 runGenStatusHeaderFile config plt optionFileName opts =
     case runState (runExceptT genStatusHeaderFile)
-        (CGeneratorEnv optionFileName S.empty opts config plt False Nothing) of
+        (CGeneratorEnv optionFileName S.empty opts config plt False Nothing M.empty) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file

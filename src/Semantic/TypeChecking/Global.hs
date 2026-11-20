@@ -23,10 +23,10 @@ import Semantic.TypeChecking.Expression
 import Semantic.Modifiers (Declaration(..))
 import Core.Utils
 
-typeGlobal :: Global ParserAnn -> SemanticMonad (SAST.Global SemanticAnn, LocatedElement (GEntry SemanticAnn))
+typeGlobal :: Global ParserAnn -> SemanticMonad (SAST.Global SemanticAnn)
 typeGlobal (Task ident ts mexpr mods anns) = do
-  ty <- typeTypeSpecifier anns typeGlobalObject ts
-  checkTerminaType anns ty
+  ty <- typeTypeSpecifier (getLocation anns) typeGlobalObject ts
+  checkTerminaType (getLocation anns) ty
   case ty of
     TGlobal TaskClass _ -> do
       exprty <-
@@ -34,15 +34,15 @@ typeGlobal (Task ident ts mexpr mods anns) = do
           -- If it has an initial value great
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
           -- If it has not, we need to check that the type has actually NO fields
-          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
-      tyMods <- typeModifiers anns TaskDeclaration typeGlobalObject mods
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing (undocumented (getLocation anns)))
+      tyMods <- typeModifiers (getLocation anns) TaskDeclaration typeGlobalObject mods
       unless (any (\(SAST.Modifier modIdent _) -> modIdent == "priority") tyMods) $
-        throwError $ annotateError anns (EMissingTaskPriority ident)
-      return (SAST.Task ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
-    _ -> throwError $ annotateError anns (EInvalidTaskType ty)
+        throwError $ annotateError (getLocation anns) (EMissingTaskPriority ident)
+      return (SAST.Task ident ty exprty tyMods (buildGlobalAnn anns ty))
+    _ -> throwError $ annotateError (getLocation anns) (EInvalidTaskType ty)
 typeGlobal (Handler ident ts mexpr mods anns) = do
-  ty <- typeTypeSpecifier anns typeGlobalObject ts
-  checkTerminaType anns ty
+  ty <- typeTypeSpecifier (getLocation anns) typeGlobalObject ts
+  checkTerminaType (getLocation anns) ty
   case ty of
     TGlobal HandlerClass _ -> do
       exprty <-
@@ -50,26 +50,26 @@ typeGlobal (Handler ident ts mexpr mods anns) = do
           -- If it has an initial value great
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
           -- If it has not, we need to check that the type has actually NO fields
-          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
-      tyMods <- typeModifiers anns HandlerDeclaration typeGlobalObject mods
-      return (SAST.Handler ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
-    _ -> throwError $ annotateError anns (EInvalidHandlerType ty)
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing (undocumented (getLocation anns)))
+      tyMods <- typeModifiers (getLocation anns) HandlerDeclaration typeGlobalObject mods
+      return (SAST.Handler ident ty exprty tyMods (buildGlobalAnn anns ty))
+    _ -> throwError $ annotateError (getLocation anns) (EInvalidHandlerType ty)
 typeGlobal (Test ident ts mexpr mods anns) = do
-  onlyInTest anns ("test instance " ++ ident)
-  ty <- typeTypeSpecifier anns typeGlobalObject ts
-  checkTerminaType anns ty
+  onlyInTest (getLocation anns) ("test instance " ++ ident)
+  ty <- typeTypeSpecifier (getLocation anns) typeGlobalObject ts
+  checkTerminaType (getLocation anns) ty
   case ty of
     TGlobal TestClass _ -> do
       exprty <-
         case mexpr of
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
-          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
-      tyMods <- typeModifiers anns TestInstanceDeclaration typeGlobalObject mods
-      return (SAST.Test ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
-    _ -> throwError $ annotateError anns (EInvalidTestType ty)
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing (undocumented (getLocation anns)))
+      tyMods <- typeModifiers (getLocation anns) TestInstanceDeclaration typeGlobalObject mods
+      return (SAST.Test ident ty exprty tyMods (buildGlobalAnn anns ty))
+    _ -> throwError $ annotateError (getLocation anns) (EInvalidTestType ty)
 typeGlobal (Resource ident ts mexpr mods anns) = do
-  ty <- typeTypeSpecifier anns typeGlobalObject ts
-  checkTerminaType anns ty
+  ty <- typeTypeSpecifier (getLocation anns) typeGlobalObject ts
+  checkTerminaType (getLocation anns) ty
   case ty of
     -- | User-defined resources
     TGlobal ResourceClass clsId -> do
@@ -78,65 +78,65 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
           -- If it has an initial value great
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
           -- If it has not, we need to check that the type has actually NO fields
-          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
-      tyMods <- typeModifiers anns ResourceDeclaration typeGlobalObject mods
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing (undocumented (getLocation anns)))
+      tyMods <- typeModifiers (getLocation anns) ResourceDeclaration typeGlobalObject mods
       -- A resource can be unprotected only if its class has no regular fields
       -- or every procedure and method of its class takes &self, so that the
       -- fields are only set by the initializer
       when (isUnprotected tyMods) $
-          getGlobalTypeDef anns clsId >>= \case{
-              LocatedElement (Class _clsKind _ident members _provides _mods) clsLoc ->
+          getGlobalTypeDef (getLocation anns) clsId >>= \case{
+              TypeDefinition (Class _clsKind _ident members _provides _mods) clsAnn ->
                 let fields = [fieldIdentifier fld | ClassField fld@(FieldDefinition _ fty _) <- members, (not . portTy) fty]
                     writers = [WritingProcedure member ak | ClassProcedure ak member _ _ _ <- members, ak /= Immutable]
                       ++ [WritingMethod member ak | ClassMethod ak member _ _ _ _ <- members, ak /= Immutable] in
                 case (fields, writers) of {
-                  (field : _, writer : _) -> throwError $ annotateError anns (EInvalidUnprotectedResource ident (clsId, clsLoc) field writer);
+                  (field : _, writer : _) -> throwError $ annotateError (getLocation anns) (EInvalidUnprotectedResource ident (clsId, getLocation clsAnn) field writer);
                   _ -> return ()
                 };
               _ -> throwError $ annotateError Internal EExpectedClassType;
             }
-      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
+      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty))
     -- | Memory pools 
     TPool {} -> do
       exprty <-
         case mexpr of
-          Just _ -> throwError $ annotateError anns EInvalidPoolInitialization
+          Just _ -> throwError $ annotateError (getLocation anns) EInvalidPoolInitialization
           Nothing   -> return Nothing
-      tyMods <- typeModifiers anns PoolDeclaration typeGlobalObject mods
-      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
+      tyMods <- typeModifiers (getLocation anns) PoolDeclaration typeGlobalObject mods
+      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty))
     -- | Deques, which always start empty
     TDeque {} -> do
       exprty <-
         case mexpr of
-          Just _ -> throwError $ annotateError anns EDequeInitialized
+          Just _ -> throwError $ annotateError (getLocation anns) EDequeInitialized
           Nothing   -> return Nothing
-      tyMods <- typeModifiers anns DequeDeclaration typeGlobalObject mods
-      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
+      tyMods <- typeModifiers (getLocation anns) DequeDeclaration typeGlobalObject mods
+      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty))
     -- | Pools of a unit test, which start empty like any pool
     TTestPool {} -> do
       exprty <-
         case mexpr of
-          Just _ -> throwError $ annotateError anns (ETestComponentInitialized ty)
+          Just _ -> throwError $ annotateError (getLocation anns) (ETestComponentInitialized ty)
           Nothing   -> return Nothing
-      tyMods <- typeModifiers anns TestPoolDeclaration typeGlobalObject mods
-      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
+      tyMods <- typeModifiers (getLocation anns) TestPoolDeclaration typeGlobalObject mods
+      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty))
     -- | Atomic variables
     TAtomic {} -> do
       exprty <-
         case mexpr of
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
-          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
-      tyMods <- typeModifiers anns AtomicDeclaration typeGlobalObject mods
-      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing (undocumented (getLocation anns)))
+      tyMods <- typeModifiers (getLocation anns) AtomicDeclaration typeGlobalObject mods
+      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty))
     -- | Atomic arrays
     TAtomicArray {} -> do
       exprty <-
         case mexpr of
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
-          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
-      tyMods <- typeModifiers anns AtomicArrayDeclaration typeGlobalObject mods
-      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
-    _ -> throwError $ annotateError anns (EInvalidResourceType ty)
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing (undocumented (getLocation anns)))
+      tyMods <- typeModifiers (getLocation anns) AtomicArrayDeclaration typeGlobalObject mods
+      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty))
+    _ -> throwError $ annotateError (getLocation anns) (EInvalidResourceType ty)
   
   where
 
@@ -146,66 +146,66 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
     isUnprotected (_ : xs) = isUnprotected xs
 
 typeGlobal (Emitter ident ts mexpr mods anns) = do
-  ty <- typeTypeSpecifier anns typeGlobalObject ts
-  checkTerminaType anns ty
+  ty <- typeTypeSpecifier (getLocation anns) typeGlobalObject ts
+  checkTerminaType (getLocation anns) ty
   case ty of
     TGlobal EmitterClass clsId -> do
-      unless (emitterInstTy clsId) (throwError $ annotateError anns (EEmitterClassNotInstantiable clsId))
+      unless (emitterInstTy clsId) (throwError $ annotateError (getLocation anns) (EEmitterClassNotInstantiable clsId))
       exprty <-
         case mexpr of
           -- If it has an initial value great
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
           -- If it has not, we need to check that the type has actually NO fields
-          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
-      tyMods <- typeModifiers anns EmitterDeclaration typeGlobalObject mods
-      return (SAST.Emitter ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing (undocumented (getLocation anns)))
+      tyMods <- typeModifiers (getLocation anns) EmitterDeclaration typeGlobalObject mods
+      return (SAST.Emitter ident ty exprty tyMods (buildGlobalAnn anns ty))
     -- | Emitters of a unit test, which only a case fires
     TTestEmitter {} -> do
       exprty <-
         case mexpr of
-          Just _ -> throwError $ annotateError anns (ETestComponentInitialized ty)
+          Just _ -> throwError $ annotateError (getLocation anns) (ETestComponentInitialized ty)
           Nothing -> return Nothing
-      tyMods <- typeModifiers anns TestEmitterDeclaration typeGlobalObject mods
-      return (SAST.Emitter ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
-    _ -> throwError $ annotateError anns (EInvalidEmitterType ty)
+      tyMods <- typeModifiers (getLocation anns) TestEmitterDeclaration typeGlobalObject mods
+      return (SAST.Emitter ident ty exprty tyMods (buildGlobalAnn anns ty))
+    _ -> throwError $ annotateError (getLocation anns) (EInvalidEmitterType ty)
 typeGlobal (Channel ident ts mexpr mods anns) = do
-  ty <- typeTypeSpecifier anns typeGlobalObject ts
-  checkTerminaType anns ty
+  ty <- typeTypeSpecifier (getLocation anns) typeGlobalObject ts
+  checkTerminaType (getLocation anns) ty
   case ty of
     TMsgQueue _ _ -> do
       exprty <-
         case mexpr of
           -- If it has an initial value great
-          Just _ -> throwError $ annotateError anns EInvalidMsgQueueInitialization
+          Just _ -> throwError $ annotateError (getLocation anns) EInvalidMsgQueueInitialization
           -- If it has not, we need to check that the type has actually NO fields
           Nothing -> return Nothing
-      tyMods <- typeModifiers anns ChannelDeclaration typeGlobalObject mods
-      return (SAST.Channel ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
+      tyMods <- typeModifiers (getLocation anns) ChannelDeclaration typeGlobalObject mods
+      return (SAST.Channel ident ty exprty tyMods (buildGlobalAnn anns ty))
     -- | Channels of a unit test, which a case reads
     TTestChannel {} -> do
       exprty <-
         case mexpr of
-          Just _ -> throwError $ annotateError anns (ETestComponentInitialized ty)
+          Just _ -> throwError $ annotateError (getLocation anns) (ETestComponentInitialized ty)
           Nothing -> return Nothing
-      tyMods <- typeModifiers anns TestChannelDeclaration typeGlobalObject mods
-      return (SAST.Channel ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
-    _ -> throwError $ annotateError anns (EInvalidChannelType ty)
+      tyMods <- typeModifiers (getLocation anns) TestChannelDeclaration typeGlobalObject mods
+      return (SAST.Channel ident ty exprty tyMods (buildGlobalAnn anns ty))
+    _ -> throwError $ annotateError (getLocation anns) (EInvalidChannelType ty)
 typeGlobal (Const ident ts expr mods anns) = do
-  ty <- typeTypeSpecifier anns typeGlobalObject ts
-  checkTerminaType anns ty
-  globalConstTyOrFail anns ty
+  ty <- typeTypeSpecifier (getLocation anns) typeGlobalObject ts
+  checkTerminaType (getLocation anns) ty
+  globalConstTyOrFail (getLocation anns) ty
   -- | A constant has the type TConstSubtype of the declared one, which marks
   -- it, and every scalar read from it with a constant path, as a constant
   -- expression. Its initializer is typed against that type, which makes every
   -- field and element of it a constant too.
   let constType = TConstSubtype ty
   typed_expr <- typeAssignmentExpression constType typeGlobalObject expr
-  tyMods <- typeModifiers anns ConstantDeclaration typeGlobalObject mods
-  return (SAST.Const ident constType typed_expr tyMods (buildGlobalAnn anns constType), LocatedElement (GConst constType typed_expr) anns)
+  tyMods <- typeModifiers (getLocation anns) ConstantDeclaration typeGlobalObject mods
+  return (SAST.Const ident constType typed_expr tyMods (buildGlobalAnn anns constType))
 typeGlobal (ConstExpr ident ts expr mods anns) = do
-  ty <- typeTypeSpecifier anns typeGlobalObject ts
-  checkTerminaType anns ty
-  declTyOrFail anns ty
+  ty <- typeTypeSpecifier (getLocation anns) typeGlobalObject ts
+  checkTerminaType (getLocation anns) ty
+  declTyOrFail (getLocation anns) ty
   typed_expr <- typeAssignmentExpression ty typeGlobalObject expr
-  tyMods <- typeModifiers anns ConstantDeclaration typeGlobalObject mods
-  return (SAST.ConstExpr ident ty typed_expr tyMods (buildGlobalAnn anns ty), LocatedElement (GConstExpr ty typed_expr) anns)
+  tyMods <- typeModifiers (getLocation anns) ConstantDeclaration typeGlobalObject mods
+  return (SAST.ConstExpr ident ty typed_expr tyMods (buildGlobalAnn anns ty))

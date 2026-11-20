@@ -12,6 +12,8 @@ module Pipeline.Common
   , renderTestConfigFile
   , buildAndRenderModule
   , runCoverageBuild
+  , renderDocumentedFiles
+  , renderDocumentedFilesOn
   , compileErrorCode
   , compileTestErrorCode
   , compileTestProjectErrorCode
@@ -33,10 +35,10 @@ import qualified Data.Text.Encoding as TE
 import Data.Text (Text, pack)
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
+import Doc.Facts (instanceFacts)
 import qualified Data.Set as S
 
-import Parser.Parsing (terminaModuleParser)
-import Text.Parsec (runParser)
+import Parser.Parsing (parseTerminaModule)
 import Core.AST (TerminaModule'(..), ModuleImport'(..))
 
 import Semantic.Environment (makeInitialGlobalEnv, Environment)
@@ -45,15 +47,16 @@ import Semantic.Types (SemanticAnn)
 import Configuration.Configuration (defaultConfig, TerminaConfig (..), DeploymentKind (..))
 import Configuration.Platform (Platform(..))
 import Generator.Environment (getPlatformInitialGlobalEnv)
-import Generator.CodeGen.Module (runGenSourceFile)
+import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Generator.CodeGen.Coverage (renderCoverageMap)
+import Generator.Monadic (MonadicTypes)
 import Generator.CodeGen.Application.Glue (runGenMainFile)
 import Generator.TestDescriptor (genTestDescriptor)
 import Core.TestCases (NumberedCase, typedCases)
 import Data.Word (Word32)
 import Generator.CodeGen.Application.Config (runGenConfigFile)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
-import Generator.LanguageC.Printer (runCPrinter)
+import Generator.LanguageC.Printer (CPrinterConfig(..), runCPrinter, runCPrinterWith)
 import Lowering.AST (AnnotatedProgram)
 import qualified Semantic.AST as SAST
 
@@ -61,8 +64,8 @@ import Command.Types
 import Command.Utils (CheckFailure(..), sortProjectDepsOrLoop)
 import Modules.Modules (TerminaModuleData(..), ModuleDependency(..))
 import Modules.Utils (buildModuleName)
-import Parser.Errors (Error(..), ParsingErrors)
-import Utils.Annotations (QualifiedName, annotateError, Location(Internal))
+import Parser.Errors (Error(..), ParsingErrors, parseError)
+import Utils.Annotations (QualifiedName, annotateError, Location(Internal), Located(..))
 
 import Command.Pipeline (CheckedModules(..), checkModules, typeProject)
 import ControlFlow.Architecture.Types (TerminaProgArch)
@@ -134,7 +137,30 @@ data PipelineResult = PipelineResult
   , programArch :: TerminaProgArch SemanticAnn
   , elaboratedModules :: ElaboratedProject
   , checksReports :: M.Map QualifiedName ElaborationReport
+  , pipelineMonadicTypes :: MonadicTypes
   }
+
+-- | The header and the source file of a module of a project, printed with
+-- their documentation comments, as @termina deliver --docs@ writes them, or
+-- the message of the error that stops the build.
+renderDocumentedFiles :: QualifiedName -> [(QualifiedName, String)] -> Either Text (Text, Text)
+renderDocumentedFiles = renderDocumentedFilesOn TestPlatform
+
+-- | 'renderDocumentedFiles' on a given platform.
+renderDocumentedFilesOn :: Platform -> QualifiedName -> [(QualifiedName, String)] -> Either Text (Text, Text)
+renderDocumentedFilesOn plt target sources = either (Left . failMessage) Right $ do
+  result <- runProjectPipelineOn plt configParams sources
+  let eModule = elaboratedModules result M.! target
+      program = elaboratedAST . metadata $ eModule
+      deps = [ qname | ModuleDependency qname _ <- importedModules eModule ]
+      printed = runCPrinterWith (CPrinterConfig False False True)
+      generatorError err = Failure (T.pack (show err)) (T.pack (show err))
+  (cHeaderFile, _) <- either (Left . generatorError) Right
+    (runGenHeaderFile configParams plt target deps (moduleComment eModule) program (pipelineMonadicTypes result)
+      (instanceFacts plt (programArch result)))
+  (cSourceFile, _) <- either (Left . generatorError) Right
+    (runGenSourceFile configParams plt target program)
+  return (printed cHeaderFile, printed cSourceFile)
 
 -- | The full pipeline up to (and including) the architecture checks, shared by
 -- 'runFullProjectBuild' (which renders each source module) and
@@ -143,13 +169,21 @@ runProjectPipeline ::
   TerminaConfig
   -> [(QualifiedName, String)]
   -> Either Failure PipelineResult
-runProjectPipeline cfg sources = do
+runProjectPipeline = runProjectPipelineOn TestPlatform
+
+-- | 'runProjectPipeline' on a given platform.
+runProjectPipelineOn ::
+  Platform
+  -> TerminaConfig
+  -> [(QualifiedName, String)]
+  -> Either Failure PipelineResult
+runProjectPipelineOn plt cfg sources = do
   let files = M.fromList [ (qname, pack src) | (qname, src) <- sources ]
   parsedProject <- M.fromList <$> mapM parseModule sources
   ordered <- orderModules parsedProject
-  checked <- checkedOrFailure files (snd (checkModules cfg TestPlatform S.empty parsedProject ordered))
+  checked <- checkedOrFailure files (snd (checkModules cfg plt S.empty parsedProject ordered))
   pure (PipelineResult (checkedLowered checked) ordered (checkedArchitecture checked)
-    (checkedElaborated checked) (checkedReports checked))
+    (checkedElaborated checked) (checkedReports checked) (checkedMonadicTypes checked))
 
 -- | The modules of a project that keep their types after its checks, and the
 -- code of the error that stops them.
@@ -333,16 +367,17 @@ parseModule :: (QualifiedName, String) -> Either Failure (QualifiedName, ParsedM
 parseModule (qname, src) =
   -- | The source name the parser stamps on every position is the name of the
   -- module, as in a real build, so that the error printer finds its source.
-  case runParser terminaModuleParser qname qname src of
+  case parseTerminaModule qname qname src of
     Left err -> Left (failure (M.singleton qname (pack src))
-      (annotateError Internal (EParseError err) :: ParsingErrors))
-    Right (Termina imports prog) -> do
+      (annotateError Internal (parseError err) :: ParsingErrors))
+    Right (Termina comment imports prog) -> do
       deps <- mapM toDep imports
-      pure (qname, TerminaModuleData qname qname deps [] (pack src) (ParsingData prog))
+      pure (qname, TerminaModuleData qname qname deps [] (pack src) comment (ParsingData prog))
 
   where
 
-    toDep (ModuleImport ident ann) =
+    toDep (ModuleImport ident parsedAnn) =
+      let ann = getLocation parsedAnn in
       case buildModuleName ann ident of
         Left perr ->
           let text = pack $ "Import error in " ++ qname ++ ": " ++ show perr

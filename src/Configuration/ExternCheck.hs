@@ -34,7 +34,7 @@ import Generator.CodeGen.Application.Config (genConfigPathName)
 import Generator.CodeGen.Application.Option (genOptionPathName)
 import Generator.CodeGen.Application.Status (genStatusPathName)
 import Generator.CodeGen.Application.Result (genResultPathName)
-import Utils.Annotations (Location)
+import Utils.Annotations (Location, Located(..))
 import Utils.Files (filesUnder)
 
 -- | Who a section of "extern" belongs to.
@@ -88,7 +88,7 @@ sourceExterns m = ModuleExterns (moduleSegments m) (moduleFile m) . externsOf <$
 
   where
 
-    externsOf ast = [ (ident, ann) | ExternFunction ident _ _ _ _ ann <- frags ast ]
+    externsOf ast = [ (ident, getLocation ann) | ExternFunction ident _ _ _ _ ann <- frags ast ]
 
 -- | Every problem of the sections of a manifest that follows from the manifest
 -- itself: the "extern" folder, the lists and the modules that the entries

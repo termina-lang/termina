@@ -6,6 +6,7 @@ module Modules.Modules where
 
 -- Containers
 import qualified Data.Text as T
+import Core.AST (DocComment)
 import Utils.Annotations
 import Utils.Graph
 
@@ -30,6 +31,8 @@ data TerminaModuleData a = TerminaModuleData {
   visibleModules :: [QualifiedName],
   -- | Source code
   sourcecode :: T.Text,
+  -- | The documentation comment of the module, at the start of its file
+  moduleComment :: Maybe DocComment,
   -- | Module meta-data (e.g. parsed AST)
   metadata :: a
 } deriving (Show)

@@ -34,19 +34,19 @@ typeBlock rTy (Block stmts loc) = do
 typeStatement :: Maybe (SAST.TerminaType SemanticAnn) -> Statement ParserAnn -> SemanticMonad (SAST.Statement SemanticAnn)
 -- Declaration semantic analysis
 typeStatement _retTy (Declaration lhs_id lhs_ak lhs_ts expr anns) = do
-  lhs_type <- typeTypeSpecifier anns typeRHSObject lhs_ts
+  lhs_type <- typeTypeSpecifier (getLocation anns) typeRHSObject lhs_ts
   -- Check type is alright
-  checkTerminaType anns lhs_type
+  checkTerminaType (getLocation anns) lhs_type
   -- Check if the type is a valid declaration type
-  declTyOrFail anns lhs_type
+  declTyOrFail (getLocation anns) lhs_type
   -- Expression and type must match. A deferred declaration has no initializer.
   ety <- mapM (typeAssignmentExpression lhs_type typeRHSObject) expr
   -- Insert object in the corresponding environment
   -- If the object is mutable, then we insert it in the local mutable environment
   -- otherwise we insert it in the read-only environment
   case lhs_ak of
-    Mutable -> insertLocalMutObj anns lhs_id lhs_type
-    Immutable -> insertLocalImmutObj anns lhs_id lhs_type
+    Mutable -> insertLocalMutObj (getLocation anns) lhs_id lhs_type
+    Immutable -> insertLocalImmutObj (getLocation anns) lhs_id lhs_type
     Private -> throwError $ annotateError Internal (EInvalidObjectDeclaration lhs_id)
   -- Return annotated declaration
   return (SAST.Declaration lhs_id lhs_ak lhs_type ety (buildStmtAnn anns))
@@ -55,7 +55,7 @@ typeStatement _retTy (AssignmentStmt lhs_o rhs_expr anns) = do
   (lhs_o_ak', lhs_o_type') <- getObjType lhs_o_typed'
   let (lhs_o_typed, lhs_o_ak, lhs_o_type) =
         maybe (lhs_o_typed', lhs_o_ak', lhs_o_type') (unBox lhs_o_typed', Mutable, ) (isBox lhs_o_type')
-  unless (lhs_o_ak /= Immutable) (throwError $ annotateError anns EAssignmentToImmutable)
+  unless (lhs_o_ak /= Immutable) (throwError $ annotateError (getLocation anns) EAssignmentToImmutable)
   -- | A value assigned to a fixed location has the type of the located object
   let lhs_value_type = case lhs_o_type of
         TFixedLocation ty -> ty
@@ -67,7 +67,7 @@ typeStatement _retTy (AssignmentStmt lhs_o rhs_expr anns) = do
   return $ SAST.AssignmentStmt lhs_o_typed ety $ buildStmtAnn anns
 typeStatement retTy (IfElseStmt condIf elifs condElse anns) = do
   -- | Check that if the statement defines an else-if branch, then it must have an otherwise branch
-  when (not (null elifs) && isNothing condElse) (throwError $ annotateError anns EIfElseNoOtherwise)
+  when (not (null elifs) && isNothing condElse) (throwError $ annotateError (getLocation anns) EIfElseNoOtherwise)
   SAST.IfElseStmt
     -- | Check that the condition is a boolean expression
     <$> typeCondIf condIf
@@ -103,26 +103,26 @@ typeStatement retTy (IfElseStmt condIf elifs condElse anns) = do
         <*> return (buildStmtAnn ann')
 -- Here we could implement some abstract interpretation analysis
 typeStatement retTy (ForLoopStmt it_id it_ts from_expr to_expr mWhile body_stmt anns) = do
-  it_ty <- typeTypeSpecifier anns typeRHSObject it_ts
+  it_ty <- typeTypeSpecifier (getLocation anns) typeRHSObject it_ts
   -- Check if the type of the iterator is a valid declaration type
-  declTyOrFail anns it_ty
+  declTyOrFail (getLocation anns) it_ty
   -- Check the iterator is of integer type
-  unless (intTy it_ty) (throwError $ annotateError anns (EForIteratorInvalidType it_ty))
+  unless (intTy it_ty) (throwError $ annotateError (getLocation anns) (EForIteratorInvalidType it_ty))
   -- Both boundaries should have the same integer type and be a constant
-  typed_fromexpr <- catchMismatch (getAnnotation from_expr) (EForLoopLowerBoundTypeMismatch (TConstSubtype it_ty))
+  typed_fromexpr <- catchMismatch (getLocation (getAnnotation from_expr)) (EForLoopLowerBoundTypeMismatch (TConstSubtype it_ty))
     (typeExpression (Just (TConstSubtype it_ty)) typeRHSObject from_expr)
-  typed_toexpr <- catchMismatch (getAnnotation to_expr) (EForLoopUpperBoundTypeMismatch (TConstSubtype it_ty))
+  typed_toexpr <- catchMismatch (getLocation (getAnnotation to_expr)) (EForLoopUpperBoundTypeMismatch (TConstSubtype it_ty))
     (typeExpression (Just (TConstSubtype it_ty)) typeRHSObject to_expr)
   SAST.ForLoopStmt it_id it_ty typed_fromexpr typed_toexpr
     <$> (case mWhile of
               Nothing -> return Nothing
               Just whileC -> do
                   typed_whileC <- localScope $ do
-                      insertLocalImmutObj anns it_id it_ty
+                      insertLocalImmutObj (getLocation anns) it_id it_ty
                       typeExpression (Just TBool) typeRHSObject whileC
                   return (Just typed_whileC)
         )
-    <*> localScope (insertLocalImmutObj anns it_id it_ty >> typeBlock retTy body_stmt)
+    <*> localScope (insertLocalImmutObj (getLocation anns) it_id it_ty >> typeBlock retTy body_stmt)
     <*> return (buildStmtAnn anns)
 -- | A call to a noreturn function can only appear as a statement of its own,
 -- and its statement is marked so that lowering turns it into a NoReturnCall
@@ -130,7 +130,7 @@ typeStatement retTy (ForLoopStmt it_id it_ts from_expr to_expr mWhile body_stmt 
 typeStatement _retTy (SingleExpStmt expr anns) = do
   let typeUnitExpression = case expr of
         FunctionCall ident args cann -> do
-          (ps, retty, mode, funcLocation) <- getFunctionTy cann ident
+          (ps, retty, mode, funcLocation) <- getFunctionTy (getLocation cann) ident
           typed_call <- typeFunctionCall (Just TUnit) ident ps retty funcLocation args cann
           return (typed_call, if mode == NoReturn then buildNoReturnCallStmtAnn else buildStmtAnn)
         _ -> do
@@ -138,7 +138,7 @@ typeStatement _retTy (SingleExpStmt expr anns) = do
           return (typed_expr, buildStmtAnn)
   (typed_expr, stmtAnn) <- catchError typeUnitExpression (
     \err -> case getError err of
-      EMismatch ty _ -> throwError $ annotateError anns (ESingleExpressionTypeNotUnit ty)
+      EMismatch ty _ -> throwError $ annotateError (getLocation anns) (ESingleExpressionTypeNotUnit ty)
       _ -> throwError err)
   return $ SAST.SingleExpStmt typed_expr (stmtAnn anns)
 typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
@@ -153,38 +153,40 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
       typed_bd <- localScope $ typeBlock retTy bd
       return $ Just (SAST.DefaultCase typed_bd (buildStmtAnn ann'))
   case type_matchE of
-    TEnum t -> getGlobalTypeDef ann t >>=
+    TEnum t -> getGlobalTypeDef (getLocation ann) t >>=
         \case {
-          LocatedElement (Enum ident flsDef _mods) eloc -> do
-            let flsDefIdents = variantIdentifier <$> flsDef
+          TypeDefinition (Enum ident flsDef _mods) enumAnn -> do
+            let eloc = getLocation enumAnn
+                flsDefIdents = variantIdentifier <$> flsDef
                 casesIdents = matchIdentifier <$> cases
-                variantMap = M.fromList (map (\variant@(EnumVariant vId _) -> (vId, variant)) flsDef)
+                variantMap = M.fromList (map (\variant@(EnumVariant vId _ _) -> (vId, variant)) flsDef)
                 caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
             when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
-              \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
+              \case { [] -> return (); cs -> throwError $ annotateError (getLocation ann) (EMatchMissingCases cs); })
             typedCases <- mapM (typeMatchCase ident eloc caseMap variantMap) casesIdents
             when (not total && (length flsDefIdents == length casesIdents)) $
-              throwError $ annotateError ann EInvalidDefaultCase
+              throwError $ annotateError (getLocation ann) EInvalidDefaultCase
             return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
           ;
           _ -> throwError $ annotateError Internal EExpectedEnumType
         }
-    TReference refKind (TEnum t) -> getGlobalTypeDef ann t >>=
+    TReference refKind (TEnum t) -> getGlobalTypeDef (getLocation ann) t >>=
         \case {
-          LocatedElement (Enum ident flsDef _mods) eloc -> do
-            let flsDefIdents = variantIdentifier <$> flsDef
+          TypeDefinition (Enum ident flsDef _mods) enumAnn -> do
+            let eloc = getLocation enumAnn
+                flsDefIdents = variantIdentifier <$> flsDef
                 casesIdents = matchIdentifier <$> cases
                 -- | The parameters will now be refernces to the the actual objects
                 -- inside the enum
                 variantMap = M.fromList (
-                  map (\(EnumVariant vId variantParams) ->
-                    (vId, EnumVariant vId (TReference refKind <$> variantParams))) flsDef)
+                  map (\(EnumVariant vId variantParams vann) ->
+                    (vId, EnumVariant vId (TReference refKind <$> variantParams) vann)) flsDef)
                 caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
             when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
-              \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
+              \case { [] -> return (); cs -> throwError $ annotateError (getLocation ann) (EMatchMissingCases cs); })
             typedCases <- localScope (moveExpression typed_matchE >> mapM (typeMatchCase ident eloc caseMap variantMap) casesIdents)
             when (not total && (length flsDefIdents == length casesIdents)) $
-              throwError $ annotateError ann EInvalidDefaultCase
+              throwError $ annotateError (getLocation ann) EInvalidDefaultCase
             return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
           ;
           _ -> throwError $ annotateError Internal EExpectedEnumType
@@ -192,70 +194,70 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
     TOption t -> do
       let flsDefIdents = ["None", "Some"]
           casesIdents = matchIdentifier <$> cases
-          variantMap = M.fromList [("None", EnumVariant "None" []), ("Some", EnumVariant "Some" [t])]
+          variantMap = M.fromList [("None", internalVariant "None" []), ("Some", internalVariant "Some" [t])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
       when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
-        \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
+        \case { [] -> return (); cs -> throwError $ annotateError (getLocation ann) (EMatchMissingCases cs); })
       typedCases <- mapM (typeMatchCase "Option" Internal caseMap variantMap) casesIdents
       when (not total && (length flsDefIdents == length casesIdents)) $
-        throwError $ annotateError ann EInvalidDefaultCase
+        throwError $ annotateError (getLocation ann) EInvalidDefaultCase
       return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
     TReference refKind (TOption t) -> do
       let flsDefIdents = ["None", "Some"]
           casesIdents = matchIdentifier <$> cases
-          variantMap = M.fromList [("None", EnumVariant "None" []), ("Some", EnumVariant "Some" [TReference refKind t])]
+          variantMap = M.fromList [("None", internalVariant "None" []), ("Some", internalVariant "Some" [TReference refKind t])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
       when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
-        \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
+        \case { [] -> return (); cs -> throwError $ annotateError (getLocation ann) (EMatchMissingCases cs); })
       typedCases <- localScope (moveExpression typed_matchE >> mapM (typeMatchCase "Option" Internal caseMap variantMap) casesIdents)
       when (not total && (length flsDefIdents == length casesIdents)) $
-        throwError $ annotateError ann EInvalidDefaultCase
+        throwError $ annotateError (getLocation ann) EInvalidDefaultCase
       return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
     TStatus t -> do
       let flsDefIdents = ["Success", "Failure"]
           casesIdents = matchIdentifier <$> cases
-          variantMap = M.fromList [("Success", EnumVariant "Success" []), ("Failure", EnumVariant "Failure" [t])]
+          variantMap = M.fromList [("Success", internalVariant "Success" []), ("Failure", internalVariant "Failure" [t])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
       when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
-        \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
+        \case { [] -> return (); cs -> throwError $ annotateError (getLocation ann) (EMatchMissingCases cs); })
       typedCases <- mapM (typeMatchCase "Status" Internal caseMap variantMap) casesIdents
       when (not total && (length flsDefIdents == length casesIdents)) $
-        throwError $ annotateError ann EInvalidDefaultCase
+        throwError $ annotateError (getLocation ann) EInvalidDefaultCase
       return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
     TReference refKind (TStatus t) -> do
       let flsDefIdents = ["Success", "Failure"]
           casesIdents = matchIdentifier <$> cases
-          variantMap = M.fromList [("Success", EnumVariant "Success" []), ("Failure", EnumVariant "Failure" [TReference refKind t])]
+          variantMap = M.fromList [("Success", internalVariant "Success" []), ("Failure", internalVariant "Failure" [TReference refKind t])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
       when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
-        \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
+        \case { [] -> return (); cs -> throwError $ annotateError (getLocation ann) (EMatchMissingCases cs); })
       typedCases <- localScope (moveExpression typed_matchE >> mapM (typeMatchCase "Status" Internal caseMap variantMap) casesIdents)
       when (not total && (length flsDefIdents == length casesIdents)) $
-        throwError $ annotateError ann EInvalidDefaultCase
+        throwError $ annotateError (getLocation ann) EInvalidDefaultCase
       return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
     TResult okTy errorTy -> do
       let flsDefIdents = ["Ok", "Error"]
           casesIdents = matchIdentifier <$> cases
-          variantMap = M.fromList [("Ok", EnumVariant "Ok" [okTy]), ("Error", EnumVariant "Error" [errorTy])]
+          variantMap = M.fromList [("Ok", internalVariant "Ok" [okTy]), ("Error", internalVariant "Error" [errorTy])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
       when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
-        \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
+        \case { [] -> return (); cs -> throwError $ annotateError (getLocation ann) (EMatchMissingCases cs); })
       typedCases <- mapM (typeMatchCase "Result" Internal caseMap variantMap) casesIdents
       when (not total && (length flsDefIdents == length casesIdents)) $
-        throwError $ annotateError ann EInvalidDefaultCase
+        throwError $ annotateError (getLocation ann) EInvalidDefaultCase
       return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
     TReference refKind (TResult okTy errorTy) -> do
       let flsDefIdents = ["Ok", "Error"]
           casesIdents = matchIdentifier <$> cases
-          variantMap = M.fromList [("Ok", EnumVariant "Ok" [TReference refKind okTy]), ("Error", EnumVariant "Error" [TReference refKind errorTy])]
+          variantMap = M.fromList [("Ok", internalVariant "Ok" [TReference refKind okTy]), ("Error", internalVariant "Error" [TReference refKind errorTy])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
       when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
-        \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
+        \case { [] -> return (); cs -> throwError $ annotateError (getLocation ann) (EMatchMissingCases cs); })
       typedCases <- localScope (moveExpression typed_matchE >> mapM (typeMatchCase "Result" Internal caseMap variantMap) casesIdents)
       when (not total && (length flsDefIdents == length casesIdents)) $
-        throwError $ annotateError ann EInvalidDefaultCase
+        throwError $ annotateError (getLocation ann) EInvalidDefaultCase
       return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
-    _ -> throwError $  annotateError ann $ EMatchInvalidType type_matchE
+    _ -> throwError $  annotateError (getLocation ann) $ EMatchInvalidType type_matchE
 
     where
 
@@ -276,8 +278,8 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
         -> SemanticMonad (M.Map Identifier Location)
       checkCaseDuplicates' acc (MatchCase i _ _ loc) =
         case M.lookup i acc of
-          Nothing -> return $ M.insert i loc acc
-          Just prevLoc -> throwError $ annotateError loc (EMatchCaseDuplicate i prevLoc)
+          Nothing -> return $ M.insert i (getLocation loc) acc
+          Just prevLoc -> throwError $ annotateError (getLocation loc) (EMatchCaseDuplicate i prevLoc)
 
       checkMissingCase ::
         M.Map Identifier a
@@ -293,8 +295,8 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
         -> Identifier -> SemanticMonad (SAST.MatchCase SemanticAnn)
       typeMatchCase enumId loc caseMap variantMap caseId =
         case M.lookup caseId variantMap of
-          Nothing -> throwError $ annotateError ann (EMatchCaseUnknownVariant caseId)
-          Just (EnumVariant _ vData) ->  typeMatchCase' c vData
+          Nothing -> throwError $ annotateError (getLocation ann) (EMatchCaseUnknownVariant caseId)
+          Just (EnumVariant _ vData _) ->  typeMatchCase' c vData
 
         where
 
@@ -311,23 +313,23 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
               flip (SAST.MatchCase cIdent typedBVars)
                   (buildStmtMatchCaseAnn (matchAnnotation c) tVars)
                   <$> localScope (
-                        mapM_ (\((ident, bloc), tVar) -> insertLocalImmutObj bloc ident tVar)
+                        mapM_ (\((ident, bloc), tVar) -> insertLocalImmutObj (getLocation bloc) ident tVar)
                           (zip bVars tVars) >>
                         typeBlock retTy bd
                       )
               else if psLen < asLen
-              then throwError $ annotateError mcann (EEnumVariantExtraParams (enumId, loc) (cIdent, tVars) (fromIntegral asLen))
-              else throwError $ annotateError mcann (EEnumVariantMissingParams (enumId, loc) (cIdent, tVars) (fromIntegral asLen))
+              then throwError $ annotateError (getLocation mcann) (EEnumVariantExtraParams (enumId, loc) (cIdent, tVars) (fromIntegral asLen))
+              else throwError $ annotateError (getLocation mcann) (EEnumVariantMissingParams (enumId, loc) (cIdent, tVars) (fromIntegral asLen))
 
 typeStatement rTy (ReturnStmt retExpression anns) =
   case (rTy, retExpression) of
     (Nothing, Nothing) -> return $ SAST.ReturnStmt Nothing (buildExpAnn anns TUnit)
     (Just ts, Just e) -> do
-      typed_e <- catchMismatch (getAnnotation e) (EReturnValueTypeMismatch ts) (typeExpression (Just ts) typeRHSObject e)
+      typed_e <- catchMismatch (getLocation (getAnnotation e)) (EReturnValueTypeMismatch ts) (typeExpression (Just ts) typeRHSObject e)
       -- ReturnStmt (Just ety) . buildExpAnn anns <$> getExprType ety
       return $ SAST.ReturnStmt (Just typed_e) (buildExpAnn anns ts)
-    (Just ty, Nothing) -> throwError $ annotateError anns $ EReturnValueExpected ty
-    (Nothing, Just _) -> throwError $ annotateError anns EReturnValueNotUnit
+    (Just ty, Nothing) -> throwError $ annotateError (getLocation anns) $ EReturnValueExpected ty
+    (Nothing, Just _) -> throwError $ annotateError (getLocation anns) EReturnValueNotUnit
 typeStatement _ (ContinueStmt contE anns) =
   case contE of
     MemberFunctionCall obj ident args ann -> do
@@ -342,8 +344,8 @@ typeStatement _ (ContinueStmt contE anns) =
         TReference _ rTy -> do
           ((ps, typed_args), fty) <- typeActionCall ann rTy ident args
           return $ SAST.ContinueStmt (SAST.DerefMemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)) (buildStmtAnn anns)
-        ty -> throwError $ annotateError anns $ EDereferenceInvalidType ty
-    _ -> throwError $ annotateError anns EContinueInvalidExpression
+        ty -> throwError $ annotateError (getLocation anns) $ EDereferenceInvalidType ty
+    _ -> throwError $ annotateError (getLocation anns) EContinueInvalidExpression
 
   where
 
@@ -355,12 +357,12 @@ typeStatement _ (ContinueStmt contE anns) =
       -> SemanticMonad (([SAST.Parameter SemanticAnn], [SAST.Expression SemanticAnn]), SAST.TerminaType SemanticAnn)
     typeActionCall ann obj_ty ident args =
       case obj_ty of
-        TGlobal _ dident -> getGlobalTypeDef ann dident >>=
+        TGlobal _ dident -> getGlobalTypeDef (getLocation ann) dident >>=
           \case{
             -- This case corresponds to a call to an inner method or viewer from the self object.
-            LocatedElement (Class _ _identTy cls _provides _mods) _ ->
+            TypeDefinition (Class _ _identTy cls _provides _mods) _ ->
               case findClassViewerOrMethod ident cls of
-                Just _ -> throwError $ annotateError ann (EContinueInvalidMethodOrViewerCall ident)
+                Just _ -> throwError $ annotateError (getLocation ann) (EContinueInvalidMethodOrViewerCall ident)
                 Nothing ->
                   case findClassAction ident cls of
                     Just (Just param@(Parameter _ ty _), SemanticAnn _ loc) ->
@@ -368,12 +370,12 @@ typeStatement _ (ContinueStmt contE anns) =
                           [arg] -> do
                             typed_arg <- typeExpression (Just ty) typeRHSObject arg
                             return (([param], [typed_arg]), TUnit)
-                          [] -> throwError $ annotateError ann (EContinueActionMissingArgs (ident, loc))
-                          _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [param], loc) (fromIntegral (length args)))
+                          [] -> throwError $ annotateError (getLocation ann) (EContinueActionMissingArgs (ident, getLocation loc))
+                          _ -> throwError $ annotateError (getLocation ann) (EContinueActionExtraArgs (ident, [param], getLocation loc) (fromIntegral (length args)))
                     Just (Nothing, SemanticAnn _ loc) ->
                       case args of
                         [] -> return (([], []), TUnit)
-                        _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [], loc) (fromIntegral (length args)))
+                        _ -> throwError $ annotateError (getLocation ann) (EContinueActionExtraArgs (ident, [], getLocation loc) (fromIntegral (length args)))
                     -- This should not happen, since the expression has been 
                     -- type-checked before and the method should have been found.
                     _ -> throwError $ annotateError Internal EContinueActionNotFound
@@ -381,5 +383,5 @@ typeStatement _ (ContinueStmt contE anns) =
             -- Other user-defined types do not define methods (yet?)
             _ -> throwError $ annotateError Internal EExpectedClassType
           }
-        _ -> throwError $ annotateError ann (EContinueInvalidMemberCall obj_ty)
+        _ -> throwError $ annotateError (getLocation ann) (EContinueInvalidMemberCall obj_ty)
 typeStatement _retTy (RebootStmt anns) = return $ SAST.RebootStmt (buildStmtAnn anns)

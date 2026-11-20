@@ -14,6 +14,7 @@ module Configuration.Configuration (
     listedFiles,
     insideFolder,
     ProjectProfile(..),
+    readProfile,
     defaultConfig,
     DeploymentKind(..),
     isTestBuild,
@@ -37,6 +38,12 @@ import System.FilePath (isRelative, splitDirectories, takeDirectory, takeFileNam
 import Configuration.Platform
 
 data ProjectProfile = Debug | Release deriving (Eq, Show)
+
+-- | A profile as written in the option --profile of a command.
+readProfile :: String -> Either String ProjectProfile
+readProfile "debug" = Right Debug
+readProfile "release" = Right Release
+readProfile other = Left $ "Unknown profile: " ++ other ++ " (use debug or release)"
 
 -- | The C of the project, in the "extern" folder, under the module whose
 -- extern functions it defines, named with dots as in an import.
@@ -172,7 +179,10 @@ data TerminaConfig =
     -- | Whether the generated C carries the flags of the coverage
     coverage :: !Bool,
     -- | Whether the modules of the dependencies carry them too
-    coverageDeps :: !Bool
+    coverageDeps :: !Bool,
+    -- | Whether the generated C carries the documentation comments, which
+    -- termina deliver --docs asks for the plain C of the deliverable
+    docComments :: !Bool
   } deriving (Eq, Show)
 
 -- | What a deployment builds. What a test needs and the application does not
@@ -206,7 +216,8 @@ defaultConfig projectName plt = TerminaConfig {
     xsdbInit = Nothing,
     lineDirectives = False,
     coverage = False,
-    coverageDeps = False
+    coverageDeps = False,
+    docComments = False
 }
 
 -- | Bytes of the record of results of a test when its entry does not say.

@@ -633,7 +633,8 @@ configFor manifest kind plt prf tick = TerminaConfig {
     xsdbInit = Nothing,
     lineDirectives = True,
     coverage = False,
-    coverageDeps = False
+    coverageDeps = False,
+    docComments = False
   }
 
   where

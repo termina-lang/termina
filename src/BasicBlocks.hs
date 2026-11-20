@@ -165,6 +165,32 @@ data BasicBlock' ty expr obj a =
         a
     deriving (Functor)
 
+-- | The annotation of a basic block, which is the one of the statement it
+-- comes from. A regular block has none, since each of its statements keeps
+-- its own.
+basicBlockAnnotation :: BasicBlock' ty expr obj a -> Maybe a
+basicBlockAnnotation blk = case blk of
+    IfElseBlock _ _ _ a -> Just a
+    ForLoopBlock _ _ _ _ _ _ a -> Just a
+    MatchBlock _ _ _ a -> Just a
+    SendMessage _ _ a -> Just a
+    ProcedureInvoke _ _ _ a -> Just a
+    AtomicLoad _ _ a -> Just a
+    AtomicStore _ _ a -> Just a
+    AtomicArrayLoad _ _ _ a -> Just a
+    AtomicArrayStore _ _ _ a -> Just a
+    AllocBox _ _ a -> Just a
+    FreeBox _ _ a -> Just a
+    DequeTake _ _ a -> Just a
+    DequePut _ _ _ a -> Just a
+    DequeExchange _ _ _ _ a -> Just a
+    RegularBlock _ -> Nothing
+    ReturnBlock _ a -> Just a
+    ContinueBlock _ a -> Just a
+    RebootBlock a -> Just a
+    NoReturnCall _ a -> Just a
+    SystemCall _ _ _ a -> Just a
+
 -- | |BlockRet| represent a body block with its return statement
 data Block' ty expr obj a
   = Block

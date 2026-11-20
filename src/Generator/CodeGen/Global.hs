@@ -10,44 +10,53 @@ import Generator.CodeGen.Common
 import Generator.LanguageC.Embedded
 import Generator.CodeGen.Expression
 import Generator.CodeGen.Types (termina__box_t)
+import Generator.CodeGen.Doc (genDoc, genInstanceDoc)
 import Utils.Annotations
 
 genGlobalDecl :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genGlobalDecl (GlobalDeclaration (Resource identifier ts@(TDeque _ size) _ _ ann)) = do
     cTs <- genType noqual ts
     cSize <- genConstExpression size
+    doc <- genInstanceDoc identifier ann
     return [CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec (CTArray termina__box_t cSize))
        (Just (dequeItems identifier)) Nothing)) (buildDeclarationAnn ann True),
-       CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
+       documented doc $ CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
        (Just identifier) Nothing)) (buildDeclarationAnn ann False)]
 genGlobalDecl (GlobalDeclaration (Resource identifier ts _ _ ann)) = do
     cTs <- genType noqual ts
-    return [CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
-       (Just identifier) Nothing)) (buildDeclarationAnn ann True)] 
+    doc <- genInstanceDoc identifier ann
+    return [documented doc $ CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
+       (Just identifier) Nothing)) (buildDeclarationAnn ann True)]
 genGlobalDecl (GlobalDeclaration (Channel identifier ts _ _ ann)) = do
     cTs <- genType noqual ts
-    return [CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
-        (Just identifier) Nothing)) (buildDeclarationAnn ann True)] 
+    doc <- genInstanceDoc identifier ann
+    return [documented doc $ CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
+        (Just identifier) Nothing)) (buildDeclarationAnn ann True)]
 genGlobalDecl (GlobalDeclaration (Task identifier ts _ _ ann)) = do
     cTs <- genType noqual ts
-    return [CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
-        (Just identifier) Nothing)) (buildDeclarationAnn ann True)] 
+    doc <- genInstanceDoc identifier ann
+    return [documented doc $ CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
+        (Just identifier) Nothing)) (buildDeclarationAnn ann True)]
 genGlobalDecl (GlobalDeclaration (Handler identifier ts _ _ ann)) = do
     cTs <- genType noqual ts
-    return [CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
-        (Just identifier) Nothing)) (buildDeclarationAnn ann True)] 
+    doc <- genInstanceDoc identifier ann
+    return [documented doc $ CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
+        (Just identifier) Nothing)) (buildDeclarationAnn ann True)]
 genGlobalDecl (GlobalDeclaration (Emitter identifier ts _ _ ann)) = do
     cTs <- genType noqual ts
-    return [CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
+    doc <- genInstanceDoc identifier ann
+    return [documented doc $ CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
         (Just identifier) Nothing)) (buildDeclarationAnn ann True)]
 genGlobalDecl (GlobalDeclaration (Test identifier ts _ _ ann)) = do
     cTs <- genType noqual ts
-    return [CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
+    doc <- genDoc ann []
+    return [documented doc $ CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
         (Just identifier) Nothing)) (buildDeclarationAnn ann True)]
 genGlobalDecl (GlobalDeclaration (Const identifier ts _expr _ ann)) = do
     cTs <- genType constqual ts
+    doc <- genDoc ann []
     return [
-            pre_cr $ extern (var identifier cTs) |>> getLocation ann
+            documented doc $ pre_cr $ extern (var identifier cTs) |>> getLocation ann
         ]
 -- | Constant expressions are already substituted in the semantic phase
 genGlobalDecl (GlobalDeclaration (ConstExpr {})) = return []

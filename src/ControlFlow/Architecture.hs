@@ -12,6 +12,7 @@ import Lowering.AST
 import Data.Maybe
 import ControlFlow.Architecture.Utils
 import Semantic.Types
+import Parser.Types (undocumented)
 import Utils.Annotations
 import qualified Data.Map.Strict as M
 import ControlFlow.Architecture.BoxInOut
@@ -400,8 +401,8 @@ genArchElement _ (TypeDefinition typeDef ann) = genArchTypeDef ann typeDef
 emptyTerminaProgArch :: TerminaProgArch SemanticAnn
 emptyTerminaProgArch = TerminaProgArch {
   emitters = M.fromList [
-    ("system_init", TPSystemInitEmitter "system_init" (SemanticAnn (GTy (TGlobal EmitterClass "SystemInit")) Internal)),
-    ("system_except", TPSystemExceptEmitter "system_except" (SemanticAnn (GTy (TGlobal EmitterClass "SystemExcept")) Internal))
+    ("system_init", TPSystemInitEmitter "system_init" (SemanticAnn (GTy (TGlobal EmitterClass "SystemInit")) (undocumented Internal))),
+    ("system_except", TPSystemExceptEmitter "system_except" (SemanticAnn (GTy (TGlobal EmitterClass "SystemExcept")) (undocumented Internal)))
   ],
   functions = M.empty,
   globalConstants = M.empty,
@@ -412,10 +413,10 @@ emptyTerminaProgArch = TerminaProgArch {
   handlers = M.empty,
   resourceClasses = M.empty,
   resources = M.fromList [
-    ("system_entry", TPResource "system_entry" "SystemEntry" M.empty [] Nothing (SemanticAnn (GTy (TGlobal ResourceClass "SystemEntry")) Internal)),
-    ("test_checks", TPResource "test_checks" "TestChecksEntry" M.empty [] Nothing (SemanticAnn (GTy (TGlobal ResourceClass "TestChecksEntry")) Internal)),
-    ("test_clock", TPResource "test_clock" "TestClockEntry" M.empty [] Nothing (SemanticAnn (GTy (TGlobal ResourceClass "TestClockEntry")) Internal)),
-    ("test_scenario", TPResource "test_scenario" "TestScenarioEntry" M.empty [] Nothing (SemanticAnn (GTy (TGlobal ResourceClass "TestScenarioEntry")) Internal))
+    ("system_entry", TPResource "system_entry" "SystemEntry" M.empty [] Nothing (SemanticAnn (GTy (TGlobal ResourceClass "SystemEntry")) (undocumented Internal))),
+    ("test_checks", TPResource "test_checks" "TestChecksEntry" M.empty [] Nothing (SemanticAnn (GTy (TGlobal ResourceClass "TestChecksEntry")) (undocumented Internal))),
+    ("test_clock", TPResource "test_clock" "TestClockEntry" M.empty [] Nothing (SemanticAnn (GTy (TGlobal ResourceClass "TestClockEntry")) (undocumented Internal))),
+    ("test_scenario", TPResource "test_scenario" "TestScenarioEntry" M.empty [] Nothing (SemanticAnn (GTy (TGlobal ResourceClass "TestScenarioEntry")) (undocumented Internal)))
   ],
   pools = M.empty,
   atomics = M.empty,

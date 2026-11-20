@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor  #-}
+{-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -41,7 +42,7 @@ data Object a
   -- value |eI :: exprI a| is an identifier expression
   -- |cEx| is an expression for the lower bound
   -- |cEx| is an expression for the upper bound
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 instance ShowText (Object a) where
     showText (Variable ident _) = T.pack ident
@@ -95,7 +96,7 @@ data Expression
     (Object a) -- ^ Option object
     MonadicVariantLabel -- ^ Variant label
     a
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 instance ShowText (Expression a) where
     showText (AccessObject obj) = showText obj
@@ -184,32 +185,48 @@ data MatchCase a = MatchCase
   , matchBVars      :: [(Identifier, a)] -- ^ variables the variant binds, each with its own position
   , matchBody       :: Block a
   , matchAnnotation :: a
-  } deriving (Show, Functor)
+  } deriving (Show, Functor, Foldable)
+
+instance Annotated MatchCase where
+  getAnnotation = matchAnnotation
+  updateAnnotation c a = c { matchAnnotation = a }
 
 data DefaultCase a = DefaultCase
   (Block a)
   a
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
+
+instance Annotated DefaultCase where
+  getAnnotation (DefaultCase _ a) = a
+  updateAnnotation (DefaultCase b _) = DefaultCase b
 
 data CondIf a = CondIf
   {
     condIfCond       :: Expression a
   , condIfBody       :: Block a
   , condIfAnnotation :: a
-  } deriving (Show, Functor)
+  } deriving (Show, Functor, Foldable)
 
 data CondElse a = CondElse
   {
     condElseBody       :: Block a
   , condElseAnnotation :: a
-  } deriving (Show, Functor)
+  } deriving (Show, Functor, Foldable)
+
+instance Annotated CondElse where
+  getAnnotation = condElseAnnotation
+  updateAnnotation c a = c { condElseAnnotation = a }
 
 data CondElseIf a = CondElseIf
   {
     condElseIfCond       :: Expression a
   , condElseIfBody       :: Block a
   , condElseIfAnnotation :: a
-  } deriving (Show, Functor)
+  } deriving (Show, Functor, Foldable)
+
+instance Annotated CondElseIf where
+  getAnnotation = condElseIfAnnotation
+  updateAnnotation c a = c { condElseIfAnnotation = a }
 
 data Statement a =
   -- | Declaration statement
@@ -252,7 +269,28 @@ data Statement a =
     (Expression a)
     a
   | RebootStmt a
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
+
+instance Annotated Statement where
+  getAnnotation (Declaration _ _ _ _ a) = a
+  getAnnotation (AssignmentStmt _ _ a) = a
+  getAnnotation (IfElseStmt _ _ _ a) = a
+  getAnnotation (ForLoopStmt _ _ _ _ _ _ a) = a
+  getAnnotation (MatchStmt _ _ _ a) = a
+  getAnnotation (SingleExpStmt _ a) = a
+  getAnnotation (ReturnStmt _ a) = a
+  getAnnotation (ContinueStmt _ a) = a
+  getAnnotation (RebootStmt a) = a
+
+  updateAnnotation (Declaration n ak ts e _) = Declaration n ak ts e
+  updateAnnotation (AssignmentStmt o e _) = AssignmentStmt o e
+  updateAnnotation (IfElseStmt i eis e _) = IfElseStmt i eis e
+  updateAnnotation (ForLoopStmt n ts f t c b _) = ForLoopStmt n ts f t c b
+  updateAnnotation (MatchStmt e cs d _) = MatchStmt e cs d
+  updateAnnotation (SingleExpStmt e _) = SingleExpStmt e
+  updateAnnotation (ReturnStmt e _) = ReturnStmt e
+  updateAnnotation (ContinueStmt e _) = ContinueStmt e
+  updateAnnotation (RebootStmt _) = RebootStmt
 
 -- | |BlockRet| represent a body block with its return statement
 data Block a
@@ -261,7 +299,7 @@ data Block a
     blockBody :: [Statement a],
     blockAnnotation :: a
   }
-  deriving (Show, Functor)
+  deriving (Show, Functor, Foldable)
 
 ----------------------------------------
 type TypeParameter = TypeParameter' Expression

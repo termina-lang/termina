@@ -8,12 +8,14 @@ import Codegen.Positive.Source.Common (foldingProofs)
 import Utils.Annotations
 import Text.Parsec.Pos (newPos)
 import Semantic.Types
+import Parser.Types (undocumented)
 import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.Except
 import Generator.CodeGen.Expression
 import Configuration.Configuration
 import Configuration.Platform
+import qualified Data.Map.Strict as M
 import Generator.CodeGen.Common
 import Generator.LanguageC.Printer
 import qualified Data.Set as S
@@ -29,25 +31,25 @@ import Prettyprinter
 import Utils.Printer
 
 objSemAnn :: AccessKind -> TerminaType SemanticAnn -> SemanticAnn
-objSemAnn ak ts = SemanticAnn (ETy (ObjectType ak ts)) Internal
+objSemAnn ak ts = SemanticAnn (ETy (ObjectType ak ts)) (undocumented Internal)
 
 stmtSemAnn :: SemanticAnn
-stmtSemAnn = SemanticAnn (STy SimpleStmtType) Internal
+stmtSemAnn = SemanticAnn (STy SimpleStmtType) (undocumented Internal)
 
 simpleTySemAnn :: TerminaType SemanticAnn -> SemanticAnn
-simpleTySemAnn ts = SemanticAnn (ETy (SimpleType ts)) Internal
+simpleTySemAnn ts = SemanticAnn (ETy (SimpleType ts)) (undocumented Internal)
 
 matchCaseSemAnn :: [TerminaType SemanticAnn] -> SemanticAnn
-matchCaseSemAnn ts = SemanticAnn (STy (MatchCaseStmtType ts)) Internal
+matchCaseSemAnn ts = SemanticAnn (STy (MatchCaseStmtType ts)) (undocumented Internal)
 
 -- | Gives an annotation a position of its own in the source. Two operations
 -- of the same kind in one expression are told apart by their positions.
 located :: Int -> SemanticAnn -> SemanticAnn
 located row (SemanticAnn e _) =
-  SemanticAnn e (Position "test" (newPos "test" row 1) (newPos "test" row 2))
+  SemanticAnn e (undocumented (Position "test" (newPos "test" row 1) (newPos "test" row 2)))
 
 buildConstExprTUSize :: Integer -> Expression SemanticAnn
-buildConstExprTUSize i = Constant (I (TInteger i DecRepr) Nothing) (buildExpAnn Internal TUSize)
+buildConstExprTUSize i = Constant (I (TInteger i DecRepr) Nothing) (buildExpAnn (undocumented Internal) TUSize)
 
 unitSemAnn :: SemanticAnn
 unitSemAnn = simpleTySemAnn TUnit
@@ -188,14 +190,14 @@ msgQueueSemAnn :: TerminaType SemanticAnn -> SemanticAnn
 msgQueueSemAnn ts = objSemAnn Mutable (TOutPort ts)
 
 funSemAnn :: [Parameter SemanticAnn] -> TerminaType SemanticAnn -> SemanticAnn
-funSemAnn params ts = SemanticAnn (ETy (AppType params ts)) Internal
+funSemAnn params ts = SemanticAnn (ETy (AppType params ts)) (undocumented Internal)
 
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
   let config = defaultConfig "test" TestPlatform in
-  case runState (runExceptT (genExpression (elaborateExpression (foldingProofs (foldExpression expr)) expr))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False Nothing) of
+  case runState (runExceptT (genExpression (elaborateExpression (foldingProofs (foldExpression expr)) expr))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False Nothing M.empty) of
     (Left err, _) -> pack $ show err
-    (Right cExpr, _) -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
+    (Right cExpr, _) -> render $ runReader (pprint cExpr) (CPrinterConfig False False False)
 
 renderStatement :: Statement SemanticAnn -> Text
 renderStatement stmt = 
@@ -204,9 +206,9 @@ renderStatement stmt =
     Right bBlocks ->
       let config = defaultConfig "test" TestPlatform
           body = LAST.Block bBlocks stmtSemAnn in
-      case runState (runExceptT (Prelude.concat <$> traverse genBlocks (EAST.blockBody (elaborateBody (foldingProofs (foldBasicBlocks body)) body)))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False Nothing) of
+      case runState (runExceptT (Prelude.concat <$> traverse genBlocks (EAST.blockBody (elaborateBody (foldingProofs (foldBasicBlocks body)) body)))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False Nothing M.empty) of
         (Left err, _) -> pack $ show err
-        (Right cStmts, _) -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
+        (Right cStmts, _) -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False False)
 
 renderTypeDefinitionDecl :: MonadicTypes -> AnnASTElement SemanticAnn -> Text
 renderTypeDefinitionDecl monTypes decl = 
@@ -214,9 +216,9 @@ renderTypeDefinitionDecl monTypes decl =
     Left err -> pack $ show err
     Right bbDecl ->
       let config = defaultConfig "test" TestPlatform in
-      case runState (runExceptT (genTypeDefinitionDecl (elaborateElement bbDecl))) (CGeneratorEnv "test" S.empty monTypes config TestPlatform False Nothing) of
+      case runState (runExceptT (genTypeDefinitionDecl (elaborateElement bbDecl))) (CGeneratorEnv "test" S.empty monTypes config TestPlatform False Nothing M.empty) of
         (Left err, _) -> pack $ show err
-        (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
+        (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False False)
 
 renderFunctionDecl :: MonadicTypes -> AnnASTElement SemanticAnn -> Text
 renderFunctionDecl monTypes decl = 
@@ -224,9 +226,9 @@ renderFunctionDecl monTypes decl =
     Left err -> pack $ show err
     Right bbAST -> 
       let config = defaultConfig "test" TestPlatform in
-      case runState (runExceptT (genFunctionDecl (elaborateElement bbAST))) (CGeneratorEnv "test" S.empty monTypes config TestPlatform False Nothing) of
+      case runState (runExceptT (genFunctionDecl (elaborateElement bbAST))) (CGeneratorEnv "test" S.empty monTypes config TestPlatform False Nothing M.empty) of
         (Left err, _) -> pack $ show err
-        (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False) 
+        (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False False) 
 
 renderFunction :: AnnASTElement SemanticAnn -> Text
 renderFunction func = 
@@ -234,9 +236,9 @@ renderFunction func =
     Left err -> pack $ show err
     Right bbAST -> 
       let config = defaultConfig "test" TestPlatform in
-      case runState (runExceptT (genFunction (elaborateElement bbAST))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False Nothing) of
+      case runState (runExceptT (genFunction (elaborateElement bbAST))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False Nothing M.empty) of
         (Left err, _) -> pack $ show err
-        (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
+        (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False False)
 -- | Elaborates a single lowered element with the proofs of the constant folding.
 elaborateElement :: LAST.AnnASTElement SemanticAnn -> EAST.AnnASTElement SemanticAnn
 elaborateElement element' = Prelude.head (fst (elaborateProgram (foldingProofs (foldElement element')) [element']))

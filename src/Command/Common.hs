@@ -27,7 +27,7 @@ import Parser.Errors
 import qualified Data.Map.Strict as M
 import Modules.Modules
 import Core.AST
-    ( TerminaModule'(frags, modules), ModuleImport'(..) )
+    ( TerminaModule'(frags, modules, moduleDoc), ModuleImport'(..) )
 import Utils.Annotations
 import Text.Parsec.Error
 import Text.Parsec.Pos (initialPos)
@@ -51,7 +51,7 @@ loadTerminaModule sources root filePath = do
   return $ do
     (src_code, term) <- parsedModule filePath fullP parsedFile
     imports <- mapM importOf (modules term)
-    Right (TerminaModuleData filePath fullP imports [] src_code (ParsingData . frags $ term))
+    Right (TerminaModuleData filePath fullP imports [] src_code (moduleDoc term) (ParsingData . frags $ term))
 
   where
 
@@ -61,7 +61,8 @@ loadTerminaModule sources root filePath = do
     seen = maybe [root] folderSees (find ((== root) . folderPath) sources)
 
     -- | An import, looked up in the folders that the folder of the module sees.
-    importOf (ModuleImport modName ann) =
+    importOf (ModuleImport modName parsedAnn) =
+      let ann = getLocation parsedAnn in
       case buildModuleName ann modName of
         Left err -> Left (checkFailure err)
         Right qname ->
@@ -98,7 +99,7 @@ parsedModule :: QualifiedName -> FilePath -> ParsedFile -> Either CheckFailure (
 parsedModule filePath fullP parsedFile =
   case parsedFile of
     Left NotUtf8 -> Left (loadFailure (Position fullP (initialPos fullP) (initialPos fullP)) EInvalidUtf8)
-    Left (InvalidSyntax _ err) -> Left (loadFailure (Position filePath (errorPos err) (errorPos err)) (EParseError err))
+    Left (InvalidSyntax _ err) -> Left (loadFailure (Position filePath (errorPos err) (errorPos err)) (parseError err))
     Right parsed -> Right parsed
 
 -- | The text and the tree of a parsed module file, given its qualified name

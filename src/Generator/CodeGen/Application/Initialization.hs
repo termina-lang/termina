@@ -15,6 +15,7 @@ import Generator.LanguageC.Embedded
 import Generator.Monadic (emptyMonadicTypes)
 import Control.Monad.State
 import qualified Data.Set as S
+import qualified Data.Map.Strict as M
 import Utils.Annotations
 import Generator.CodeGen.Types
 import Generator.CodeGen.Expression
@@ -93,22 +94,22 @@ genInitFile mName prjprogs = do
 
         initFunctionName = terminafy $ "app" <::> "init_globals"
 
-        includeTermina = CPPDirective (CPPInclude True ("termina" <.> "h")) (internalAnn (CPPDirectiveAnn True))
+        includeTermina = CPPDirective (CPPInclude True ("termina" <.> "h")) (internalAnn (CPPDirectiveAnn True Nothing))
 
         -- | The identifiers of the deployment. The OSAL API does not include
         -- config.h, so that the modules do not depend on it.
-        includeConfig = CPPDirective (CPPInclude False genConfigPathName) (internalAnn (CPPDirectiveAnn False))
+        includeConfig = CPPDirective (CPPInclude False genConfigPathName) (internalAnn (CPPDirectiveAnn False Nothing))
 
         -- Generate include preprocessor directives for the modules
         genIncludes :: [QualifiedName] -> [CFileItem]
         genIncludes [] = []
         genIncludes (inc:xincs) = 
-            CPPDirective (CPPInclude False (inc <.> "h")) (internalAnn (CPPDirectiveAnn True)) : genIncludes' xincs
+            CPPDirective (CPPInclude False (inc <.> "h")) (internalAnn (CPPDirectiveAnn True Nothing)) : genIncludes' xincs
         
         genIncludes' :: [QualifiedName] -> [CFileItem]
         genIncludes' [] = []
         genIncludes' (inc:xincs) =
-            CPPDirective (CPPInclude False (inc <.> "h")) (internalAnn (CPPDirectiveAnn False)) : genIncludes' xincs
+            CPPDirective (CPPInclude False (inc <.> "h")) (internalAnn (CPPDirectiveAnn False Nothing)) : genIncludes' xincs
 
         genItems :: [Global SemanticAnn] -> CGenerator [CCompoundBlockItem]
         genItems [] = return []
@@ -124,6 +125,6 @@ runGenInitFile ::
     -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either CGeneratorError CFile 
 runGenInitFile config plt initFilePath prjprogs = 
     case runState (runExceptT (genInitFile initFilePath prjprogs)) 
-        (CGeneratorEnv initFilePath S.empty emptyMonadicTypes config plt False Nothing) of
+        (CGeneratorEnv initFilePath S.empty emptyMonadicTypes config plt False Nothing M.empty) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file

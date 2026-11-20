@@ -5,8 +5,11 @@ module Parser.Negative.DetailSpec (spec) where
 
 import Parser.Common (parserStageError, moduleStageError)
 import Modules.Modules (ModuleDependency(..))
-import Parser.Errors (Error(..))
+import Parser.Errors (Error(..), parseError)
+import Parser.Parsing (parseTerminaModule)
+import Core.AST (DocPlacement(..))
 import Utils.Annotations (AnnotatedError(..))
+import Text.Parsec (errorPos, sourceLine, sourceColumn)
 import Text.Parsec.Error (errorMessages, messageString)
 
 import Test.Hspec
@@ -49,8 +52,97 @@ doubleUnderscore =
   where
     identifierMsg name = "Identifiers cannot contain two consecutive underscores: " ++ name ++ "."
 
+-- | The placement, line and column of a misplaced documentation comment in a
+-- module, or Nothing if the module parses or fails for another reason.
+misplacedAt :: [String] -> Maybe (DocPlacement, Int, Int)
+misplacedAt src =
+  case parseTerminaModule "test" "test" (unlines src) of
+    Left err | EMisplacedDocComment placement <- parseError err ->
+      Just (placement, sourceLine (errorPos err), sourceColumn (errorPos err))
+    _ -> Nothing
+
+-- | One module per kind of misplaced documentation comment, with the placement
+-- and the position of the comment.
+misplaced :: [(String, [String], (DocPlacement, Int, Int))]
+misplaced =
+  [ ("a block comment before the imports", ["/** Header. */", "import foo.bar;"], (DocBefore, 1, 1))
+  , ("a module comment after a declaration", ["function f() { return; }", "//! Late."], (DocModule, 2, 1))
+  , ("a comment that no statement follows", ["function f() {", "    return;", "    /// Nothing.", "}"], (DocBefore, 3, 5))
+  , ("a comment at the end of the module", ["function f() { return; }", "/// Nothing."], (DocBefore, 2, 1))
+  , ("a comment that no case follows", [ "function f(o : Option<u32>) -> u32 {", "    var r : u32 = 0;"
+                                       , "    match o {", "        case Some(x) => { r = x; }"
+                                       , "        case None => { r = 1; }", "        /// Nothing.", "    }"
+                                       , "    return r;", "}" ], (DocBefore, 6, 9))
+  , ("a comment inside an expression", ["function f() -> u32 {", "    let x : u32 = /** mid */ 3;", "    return x;", "}"], (DocBefore, 2, 19))
+  , ("a comment after with nothing before", ["function f() {", "    ///< After nothing.", "    return;", "}"], (DocAfter, 2, 5))
+  , ("a comment before on the side of after", ["struct S {", "    x : u32 /// Wrong side.", "    ;", "};"], (DocBefore, 2, 13))
+  , ("a comment after an import", ["import foo.bar; ///< Wrong.", "function f() { return; }"], (DocAfter, 1, 17))
+  , ("a comment before a parameter", ["function f(/// The value.", "    v : u32) { return; }"], (DocBefore, 1, 12))
+  , ("a comment after on the line below its field", ["struct S {", "    x : u32;", "    ///< Below.", "};"], (DocAfter, 3, 5))
+  , ("a second line of a comment after", ["struct S {", "    x : u32; ///< First.", "             ///< Second.", "};"], (DocAfter, 3, 14))
+  , ("a comment after a function", ["function f() {", "    return;", "} ///< A function."], (DocAfter, 3, 3))
+  , ("a comment after a method", ["resource class C provides I {", "    method m(&priv self) { return; } ///< A method.", "};"], (DocAfter, 2, 38))
+  , ("a comment after an interface procedure", ["interface I {", "    procedure p(&mut self); ///< A procedure.", "};"], (DocAfter, 2, 29))
+  , ("a comment after the brace of a branch", ["function f(v : u32) {", "    if (v == 0) { ///< First.", "        return;", "    }", "    return;", "}"], (DocAfter, 2, 19))
+  ]
+
+-- | The line and column of the second documentation comment of an element, or
+-- Nothing if the module parses or fails for another reason.
+secondCommentAt :: [String] -> Maybe (Int, Int)
+secondCommentAt src =
+  case parseTerminaModule "test" "test" (unlines src) of
+    Left err | ETwoDocComments <- parseError err ->
+      Just (sourceLine (errorPos err), sourceColumn (errorPos err))
+    _ -> Nothing
+
+-- | One module per kind of element with a comment before it and another one
+-- after it, with the position of the comment after it.
+twoComments :: [(String, [String], (Int, Int))]
+twoComments =
+  [ ("a field", ["struct S {", "    /// Before.", "    x : u32; ///< After.", "};"], (3, 14))
+  , ("a port", ["task class T {", "    /// Before.", "    i : in u32 triggers a; ///< After."
+               , "    action a(&priv self, v : u32) { return; }", "};"], (3, 28))
+  , ("a statement", ["function f() {", "    /// Before.", "    return; ///< After.", "}"], (3, 13))
+  , ("a constant", ["/// Before.", "const a : u32 = 1; ///< After."], (2, 20))
+  , ("a variant", ["enum E {", "    /// Before.", "    A, ///< After.", "    B", "};"], (3, 8))
+  ]
+
+-- | The error in the tags of a documentation comment and its line and column,
+-- or Nothing if the module parses or fails for another reason.
+docTagErrorAt :: [String] -> Maybe (Error, (Int, Int))
+docTagErrorAt src =
+  case parseTerminaModule "test" "test" (unlines src) of
+    Left err -> case parseError err of
+      e@(EUnknownDocTag _) -> Just (e, at err)
+      e@(EMalformedDocTag _) -> Just (e, at err)
+      _ -> Nothing
+    Right _ -> Nothing
+
+  where
+
+    at err = (sourceLine (errorPos err), sourceColumn (errorPos err))
+
+-- | One module per kind of error in the tags, with the error and its position.
+docTagErrors :: [(String, [String], (String, (Int, Int)))]
+docTagErrors =
+  [ ("an unknown tag in a block comment", ["/**", " * Summary.", " *", " * @brief Nope.", " */", "function f() { return; }"], ("EUnknownDocTag \"brief\"", (4, 4)))
+  , ("an unknown tag in a run of line comments", ["/// Summary.", "///", "/// @brief Nope.", "function f() { return; }"], ("EUnknownDocTag \"brief\"", (3, 5)))
+  , ("an unknown tag after a tab", ["struct S {", "\t/**", "\t * @brief Nope.", "\t */", "\tx : u32;", "};"], ("EUnknownDocTag \"brief\"", (3, 5)))
+  , ("an unknown tag on the line of the delimiter", ["/** @brief Nope. */", "function f() { return; }"], ("EUnknownDocTag \"brief\"", (1, 5)))
+  , ("an unknown tag in a comment after a field", ["struct S {", "    x : u32; /**< @todo Later. */", "};"], ("EUnknownDocTag \"todo\"", (2, 19)))
+  , ("a parameter without a name", ["/**", " * Summary.", " * @param", " */", "function f() { return; }"], ("EMalformedDocTag (MissingArgument \"param\")", (3, 4)))
+  , ("text after the tags", ["/**", " * Summary.", " * @pre Never.", " *", " * Loose text.", " */", "function f() { return; }"], ("EMalformedDocTag TextAfterTags", (5, 4)))
+  ]
+
 spec :: Spec
 spec = describe "Parser stage: error detail" $ do
+  describe "PE-011 and PE-012 point at the tag" $
+    mapM_ (\(what, src, (expected, pos)) -> it ("for " ++ what) $
+      fmap (\(e, p) -> (show e, p)) (docTagErrorAt src) `shouldBe` Just (expected, pos)) docTagErrors
+  describe "PE-009 points at the comment" $
+    mapM_ (\(what, src, expected) -> it ("for " ++ what) $ misplacedAt src `shouldBe` Just expected) misplaced
+  describe "PE-010 points at the comment after the element" $
+    mapM_ (\(what, src, expected) -> it ("for " ++ what) $ secondCommentAt src `shouldBe` Just expected) twoComments
   it "PE-001 wraps the underlying parse error" $
     moduleStageError "function f() -> { return; }" `shouldSatisfy` \case
       Just (AnnotatedError (EParseError _) _) -> True

@@ -12,7 +12,9 @@ import Configuration.Platform (Platform)
 import Generator.Monadic
 import qualified Control.Monad.State as ST
 import qualified Data.Set as S
+import qualified Data.Map.Strict as M
 import Data.Maybe (maybeToList)
+import Doc.Facts (DocFact)
 
 newtype CGeneratorError = InternalError String
     deriving (Show)
@@ -25,7 +27,10 @@ data CGeneratorEnv = CGeneratorEnv {
     targetPlatform :: Platform,
     eventParamUsed :: Bool,
     -- | The points of the coverage of the module, when its C is instrumented
-    coverageState :: Maybe CoverageState
+    coverageState :: Maybe CoverageState,
+    -- | The facts of each instance of the deployment, for the documentation
+    -- comments of their declarations
+    deploymentFacts :: M.Map Identifier [DocFact SemanticAnn]
   }
 
 -- | What a point of the coverage records: a statement has a flag, a witness a row of two.
@@ -102,7 +107,7 @@ generatedIdentifiers file = concatMap itemIdents (fileItems file)
     extDeclIdents (CEDVariable _ (CDecl _ mid _)) = maybeToList mid
     extDeclIdents (CEDMacroVariable _ (CDecl _ mid _)) = maybeToList mid
     extDeclIdents (CEDFunction _ _ _ ident params) = ident : paramIdents params
-    extDeclIdents (CEDEnum mid (CEnum _ constants _)) = maybeToList mid ++ map fst constants
+    extDeclIdents (CEDEnum mid (CEnum _ constants _)) = maybeToList mid ++ [ ident | CEnumerator ident _ _ <- constants ]
     extDeclIdents (CEDStructUnion mid _) = maybeToList mid
     extDeclIdents (CEDTypeDef ident _) = [ident]
 
@@ -467,19 +472,19 @@ internalAnn :: CItemAnn -> CAnns
 internalAnn = flip LocatedElement Internal
 
 buildGenericAnn :: SemanticAnn -> CAnns
-buildGenericAnn (SemanticAnn _ loc) = LocatedElement CGenericAnn loc
+buildGenericAnn ann = LocatedElement CGenericAnn (getLocation ann)
 
 buildStatementAnn :: SemanticAnn -> Bool -> CAnns
-buildStatementAnn (SemanticAnn _ loc) before = LocatedElement (CStatementAnn before False) loc
+buildStatementAnn ann before = LocatedElement (CStatementAnn before False Nothing) (getLocation ann)
 
 buildDeclarationAnn :: SemanticAnn -> Bool -> CAnns
-buildDeclarationAnn (SemanticAnn _ loc) before = LocatedElement (CDeclarationAnn before) loc
+buildDeclarationAnn ann before = LocatedElement (CDeclarationAnn before Nothing) (getLocation ann)
 
 buildCompoundAnn :: SemanticAnn -> Bool -> Bool -> CAnns
-buildCompoundAnn (SemanticAnn _ loc) before trailing = LocatedElement (CCompoundAnn before trailing) loc
+buildCompoundAnn ann before trailing = LocatedElement (CCompoundAnn before trailing Nothing) (getLocation ann)
 
 buildCPPDirectiveAnn :: SemanticAnn -> Bool -> CAnns
-buildCPPDirectiveAnn (SemanticAnn _ loc) before = LocatedElement (CPPDirectiveAnn before) loc
+buildCPPDirectiveAnn ann before = LocatedElement (CPPDirectiveAnn before Nothing) (getLocation ann)
 
 -- | TODO: The size of the enum field has been hardcoded, it should be
 -- platform dependent
@@ -532,4 +537,4 @@ genDiscardedParameters params =
             let cAnn = internalAnn CGenericAnn in
             CBlockStmt $ CSDo
                 (CExprCast (CExprValOf (CVar identifier cType) cType cAnn) (CTVoid noqual) cAnn)
-                (internalAnn (CStatementAnn before False))
+                (internalAnn (CStatementAnn before False Nothing))

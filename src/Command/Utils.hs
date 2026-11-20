@@ -43,7 +43,7 @@ import System.Environment (getEnvironment)
 import Control.Exception (IOException, try)
 import System.Process (readCreateProcessWithExitCode)
 import Configuration.Fetch (gitProcess)
-import Configuration.Configuration (ProjectProfile(..), outputFolderName)
+import Configuration.Configuration (outputFolderName)
 import Runner.CoverageHtml (Provenance(..))
 import Runner.CoverageReport (buildReport)
 import Data.Time (defaultTimeLocale, formatTime, getZonedTime)
@@ -195,6 +195,7 @@ lowerTypedModule typedModule = do
             (importedModules typedModule)
             (visibleModules typedModule)
             (sourcecode typedModule)
+            (moduleComment typedModule)
             (BasicBlockData bbAST)
 
 -- | Elaborates each module of a project, deciding the run-time checks of its
@@ -357,12 +358,6 @@ runGit args = do
         Left e -> Left (show (e :: IOException))
         Right (ExitSuccess, out, _) -> Right out
         Right (ExitFailure _, _, err) -> Left err
-
--- | The profile of the option --profile
-readProfile :: String -> Either String ProjectProfile
-readProfile "debug" = Right Debug
-readProfile "release" = Right Release
-readProfile other = Left $ "Unknown profile: " ++ other ++ " (use debug or release)"
 
 -- | Writes the coverage report with the project and the stylesheet of the manifest, given the version of termina, and says where it is
 writeCoverageReport :: String -> IO ()

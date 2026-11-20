@@ -13,7 +13,7 @@ import qualified Data.Map.Strict as M
 import Utils.Annotations
 import Generator.LanguageC.Embedded
 import Control.Monad (zipWithM, foldM)
-import Data.List (sort)
+import Data.List (sortOn)
 import Generator.CodeGen.Application.Utils
 import Generator.CodeGen.Types
 import Generator.CodeGen.Expression
@@ -21,11 +21,20 @@ import Generator.Monadic
 import qualified Data.Set as S
 import Control.Monad.State
 import Core.Utils
+import Generator.CodeGen.Doc
 
 filterStructModifiers :: [Modifier SemanticAnn] -> [Modifier SemanticAnn]
 filterStructModifiers = filter (\case
       Modifier "packed" Nothing -> True
       _ -> False)
+
+-- | The members of a struct or a class that a field gives, with the
+-- documentation comment of the field.
+genFieldMembers :: FieldDefinition SemanticAnn -> CGenerator [CMember]
+genFieldMembers fld@(FieldDefinition _ _ ann) = do
+    decls <- genFieldDeclaration fld
+    doc <- genDoc ann []
+    return $ map (documentedMember doc) decls
 
 genFieldDeclaration :: FieldDefinition SemanticAnn -> CGenerator [CDeclaration]
 genFieldDeclaration (FieldDefinition identifier ts@(TFixedLocation {}) _) = do
@@ -49,14 +58,16 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface _ _)) (
     return [
             CDecl
                 (CTSStructUnion
-                    (CStruct CStructTag Nothing (cThatField : memberFields) []))
+                    (CStruct CStructTag Nothing (undocumentedMember cThatField : memberFields) []))
                 (Just identifier) Nothing
         ]
 
     where
 
-        genInterfaceProcedureField :: InterfaceMember' TerminaType expr SemanticAnn -> CGenerator CDeclaration
-        genInterfaceProcedureField (InterfaceProcedure ak procedure params _modifiers _) = do
+        -- The pointer to a procedure, with the summary of the procedure.
+        genInterfaceProcedureField :: InterfaceMember' TerminaType expr SemanticAnn -> CGenerator CMember
+        genInterfaceProcedureField (InterfaceProcedure ak procedure params _modifiers procAnn) = do
+            doc <- genBriefDoc procAnn
             cParams <- mapM genCParameter params
             -- | The pointer to the procedure takes the instance as the
             -- procedure itself does: read only when the procedure takes
@@ -67,7 +78,7 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface _ _)) (
                 cEventParam = CParameter eventParam (_const . ptr $ _const termina__event_t)
                 cThisParam = CParameter thisParam cThisType
                 cFuncPointerType = CTFunctionPointer (CTVoid noqual) (cEventParam : cThisParam : cParams) noqual
-            return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
+            return $ documentedMember doc (CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing)
 genFieldDeclaration (FieldDefinition _ (TAccessPort (TInterface _ _)) ann) = error $ "Invalid access port annotation" ++ show ann
 genFieldDeclaration (FieldDefinition identifier ts _) = do
     cTs <- genType noqual ts
@@ -216,11 +227,14 @@ genAttribute (Modifier name (Just expr)) = do
     return $ CAttr name [cExpr]
 
 genEnumVariantParameterStruct :: SemanticAnn -> Identifier -> EnumVariant SemanticAnn -> CGenerator CFileItem
-genEnumVariantParameterStruct ann identifier (EnumVariant this_variant params) = do
+genEnumVariantParameterStruct ann identifier (EnumVariant this_variant params _) = do
     let cAnn = buildDeclarationAnn ann True
     pParams <- zipWithM genEnumVariantParameter params [0..]
     paramsStructName <- genEnumParameterStructName identifier this_variant
-    return $ CExtDecl (CEDStructUnion (Just paramsStructName) (CStruct CStructTag Nothing pParams [])) cAnn
+    -- Generated text only for an enum that the author documents
+    enumDoc <- genDoc ann []
+    let doc = generatedDoc [textInline "Data of ", codeInline (identifier ++ "::" ++ this_variant), textInline "."] <$ enumDoc
+    return $ documented doc $ CExtDecl (CEDStructUnion (Just paramsStructName) (CStruct CStructTag Nothing (map undocumentedMember pParams) [])) cAnn
     where
         genEnumVariantParameter :: TerminaType SemanticAnn -> Integer -> CGenerator CDeclaration
         genEnumVariantParameter ts index = do
@@ -298,8 +312,9 @@ genResourceUnlockStmt ann identifier = do
 genTypeDefinitionDecl :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genTypeDefinitionDecl (TypeDefinition (Struct identifier fls modifiers) ann) = do
     let cAnn = buildDeclarationAnn ann True
+    doc <- genDoc ann []
     structModifiers <- mapM genAttribute (filterStructModifiers modifiers)
-    cFields <- concat <$> traverse genFieldDeclaration fls
+    cFields <- concat <$> traverse genFieldMembers fls
     opts <- gets (optionTypes . monadicTypes)
     optsDeclExt <- if S.member (TStruct identifier) opts then
         genOptionStruct (TStruct identifier)
@@ -318,14 +333,18 @@ genTypeDefinitionDecl (TypeDefinition (Struct identifier fls modifiers) ann) = d
                 generatedTypes = M.insert (TStruct identifier) currModule (generatedTypes . monadicTypes $ st)
             }
         }
-    return $ CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing cFields structModifiers)) cAnn : (optsDeclExt ++ statusDeclExt ++ resultsDeclExt)
+    return $ documented doc (CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing cFields structModifiers)) cAnn) : (optsDeclExt ++ statusDeclExt ++ resultsDeclExt)
 genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
     let cAnn = buildDeclarationAnn ann True
         variantsWithParams = filter (not . null . assocData) variants
     enumName <- genEnumStructName identifier
-    pEnumVariants <- mapM (\(EnumVariant this_variant _) -> genEnumVariantName identifier this_variant) variants
+    pEnumVariants <- mapM (\(EnumVariant this_variant _ variantAnn) -> do
+        name <- genEnumVariantName identifier this_variant
+        doc <- genDoc variantAnn []
+        return (documentedEnumerator doc name)) variants
     pEnumParameterStructs <- mapM (genEnumVariantParameterStruct ann identifier) variantsWithParams
-    enumStruct <- genEnumStruct enumName variantsWithParams
+    doc <- genDoc ann []
+    enumStruct <- documented doc <$> genEnumStruct enumName variantsWithParams
     opts <- gets (optionTypes . monadicTypes)
     optsDeclExt <- if S.member (TEnum identifier) opts then
         genOptionStruct (TStruct identifier)
@@ -334,13 +353,15 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
     statusDeclExt <- if S.member (TEnum identifier) stats then
         genStatusStruct (TStruct identifier)
         else return []
-    return $ CExtDecl (CEDEnum (Just enumName) (CEnum Nothing [(v, Nothing) | v <- pEnumVariants] [])) cAnn
+    -- Generated text only for an enum that the author documents
+    let tagDoc = generatedDoc [textInline "Variants of ", codeInline identifier, textInline "."] <$ doc
+    return $ documented tagDoc (CExtDecl (CEDEnum (Just enumName) (CEnum Nothing pEnumVariants [])) cAnn)
                 : pEnumParameterStructs ++ (enumStruct : optsDeclExt ++ statusDeclExt)
 
         where
 
             genParameterUnionField :: EnumVariant SemanticAnn -> CGenerator CDeclaration
-            genParameterUnionField (EnumVariant this_variant _) = do
+            genParameterUnionField (EnumVariant this_variant _ _) = do
                 paramsStructName <- genEnumParameterStructName identifier this_variant
                 paramsStructType <- genType noqual (TStruct paramsStructName)
                 return $ CDecl (CTypeSpec paramsStructType) (Just this_variant) Nothing
@@ -348,7 +369,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
             genParameterUnion :: [EnumVariant SemanticAnn] -> CGenerator CDeclaration
             genParameterUnion variantsWithParams = do
                 pFields <- mapM genParameterUnionField variantsWithParams
-                return $ CDecl (CTSStructUnion (CStruct CUnionTag Nothing pFields [])) Nothing Nothing
+                return $ CDecl (CTSStructUnion (CStruct CUnionTag Nothing (map undocumentedMember pFields) [])) Nothing Nothing
 
             genEnumStruct :: Identifier -> [EnumVariant SemanticAnn] -> CGenerator CFileItem
             genEnumStruct enumName variantsWithParams = do
@@ -376,27 +397,26 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier membe
             _ -> True}) fields
     cFields <- concat <$> traverse genClassField fields'
     cFunctions <- traverse (genClassFunctionDeclaration clsdef) (filter (not . isPrivateClassMember) functions)
-    let structFields = case clsKind of
+    doc <- genDoc ann [] >>= case ann of
+        SemanticAnn (TTy (ResourceClassTypeDef ifaces)) _ -> withProvides ifaces
+        _ -> return
+    let generatedFields = case clsKind of
             TaskClass ->
-                let cMsgQueueIDField = field taskMsgQueueIDField (typeDef terminaID) 
+                let cMsgQueueIDField = field taskMsgQueueIDField (typeDef terminaID)
                     cTaskIDField = field taskIDField (typeDef terminaID) in
-                [cTaskIDField, cMsgQueueIDField] ++ cFields
-            HandlerClass ->
-                let cIDField = field handlerIDField (typeDef terminaID) in
-                cIDField : cFields
-            ResourceClass ->
-                let cIDField = field resourceLockTypeField termina__resource_lock_type_t in
-                cIDField : cFields
-            _ -> cFields
+                [cTaskIDField, cMsgQueueIDField]
+            HandlerClass -> [field handlerIDField (typeDef terminaID)]
+            ResourceClass -> [field resourceLockTypeField termina__resource_lock_type_t]
+            _ -> []
+        structFields = map undocumentedMember generatedFields ++ cFields
+        cStruct = documented doc $ pre_cr (documentedStruct identifier structFields structModifiers |>> getLocation ann)
     case clsKind of
         TaskClass -> do
             cTaskFunction <- genTaskFunctionDeclaration
             cPortDefines <- genPortDefines
-            return $ cPortDefines ++ [pre_cr (struct identifier structFields structModifiers |>> getLocation ann), cTaskFunction]
-                ++ cFunctions
+            return $ cPortDefines ++ [cStruct, cTaskFunction] ++ cFunctions
         _ ->
-            return $ pre_cr (struct identifier structFields structModifiers |>> getLocation ann)
-                : cFunctions
+            return $ cStruct : cFunctions
 
     where
 
@@ -406,24 +426,38 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier membe
         -- of a module does not depend on the deployment.
         genPortDefines :: CGenerator [CFileItem]
         genPortDefines = do
-            let ports = sort [port | ClassField (FieldDefinition port (TSinkPort {}) _) <- members]
-                    ++ sort [port | ClassField (FieldDefinition port (TInPort {}) _) <- members]
+            let ports = map fst (triggeringPorts members)
             variants <- mapM (genVariantForPort identifier) ports
-            return $ case zipWith (\v idx -> _define v (Just [show idx])) variants [0 :: Integer ..] of
+            let define port v idx = documented (Just (portDoc port)) (_define v (Just [show idx]))
+            return $ case zipWith3 define ports variants [0 :: Integer ..] of
                 [] -> []
                 (first : rest) -> pre_cr first : rest
 
+        portDoc port = generatedDoc [textInline "Identifier of port ", codeInline port, textInline " of class ", codeInline identifier, textInline "."]
+
         genTaskFunctionDeclaration :: CGenerator CFileItem
         genTaskFunctionDeclaration = do
-            return $ CExtDecl (CEDFunction Nothing [] void (terminafy ("task_entry" <::> identifier)) [
+            let brief = generatedDoc [textInline "Body of the tasks of class ", codeInline identifier,
+                    textInline ": it waits for the events of its ports and runs the action that each one triggers."]
+                facts = [ [textInline "Port ", codeInline port, textInline " triggers ", codeInline action, textInline "."]
+                        | (port, action) <- triggeringPorts members ]
+            return $ documented (withFacts facts (Just brief)) $ CExtDecl (CEDFunction Nothing [] void (terminafy ("task_entry" <::> identifier)) [
                     CDecl (CTypeSpec (_const . ptr $ void)) (Just "arg") Nothing
                 ]) (buildDeclarationAnn ann True)
 
-        genClassField :: ClassMember SemanticAnn -> CGenerator [CDeclaration]
-        genClassField (ClassField fld) = genFieldDeclaration fld
+        genClassField :: ClassMember SemanticAnn -> CGenerator [CMember]
+        genClassField (ClassField fld) = genFieldMembers fld
         genClassField member = throwError $ InternalError $ "invalid class member. Not a field: " ++ show member
 
 genTypeDefinitionDecl ts = throwError $ InternalError $ "Unsupported type definition: " ++ show ts
+
+-- | The ports of a class that trigger its actions, each with the action it
+-- triggers: the sink ports first, then the in ports, each group by name, which
+-- is the order of the identifiers of the ports of a task class.
+triggeringPorts :: [ClassMember SemanticAnn] -> [(Identifier, Identifier)]
+triggeringPorts members =
+    sortOn fst [ (port, action) | ClassField (FieldDefinition port (TSinkPort _ action) _) <- members ]
+    ++ sortOn fst [ (port, action) | ClassField (FieldDefinition port (TInPort _ action) _) <- members ]
 
 -- | Methods and viewers can only be called from the members of their own
 -- class, which are all defined in the same source file. They have internal
@@ -436,8 +470,55 @@ isPrivateClassMember _ = False
 -- | Declaration of a class member function. The declarations of the private
 -- member functions carry the static storage class specifier.
 genClassFunctionDeclaration :: AnnASTElement SemanticAnn -> ClassMember SemanticAnn -> CGenerator CFileItem
-genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier _ _ _) ann) member =
-    case member of
+genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier classMembers _ _) ann) member = do
+    -- The comment is the one of the member, with its own parameters; a
+    -- procedure inherits from its interface what it does not write.
+    doc <- case member of
+        ClassProcedure _ procedure params _ procAnn -> do
+            iface <- interfaceProcedure procedure
+            genProcedureDoc procAnn params iface
+        _ -> genDoc (getAnnotation member) memberParams
+    documented (withFacts facts (withGeneratedParams (eventParamDoc : generatedParams) doc)) <$> declaration
+
+  where
+
+    memberParams = case member of
+        ClassViewer _ params _ _ _ -> params
+        ClassMethod _ _ params _ _ _ -> params
+        ClassAction _ _ param _ _ -> maybe [] pure param
+        _ -> []
+
+    -- The procedure of the interface that a procedure implements, which the
+    -- annotation of a resource class holds.
+    interfaceProcedure procedure = case ann of
+        SemanticAnn (TTy (ResourceClassTypeDef ifaces)) _ ->
+            case [ (ifaceAnn, ifaceParams)
+                 | TypeDefinition (Interface _ _ _ procs _) _ <- ifaces
+                 , InterfaceProcedure _ name ifaceParams _ ifaceAnn <- procs, name == procedure ] of
+                inherited : _ -> return inherited
+                [] -> throwError $ InternalError $ "procedure of no provided interface: " ++ procedure
+        _ -> throwError $ InternalError $ "resource class without its provided interfaces: " ++ identifier
+
+    -- The ports that trigger an action.
+    facts = case member of
+        ClassAction _ action _ _ _ ->
+            [ [textInline "Triggered by port ", codeInline port, textInline "."]
+            | (port, triggered) <- triggeringPorts classMembers, triggered == action ]
+        _ -> []
+
+    -- The parameter of the instance that the generator adds after the event.
+    generatedParams = case member of
+        ClassViewer {} -> [instanceParamDoc selfParam CParamIn identifier "."]
+        ClassMethod ak _ _ _ _ _ -> [instanceParamDoc selfParam (direction ak) identifier "."]
+        ClassProcedure ak _ _ _ _ -> [instanceParamDoc thisParam (direction ak) identifier " on which the procedure runs."]
+        ClassAction ak _ _ _ _ -> [instanceParamDoc thisParam (direction ak) identifier " whose port triggered the action."]
+        ClassCase ak _ _ _ _ -> [instanceParamDoc thisParam (direction ak) identifier "."]
+        ClassField _ -> []
+
+    direction Immutable = CParamIn
+    direction _ = CParamInOut
+
+    declaration = case member of
         ClassViewer viewer params rts _ _ -> do
             retType <- maybe (return void) (genType noqual) rts
             cParamDecls <- mapM genParameterDeclaration params
@@ -485,10 +566,8 @@ genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier _ _ _) an
             return $ CExtDecl (CEDFunction storage [] void clsFuncName [cEventParam, cThisParam]) (buildDeclarationAnn ann True)
         _ -> throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
 
-    where
-
-        storage :: Maybe CStorageSpecifier
-        storage = if isPrivateClassMember member then Just CStatic else Nothing
+    storage :: Maybe CStorageSpecifier
+    storage = if isPrivateClassMember member then Just CStatic else Nothing
 
 genClassFunctionDeclaration _ member = throwError $ InternalError $ "invalid class definition for member: " ++ show member
 

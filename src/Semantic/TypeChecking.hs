@@ -9,7 +9,6 @@ module Semantic.TypeChecking (
 -- Termina Ast and Utils
 import Utils.Annotations
 import Parser.AST as PAST
-import Core.Utils
 
 -- Termina Semantic AST
 import qualified Semantic.AST as SAST
@@ -24,7 +23,6 @@ import Semantic.Errors
 -- Semantic Monad
 import Semantic.Monad
 
-import qualified Data.List  (map)
 import Data.Maybe
 
 import qualified Control.Monad.State.Strict as ST
@@ -35,70 +33,63 @@ import Semantic.TypeChecking.TypeDefinition
     ( typeParameter, typeTypeDefinition )
 import Semantic.TypeChecking.Expression
 import Semantic.Modifiers (Declaration(..))
-import Data.Bifunctor
 import Semantic.Environment
 import Utils.Monad
 import qualified Data.Set as S
 
 typeElement :: AnnASTElement ParserAnn
-  -> SemanticMonad (SAST.AnnASTElement SemanticAnn, LocatedElement (GEntry SemanticAnn))
+  -> SemanticMonad (SAST.AnnASTElement SemanticAnn)
 typeElement (Function ident ps_ts mts bret mds_ts anns) = do
   ----------------------------------------
   -- Check the return type 
-  mty <- mapM (typeTypeSpecifier anns typeGlobalObject >=>
-      (\ty -> checkReturnType anns ty >> return ty)) mts
+  mty <- mapM (typeTypeSpecifier (getLocation anns) typeGlobalObject >=>
+      (\ty -> checkReturnType (getLocation anns) ty >> return ty)) mts
   (ps_ty, typedBret) <- localScope $ do
       ps_ty <- forM ps_ts (\param@(Parameter paramId _ pann) -> do
-          typedParam <- typeParameter anns param
-          insertLocalImmutObj pann paramId (paramType typedParam)
+          typedParam <- typeParameter (getLocation anns) param
+          insertLocalImmutObj (getLocation pann) paramId (paramType typedParam)
           return typedParam)
       typedBret <- typeBlock mty bret
       return (ps_ty, typedBret)
-  mds_ty <- typeModifiers anns FunctionDeclaration typeGlobalObject mds_ts
+  mds_ty <- typeModifiers (getLocation anns) FunctionDeclaration typeGlobalObject mds_ts
   let functionSeman = FunctionSeman ps_ty (fromMaybe TUnit mty) Returns
-  return (Function ident ps_ty mty typedBret mds_ty (SemanticAnn (FnTy functionSeman) anns), LocatedElement (GFun functionSeman) anns)
+  return (Function ident ps_ty mty typedBret mds_ty (SemanticAnn (FnTy functionSeman) anns))
 typeElement (ExternFunction ident ps_ts mts mode mds_ts anns) = do
   -- A function that never comes back to the caller has nothing to return
   when (mode == NoReturn && isJust mts) $
-    throwError $ annotateError anns (ENoReturnFunctionReturnType ident)
+    throwError $ annotateError (getLocation anns) (ENoReturnFunctionReturnType ident)
   -- Check the return type and the parameters with the rules of a function
-  mty <- mapM (typeTypeSpecifier anns typeGlobalObject >=>
-      (\ty -> checkReturnType anns ty >> return ty)) mts
+  mty <- mapM (typeTypeSpecifier (getLocation anns) typeGlobalObject >=>
+      (\ty -> checkReturnType (getLocation anns) ty >> return ty)) mts
   ps_ty <- localScope $ forM ps_ts (\param@(Parameter paramId _ pann) -> do
-      typedParam <- typeParameter anns param
-      insertLocalImmutObj pann paramId (paramType typedParam)
+      typedParam <- typeParameter (getLocation anns) param
+      insertLocalImmutObj (getLocation pann) paramId (paramType typedParam)
       return typedParam)
-  mds_ty <- typeModifiers anns ExternFunctionDeclaration typeGlobalObject mds_ts
+  mds_ty <- typeModifiers (getLocation anns) ExternFunctionDeclaration typeGlobalObject mds_ts
   let functionSeman = FunctionSeman ps_ty (fromMaybe TUnit mty) mode
-  return (ExternFunction ident ps_ty mty mode mds_ty (SemanticAnn (FnTy functionSeman) anns), LocatedElement (GFun functionSeman) anns)
-typeElement (GlobalDeclaration gbl) = first GlobalDeclaration <$> typeGlobal gbl
+  return (ExternFunction ident ps_ty mty mode mds_ty (SemanticAnn (FnTy functionSeman) anns))
+typeElement (GlobalDeclaration gbl) = GlobalDeclaration <$> typeGlobal gbl
 typeElement (TypeDefinition tydef ann) = do
-  typed_tydef <- typeTypeDefinition ann tydef
-  case typed_tydef of
-    Struct {} -> return (TypeDefinition typed_tydef (buildTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
-    Enum {} -> return (TypeDefinition typed_tydef (buildTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
-    (Class _clsKind _ _ _ _) -> return (TypeDefinition typed_tydef (buildTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
-    (Interface {}) -> do
-      return (TypeDefinition typed_tydef (buildTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
+  typed_tydef <- typeTypeDefinition (getLocation ann) tydef
+  TypeDefinition typed_tydef <$> case typed_tydef of
+    -- The interfaces it provides and the ones they extend, from which its
+    -- procedures inherit their comments
+    Class ResourceClass _ _ provides _ ->
+      buildResourceClassAnn ann <$> collectProvidedInterfaces (getLocation ann) provides
+    _ -> return (buildTypeAnn ann)
 
-semanticTypeDef :: SAST.TypeDef SemanticAnn -> SemanTypeDef SemanticAnn
-semanticTypeDef (Struct i f m)  = Struct i f m
-semanticTypeDef (Enum i e m)    = Enum i e m
-semanticTypeDef (Class kind i cls ps m) = Class kind i (Data.List.map kClassMember cls) ps m
-semanticTypeDef (Interface kind i extends cls m) = Interface kind i extends cls m
+-- | Add a typed element to the global environment, as its declaration.
+addElement :: SAST.AnnASTElement SemanticAnn -> SemanticMonad ()
+addElement el = insertGlobal name (globalDecl el) (usedName name)
 
--- Adding Global elements to the environment.
-addElement :: SAST.AnnASTElement SemanticAnn -> LocatedElement (GEntry SemanticAnn) -> SemanticMonad ()
-addElement (Function ident _ _ _ _ _) el =
-  insertGlobal ident el (EUsedFunName ident)
-addElement (ExternFunction ident _ _ _ _ _) el =
-  insertGlobal ident el (EUsedFunName ident)
-addElement (GlobalDeclaration glb) el =
-  let global_name = getGlobalIdentifier glb in
-  insertGlobal global_name el (EUsedGlobalName global_name)
-addElement (TypeDefinition ty _) el =
-  let type_name = getTypeIdentifier ty in
-  insertGlobal type_name el (EUsedTypeName type_name)
+  where
+
+    name = globalDeclName el
+    usedName = case el of
+      Function {} -> EUsedFunName
+      ExternFunction {} -> EUsedFunName
+      GlobalDeclaration {} -> EUsedGlobalName
+      TypeDefinition {} -> EUsedTypeName
 
 typeTerminaModule ::
   S.Set QualifiedName
@@ -111,8 +102,8 @@ typeTerminaModule visibleModules prog = do
   where
     typeAndAdd :: AnnASTElement ParserAnn -> SemanticMonad (SAST.AnnASTElement SemanticAnn)
     typeAndAdd el = do
-      (typed_el, entry) <- typeElement el
-      addElement typed_el entry
+      typed_el <- typeElement el
+      addElement typed_el
       return typed_el
 
 runTypeChecking

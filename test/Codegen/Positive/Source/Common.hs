@@ -57,7 +57,7 @@ renderHeaderWith configParams input = case runP (contents topLevel) "test" "" in
         case runLowerModule tast of
           Left err -> pack $ "Basic blocks error: " ++ show err
           Right bbAST -> 
-            case runGenHeaderFile configParams TestPlatform "test" [] (fst (elaborateProgram (foldingProofs (mapM foldElement bbAST)) bbAST)) emptyMonadicTypes of
+            case runGenHeaderFile configParams TestPlatform "test" [] Nothing (fst (elaborateProgram (foldingProofs (mapM foldElement bbAST)) bbAST)) emptyMonadicTypes M.empty of
               Left err -> pack $ show err
               Right (cHeaderFile, _) -> runCPrinter False cHeaderFile
 

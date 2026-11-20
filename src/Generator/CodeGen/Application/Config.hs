@@ -114,8 +114,8 @@ genConfigFile mName config progArchitecture = do
                 Just (size, cTy) -> do
                     cSize <- genConstExpression size
                     let cSizeOf = _sizeOfType cTy
-                        ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
-                        ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
+                        ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False False)
+                        ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False False)
                     return [
                             "    TERMINA__APP_CONFIG__MESSAGE_QUEUE_BUFFER( ",
                             "        " <> ppSize <> ", ",
@@ -139,7 +139,7 @@ genConfigFile mName config progArchitecture = do
                     CPPDirective (CPPDefine "TERMINA__APP_CONFIG__MESSAGE_BUFFER_MEMORY"
                         (Just $
                             "( " : messagesForQueue ++ [")"]
-                        )) (internalAnn (CPPDirectiveAnn True))
+                        )) (internalAnn (CPPDirectiveAnn True Nothing))
                 ]
 
 
@@ -151,6 +151,6 @@ runGenConfigFile ::
     -> Either CGeneratorError CFile
 runGenConfigFile config plt configFilePath progArchitecture =
     case runState (runExceptT (genConfigFile configFilePath config progArchitecture))
-        (CGeneratorEnv configFilePath S.empty emptyMonadicTypes config plt False Nothing) of
+        (CGeneratorEnv configFilePath S.empty emptyMonadicTypes config plt False Nothing M.empty) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file

@@ -27,6 +27,7 @@ import Command.Utils
 import Core.AST
 import Modules.Modules
 import Modules.Utils (qualifiedToModuleName)
+import Utils.Annotations (Located(..))
 import Utils.Files (filesUnder)
 
 import Control.Monad
@@ -185,7 +186,7 @@ verifyLoadedExterns mainModule mainSection project sections =
 -- | The extern functions of a module that the build has loaded.
 parsedExterns :: ParsedModule -> ModuleExterns
 parsedExterns m = ModuleExterns (splitDirectories (qualifiedName m)) (fullPath m)
-  [ (ident, ann) | ExternFunction ident _ _ _ _ ann <- parsedAST (metadata m) ]
+  [ (ident, getLocation ann) | ExternFunction ident _ _ _ _ ann <- parsedAST (metadata m) ]
 
 -- | The source folder next to an "extern" folder.
 sourceFolderOf :: FilePath -> FilePath

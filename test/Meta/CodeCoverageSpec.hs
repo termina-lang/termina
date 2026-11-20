@@ -31,6 +31,9 @@ families =
   [ Family "Parser (PE)" "PE"
       "src/Parser/Errors.hs"
       ["test/Parser/Negative/CodeSpec.hs", "test/Configuration/SourcesSpec.hs"] [] []
+  , Family "Documentation (DE)" "DE"
+      "src/Doc/Errors.hs"
+      ["test/Doc/CheckSpec.hs"] [] []
   , Family "Semantic (SE)" "SE"
       "src/Semantic/Errors.hs"
       -- Most SE codes are tested via fixtures; the float-exclusive ones (e.g.

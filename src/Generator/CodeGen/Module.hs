@@ -23,6 +23,8 @@ import Configuration.Configuration
 import Generator.Monadic
 import Control.Monad.State
 import qualified Data.Set as S
+import Doc.Facts (DocFact)
+import Generator.CodeGen.Doc (genFileDoc)
 
 
 genModuleDefineLabel :: QualifiedName -> String
@@ -32,7 +34,7 @@ genModuleDefineLabel mn =
     unpack $ intercalate (pack "__") (map (toUpper . replace (pack ".") (pack "_")) filePath) <> pack "__"
 
 genInclude :: QualifiedName -> Bool -> CFileItem
-genInclude mName before = CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn before) Internal)
+genInclude mName before = CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn before Nothing) Internal)
 
 genHeaderASTElement :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genHeaderASTElement typedef@(TypeDefinition {}) = genTypeDefinitionDecl typedef
@@ -59,25 +61,28 @@ genHeaderFile ::
     -> QualifiedName
     -- | Import list
     -> [QualifiedName]
+    -- | Comment of the module
+    -> Maybe DocComment
     -> AnnotatedProgram SemanticAnn
     -> CGenerator CFile
-genHeaderFile includeOptionH includeStatusH includeResultH mName imports program = do
+genHeaderFile includeOptionH includeStatusH includeResultH mName imports comment program = do
     let defineLabel = genModuleDefineLabel mName
+    fileDoc <- genFileDoc comment
     items <- concat <$> traverse genHeaderASTElement program
     extra <- gets extraImports
     let includeList = genIncludeList (S.toList (S.union (S.fromList imports) extra))
     let file = CHeaderFile mName $
             [
-                CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False) Internal),
-                CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False) Internal),
-                CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True) Internal)
+                CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False (Just fileDoc)) Internal),
+                CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False Nothing) Internal),
+                CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True Nothing) Internal)
             ] ++ includeList
-            ++ ([CPPDirective (CPPInclude False genOptionPathName) (LocatedElement (CPPDirectiveAnn True) Internal) | includeOptionH])
-            ++ ([CPPDirective (CPPInclude False genStatusPathName) (LocatedElement (CPPDirectiveAnn False) Internal) | includeStatusH])
-            ++ ([CPPDirective (CPPInclude False genResultPathName) (LocatedElement (CPPDirectiveAnn False) Internal) | includeResultH])
+            ++ ([CPPDirective (CPPInclude False genOptionPathName) (LocatedElement (CPPDirectiveAnn True Nothing) Internal) | includeOptionH])
+            ++ ([CPPDirective (CPPInclude False genStatusPathName) (LocatedElement (CPPDirectiveAnn False Nothing) Internal) | includeStatusH])
+            ++ ([CPPDirective (CPPInclude False genResultPathName) (LocatedElement (CPPDirectiveAnn False Nothing) Internal) | includeResultH])
             ++ items
             ++ [
-                CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) Internal)
+                CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True Nothing) Internal)
             ]
     plt <- gets targetPlatform
     checkIdentifierLengths (maxIdentifierLength plt) file
@@ -96,11 +101,12 @@ genSourceFile ::
     -> AnnotatedProgram SemanticAnn
     -> CGenerator CFile
 genSourceFile mName program = do
+    fileDoc <- genFileDoc Nothing
     items <- concat <$> traverse genSourceASTElement program
     -- | The arrays of the coverage, whose sizes are known once the items are generated
     covItems <- coverageItems
     let file = CSourceFile mName $
-            CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn True) Internal)
+            CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn True (Just fileDoc)) Internal)
             : covItems ++ items
     plt <- gets targetPlatform
     checkIdentifierLengths (maxIdentifierLength plt) file
@@ -115,7 +121,7 @@ runGenSourceFile ::
     -> Either CGeneratorError (CFile, [CoveragePoint])
 runGenSourceFile config plt mName program =
     let cov = if coverage config then Just emptyCoverageState else Nothing in
-    case runState (runExceptT (genSourceFile mName program)) (CGeneratorEnv mName S.empty emptyMonadicTypes config plt False cov) of
+    case runState (runExceptT (genSourceFile mName program)) (CGeneratorEnv mName S.empty emptyMonadicTypes config plt False cov M.empty) of
     (Left err, _) -> Left err
     (Right file, env) -> Right (file, maybe [] (reverse . coveragePoints) (coverageState env))
 
@@ -123,11 +129,14 @@ runGenHeaderFile ::
     TerminaConfig 
     -> Platform
     -> QualifiedName 
-    -> [QualifiedName] 
-    -> AnnotatedProgram SemanticAnn 
-    -> MonadicTypes 
+    -> [QualifiedName]
+    -> Maybe DocComment
+    -> AnnotatedProgram SemanticAnn
+    -> MonadicTypes
+    -- | The facts of the instances of the deployment
+    -> M.Map Identifier [DocFact SemanticAnn]
     -> Either CGeneratorError (CFile, MonadicTypes)
-runGenHeaderFile config plt mName imports program monadicTys = 
+runGenHeaderFile config plt mName imports comment program monadicTys facts =
     let includeOptionH = not (S.null (S.filter (\case {
             TStruct _ -> False;
             TEnum _ -> False;
@@ -144,7 +153,7 @@ runGenHeaderFile config plt mName imports program monadicTys =
             _ -> True;
             }) $ resultTypes monadicTys))
     in
-    case runState (runExceptT (genHeaderFile includeOptionH includeStatusH includeResultH mName imports program))
-        (CGeneratorEnv mName S.empty monadicTys config plt False Nothing) of
+    case runState (runExceptT (genHeaderFile includeOptionH includeStatusH includeResultH mName imports comment program))
+        (CGeneratorEnv mName S.empty monadicTys config plt False Nothing facts) of
     (Left err, _) -> Left err
     (Right file, env) -> Right (file, monadicTypes env)

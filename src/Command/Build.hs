@@ -35,12 +35,14 @@ import Generator.Monadic
 import Data.List (nub)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Generator.CodeGen.Coverage (renderCoverageMap)
-import Generator.LanguageC.Printer (runCPrinter)
+import Doc.Facts (DocFact, instanceFacts)
+import Semantic.Types (SemanticAnn)
+import Generator.LanguageC.Printer (CPrinterConfig(..), runCPrinter, runCPrinterWith)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
 import Generator.CodeGen.Application.Option (runGenOptionHeaderFile, genOptionPathName)
 import Generator.CodeGen.Application.Config (genConfigPathName)
 import Core.AST
-    ( TerminaType'(TEnum, TStruct) )
+    ( Identifier, TerminaType'(TEnum, TStruct) )
 import Generator.CodeGen.Platform
 import Configuration.Platform
 import Utils.Annotations
@@ -240,12 +242,18 @@ genModules ::
   -> (QualifiedName -> Bool)
   -- | The map with the option types to generate from defined types
   -> MonadicTypes
+  -- | The facts of the instances of the deployment
+  -> M.Map Identifier [DocFact SemanticAnn]
   -- | The project to generate the code from
   -> ElaboratedProject -> IO ()
-genModules params plt instrumented initialMonadicTypes loweredProject =
+genModules params plt instrumented initialMonadicTypes facts loweredProject =
   foldM_ printModule initialMonadicTypes (M.elems loweredProject)
 
   where
+
+    -- | The C of the modules, with #line pragmas or plain, and with the
+    -- documentation comments when the configuration asks for them
+    moduleConfig config = CPrinterConfig (lineDirectives config) False (docComments config)
 
     printModule :: MonadicTypes -> ElaboratedModule -> IO MonadicTypes
     printModule currentMonadicTypes bbModule = do
@@ -261,7 +269,7 @@ genModules params plt instrumented initialMonadicTypes loweredProject =
       case runGenSourceFile params { coverage = covered } plt (qualifiedName bbModule) tAST of
         Left err -> dieWithError $ show err
         Right (cSourceFile, points) -> do
-          writeIfChanged sourceFile $ runCPrinter (lineDirectives params) cSourceFile
+          writeIfChanged sourceFile $ runCPrinterWith (moduleConfig params) cSourceFile
           -- | The map of the flags of an instrumented module
           when covered $ do
             let mapFile = destinationPath </> "map" </> qualifiedName bbModule <.> "json"
@@ -273,11 +281,11 @@ genModules params plt instrumented initialMonadicTypes loweredProject =
       let destinationPath = outputFolder params
           tAST = elaboratedAST . metadata $ bbModule
           moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
-      case runGenHeaderFile params plt (qualifiedName bbModule) moduleDeps tAST currentMonadicTypes of
+      case runGenHeaderFile params plt (qualifiedName bbModule) moduleDeps (moduleComment bbModule) tAST currentMonadicTypes facts of
         Left err -> dieWithError $ show err
         Right (cHeaderFile, newMonadicTypes) -> do
           let headerFile = destinationPath </> "include" </> qualifiedName bbModule <.> "h"
-          writeIfChanged headerFile $ runCPrinter (lineDirectives params) cHeaderFile
+          writeIfChanged headerFile $ runCPrinterWith (moduleConfig params) cHeaderFile
           return newMonadicTypes
 
 genInitFile :: TerminaConfig -> Platform -> ElaboratedProject -> IO ()
@@ -557,7 +565,7 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
     externs <- prepareExtern config (map outputFolder outConfigs) parsedProject sources (deploymentExterns deployment)
     forM_ outConfigs $ \outConfig -> do
       when chatty (putStrLn . debugMessage $ "Generating code into \"" ++ outputFolder outConfig ++ "\"")
-      genModules outConfig plt instrumented monadicTypes elaboratedProject
+      genModules outConfig plt instrumented monadicTypes (instanceFacts plt programArchitecture) elaboratedProject
       genInitFile outConfig plt elaboratedProject
       genPlatformCode outConfig plt loweredProject programArchitecture externs
       monadicHeaders <- genMonadicHeaderFiles outConfig plt monadicTypes

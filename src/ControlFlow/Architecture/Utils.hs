@@ -231,6 +231,22 @@ genResourceLockings :: TerminaProgArch a -> ResourceLockingMap
 genResourceLockings programArchitecture =
   evalState (genResourceLockingsInternal programArchitecture >> gets resLockingMap) (ResLockingSt M.empty)
 
+-- | The resources, pools, atomics and deques that a component reaches,
+-- directly or through other resources, in order of name.
+reachableResources :: TerminaProgArch a -> Identifier -> [Identifier]
+reachableResources programArchitecture component =
+    S.toList (reach S.empty (M.findWithDefault [] component usageGraph))
+
+    where
+
+        usageGraph = genResourceUsageGraph programArchitecture
+
+        reach :: S.Set Identifier -> [Identifier] -> S.Set Identifier
+        reach visited [] = visited
+        reach visited (r : rs)
+            | S.member r visited = reach visited rs
+            | otherwise = reach (S.insert r visited) (M.findWithDefault [] r usageGraph ++ rs)
+
 -- | Checks if a handler is the one connected to system_except
 isExceptHandler :: TerminaProgArch a -> Identifier -> Bool
 isExceptHandler programArchitecture ident =
@@ -246,18 +262,11 @@ getExceptProtectedResources programArchitecture =
     case M.lookup "system_except" (emitterTargets programArchitecture) of
         Nothing -> []
         Just (handler, _, _) ->
-            filter isProtected . S.toList $ reach S.empty (M.findWithDefault [] handler usageGraph)
+            filter isProtected (reachableResources programArchitecture handler)
 
     where
 
-        usageGraph = genResourceUsageGraph programArchitecture
         resLockMap = genResourceLockings programArchitecture
-
-        reach :: S.Set Identifier -> [Identifier] -> S.Set Identifier
-        reach visited [] = visited
-        reach visited (r : rs)
-            | S.member r visited = reach visited rs
-            | otherwise = reach (S.insert r visited) (M.findWithDefault [] r usageGraph ++ rs)
 
         isProtected :: Identifier -> Bool
         isProtected r = case M.lookup r resLockMap of

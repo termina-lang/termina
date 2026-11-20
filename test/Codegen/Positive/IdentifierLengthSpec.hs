@@ -36,8 +36,8 @@ sampleFunction = CFunctionDef Nothing
 -- | A translation unit with file-scope declarations plus the function above.
 sampleFile :: CFile
 sampleFile = CHeaderFile "test"
-    [ CPPDirective (CPPDefine "SHORT_GUARD" Nothing) (internalAnn (CPPDirectiveAnn False))
-    , CExtDecl (CEDTypeDef "my_type_t" void) (internalAnn (CDeclarationAnn False))
+    [ CPPDirective (CPPDefine "SHORT_GUARD" Nothing) (internalAnn (CPPDirectiveAnn False Nothing))
+    , CExtDecl (CEDTypeDef "my_type_t" void) (internalAnn (CDeclarationAnn False Nothing))
     , sampleFunction
     ]
 
