@@ -8,6 +8,7 @@ import Semantic.Types
 import Control.Monad.Except
 import Generator.CodeGen.Common
 import Generator.CodeGen.Statement
+import Generator.CodeGen.Coverage (setCoveredFunction)
 import qualified Data.Map.Strict as M
 import Utils.Annotations
 import Generator.LanguageC.Embedded
@@ -661,7 +662,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
             cParamDecls <- mapM genParameterDeclaration parameters
             cEventParam <- getEventParam
             cSelfParam <- genConstSelfParam clsdef
-            cBody <- genMemberBody parameters $ foldM (\acc x -> do
+            cBody <- genMemberBody viewer parameters $ foldM (\acc x -> do
                 cStmt <- genBlocks x
                 return $ acc ++ cStmt) [] stmts
             return $ CFunctionDef (Just CStatic) (CFunction cRetType clsFuncName (cEventParam : cSelfParam : cParamDecls)
@@ -674,7 +675,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                 Immutable -> genConstThisParam
                 _ -> genThisParam
             cParamDecls <- mapM genParameterDeclaration parameters
-            cBody <- genMemberBody parameters $ do
+            cBody <- genMemberBody procedure parameters $ do
                 selfCastStmt <- case ak of
                     Immutable -> genConstSelfCastStmt ann identifier
                     _ -> genSelfCastStmt ann identifier
@@ -700,7 +701,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                 Immutable -> genConstSelfParam clsdef
                 _ -> genSelfParam clsdef
             cParamDecls <- mapM genParameterDeclaration parameters
-            cBody <- genMemberBody parameters $ foldM (\acc x -> do
+            cBody <- genMemberBody method parameters $ foldM (\acc x -> do
                 cStmt <- genBlocks x
                 return $ acc ++ cStmt) [] stmts
             return $ CFunctionDef (Just CStatic) (CFunction cRetType clsFuncName (cEventParam :  cSelfParam : cParamDecls)
@@ -713,7 +714,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
             cThisParam <-  case ak of
                 Immutable -> genConstThisParam
                 _ -> genThisParam
-            cBody <- genMemberBody [p | Just p <- [param]] $ do
+            cBody <- genMemberBody action [p | Just p <- [param]] $ do
                 selfCastStmt <- case ak of
                     Immutable -> genConstSelfCastStmt ann identifier
                     _ -> genSelfCastStmt ann identifier
@@ -736,7 +737,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
             cThisParam <- case ak of
                 Immutable -> genConstThisParam
                 _ -> genThisParam
-            cBody <- genMemberBody parameters $ do
+            cBody <- genMemberBody testCase parameters $ do
                 selfCastStmt <- case ak of
                     Immutable -> genConstSelfCastStmt ann identifier
                     _ -> genSelfCastStmt ann identifier
@@ -751,9 +752,10 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
         -- | Generates the body of a class member, which receives the event
         -- parameter. The body starts discarding the event parameter, when the
         -- member does not use it, and every ignored parameter.
-        genMemberBody :: [Parameter SemanticAnn] -> CGenerator [CCompoundBlockItem] -> CGenerator [CCompoundBlockItem]
-        genMemberBody memberParams genItems = do
+        genMemberBody :: Identifier -> [Parameter SemanticAnn] -> CGenerator [CCompoundBlockItem] -> CGenerator [CCompoundBlockItem]
+        genMemberBody member memberParams genItems = do
             modify (\env -> env { eventParamUsed = False })
+            setCoveredFunction (identifier ++ "::" ++ member)
             cItems <- genItems
             used <- gets eventParamUsed
             ignored <- mapM (\(Parameter pid pty _) -> do

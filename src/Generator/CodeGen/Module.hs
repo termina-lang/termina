@@ -10,6 +10,7 @@ import Configuration.Platform (Platform, maxIdentifierLength)
 import Generator.CodeGen.TypeDefinition
 import Generator.CodeGen.Global
 import Generator.CodeGen.Function
+import Generator.CodeGen.Coverage (coverageItems)
 import Generator.CodeGen.Application.Option (genOptionPathName)
 import Generator.CodeGen.Application.Status (genStatusPathName)
 import Generator.CodeGen.Application.Result (genResultPathName)
@@ -96,23 +97,27 @@ genSourceFile ::
     -> CGenerator CFile
 genSourceFile mName program = do
     items <- concat <$> traverse genSourceASTElement program
+    -- | The arrays of the coverage, whose sizes are known once the items are generated
+    covItems <- coverageItems
     let file = CSourceFile mName $
             CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn True) Internal)
-            : items
+            : covItems ++ items
     plt <- gets targetPlatform
     checkIdentifierLengths (maxIdentifierLength plt) file
     return file
 
-runGenSourceFile :: 
-    TerminaConfig 
+-- | The C of a module and the points of its coverage, if any.
+runGenSourceFile ::
+    TerminaConfig
     -> Platform
-    -> QualifiedName 
-    -> AnnotatedProgram SemanticAnn 
-    -> Either CGeneratorError CFile
+    -> QualifiedName
+    -> AnnotatedProgram SemanticAnn
+    -> Either CGeneratorError (CFile, [CoveragePoint])
 runGenSourceFile config plt mName program =
-    case runState (runExceptT (genSourceFile mName program)) (CGeneratorEnv mName S.empty emptyMonadicTypes config plt False) of
+    let cov = if coverage config then Just emptyCoverageState else Nothing in
+    case runState (runExceptT (genSourceFile mName program)) (CGeneratorEnv mName S.empty emptyMonadicTypes config plt False cov) of
     (Left err, _) -> Left err
-    (Right file, _) -> Right file
+    (Right file, env) -> Right (file, maybe [] (reverse . coveragePoints) (coverageState env))
 
 runGenHeaderFile :: 
     TerminaConfig 
@@ -139,7 +144,7 @@ runGenHeaderFile config plt mName imports program monadicTys =
             _ -> True;
             }) $ resultTypes monadicTys))
     in
-    case runState (runExceptT (genHeaderFile includeOptionH includeStatusH includeResultH mName imports program)) 
-        (CGeneratorEnv mName S.empty monadicTys config plt False) of
+    case runState (runExceptT (genHeaderFile includeOptionH includeStatusH includeResultH mName imports program))
+        (CGeneratorEnv mName S.empty monadicTys config plt False Nothing) of
     (Left err, _) -> Left err
     (Right file, env) -> Right (file, monadicTypes env)

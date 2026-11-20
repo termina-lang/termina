@@ -83,6 +83,18 @@ spec = describe "Manifest" $ do
       ("project:\n  name: test\n  version: 0.1.0\n  manifest-version: 2\n" ++ app)
         `failsWith` "manifest-version 2 is not supported"
 
+    it "reads the stylesheet of the coverage report" $
+      fmap (coverageStyle . manifestCoverage) (parsed (project ++ app ++ "coverage:\n  style: docs/coverage.css\n"))
+        `shouldBe` Right (Just "docs/coverage.css")
+
+    it "rejects a stylesheet outside the project" $
+      (project ++ app ++ "coverage:\n  style: ../coverage.css\n")
+        `failsWith` "coverage.style: ../coverage.css is outside the project"
+
+    it "rejects an unknown field in the coverage section" $
+      (project ++ app ++ "coverage:\n  css: docs/coverage.css\n")
+        `failsWith` "unknown field \"css\""
+
     it "suggests the field closest to an unknown one" $
       (project ++ "app:\n  paltform: posix-gcc\n  profile: release\n")
         `failsWith` "did you mean \"platform\"?"
@@ -257,6 +269,11 @@ spec = describe "Manifest" $ do
       errors <- withProject "noscript" ["app/app.fin"] (project ++ app ++ "  linker-script: ld/linkcmds\n")
         (\root m -> checkLayout root m)
       errors `shouldBe` ["termina.yaml: the linker script ld/linkcmds does not exist"]
+
+    it "rejects a stylesheet of the coverage report that does not exist" $ do
+      errors <- withProject "nostyle" ["app/app.fin"] (project ++ app ++ "coverage:\n  style: docs/coverage.css\n")
+        (\root m -> checkLayout root m)
+      errors `shouldBe` ["termina.yaml: the stylesheet docs/coverage.css does not exist"]
 
     it "reports once a missing linker script that the application and a test share" $ do
       errors <- withProject "sharedscript" ["app/app.fin", "tests/hk/test.fin"]

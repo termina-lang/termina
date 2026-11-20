@@ -5,18 +5,22 @@
 -- test without type checking or building them.
 module Command.Test (
     testCmdArgsParser, testCommand, TestCmdArgs,
-    TestCase(..), testCases
+    TestCase(..), testCases,
+    Servers(..), Target(..), Launcher(..), targetOf,
+    Mode(..), modeOf, runTests, cannotRun
 ) where
 
 import Command.Build (BuildCmdArgs(..), Selection(..), announce, buildDeployment, checkExportedModules, nothingSelected, selectDeployments, warnLocalFolders, refuseLocalFoldersInRelease)
 import Command.Dependencies (Fetching(..), FetchingCommand(..))
 import Command.Project (Dependencies(..), loadProject)
 import Command.Common (loadMainModule, orderedModules, sourceTexts)
-import Command.Provenance (buildInfo)
+import Command.Provenance (buildInfo, terminaVersion)
 import Command.Sources (LoadedProject(..), buildSources, readProject)
 import Configuration.Configuration
 import Configuration.Platform (Platform(..), callSite, checkPlatform, gdbLaunch, xsdbServerPort)
-import Runner.Analysis (TestResult(TestResult), Run(..), RunEnd(..), AddressKind(..), analyse, addressesOf, renderReport, exitCodeOf)
+import Runner.Analysis (TestResult(TestResult), CaseResult(..), Run(..), RunEnd(..), AddressKind(..), analyse, addressesOf, renderReport, exitCodeOf)
+import qualified Runner.Analysis as A
+import Runner.Coverage (readMaps, coverageArrays, linkedArrays, writeTestResult)
 import Runner.Descriptor (Descriptor(..), DescriptorCase, Symbols(..), readDescriptor)
 import qualified Runner.Descriptor as D
 import Runner.Gdb (GdbTarget(..), GdbEnd(..), GdbRun(..), runGdb)
@@ -50,6 +54,7 @@ import Modules.Modules
 import Parser.AST
 import Parser.Types (ParserAnn)
 import Utils.Annotations
+import Utils.Hash (sha256File)
 
 import Control.Monad
 import Data.Aeson (object, (.=))
@@ -118,15 +123,6 @@ testCmdArgsParser = TestCmdArgs
     <*> O.switch (O.long "json"
         <> O.help "Write the list in JSON")
 
-  where
-
-    readProfile :: String -> Either String ProjectProfile
-    readProfile profileName =
-        case profileName of
-            "debug" -> Right Debug
-            "release" -> Right Release
-            other -> Left $ "Unknown profile: " ++ other ++ " (use debug or release)"
-
 -- | A case of a test, named by its test instance
 data TestCase = TestCase {
     caseInstance :: Identifier,
@@ -151,7 +147,7 @@ testCommand (TestCmdArgs mName mPlatform mProfile mCase isolated mRecord withGdb
         (isJust mCase, "--case"), (isolated, "--isolated"), (isJust mRecord, "--record"),
         (withGdb, "--with-gdb"), (isJust mServer, "--gdb"), (isJust mXsdb, "--xsdb"), (offline, "--offline")])
     | json = cannotRun "--json needs --list"
-    | otherwise = either cannotRun (runTests mName mPlatform mProfile withGdb mServer mXsdb offline) (modeOf mName mCase isolated mRecord offline)
+    | otherwise = either cannotRun (runTests mName mPlatform mProfile withGdb mServer mXsdb offline NoCoverage) (modeOf mName mCase isolated mRecord offline)
 
 -- | A test that cannot be run exits with 2
 cannotRun :: String -> IO a
@@ -186,8 +182,8 @@ modeOf mName mCase isolated mRecord offline =
 -- a test cannot be built or read, also when the project cannot be loaded. A
 -- record is decoded with the binary already built, and only the manifest is
 -- read.
-runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Bool -> Maybe Server -> Maybe Server -> Bool -> Mode -> IO ()
-runTests mName mPlatform mProfile withGdb mServer mXsdb offline mode = do
+runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Bool -> Maybe Server -> Maybe Server -> Bool -> Instrumentation -> Mode -> IO ()
+runTests mName mPlatform mProfile withGdb mServer mXsdb offline instrumentation mode = do
     loaded <- try (case mode of
         Recorded _ -> (\m -> LoadedProject projectRoot m M.empty M.empty M.empty) <$> (loadManifest projectRoot >>= either dieWithFirstError return)
         _ -> do
@@ -200,7 +196,7 @@ runTests mName mPlatform mProfile withGdb mServer mXsdb offline mode = do
     project <- either (const (exitWith (ExitFailure 2))) return loaded
     let manifest = loadedManifest project
         selection = maybe SelectTests SelectTest mName
-        buildArgs = BuildCmdArgs False False Nothing selection mPlatform mProfile offline
+        buildArgs = BuildCmdArgs False False Nothing selection mPlatform mProfile offline NoCoverage
     deployments <- either cannotRun return (selectDeployments manifest selection mPlatform mProfile)
     when (null deployments) $
         putStrLn (infoMessage (nothingSelected manifest selection mPlatform)) >> exitSuccess
@@ -221,7 +217,7 @@ runTests mName mPlatform mProfile withGdb mServer mXsdb offline mode = do
                           (maybe host (\(Server h _) -> h) mXsdb, mXsdb >>= \(Server _ port) -> port)
     codes <- case (mode, deployments) of
         -- | A record is decoded with the binary already built, which made it
-        (Recorded _, [deployment]) -> (: []) <$> runDeployment True servers mode deployment
+        (Recorded _, [deployment]) -> (: []) . runCode <$> runDeployment True True [] servers mode deployment
         (Recorded _, _) -> cannotRun ("--record decodes the record of one platform, and the test has "
             ++ intercalate ", " (map (show . deploymentPlatform) deployments) ++ "; choose one with --platform")
         _ -> forM deployments $ \deployment -> do
@@ -232,10 +228,46 @@ runTests mName mPlatform mProfile withGdb mServer mXsdb offline mode = do
                     let config = deploymentConfig deployment
                     createDirectoryIfMissing True (outputFolder config)
                     evidence <- evidenceOf config mode Nothing (targetLauncher (targetOf (deploymentPlatform deployment) (xsdbInit config) withGdb servers))
-                    finish config evidence Nothing M.empty (invalid config "it does not build")
-                Right _ -> runDeployment withGdb servers mode deployment
+                    finish True config evidence Nothing M.empty (invalid config "it does not build")
+                Right _ -> do
+                    plain <- runDeployment withGdb True [] servers mode deployment
+                    when (instrumentation /= NoCoverage) $ runCovered project servers mode instrumentation deployment (runResult plain)
+                    return (runCode plain)
     let worst = maximum (0 : codes)
     if worst == 0 then exitSuccess else exitWith (ExitFailure worst)
+
+-- | Builds and runs a test with the coverage, after its run without it.
+runCovered :: LoadedProject -> Servers -> Mode -> Instrumentation -> Deployment -> Maybe TestResult -> IO ()
+runCovered project servers mode instrumentation deployment plainResult = do
+    let covered = deployment { deploymentConfig = coverageConfigFor instrumentation (deploymentConfig deployment) }
+        config = deploymentConfig covered
+        label = labelOf config
+        buildArgs = BuildCmdArgs False False Nothing SelectTests Nothing Nothing False NoCoverage
+    built <- try (void (buildDeployment buildArgs project covered)) :: IO (Either ExitCode ())
+    case built of
+        Left _ -> putStrLn (warnMessage (label ++ " does not build with coverage"))
+        Right _ -> do
+            maps <- readMaps (outputFolder config)
+            case maps of
+                Left err -> putStrLn (warnMessage (label ++ ": " ++ err))
+                Right moduleMaps -> do
+                    started <- timestamp
+                    run <- runDeployment True False (coverageArrays moduleMaps) servers mode covered
+                    ended <- timestamp
+                    case (plainResult, runResult run) of
+                        (Just plain, Just instrumented) | verdicts plain /= verdicts instrumented ->
+                            putStrLn (warnMessage (label ++ ": the verdicts with coverage differ from those without it"))
+                        (_, Nothing) -> putStrLn (warnMessage (label ++ ": the run with coverage could not be read"))
+                        _ -> return ()
+                    file <- writeTestResult outputFolderName (T.unpack (name config)) (T.unpack (platform config))
+                        started ended (maybe "not read" (A.verdictSummary . A.testCases) (runResult run)) moduleMaps (runDumps run)
+                    putStrLn (infoMessage ("The coverage of " ++ label ++ " is in " ++ file))
+                    -- | The report takes every result whose stamps match the build
+                    writeCoverageReport terminaVersion
+
+  where
+
+    verdicts result = [ (D.caseId (resultCase c), resultVerdict c) | c <- A.testCases result ]
 
 -- | The label of a test in the reports
 labelOf :: TerminaConfig -> String
@@ -307,10 +339,17 @@ data Planned = Planned Integer [DescriptorCase] FilePath FilePath
 -- the toolchain, natively or through the GDB server of a board
 data Launcher = AsProcess | UnderGdb FilePath GdbTarget
 
+-- | The exit code, the verdicts and the flags of the coverage of a run of a deployment
+data DeploymentRun = DeploymentRun {
+    runCode :: Int,
+    runResult :: Maybe TestResult,
+    runDumps :: [(String, BS.ByteString)]
+  }
+
 -- | Run a test that is built on the target of its platform, and write its
 -- report. With --record, it decodes the record of a previous run instead.
-runDeployment :: Bool -> Servers -> Mode -> Deployment -> IO Int
-runDeployment withGdb servers mode deployment = do
+runDeployment :: Bool -> Bool -> [(String, Integer)] -> Servers -> Mode -> Deployment -> IO DeploymentRun
+runDeployment withGdb report arrays servers mode deployment = do
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
         folder = outputFolder config
@@ -325,7 +364,7 @@ runDeployment withGdb servers mode deployment = do
     case loaded of
       Left err -> do
         evidence <- evidenceOf config mode Nothing (targetLauncher target)
-        finish config evidence Nothing M.empty (invalid config ("its descriptor cannot be read: " ++ err))
+        unread <$> finish report config evidence Nothing M.empty (invalid config ("its descriptor cannot be read: " ++ err))
       Right descriptor -> do
         prefix <- if targetBoard target
             then M.findWithDefault "" "EXPANDED_CROSS" <$> buildInfo (labelOf config) folder
@@ -339,28 +378,41 @@ runDeployment withGdb servers mode deployment = do
                     ++ (if targetBoard target then " on the board" else "") ++ ", is not in the PATH")
                 _ -> Right ()
         case available >> plan folder descriptor of
-          Left err -> finish config evidence (Just descriptor) M.empty (invalid config err)
+          Left err -> unread <$> finish report config evidence (Just descriptor) M.empty (invalid config err)
           Right planned -> do
-            stamp <- stampAddress prefix binary
+            stamp <- stampAddress binary
             either (putStrLn . warnMessage) (const (return ())) stamp
+            (linked, unread') <- linkedArrays binary arrays
+            maybe (return ()) (putStrLn . warnMessage) unread'
             let run p = case mode of
-                    Recorded given -> readRecord (platformLayout plt) descriptor (either (const Nothing) Just stamp) given
+                    Recorded given -> fmap (\r -> (r, [])) <$> readRecord (platformLayout plt) descriptor (either (const Nothing) Just stamp) given
                     _ -> targetPrepare target >>= either (return . Left)
-                        (const (execute config (targetLauncher target) (platformLayout plt) descriptor binary (either (const Nothing) Just stamp) p))
+                        (const (execute config (targetLauncher target) (platformLayout plt) descriptor binary (either (const Nothing) Just stamp) linked p))
             ran <- runAll run planned
             case ran of
-              Left err -> finish config evidence (Just descriptor) M.empty (invalid config err)
-              Right runs -> do
-                let results = concatMap (analyse . fst) runs
+              Left err -> unread <$> finish report config evidence (Just descriptor) M.empty (invalid config err)
+              Right done -> do
+                let runs = map fst done
+                    results = concatMap (analyse . fst) runs
                     overflowed = [ (headerCasesEnded h, headerChecksFailed h) | (r, h) <- runs, runOverflow r ]
                     overflow = if null overflowed then Nothing else Just (sum (map fst overflowed), sum (map snd overflowed))
                 let lookups = [ (recorded, if kind == ReturnAddress then callSite plt recorded else recorded)
                               | (recorded, kind) <- addressesOf results ]
                 (locations, warning) <- locateAddresses prefix binary lookups
                 maybe (return ()) (putStrLn . warnMessage) warning
-                finish config evidence (Just descriptor) locations (TestResult (labelOf config) Nothing results overflow)
+                let result = TestResult (labelOf config) Nothing results overflow
+                code <- finish report config evidence (Just descriptor) locations result
+                -- | A flag is set when any of the processes set it
+                return (DeploymentRun code (Just result) (mergeDumps (map snd done)))
 
   where
+
+    unread code = DeploymentRun code Nothing []
+
+    mergeDumps dumps =
+        case dumps of
+            [] -> []
+            first : rest -> foldl (zipWith (\(s, a) (_, b) -> (s, BS.pack (BS.zipWith max a b)))) first rest
 
     plan folder descriptor =
         let cases = D.descriptorCases descriptor
@@ -432,15 +484,16 @@ readRecord layout descriptor stamp folder = do
                 found -> Right found
 
 -- | Runs the binary once and decodes its record, without the load offset in its addresses
-execute :: TerminaConfig -> Launcher -> Layout -> Descriptor -> FilePath -> Maybe Integer -> Planned -> IO (Either String (Run, Header))
-execute config launcher layout descriptor binary stamp (Planned selected cases recordFile logFile) = do
+execute :: TerminaConfig -> Launcher -> Layout -> Descriptor -> FilePath -> Maybe Integer -> [(String, Integer)] -> Planned
+        -> IO (Either String ((Run, Header), [(String, BS.ByteString)]))
+execute config launcher layout descriptor binary stamp arrays (Planned selected cases recordFile logFile) = do
     ran <- case launcher of
-        AsProcess -> fmap fromProcess <$>
+        AsProcess -> fmap (\r -> (fromProcess r, [])) <$>
             runPosix layout binary recordFile logFile (recordCapacity config) selected (descriptorTimeout descriptor)
-        UnderGdb gdb target -> fmap fromGdb <$>
-            runGdb gdb binary target (takeDirectory recordFile) logFile selected (descriptorTimeout descriptor)
-    return $ ran >>= \(bytes, end, frames, noRecord) ->
-        decodeRun layout descriptor stamp (const (Right cases)) noRecord bytes end frames
+        UnderGdb gdb target -> fmap (\r -> (fromGdb r, gdbCoverage r)) <$>
+            runGdb gdb binary target (takeDirectory recordFile) logFile selected (descriptorTimeout descriptor) arrays
+    return $ ran >>= \((bytes, end, frames, noRecord), dumps) ->
+        (\decoded -> (decoded, dumps)) <$> decodeRun layout descriptor stamp (const (Right cases)) noRecord bytes end frames
 
   where
 
@@ -457,10 +510,10 @@ execute config launcher layout descriptor binary stamp (Planned selected cases r
          "the binary did not initialize its record; the log of gdb is in " ++ logFile)
 
 -- | Writes the report on the console, results.json and report.xml, and gives the exit code
-finish :: TerminaConfig -> Evidence -> Maybe Descriptor -> M.Map Integer (Maybe S.Location) -> TestResult -> IO Int
-finish config evidence mDescriptor locations result = do
+finish :: Bool -> TerminaConfig -> Evidence -> Maybe Descriptor -> M.Map Integer (Maybe S.Location) -> TestResult -> IO Int
+finish report config evidence mDescriptor locations result = do
     let folder = outputFolder config
-    mapM_ putStrLn (renderReport (fromMaybe emptyDescriptor mDescriptor) locations result)
+    when report $ mapM_ putStrLn (renderReport (fromMaybe emptyDescriptor mDescriptor) locations result)
     BL.writeFile (folder </> "results" <.> "json") (renderResults (resultsJson evidence mDescriptor locations result))
     writeFile (folder </> "report" <.> "xml") (renderJUnit evidence mDescriptor locations result)
     return (exitCodeOf result)

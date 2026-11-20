@@ -19,6 +19,7 @@ import qualified Data.Map.Strict as M
 import Data.String (fromString)
 import qualified Data.Text as T
 import Numeric (showHex)
+import Utils.Markup (escape)
 
 -- | What ties a result to the build and the run that produced it
 data Evidence = Evidence {
@@ -252,19 +253,3 @@ renderJUnit evidence mDescriptor locations result =
             Interrupted -> element "error" "interrupted"
             Unrecorded -> element "error" "unrecorded"
             NotRun -> [open ++ ">", "      <skipped/>", "    </testcase>"]
-
--- | The text of an attribute or of an element of XML; the control characters that XML 1.0 does not admit are dropped
-escape :: String -> String
-escape = concatMap char
-
-  where
-
-    char c =
-        case c of
-            '&' -> "&amp;"
-            '<' -> "&lt;"
-            '>' -> "&gt;"
-            '"' -> "&quot;"
-            '\'' -> "&apos;"
-            '\n' -> "&#10;"
-            _ -> if c < ' ' && c /= '\t' then "" else [c]

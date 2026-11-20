@@ -640,6 +640,9 @@ instance CPrint CExternalDeclaration where
     pprint (CEDVariable stspec decl) = do
         pdecl <- pprint decl
         return $ pretty stspec <+> pdecl <> semi
+    pprint (CEDMacroVariable macro decl) = do
+        pdecl <- pprint decl
+        return $ pretty macro <+> pdecl <> semi
     pprint (CEDFunction stspec funspecs ty ident params) = do
         pty <- pprint ty
         pparams <- mapM pprint params

@@ -2,7 +2,7 @@
 
 module Command.Build (
     buildCmdArgsParser, buildCommand, generateCommand, BuildCmdArgs(..),
-    Selection(..), selectDeployments, nothingSelected, warnLocalFolders, refuseLocalFoldersInRelease,
+    Selection(..), selectDeployments, selectedDeployments, nothingSelected, warnLocalFolders, refuseLocalFoldersInRelease,
     localFoldersInRelease, buildDeployment, announce, runMake,
     CheckedDeployment(..), checkDeployment, checkExportedModules
 ) where
@@ -29,10 +29,12 @@ import System.Exit
 import System.Directory
 
 import qualified Data.Map.Strict as M
+import Runner.Coverage (coverageArrays, gdbScripts, linkedArrays, readMaps)
 import Modules.Modules
 import Generator.Monadic
 import Data.List (nub)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
+import Generator.CodeGen.Coverage (renderCoverageMap)
 import Generator.LanguageC.Printer (runCPrinter)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
 import Generator.CodeGen.Application.Option (runGenOptionHeaderFile, genOptionPathName)
@@ -42,6 +44,7 @@ import Core.AST
 import Generator.CodeGen.Platform
 import Configuration.Platform
 import Utils.Annotations
+import Utils.Hash (sha256File)
 import qualified Data.Set as S
 import Generator.CodeGen.Application.Status (runGenStatusHeaderFile, genStatusPathName)
 import Generator.CodeGen.Application.Result (runGenResultHeaderFile, genResultPathName)
@@ -49,7 +52,7 @@ import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
 import EFP.Schedulability.WCEPath.Printer
 import Command.Common
 import Command.Pipeline (CheckedModules(..), checkModules)
-import Command.Provenance (buildInfo, provenanceFields, readHashes, writeProvenanceFile)
+import Command.Provenance (buildInfo, provenanceFields, readHashes, terminaVersion, writeProvenanceFile)
 import Command.Extern (ExternGroup, parsedExterns, prepareExtern, verifyLoadedExterns)
 import Configuration.ExternCheck (SectionOwner(..), checkExternModules)
 import ControlFlow.Architecture.Types
@@ -86,6 +89,7 @@ data BuildCmdArgs =
         (Maybe Platform) -- ^ Only the tests on this platform
         (Maybe ProjectProfile) -- ^ Profile of what is built
         Bool -- ^ Offline: fail instead of fetching when the lock does not match the manifest
+        Instrumentation -- ^ Instrument the C for coverage, with the modules of the dependencies or without them
     deriving Show
 
 -- | Parser for the "generate" and "build" command arguments
@@ -108,6 +112,8 @@ buildCmdArgsParser = BuildCmdArgs
           <> O.help "Profile of what is built (default: the one of the application, and debug for the tests of a library)"))
     <*> O.switch (O.long "offline"
         <> O.help "Fail instead of fetching when termina.lock does not match termina.yaml")
+    -- | The build with the coverage is the one of termina coverage --build-only
+    <*> pure NoCoverage
 
   where
 
@@ -117,11 +123,6 @@ buildCmdArgsParser = BuildCmdArgs
       O.<|> O.flag' SelectTests (O.long "tests" <> O.help "Every test")
       O.<|> O.flag' SelectAll (O.long "all" <> O.help "The application and every test")
       O.<|> pure SelectApp
-
-    readProfile :: String -> Either String ProjectProfile
-    readProfile "debug" = Right Debug
-    readProfile "release" = Right Release
-    readProfile other = Left $ "Unknown profile: " ++ other ++ " (use debug or release)"
 
     paramParser :: O.Parser CmpDiagramParam
     paramParser =
@@ -235,11 +236,13 @@ genChecksReportFile params loweredProject reports = do
 genModules ::
   TerminaConfig
   -> Platform
-  -- | The map with the option types to generate from defined types 
+  -- | The modules that carry the flags of the coverage
+  -> (QualifiedName -> Bool)
+  -- | The map with the option types to generate from defined types
   -> MonadicTypes
   -- | The project to generate the code from
   -> ElaboratedProject -> IO ()
-genModules params plt initialMonadicTypes loweredProject =
+genModules params plt instrumented initialMonadicTypes loweredProject =
   foldM_ printModule initialMonadicTypes (M.elems loweredProject)
 
   where
@@ -254,9 +257,16 @@ genModules params plt initialMonadicTypes loweredProject =
       let destinationPath = outputFolder params
           sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
           tAST = elaboratedAST . metadata $ bbModule
-      case runGenSourceFile params plt (qualifiedName bbModule) tAST of
+          covered = instrumented (qualifiedName bbModule)
+      case runGenSourceFile params { coverage = covered } plt (qualifiedName bbModule) tAST of
         Left err -> dieWithError $ show err
-        Right cSourceFile -> writeIfChanged sourceFile $ runCPrinter (lineDirectives params) cSourceFile
+        Right (cSourceFile, points) -> do
+          writeIfChanged sourceFile $ runCPrinter (lineDirectives params) cSourceFile
+          -- | The map of the flags of an instrumented module
+          when covered $ do
+            let mapFile = destinationPath </> "map" </> qualifiedName bbModule <.> "json"
+            sourceHash <- sha256File (fullPath bbModule)
+            writeIfChanged mapFile $ renderCoverageMap terminaVersion (fullPath bbModule) sourceHash (qualifiedName bbModule) points
 
     printHeader :: MonadicTypes -> ElaboratedModule -> IO MonadicTypes
     printHeader currentMonadicTypes bbModule = do
@@ -308,7 +318,7 @@ genMonadicHeaderFiles params plt monadicTypes = do
 
 -- | Load the project and give the deployments that the arguments select.
 selectedDeployments :: BuildCmdArgs -> IO (LoadedProject, [Deployment])
-selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile offline) = do
+selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile offline instrumentation) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
     refuseLocalFoldersInRelease selection mPlatform mProfile
     project <- loadProject (Update (if offline then Offline else Reuse BuildCommand))
@@ -316,7 +326,8 @@ selectedDeployments (BuildCmdArgs chatty _ _ selection mPlatform mProfile offlin
         Library _ -> checkExportedModules chatty project
         Application _ -> return ()
     let manifest = loadedManifest project
-    deployments <- either dieWithError return $ selectDeployments manifest selection mPlatform mProfile
+    selected <- either dieWithError return $ selectDeployments manifest selection mPlatform mProfile
+    let deployments = [ d { deploymentConfig = coverageConfigFor instrumentation (deploymentConfig d) } | d <- selected ]
     when (null deployments) (putStrLn . infoMessage $ nothingSelected manifest selection mPlatform)
     warnLocalFolders project deployments
     return (project, deployments)
@@ -433,7 +444,23 @@ buildDeployment args project deployment = do
     info <- buildInfo (deploymentLabel deployment) (outputFolder config)
     hashes <- readHashes (outputFolder config </> "bin" </> "stripped.sha256")
     provenanceFields config info hashes modules >>= writeProvenanceFile (outputFolder config)
+    when (coverage config) (writeGdbScripts config)
     return built
+
+  where
+
+    -- | The scripts that clear and dump the arrays of the coverage that the binary has
+    writeGdbScripts config = do
+        maps <- readMaps (outputFolder config)
+        let binary = outputFolder config </> "bin" </> T.unpack (name config)
+            arrays = either (const []) coverageArrays maps
+        (linked, warning) <- linkedArrays binary arrays
+        maybe (return ()) (putStrLn . warnMessage) warning
+        let (clearScript, dumpScript) = gdbScripts linked
+            folder = outputFolder config </> "gdb"
+        createDirectoryIfMissing True folder
+        writeFile (folder </> "clear.gdb") clearScript
+        writeFile (folder </> "dump.gdb") dumpScript
 
 -- | Say which deployment comes next when there are several.
 announce :: [Deployment] -> String -> IO ()
@@ -513,18 +540,24 @@ checkExportedModules chatty project = do
 -- | Generate the C and the Makefile of a deployment of a project. It gives the
 -- modules of the deployment with their source files, and its groups of C.
 generateDeployment :: BuildCmdArgs -> LoadedProject -> Deployment -> IO ([(QualifiedName, FilePath)], [ExternGroup])
-generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _) project deployment = do
+generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _ _) project deployment = do
     CheckedDeployment sources parsedProject _ (CheckedModules monadicTypes loweredProject elaboratedProject checksReports programArchitecture)
         <- checkDeployment chatty project deployment
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment
-        outConfigs = [deploymentConfig deployment, deploymentPlainConfig deployment]
+        -- | A deployment with coverage generates only the instrumented C
+        outConfigs = if coverage config
+            then [config]
+            else [config, deploymentPlainConfig deployment]
+        -- | The modules that carry the flags of the coverage
+        instrumented qname = coverage config
+            && (coverageDeps config || not (S.member qname (dependencyModulesOf sources)))
     -- | Copy the C of the deployment to the output folders of the code with the
     -- #line pragmas and of the plain C, which have the same groups of C
     externs <- prepareExtern config (map outputFolder outConfigs) parsedProject sources (deploymentExterns deployment)
     forM_ outConfigs $ \outConfig -> do
       when chatty (putStrLn . debugMessage $ "Generating code into \"" ++ outputFolder outConfig ++ "\"")
-      genModules outConfig plt monadicTypes elaboratedProject
+      genModules outConfig plt instrumented monadicTypes elaboratedProject
       genInitFile outConfig plt elaboratedProject
       genPlatformCode outConfig plt loweredProject programArchitecture externs
       monadicHeaders <- genMonadicHeaderFiles outConfig plt monadicTypes
@@ -535,6 +568,8 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
       removeStaleFiles (out </> "src") [".c"] [out </> "src" </> m <.> "c" | m <- moduleNames]
       removeStaleFiles (out </> "include") [".h"]
         ([out </> "include" </> m <.> "h" | m <- moduleNames] ++ [out </> "include" </> genConfigPathName] ++ monadicHeaders)
+      when (coverage outConfig) $
+        removeStaleFiles (out </> "map") [".json"] [out </> "map" </> m <.> "json" | m <- moduleNames, instrumented m]
     genChecksReportFile config loweredProject checksReports
     when genTransactionalWCEPs $
       when chatty (putStrLn . debugMessage $ "Generating transactional worst-case execution paths") >>

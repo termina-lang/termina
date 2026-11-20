@@ -8,6 +8,8 @@ copyright:           "The Termina Project Contributors"
 
 extra-source-files:
 - README.md
+- assets/coverage/termina-mark.svg
+- assets/coverage/coverage.css
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -57,6 +59,10 @@ dependencies:
 - cryptohash-sha256
 # The XSDB command server of the PYNQ
 - network
+# The Termina mark of the report of the coverage
+- file-embed
+# The symbol table of the binaries that the runner reads
+- elf
 
 ghc-options:
 - -Wall

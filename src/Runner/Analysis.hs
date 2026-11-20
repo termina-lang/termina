@@ -4,7 +4,7 @@ module Runner.Analysis (
     Verdict(..), CaseResult(..), TestResult(..), Run(..), RunEnd(..),
     FailureDetail(..), Shown(..), ExceptionDetail(..), AddressKind(..),
     analyse, addressesOf, failureDetail, exceptionDetail, caseDetailLines,
-    renderReport, exitCodeOf
+    renderReport, exitCodeOf, verdictSummary
 ) where
 
 import Runner.Descriptor
@@ -257,7 +257,7 @@ renderReport descriptor locations result =
             [testLabel result]
             ++ concatMap caseLines (testCases result)
             ++ maybe [] overflowLine (testOverflow result)
-            ++ ["  " ++ summary (testCases result)]
+            ++ ["  " ++ verdictSummary (testCases result)]
 
   where
 
@@ -287,16 +287,18 @@ renderReport descriptor locations result =
         [ "  the record overflowed: " ++ show ended ++ " cases ended and " ++ show failed
           ++ " checks failed in all, and the failures beyond it are not detailed" ]
 
-    summary results =
-        let count verdict = length [ r | r <- results, resultVerdict r == verdict ]
-            parts = [ show (count Passed) ++ " passed" ]
-                ++ [ show (count Failed) ++ " failed" | count Failed > 0 ]
-                ++ [ show (count Raised) ++ " with an exception" | count Raised > 0 ]
-                ++ [ show (count TimedOut) ++ " timed out" | count TimedOut > 0 ]
-                ++ [ show (count Interrupted) ++ " interrupted" | count Interrupted > 0 ]
-                ++ [ show (count NotRun) ++ " not run" | count NotRun > 0 ]
-                ++ [ show (count Unrecorded) ++ " without a record" | count Unrecorded > 0 ]
-        in intercalate ", " parts
+-- | The number of cases of each verdict, as the report of the console ends
+verdictSummary :: [CaseResult] -> String
+verdictSummary results =
+    let count verdict = length [ r | r <- results, resultVerdict r == verdict ]
+        parts = [ show (count Passed) ++ " passed" ]
+            ++ [ show (count Failed) ++ " failed" | count Failed > 0 ]
+            ++ [ show (count Raised) ++ " with an exception" | count Raised > 0 ]
+            ++ [ show (count TimedOut) ++ " timed out" | count TimedOut > 0 ]
+            ++ [ show (count Interrupted) ++ " interrupted" | count Interrupted > 0 ]
+            ++ [ show (count NotRun) ++ " not run" | count NotRun > 0 ]
+            ++ [ show (count Unrecorded) ++ " without a record" | count Unrecorded > 0 ]
+    in intercalate ", " parts
 
 -- | 0 when every case passes, 1 when one does not, 2 when the test cannot be read
 exitCodeOf :: TestResult -> Int

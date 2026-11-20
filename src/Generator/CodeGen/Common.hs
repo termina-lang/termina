@@ -23,8 +23,50 @@ data CGeneratorEnv = CGeneratorEnv {
     monadicTypes :: MonadicTypes,
     configParams :: TerminaConfig,
     targetPlatform :: Platform,
-    eventParamUsed :: Bool
+    eventParamUsed :: Bool,
+    -- | The points of the coverage of the module, when its C is instrumented
+    coverageState :: Maybe CoverageState
   }
+
+-- | What a point of the coverage records: a statement has a flag, a witness a row of two.
+data CoveragePointKind =
+    -- | A statement, with the construct it starts when it is one
+    StatementPoint (Maybe String)
+    -- | The decision of a statement, with its construct, or of an expression with && or ||
+    | DecisionPoint (Maybe String)
+    -- | An operand of a && or a ||, with the row of its decision
+    | ConditionPoint Integer
+    -- | A case of a match without a test of its own, entered as the map says
+    | CasePoint CaseEntry
+  deriving (Show, Eq)
+
+-- | How a case without a test is entered
+data CaseEntry =
+    AfterCase Integer -- ^ the test of the case before it is false
+    | WithStatement Integer -- ^ the statement of its match runs
+  deriving (Show, Eq)
+
+data CoveragePoint = CoveragePoint {
+    -- | The index of the point in its array
+    pointIndex :: Integer,
+    pointKind :: CoveragePointKind,
+    pointLocation :: Location,
+    pointFunction :: String
+  } deriving Show
+
+data CoverageState = CoverageState {
+    -- | The index of the next statement of the module
+    nextStatement :: Integer,
+    -- | The index of the next witness of the module
+    nextWitness :: Integer,
+    -- | The points of the module, the last one first
+    coveragePoints :: [CoveragePoint],
+    -- | The C function whose body is being generated
+    coveredFunction :: String
+  } deriving Show
+
+emptyCoverageState :: CoverageState
+emptyCoverageState = CoverageState 0 0 [] ""
 
 type CGenerator = ExceptT CGeneratorError (ST.State CGeneratorEnv)
 
@@ -58,6 +100,7 @@ generatedIdentifiers file = concatMap itemIdents (fileItems file)
 
     extDeclIdents :: CExternalDeclaration -> [Ident]
     extDeclIdents (CEDVariable _ (CDecl _ mid _)) = maybeToList mid
+    extDeclIdents (CEDMacroVariable _ (CDecl _ mid _)) = maybeToList mid
     extDeclIdents (CEDFunction _ _ _ ident params) = ident : paramIdents params
     extDeclIdents (CEDEnum mid (CEnum _ constants _)) = maybeToList mid ++ map fst constants
     extDeclIdents (CEDStructUnion mid _) = maybeToList mid

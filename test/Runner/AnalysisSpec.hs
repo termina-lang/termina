@@ -1,5 +1,5 @@
 -- | The verdict of each case from the records, the report of the console, the
--- files of the result and the reading of the output of atos and addr2line.
+-- files of the result and the reading of the output of addr2line.
 module Runner.AnalysisSpec (spec) where
 
 import Configuration.Platform (Platform(..), callSite)
@@ -175,9 +175,7 @@ spec = describe "Runner: verdicts and report" $ do
     callSite RTEMS5LEON3SFNEXYSA7 0x40001000 `shouldBe` 0x40001000
     callSite POSIXGCC 0x100003f55 `shouldBe` 0x100003f54
 
-  it "reads the output of atos and of addr2line" $ do
-    atosLocation "CHkFdirTests__high_severity_action (in hk_fdir) (test.fin:228)" `shouldBe` Just (Location "test.fin" 228)
-    atosLocation "0x100003f50" `shouldBe` Nothing
+  it "reads the output of addr2line" $ do
     addr2lineLocation "./tests/hk_fdir/test.fin:230" `shouldBe` Just (Location "tests/hk_fdir/test.fin" 230)
     addr2lineLocation "/src/a.fin:12 (discriminator 3)" `shouldBe` Just (Location "/src/a.fin" 12)
     addr2lineLocation "??:0" `shouldBe` Nothing

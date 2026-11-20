@@ -5,6 +5,7 @@
 -- depends on, and the deployments it builds (the application and the tests).
 module Configuration.Manifest (
     Manifest(..),
+    CoverageSettings(..),
     ProjectInfo(..),
     Assurance(..),
     Standard(..),
@@ -23,6 +24,8 @@ module Configuration.Manifest (
     Deployment(..),
     appDeployment,
     appDeploymentIn,
+    Instrumentation(..),
+    coverageConfigFor,
     appConfig,
     defaultTestProfile,
     testDeployment,
@@ -45,7 +48,7 @@ import qualified Data.ByteString as BS
 import Data.Char (isAsciiLower, isDigit)
 import Data.List (intercalate, isPrefixOf, nub, sort, stripPrefix, (\\))
 import qualified Data.Map.Strict as M
-import Data.Maybe (fromMaybe, isNothing)
+import Data.Maybe (fromMaybe, isNothing, maybeToList)
 import qualified Data.Text as T
 import Data.Yaml
 import System.Directory
@@ -67,7 +70,13 @@ data Manifest = Manifest {
     manifestPrintBufSize :: !Integer,
     manifestReadBufSize :: !Integer,
     manifestExtern :: !ExternConfig,
-    manifestTests :: !(M.Map T.Text TestEntry)
+    manifestTests :: !(M.Map T.Text TestEntry),
+    manifestCoverage :: !CoverageSettings
+  } deriving (Eq, Show)
+
+-- | The section coverage: the stylesheet of the project, loaded after the one of the report
+newtype CoverageSettings = CoverageSettings {
+    coverageStyle :: Maybe FilePath
   } deriving (Eq, Show)
 
 data ProjectInfo = ProjectInfo {
@@ -214,7 +223,7 @@ isSnakeCase [] = False
 manifestParser :: Value -> Parser Manifest
 manifestParser = withObject "manifest" $ \o -> do
     onlyFields ["project", "exports", "dependencies", "overrides",
-        "sys-print-output-buffer-size", "sys-read-input-buffer-size", "extern", "app", "tests"] o
+        "sys-print-output-buffer-size", "sys-read-input-buffer-size", "extern", "app", "tests", "coverage"] o
     project <- explicitParseField projectParser o "project"
     mExports <- o .:? "exports" :: Parser (Maybe Value)
     mApp <- o .:? "app" :: Parser (Maybe Value)
@@ -230,10 +239,22 @@ manifestParser = withObject "manifest" $ \o -> do
         <*> (explicitParseFieldMaybe positive o "sys-read-input-buffer-size" .!= defaultSysReadInputBufferSize)
         <*> (explicitParseFieldMaybe externParser o "extern" .!= emptyExternConfig)
         <*> (explicitParseFieldMaybe testsParser o "tests" .!= M.empty)
+        <*> (explicitParseFieldMaybe coverageParser o "coverage" .!= CoverageSettings Nothing)
 
   where
 
     testsParser v = parseJSON v >>= M.traverseWithKey (\t tv -> testParser t tv <?> Key (K.fromText t))
+
+    coverageParser = withObject "coverage" $ \c -> do
+        onlyFields ["style"] c
+        CoverageSettings <$> explicitParseFieldMaybe styleParser c "style"
+
+-- | The stylesheet of the coverage report: a path inside the project. Whether the
+-- file exists is a check of the layout.
+styleParser :: Value -> Parser FilePath
+styleParser v = do
+    path <- parseJSON v
+    if insideFolder path then return path else fail $ path ++ " is outside the project"
 
 projectParser :: Value -> Parser ProjectInfo
 projectParser = withObject "project" $ \o -> do
@@ -480,13 +501,19 @@ checkLayout root manifest = do
     appErrors <- checkApp
     scriptErrors <- checkLinkerScript
     xsdbErrors <- checkXsdbInit
+    styleErrors <- checkStyle
     testsErrors <- checkTests
     srcErrors <- checkSources "src"
     testSrcErrors <- concat <$> mapM (\t -> checkSources ("tests" </> T.unpack t </> "src")) (M.keys (manifestTests manifest))
     shadowErrors <- concat <$> mapM (checkShadowing . T.unpack) (M.keys (manifestTests manifest))
-    return (appErrors ++ scriptErrors ++ xsdbErrors ++ testsErrors ++ srcErrors ++ testSrcErrors ++ shadowErrors)
+    return (appErrors ++ scriptErrors ++ xsdbErrors ++ styleErrors ++ testsErrors ++ srcErrors ++ testSrcErrors ++ shadowErrors)
 
   where
+
+    checkStyle = do
+        let styles = maybeToList (coverageStyle (manifestCoverage manifest))
+        missing <- filterM (fmap not . doesFileExist . (root </>)) styles
+        return ["termina.yaml: the stylesheet " ++ style ++ " does not exist" | style <- missing]
 
     checkXsdbInit = do
         let appScripts = case manifestNature manifest of
@@ -604,7 +631,9 @@ configFor manifest kind plt prf tick = TerminaConfig {
     runTimeout = Nothing,
     linkerScript = Nothing,
     xsdbInit = Nothing,
-    lineDirectives = True
+    lineDirectives = True,
+    coverage = False,
+    coverageDeps = False
   }
 
   where
@@ -644,6 +673,19 @@ plainConfigFor :: TerminaConfig -> TerminaConfig
 plainConfigFor config = config {
     lineDirectives = False,
     outputFolder = outputFolderName </> "plain" </> makeRelative outputFolderName (outputFolder config)
+  }
+
+-- | Whether a deployment is built with the coverage, and whether its dependencies are instrumented too.
+data Instrumentation = NoCoverage | Coverage | CoverageWithDeps
+  deriving (Eq, Show)
+
+-- | The configuration of a deployment with its instrumentation; one with the coverage is built in output/coverage.
+coverageConfigFor :: Instrumentation -> TerminaConfig -> TerminaConfig
+coverageConfigFor NoCoverage config = config
+coverageConfigFor instrumentation config = config {
+    coverage = True,
+    coverageDeps = instrumentation == CoverageWithDeps,
+    outputFolder = outputFolderName </> "coverage" </> makeRelative outputFolderName (outputFolder config)
   }
 
 -- | The configuration of the application, or nothing in a library.

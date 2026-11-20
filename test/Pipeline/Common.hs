@@ -11,6 +11,7 @@ module Pipeline.Common
   , renderConfigFile
   , renderTestConfigFile
   , buildAndRenderModule
+  , runCoverageBuild
   , compileErrorCode
   , compileTestErrorCode
   , compileTestProjectErrorCode
@@ -45,6 +46,7 @@ import Configuration.Configuration (defaultConfig, TerminaConfig (..), Deploymen
 import Configuration.Platform (Platform(..))
 import Generator.Environment (getPlatformInitialGlobalEnv)
 import Generator.CodeGen.Module (runGenSourceFile)
+import Generator.CodeGen.Coverage (renderCoverageMap)
 import Generator.CodeGen.Application.Glue (runGenMainFile)
 import Generator.TestDescriptor (genTestDescriptor)
 import Core.TestCases (NumberedCase, typedCases)
@@ -298,6 +300,22 @@ compileProjectErrorMessage =
 runFullBuild :: String -> Text
 runFullBuild input = buildAndRenderModule "test" [("test", input)]
 
+-- | The instrumented C of @target@ and the map of its coverage, or a failure in both.
+runCoverageBuild :: QualifiedName -> [(QualifiedName, String)] -> (Text, Text)
+runCoverageBuild target sources =
+  let cfg = configParams { coverage = True } in
+  case runProjectPipeline cfg sources of
+    Left err -> (failMessage err, failMessage err)
+    Right result ->
+      case M.lookup target (elaboratedModules result) of
+        Nothing ->
+          let msg = pack $ "Module not found in project: " ++ target in (msg, msg)
+        Just eModule ->
+          case runGenSourceFile cfg TestPlatform target (elaboratedAST . metadata $ eModule) of
+            Left err -> let msg = T.pack (show err) in (msg, msg)
+            Right (cSourceFile, points) ->
+              (runCPrinter False cSourceFile, renderCoverageMap "0.0.0" target "source-hash" target points)
+
 -- | Build a project and return the rendered C of @target@, collapsing a
 -- pipeline failure (or a missing target) into the returned 'Text'.
 buildAndRenderModule :: QualifiedName -> [(QualifiedName, String)] -> Text
@@ -344,7 +362,7 @@ renderModule cfg eModule =
   case runGenSourceFile cfg TestPlatform (qualifiedName eModule)
          (elaboratedAST . metadata $ eModule) of
     Left err -> Left (Failure (T.pack (show err)) (T.pack (show err)))
-    Right cSourceFile -> Right $ runCPrinter False cSourceFile
+    Right (cSourceFile, _) -> Right $ runCPrinter False cSourceFile
 
 -- Shared configuration ------------------------------------------------------
 

@@ -9,6 +9,7 @@ import Control.Monad
 import Control.Monad.Except
 import Generator.CodeGen.Common
 import Generator.CodeGen.Statement
+import Generator.CodeGen.Coverage (setCoveredFunction)
 import Generator.LanguageC.Embedded
 import Utils.Annotations
 import Generator.CodeGen.Expression
@@ -32,6 +33,7 @@ genFunction (Function identifier parameters rts (Block stmts _) _ ann) = do
     cParamDecls <- mapM (\(Parameter pid pty _) -> do
         cPty <- genParameterType pty
         return $ genParameterIdentifier pid @: cPty) parameters
+    setCoveredFunction identifier
     cBody <- foldM (\acc x -> do
         cStmt <- genBlocks x
         return $ acc ++ cStmt) [] stmts

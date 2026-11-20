@@ -10,6 +10,7 @@ import Control.Monad.Except
 import Control.Monad (zipWithM)
 import Control.Monad.State (gets)
 import Generator.CodeGen.Common
+import Generator.CodeGen.Coverage (newPoint, witness)
 import Utils.Annotations
 import Generator.LanguageC.Embedded
 import Core.Utils (shiftWidth, arrayOf, withoutConst)
@@ -425,6 +426,108 @@ castToOwnType loc cExpr =
 -- the elaboration left it checked.
 genBinOp :: Bool -> Op -> Expression SemanticAnn -> Expression SemanticAnn -> SemanticAnn -> CGenerator CExpression
 genBinOp checked op left right ann =
+    case op of
+        -- | With coverage, a && or a || is a decision of its own
+        _ | isLogical op -> do
+            covered <- gets (\env -> case coverageState env of { Just _ -> True; Nothing -> False })
+            if covered
+                then genDecision Nothing (UncheckedBinOp op left right ann)
+                else genLogical op left right
+        _ -> genArithmetic
+
+    where
+
+        loc = getLocation ann
+
+        genLogical LogicalAnd l r = do
+            cLeft <- genExpression l
+            cRight <- genExpression r
+            return $ cLeft @&& cRight |>> loc
+        genLogical _ l r = do
+            cLeft <- genExpression l
+            cRight <- genExpression r
+            return $ cLeft @|| cRight |>> loc
+
+        genArithmetic = genBinOp' checked op left right ann
+
+-- | Whether an operator is a && or a ||.
+isLogical :: Op -> Bool
+isLogical LogicalAnd = True
+isLogical LogicalOr = True
+isLogical _ = False
+
+-- | A decision of a construct, or of an expression, with its witness and those
+-- of its conditions, when the module has coverage.
+genDecision :: Maybe String -> Expression SemanticAnn -> CGenerator CExpression
+genDecision construct expr = do
+    covered <- gets (\env -> case coverageState env of { Just _ -> True; Nothing -> False })
+    if not covered
+        then genExpression expr
+        else do
+            let loc = getLocation (getAnnotation expr)
+            flag <- newPoint (DecisionPoint construct) loc
+            cExpr <- if hasConditions expr
+                then genConditions flag expr
+                else genExpression expr
+            witness flag loc cExpr
+
+-- | Whether a decision has conditions: a && or a ||, also compared with true or false.
+hasConditions :: Expression SemanticAnn -> Bool
+hasConditions expr = case expr of
+    UncheckedBinOp op _ _ _ | isLogical op -> True
+    CheckedBinOp op _ _ _ | isLogical op -> True
+    _ -> maybe False (\(_, inner, _, _, _) -> hasConditions inner) (boolComparison expr)
+
+-- | A comparison with true or false, as its operator, expression, literal, side of the literal and annotation
+boolComparison :: Expression SemanticAnn
+    -> Maybe (Op, Expression SemanticAnn, Expression SemanticAnn, Bool, SemanticAnn)
+boolComparison expr = case expr of
+    UncheckedBinOp op l r ann -> compared op l r ann
+    CheckedBinOp op l r ann -> compared op l r ann
+    _ -> Nothing
+
+  where
+
+    compared op l r ann
+        | op `notElem` [RelationalEqual, RelationalNotEqual] = Nothing
+        | isBool r = Just (op, l, r, False, ann)
+        | isBool l = Just (op, r, l, True, ann)
+        | otherwise = Nothing
+
+    isBool e = case e of
+        Constant (B _) _ -> True
+        _ -> False
+
+-- | Each operand of the && and || of a decision with its witness, also under == or != with true or false
+genConditions :: Integer -> Expression SemanticAnn -> CGenerator CExpression
+genConditions decision expr =
+    case expr of
+        UncheckedBinOp op left right ann | isLogical op -> combine op left right ann
+        CheckedBinOp op left right ann | isLogical op -> combine op left right ann
+        _ | Just (op, inner, literal, literalFirst, ann) <- boolComparison expr, hasConditions inner -> do
+            cInner <- genConditions decision inner
+            cLiteral <- genExpression literal
+            let (cLeft, cRight) = if literalFirst then (cLiteral, cInner) else (cInner, cLiteral)
+            return $ (if op == RelationalEqual then cLeft @== cRight else cLeft @!= cRight) |>> getLocation ann
+        _ -> do
+            let loc = getLocation (getAnnotation expr)
+            flag <- newPoint (ConditionPoint decision) loc
+            cExpr <- genExpression expr
+            witness flag loc cExpr
+
+    where
+
+        combine op left right ann = do
+            cLeft <- genConditions decision left
+            cRight <- genConditions decision right
+            let loc = getLocation ann
+            return $ case op of
+                LogicalAnd -> cLeft @&& cRight |>> loc
+                _ -> cLeft @|| cRight |>> loc
+
+-- | A binary operation other than && and ||.
+genBinOp' :: Bool -> Op -> Expression SemanticAnn -> Expression SemanticAnn -> SemanticAnn -> CGenerator CExpression
+genBinOp' checked op left right ann =
     case op of
         LogicalAnd -> do
             cLeft <- genExpression left

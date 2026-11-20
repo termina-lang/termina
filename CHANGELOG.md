@@ -13,6 +13,57 @@ Patch versions on either side are interchangeable.
 
 ## [Unreleased]
 
+### Added
+
+- `termina coverage`, which measures the statement, decision and condition
+  coverage of the `.fin` sources. The transpiler generates the C with a flag
+  before each statement and a witness in each decision of an `if`, an
+  `else if`, the guard of a `for`, the test of a `case` and any expression
+  with `&&` or `||`, and writes a map per module with the place of each
+  flag in the source. The runtime checks have no flags. Without options the
+  command builds the application with coverage into `output/coverage/app`,
+  runs it under GDB until a Ctrl-C or `--timeout`, and reads the flags at
+  each reboot and at the end. With `--test <name>` or `--tests` it runs each
+  test without and then with instrumentation, takes the verdict from the
+  first run, and warns when the verdicts differ.
+- Each run of `termina coverage` writes its result to
+  `output/coverage/runs/` and rebuilds the report from every result whose
+  module sources and version of `termina` match the current build: static
+  HTML pages in `output/coverage/index.html`, with the project, the version
+  of `termina` and the time of the report, how each run ended and its
+  reboots, views of every run, the tests, the application, each platform and
+  each run alone, and an lcov `.info` per view. `--report-only` rebuilds the report without building or
+  running.
+- `termina coverage --build-only` builds with coverage and writes
+  `gdb/clear.gdb` and `gdb/dump.gdb` next to each binary, and
+  `termina coverage --record <folder>` takes the flags dumped by
+  `dump.gdb` as a run, so the binaries can run on a board with other tools.
+  `--include-deps` also instruments the modules of the dependencies.
+- The key `coverage.style` of `termina.yaml`, a stylesheet of the project
+  that the coverage report links after its own. Every color and font of the
+  report is a variable of `:root`.
+- `termina run`, which builds the application if needed and runs it on its
+  platform: as a process on `posix-gcc`, or under the native `gdb` with
+  `--with-gdb`, and on a board through its GDB server, with `--gdb` and
+  `--xsdb` as in `termina test`. The run ends with a Ctrl-C, the end of the
+  program or `--timeout`.
+
+### Changed
+
+- The location of an expression in parentheses runs from the opening to the
+  closing bracket. A binary operation whose left operand was in parentheses
+  started after the bracket, which cut the underline of an error on it. The
+  columns of the checks on such expressions in `checks.json` move by one.
+- The runner reads the symbol table of a binary with the Haskell library
+  `elf` instead of the `nm` of the toolchain.
+
+### Removed
+
+- The runner no longer reads the output of `atos` on macOS. A binary of
+  `posix-gcc` built on macOS is a Mach-O file, and its failed checks are
+  located only when the tests run in the container; `termina coverage`
+  rejects a run on `posix-gcc` on macOS.
+
 ## [0.7.0] - 2026-11-06
 
 ### Added
