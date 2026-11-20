@@ -20,7 +20,8 @@ import Command.Doctor
 import Command.Platforms
 import Command.Clean
 import Command.Utils (enterProject)
-import System.IO (BufferMode(LineBuffering), hSetBuffering, stdout)
+import System.IO (BufferMode(LineBuffering), hSetBuffering, hSetEncoding, stderr, stdin, stdout, utf8)
+import GHC.IO.Encoding (setLocaleEncoding)
 
 data Command =
     New NewCmdArgs
@@ -143,6 +144,9 @@ publicVersion = intercalate "." (map show (take 3 (versionBranch version)))
 
 main :: IO ()
 main = do
+    -- | Files, messages and the LSP channel are UTF-8 whatever the locale
+    setLocaleEncoding utf8
+    mapM_ (`hSetEncoding` utf8) [stdin, stdout, stderr]
     -- | The messages go in order with the errors and the output of make
     hSetBuffering stdout LineBuffering
     cmd <- customExecParser (prefs showHelpOnEmpty) $ info (commandParser <**> simpleVersioner ("termina " ++ publicVersion) <**> helper)
