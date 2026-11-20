@@ -47,8 +47,30 @@ Patch versions on either side are interchangeable.
   `--with-gdb`, and on a board through its GDB server, with `--gdb` and
   `--xsdb` as in `termina test`. The run ends with a Ctrl-C, the end of the
   program or `--timeout`.
+- Documentation comments. `///` and `/** */` document the element after
+  them, and `///<` and `/**<` the element before them; each comment stays
+  in the annotation of its element. The first paragraph is the summary, the
+  body is Markdown, with links to other elements written as `` [`name`] ``,
+  and the tags (`@param`, `@return`, `@error`, `@pre`, `@post`, `@see` and
+  others) go at the end. A comment where the grammar takes none (PE-009), an
+  element with a comment before it and another after it (PE-010), an
+  unknown tag (PE-011), a tag without its argument or text after the tags
+  (PE-012), and a `@param` that is not in the signature (DE-001) are errors.
+- `termina deliver --docs`. The plain C of the deliverable carries the
+  documentation comments as Doxygen blocks, each header starts with `@file`
+  and the comment of its module, and the transpiler adds what it knows of
+  each declaration: the class, priority and stack of a task, the connection
+  of each port, the lock of a resource and who uses it, the interrupt vector
+  of an emitter, and the port that triggers each action. The comments of the
+  statements go into the C as plain comments. The deliverable gets a
+  `Doxyfile` at its root that documents its C without the third-party files
+  of the OSAL.
 
 ### Changed
+
+- A comment that starts with `///` or `/**` is a documentation comment and
+  follows its syntax. Comments in the style of Doxygen, with tags such as
+  `@brief` or `@defgroup`, are rejected with PE-011.
 
 - The location of an expression in parentheses runs from the opening to the
   closing bracket. A binary operation whose left operand was in parentheses
@@ -63,6 +85,15 @@ Patch versions on either side are interchangeable.
   `posix-gcc` built on macOS is a Mach-O file, and its failed checks are
   located only when the tests run in the container; `termina coverage`
   rejects a run on `posix-gcc` on macOS.
+- The option `--with-trace` of `termina deliver`, which added to the
+  archive the binary built from the C with `#line` pragmas, of no use to a
+  customer without the `.fin` sources.
+
+### Fixed
+
+- The columns of a line with tabs count each tab as one character, as the
+  error messages and the language server do, instead of moving to the next
+  tab stop.
 
 ## [0.7.0] - 2026-11-06
 
