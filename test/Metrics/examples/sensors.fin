@@ -1,0 +1,53 @@
+//! Sensor sampling for the example.
+
+constexpr N : usize = 8;
+
+enum SensorStatus {
+    Ok,
+    OutOfRange,
+    Fault
+};
+
+interface ISensor {
+    procedure update(&mut self, value : Option<u16>);
+};
+
+/// Mean of the first count samples.
+function mean(samples : &[u16; N], count : usize) -> u16 {
+    var sum : u32 = 0;
+    for i : usize in 0 .. N while (i < count) {
+        sum = sum + samples[i] as u32;
+    }
+
+    var result : u16 = 0;
+    if (count > 0) {
+        result = (sum / (count as u32)) as u16;
+    }
+    return result;
+}
+
+resource class CSensor provides ISensor {
+    last : u16;
+    status : SensorStatus;
+
+    /* Classifies a new sample.
+
+       A missing sample is a fault. */
+    procedure update(&mut self, value : Option<u16>) {
+        match value {
+            case Some(v) => {
+                if (v > 1000 && self->status is SensorStatus::Ok) { // out of range
+                    self->status = SensorStatus::OutOfRange;
+                } else if (v == 0 || v == 0xFFFF) {
+                    self->status = SensorStatus::Fault;
+                } else {
+                    self->last = self->last / 2 + v / 2;
+                }
+            }
+            case None => {
+                self->status = SensorStatus::Fault;
+            }
+        }
+        return;
+    }
+};

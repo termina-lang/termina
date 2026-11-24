@@ -1,0 +1,505 @@
+{
+    "rules": "termina-metrics/1",
+    "project": {
+        "lines": {
+            "total": 126,
+            "code": 99,
+            "comment": 5,
+            "blank": 22,
+            "eol_comment": 1,
+            "doc": 2
+        },
+        "lsloc": 64,
+        "cyclomatic": {
+            "max": 6,
+            "mean": 2.29
+        },
+        "max_nesting": {
+            "max": 2,
+            "mean": 0.57
+        },
+        "modules": 3,
+        "units": 7,
+        "architecture": {
+            "totals": {
+                "tasks": 4,
+                "handlers": 0,
+                "resources": 2,
+                "pools": 0,
+                "atomics": 0,
+                "deques": 0,
+                "channels": 2,
+                "emitters": 2,
+                "connections": 8
+            },
+            "instances": [
+                {
+                    "name": "ctrl_a",
+                    "class": "CControl",
+                    "kind": "task",
+                    "ports": {
+                        "in": 0,
+                        "out": 1,
+                        "sink": 1,
+                        "access": 1
+                    },
+                    "accesses": [
+                        "real"
+                    ],
+                    "sends_to": [
+                        "data_a"
+                    ],
+                    "receives_from": [],
+                    "emitters": [
+                        "timer_a"
+                    ],
+                    "users": 0,
+                    "unit_calls": [
+                        {
+                            "unit": "sample",
+                            "calls": 3
+                        }
+                    ]
+                },
+                {
+                    "name": "ctrl_b",
+                    "class": "CControl",
+                    "kind": "task",
+                    "ports": {
+                        "in": 0,
+                        "out": 1,
+                        "sink": 1,
+                        "access": 1
+                    },
+                    "accesses": [
+                        "fake"
+                    ],
+                    "sends_to": [
+                        "data_b"
+                    ],
+                    "receives_from": [],
+                    "emitters": [
+                        "timer_b"
+                    ],
+                    "users": 0,
+                    "unit_calls": [
+                        {
+                            "unit": "sample",
+                            "calls": 3
+                        }
+                    ]
+                },
+                {
+                    "name": "log_a",
+                    "class": "CLogger",
+                    "kind": "task",
+                    "ports": {
+                        "in": 1,
+                        "out": 0,
+                        "sink": 0,
+                        "access": 0
+                    },
+                    "accesses": [],
+                    "sends_to": [],
+                    "receives_from": [
+                        "data_a"
+                    ],
+                    "emitters": [],
+                    "users": 0,
+                    "unit_calls": [
+                        {
+                            "unit": "log",
+                            "calls": 0
+                        }
+                    ]
+                },
+                {
+                    "name": "log_b",
+                    "class": "CLogger",
+                    "kind": "task",
+                    "ports": {
+                        "in": 1,
+                        "out": 0,
+                        "sink": 0,
+                        "access": 0
+                    },
+                    "accesses": [],
+                    "sends_to": [],
+                    "receives_from": [
+                        "data_b"
+                    ],
+                    "emitters": [],
+                    "users": 0,
+                    "unit_calls": [
+                        {
+                            "unit": "log",
+                            "calls": 0
+                        }
+                    ]
+                },
+                {
+                    "name": "fake",
+                    "class": "CFakeSensor",
+                    "kind": "resource",
+                    "ports": {
+                        "in": 0,
+                        "out": 0,
+                        "sink": 0,
+                        "access": 0
+                    },
+                    "accesses": [],
+                    "sends_to": [],
+                    "receives_from": [],
+                    "emitters": [],
+                    "users": 1,
+                    "unit_calls": [
+                        {
+                            "unit": "update",
+                            "calls": 0
+                        }
+                    ]
+                },
+                {
+                    "name": "real",
+                    "class": "CSensor",
+                    "kind": "resource",
+                    "ports": {
+                        "in": 0,
+                        "out": 0,
+                        "sink": 0,
+                        "access": 0
+                    },
+                    "accesses": [],
+                    "sends_to": [],
+                    "receives_from": [],
+                    "emitters": [],
+                    "users": 1,
+                    "unit_calls": [
+                        {
+                            "unit": "update",
+                            "calls": 0
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    "modules": [
+        {
+            "name": "example.app",
+            "file": "src/example/app.fin",
+            "lines": {
+                "total": 23,
+                "code": 16,
+                "comment": 0,
+                "blank": 7,
+                "eol_comment": 0,
+                "doc": 0
+            },
+            "lsloc": 12,
+            "cyclomatic": {
+                "max": 0,
+                "mean": 0
+            },
+            "max_nesting": {
+                "max": 0,
+                "mean": 0
+            },
+            "imports_out": [
+                "example.control",
+                "example.sensors"
+            ],
+            "imports_in": [],
+            "units": []
+        },
+        {
+            "name": "example.control",
+            "file": "src/example/control.fin",
+            "lines": {
+                "total": 50,
+                "code": 42,
+                "comment": 0,
+                "blank": 8,
+                "eol_comment": 0,
+                "doc": 0
+            },
+            "lsloc": 29,
+            "cyclomatic": {
+                "max": 2,
+                "mean": 1.2
+            },
+            "max_nesting": {
+                "max": 1,
+                "mean": 0.2
+            },
+            "imports_out": [
+                "example.sensors"
+            ],
+            "imports_in": [
+                "example.app"
+            ],
+            "units": [
+                {
+                    "name": "scale",
+                    "kind": "function",
+                    "first_line": 3,
+                    "last_line": 5,
+                    "lines": {
+                        "total": 3,
+                        "code": 3,
+                        "comment": 0,
+                        "blank": 0,
+                        "eol_comment": 0,
+                        "doc": 0
+                    },
+                    "statements": 1,
+                    "lsloc": 2,
+                    "statement_complexity": 0,
+                    "expression_complexity": 0,
+                    "cyclomatic": 1,
+                    "max_nesting": 0,
+                    "parameters": 1,
+                    "calls": [],
+                    "port_calls": 0,
+                    "callers": [
+                        {
+                            "unit": "filter",
+                            "by_instances": []
+                        }
+                    ]
+                },
+                {
+                    "name": "filter",
+                    "kind": "function",
+                    "first_line": 7,
+                    "last_line": 9,
+                    "lines": {
+                        "total": 3,
+                        "code": 3,
+                        "comment": 0,
+                        "blank": 0,
+                        "eol_comment": 0,
+                        "doc": 0
+                    },
+                    "statements": 1,
+                    "lsloc": 2,
+                    "statement_complexity": 0,
+                    "expression_complexity": 0,
+                    "cyclomatic": 1,
+                    "max_nesting": 0,
+                    "parameters": 2,
+                    "calls": [
+                        {
+                            "target": "scale",
+                            "through_pointer": false,
+                            "by_instances": []
+                        }
+                    ],
+                    "port_calls": 0,
+                    "callers": [
+                        {
+                            "unit": "CControl::sample",
+                            "by_instances": [
+                                "ctrl_a",
+                                "ctrl_b"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "CFakeSensor::update",
+                    "kind": "procedure",
+                    "first_line": 14,
+                    "last_line": 24,
+                    "lines": {
+                        "total": 11,
+                        "code": 11,
+                        "comment": 0,
+                        "blank": 0,
+                        "eol_comment": 0,
+                        "doc": 0
+                    },
+                    "statements": 4,
+                    "lsloc": 5,
+                    "statement_complexity": 1,
+                    "expression_complexity": 0,
+                    "cyclomatic": 2,
+                    "max_nesting": 1,
+                    "parameters": 1,
+                    "calls": [],
+                    "port_calls": 0,
+                    "callers": [
+                        {
+                            "unit": "CControl::sample",
+                            "by_instances": [
+                                "ctrl_b"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "CControl::sample",
+                    "kind": "action",
+                    "first_line": 33,
+                    "last_line": 39,
+                    "lines": {
+                        "total": 7,
+                        "code": 7,
+                        "comment": 0,
+                        "blank": 0,
+                        "eol_comment": 0,
+                        "doc": 0
+                    },
+                    "statements": 5,
+                    "lsloc": 6,
+                    "statement_complexity": 0,
+                    "expression_complexity": 0,
+                    "cyclomatic": 1,
+                    "max_nesting": 0,
+                    "parameters": 1,
+                    "calls": [
+                        {
+                            "target": "filter",
+                            "through_pointer": false,
+                            "by_instances": [
+                                "ctrl_a",
+                                "ctrl_b"
+                            ]
+                        },
+                        {
+                            "target": "CFakeSensor::update",
+                            "through_pointer": true,
+                            "by_instances": [
+                                "ctrl_b"
+                            ]
+                        },
+                        {
+                            "target": "CSensor::update",
+                            "through_pointer": true,
+                            "by_instances": [
+                                "ctrl_a"
+                            ]
+                        },
+                        {
+                            "target": "send",
+                            "through_pointer": false,
+                            "by_instances": [
+                                "ctrl_a",
+                                "ctrl_b"
+                            ]
+                        }
+                    ],
+                    "port_calls": 2,
+                    "callers": []
+                },
+                {
+                    "name": "CLogger::log",
+                    "kind": "action",
+                    "first_line": 46,
+                    "last_line": 49,
+                    "lines": {
+                        "total": 4,
+                        "code": 4,
+                        "comment": 0,
+                        "blank": 0,
+                        "eol_comment": 0,
+                        "doc": 0
+                    },
+                    "statements": 2,
+                    "lsloc": 3,
+                    "statement_complexity": 0,
+                    "expression_complexity": 0,
+                    "cyclomatic": 1,
+                    "max_nesting": 0,
+                    "parameters": 1,
+                    "calls": [],
+                    "port_calls": 0,
+                    "callers": []
+                }
+            ]
+        },
+        {
+            "name": "example.sensors",
+            "file": "src/example/sensors.fin",
+            "lines": {
+                "total": 53,
+                "code": 41,
+                "comment": 5,
+                "blank": 7,
+                "eol_comment": 1,
+                "doc": 2
+            },
+            "lsloc": 23,
+            "cyclomatic": {
+                "max": 6,
+                "mean": 5
+            },
+            "max_nesting": {
+                "max": 2,
+                "mean": 1.5
+            },
+            "imports_out": [],
+            "imports_in": [
+                "example.app",
+                "example.control"
+            ],
+            "units": [
+                {
+                    "name": "mean",
+                    "kind": "function",
+                    "first_line": 15,
+                    "last_line": 27,
+                    "lines": {
+                        "total": 13,
+                        "code": 11,
+                        "comment": 1,
+                        "blank": 1,
+                        "eol_comment": 0,
+                        "doc": 1
+                    },
+                    "statements": 7,
+                    "lsloc": 8,
+                    "statement_complexity": 3,
+                    "expression_complexity": 0,
+                    "cyclomatic": 4,
+                    "max_nesting": 1,
+                    "parameters": 2,
+                    "calls": [],
+                    "port_calls": 0,
+                    "callers": []
+                },
+                {
+                    "name": "CSensor::update",
+                    "kind": "procedure",
+                    "first_line": 36,
+                    "last_line": 52,
+                    "lines": {
+                        "total": 17,
+                        "code": 17,
+                        "comment": 0,
+                        "blank": 0,
+                        "eol_comment": 1,
+                        "doc": 0
+                    },
+                    "statements": 7,
+                    "lsloc": 8,
+                    "statement_complexity": 3,
+                    "expression_complexity": 2,
+                    "cyclomatic": 6,
+                    "max_nesting": 2,
+                    "parameters": 1,
+                    "calls": [],
+                    "port_calls": 0,
+                    "callers": [
+                        {
+                            "unit": "CControl::sample",
+                            "by_instances": [
+                                "ctrl_a"
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

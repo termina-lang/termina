@@ -1,0 +1,8 @@
+module,class,unit,kind,first_line,last_line,lines,code,comment,blank,eol_comment,doc,statements,lsloc,statement_complexity,expression_complexity,cyclomatic,max_nesting,parameters,calls,port_calls,callers
+example.control,,scale,function,3,5,3,3,0,0,0,0,1,2,0,0,1,0,1,0,0,1
+example.control,,filter,function,7,9,3,3,0,0,0,0,1,2,0,0,1,0,2,1,0,1
+example.control,CFakeSensor,update,procedure,14,24,11,11,0,0,0,0,4,5,1,0,2,1,1,0,0,1
+example.control,CControl,sample,action,33,39,7,7,0,0,0,0,5,6,0,0,1,0,1,4,2,0
+example.control,CLogger,log,action,46,49,4,4,0,0,0,0,2,3,0,0,1,0,1,0,0,0
+example.sensors,,mean,function,15,27,13,11,1,1,0,1,7,8,3,0,4,1,2,0,0,0
+example.sensors,CSensor,update,procedure,36,52,17,17,0,0,1,0,7,8,3,2,6,2,1,0,0,1

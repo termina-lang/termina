@@ -8,8 +8,9 @@ copyright:           "The Termina Project Contributors"
 
 extra-source-files:
 - README.md
-- assets/coverage/termina-mark.svg
-- assets/coverage/coverage.css
+- assets/report/termina-mark.svg
+- assets/report/termina.css
+- assets/report/termina.js
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package

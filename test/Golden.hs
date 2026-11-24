@@ -1,4 +1,4 @@
-module Golden (goldenC, goldenJSON, goldenMessage, goldenReport) where
+module Golden (goldenC, goldenJSON, goldenMessage, goldenReport, goldenMetrics) where
 
 import Data.Text (Text)
 import qualified Data.Text.IO as TIO
@@ -49,6 +49,11 @@ goldenMessage = goldenIn goldenMessageDir "txt"
 -- @test\/Runner\/golden\/\<name\>.\<ext\>@.
 goldenReport :: String -> String -> Text -> Expectation
 goldenReport ext = goldenIn ("test" </> "Runner" </> "golden") ext
+
+-- | Assert that a metrics report matches the golden file
+-- @test\/Metrics\/golden\/\<name\>.\<ext\>@.
+goldenMetrics :: String -> String -> Text -> Expectation
+goldenMetrics ext = goldenIn ("test" </> "Metrics" </> "golden") ext
 
 goldenIn :: FilePath -> String -> String -> Text -> Expectation
 goldenIn dir ext name actual = do

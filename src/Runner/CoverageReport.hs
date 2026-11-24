@@ -14,7 +14,7 @@ import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Encoding.Error as TEE
 import System.Directory (canonicalizePath, copyFile, createDirectoryIfMissing, doesDirectoryExist, doesFileExist, getCurrentDirectory, listDirectory, removeDirectoryRecursive, removeFile)
 import System.FilePath ((</>), (<.>), dropDrive, dropExtension, isRelative, joinPath, makeRelative, splitDirectories, takeDirectory, takeFileName)
-import Runner.CoverageAssets (styleSheet, terminaMark)
+import Utils.HtmlReport (Provenance(..), markFile, styleSheet, terminaMark)
 import Runner.CoverageHtml
 import Runner.CoverageModel
 import Utils.Files (filesUnder)

@@ -1,0 +1,18 @@
+src/example/app.fin               code  lsloc  v(G)  nest  par  calls  callers
+  module: 23 lines (16 code, 0 comment, 7 blank), lsloc 12
+
+src/example/control.fin           code  lsloc  v(G)  nest  par  calls  callers
+  scale               function       3      2     1     0    1      0        1
+  filter              function       3      2     1     0    2      1        1
+  CFakeSensor::update procedure     11      5     2     1    1      0        1
+  CControl::sample    action         7      6     1     0    1      4        0
+  CLogger::log        action         4      3     1     0    1      0        0
+  module: 50 lines (42 code, 0 comment, 8 blank), lsloc 29, max v(G) 2
+
+src/example/sensors.fin           code  lsloc  v(G)  nest  par  calls  callers
+  mean                function      11      8     4     1    2      0        0
+  CSensor::update     procedure     17      8     6     2    1      0        1
+  module: 53 lines (41 code, 5 comment, 7 blank), lsloc 23, max v(G) 6
+
+project: 3 modules, 7 units, 99 code lines, lsloc 64, max v(G) 6 (CSensor::update)
+architecture: 4 tasks, 0 handlers, 2 resources, 2 channels, 2 emitters, 8 connections

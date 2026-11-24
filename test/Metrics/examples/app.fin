@@ -1,0 +1,23 @@
+import example.sensors;
+import example.control;
+
+resource real : CSensor = { last = 0, status = SensorStatus::Ok };
+resource fake : CFakeSensor = { last = 0 };
+
+channel data_a : MsgQueue<u16; 4>;
+channel data_b : MsgQueue<u16; 4>;
+
+emitter timer_a : PeriodicTimer = { period = { tv_sec = 1, tv_usec = 0 } };
+emitter timer_b : PeriodicTimer = { period = { tv_sec = 1, tv_usec = 0 } };
+
+#[priority(10)]
+task ctrl_a : CControl = { sensor <-> real, out_ch -> data_a, timer <- timer_a, count = 0 };
+
+#[priority(11)]
+task ctrl_b : CControl = { sensor <-> fake, out_ch -> data_b, timer <- timer_b, count = 0 };
+
+#[priority(12)]
+task log_a : CLogger = { data_in <- data_a, total = 0 };
+
+#[priority(13)]
+task log_b : CLogger = { data_in <- data_b, total = 0 };
