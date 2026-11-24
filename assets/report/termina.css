@@ -1,4 +1,4 @@
-/* The report of the coverage, with the colours and fonts of Termina */
+/* The reports of termina, with the colours and fonts of Termina */
 
 :root {
   --navy: #0B2140;
@@ -129,6 +129,29 @@ tr.miss td.num { color: var(--miss); }
 .c.none { background: var(--card); border-color: var(--miss); border-bottom-style: dashed; }
 .p.hit { border-color: var(--hit); color: var(--hit); }
 .p.miss { border-color: var(--miss); color: var(--miss); }
+
+/* Tables of the metrics: numbers to the right, the head fixed on scrolling, a row per module over its units */
+
+h3 { font-family: var(--display); font-weight: 500; font-size: 1em; margin: 1.2em 0 .5em; }
+table.list th.n, table.list td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.list thead th { position: sticky; top: 0; z-index: 1; }
+table.sortable thead th { cursor: pointer; user-select: none; }
+table.sortable thead th.asc::after { content: " \25B4"; }
+table.sortable thead th.desc::after { content: " \25BE"; }
+table.list tr.head td { background: var(--paper); font-weight: 600; }
+tbody.group tr.head { cursor: pointer; }
+tr.head td:first-child::before { content: ""; display: inline-block; width: 1.2em; color: var(--muted); }
+tbody.group tr.head td:first-child::before { content: "\25BE"; }
+tbody.group.closed tr.head td:first-child::before { content: "\25B8"; }
+tbody.group.closed tr:not(.head) { display: none; }
+table.list td.unit { padding-left: 2.1em; }
+.fold button { font: inherit; font-size: .85em; color: var(--accent); background: var(--card); border: 1px solid var(--hair); border-radius: 6px; padding: .2em .7em; margin-right: .5em; cursor: pointer; }
+@media print {
+  tbody.group.closed tr:not(.head) { display: table-row; }
+  .fold { display: none; }
+}
+table.rules td { vertical-align: top; max-width: 50em; }
+table.rules td:first-child { white-space: nowrap; font-weight: 600; }
 
 /* Explanations on hover */
 

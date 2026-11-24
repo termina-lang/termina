@@ -1,6 +1,6 @@
 -- | The pages of the report of the coverage: the landing page, the views and the sources.
 module Runner.CoverageHtml (
-    ViewEntry(..), RunEntry(..), Provenance(..), landingPage, viewPage, sourcePage, markFile, styleFile, projectStyleFile
+    ViewEntry(..), RunEntry(..), landingPage, viewPage, sourcePage, styleFile, projectStyleFile
 ) where
 
 import Data.Char (isSpace)
@@ -8,15 +8,13 @@ import Data.List (dropWhileEnd, isPrefixOf, sortOn, tails)
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromMaybe, listToMaybe)
 import Runner.CoverageModel
+import Utils.HtmlReport (Provenance, help, provenanceLine)
+import qualified Utils.HtmlReport as H
 import Utils.Markup (escape)
-
--- | The file of the Termina mark, in the folder of the landing page
-markFile :: FilePath
-markFile = "termina-mark.svg"
 
 -- | The file of the style of the pages, in the folder of the landing page
 styleFile :: FilePath
-styleFile = "coverage.css"
+styleFile = H.styleFile "coverage"
 
 -- | The file of the style of the project, in the folder of the landing page
 projectStyleFile :: FilePath
@@ -42,19 +40,11 @@ data RunEntry = RunEntry {
     runTaken :: (Int, Int) -- ^ the modules taken of those in the result
   }
 
--- | Where a report comes from: the project with its version, the version of termina and when it was written
-data Provenance = Provenance {
-    provenanceProject :: String,
-    provenanceTermina :: String,
-    provenanceWritten :: String
-  }
-
 -- | The landing page, given its stylesheets and its provenance: the totals, the views, the runs and the number of sources not linked
 landingPage :: [FilePath] -> Provenance -> Totals -> [ViewEntry] -> [RunEntry] -> Int -> String
 landingPage styles provenance totals views runs notLinked = page styles "Termina coverage" "" [] $
     [ "<h1><small>Project</small>Coverage</h1>"
-    , "<p class=\"meta\">" ++ escape (provenanceProject provenance) ++ " · termina " ++ escape (provenanceTermina provenance)
-      ++ " · written " ++ escape (provenanceWritten provenance) ++ "</p>"
+    , provenanceLine provenance
     , tiles totals
     , "<h2>Views</h2>"
     , "<table class=\"list\"><tr><th>View</th>" ++ concatMap metricHead metrics ++ "</tr>" ]
@@ -307,23 +297,6 @@ bar hit total = "<div class=\"bar\"><i style=\"width:" ++ show (if total == 0 th
 percent :: Int -> Int -> String
 percent hit total = if total == 0 then "-" else show (100 * hit `div` total) ++ " %"
 
-help :: String -> String -> String
-help tip text = "<span class=\"help\" data-tip=\"" ++ escape tip ++ "\">" ++ text ++ "</span>"
-
--- | A page with the header of Termina, given its stylesheets, its path to the landing page and its place under it
+-- | A page of the coverage report
 page :: [FilePath] -> String -> FilePath -> [(String, Maybe FilePath)] -> [String] -> String
-page styles title toLanding crumbs body = unlines $
-    [ "<!doctype html>"
-    , "<html lang=\"en\"><head><meta charset=\"utf-8\">"
-    , "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-    , "<title>" ++ escape title ++ "</title>" ]
-    ++ [ "<link rel=\"stylesheet\" href=\"" ++ toLanding ++ style ++ "\">" | style <- styles ]
-    ++ [ "</head><body>"
-    , "<header><img src=\"" ++ toLanding ++ markFile ++ "\" alt=\"\"><span class=\"brand\"><span class=\"wordmark\">Termina</span> coverage</span>"
-      ++ "<nav><a href=\"" ++ toLanding ++ "index.html\">Coverage</a>"
-      ++ concat [ "<span>›</span>" ++ maybe (escape name) (\href -> "<a href=\"" ++ href ++ "\">" ++ escape name ++ "</a>") link
-                | (name, link) <- crumbs ]
-      ++ "</nav></header>"
-    , "<main>" ]
-    ++ body
-    ++ [ "</main></body></html>" ]
+page styles = H.page "coverage" styles []
