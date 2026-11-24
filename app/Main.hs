@@ -19,6 +19,7 @@ import Command.Sched
 import Command.Doctor
 import Command.Platforms
 import Command.Clean
+import Command.Metrics
 import Command.Utils (enterProject)
 import System.IO (BufferMode(LineBuffering), hSetBuffering, hSetEncoding, stderr, stdin, stdout, utf8)
 import GHC.IO.Encoding (setLocaleEncoding)
@@ -41,6 +42,7 @@ data Command =
     | Doctor DoctorCmdArgs
     | Platforms PlatformsCmdArgs
     | Clean CleanCmdArgs
+    | Metrics MetricsCmdArgs
     deriving Show
 
 newCommandParser :: Parser Command
@@ -70,6 +72,10 @@ doctorCommandParser = Doctor
 platformsCommandParser :: Parser Command
 platformsCommandParser = Platforms
     <$> platformsCmdArgsParser
+
+metricsCommandParser :: Parser Command
+metricsCommandParser = Metrics
+    <$> metricsCmdArgsParser
 
 cleanCommandParser :: Parser Command
 cleanCommandParser = Clean
@@ -124,6 +130,7 @@ commandParser = subparser
  <> withHelp "test" testCommandParser "Build and run the tests of the project, or list them"
  <> withHelp "run" runCommandParser "Build the application if needed and run it on its platform"
  <> withHelp "coverage" coverageCommandParser "Run the application or the tests with coverage, and write the report"
+ <> withHelp "metrics" metricsCommandParser "Measure the lines, the complexity and the coupling of the source, and write the report"
  <> withHelp "try" tryCommandParser "Translate a single file"
  <> withHelp "lsp" lspCommandParser "Start language server"
  <> withHelp "sched" schedCommandParser "Generate scheduling models"
@@ -173,3 +180,4 @@ main = do
         Doctor cmdargs -> doctorCommand cmdargs
         Platforms cmdargs -> platformsCommand cmdargs
         Clean cmdargs -> enterProject >> cleanCommand cmdargs
+        Metrics cmdargs -> enterProject >> metricsCommand cmdargs

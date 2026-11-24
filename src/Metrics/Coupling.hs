@@ -48,21 +48,39 @@ instance Semigroup Call where
 -- | The distinct targets of a unit.
 type CallSet = M.Map Target Call
 
--- | The calls of every unit of the program.
-unitCalls :: TerminaProgArch a -> M.Map UnitKey CallSet
-unitCalls arch = M.fromList (functionUnits ++ classUnits)
+-- | Where a block is: the architecture of the application, if the project has
+-- one, the class of the unit, if any, and the types of the fields of the
+-- class, among them its access ports.
+data Context a = Context
+  { ctxArch :: Maybe (TerminaProgArch a)
+  , ctxClass :: Maybe Identifier
+  , ctxFields :: M.Map Identifier (TerminaType a)
+  }
+
+-- | The calls of every unit of the given modules, taken on their basic-block
+-- AST. The architecture resolves the calls through ports and gives the
+-- instances; a library has none.
+unitCalls :: Maybe (TerminaProgArch a) -> [AnnotatedProgram a] -> M.Map UnitKey CallSet
+unitCalls arch = M.fromList . concatMap topLevel . concat
 
   where
 
-    functionUnits =
-      [ ((Nothing, name), blockCalls arch Nothing body) | (name, TPFunction _ _ _ body _) <- M.toList (functions arch) ]
+    topLevel el =
+      case el of
+        Function name _ _ body _ _ -> [((Nothing, name), blockCalls (Context arch Nothing M.empty) body)]
+        TypeDefinition (Class _ cls members _ _) _ ->
+          let ctx = Context arch (Just cls) (M.fromList [ (fieldIdentifier f, fieldTerminaType f) | ClassField f <- members ])
+          in [ ((Just cls, name), blockCalls ctx body) | (name, body) <- concatMap memberBody members ]
+        _ -> []
 
-    classUnits =
-      [ ((Just (classIdentifier cls), name), blockCalls arch (Just (classIdentifier cls)) body)
-      | cls <- allClasses arch
-      , members <- [classActions cls, classMethods cls, classProcedures cls, classViewers cls, classCases cls]
-      , (name, TPFunction _ _ _ body _) <- M.toList members
-      ]
+    memberBody m =
+      case m of
+        ClassField _ -> []
+        ClassMethod _ name _ _ body _ -> [(name, body)]
+        ClassProcedure _ name _ body _ -> [(name, body)]
+        ClassViewer name _ _ body _ -> [(name, body)]
+        ClassAction _ name _ body _ -> [(name, body)]
+        ClassCase _ name _ body _ -> [(name, body)]
 
 -- | The distinct units that call each unit, each with the instances through
 -- which it calls.
@@ -73,9 +91,6 @@ unitCallers calls =
     | (caller, targets) <- M.toList calls
     , (UnitTarget cls name, call) <- M.toList targets
     ]
-
-allClasses :: TerminaProgArch a -> [TPClass a]
-allClasses arch = concatMap M.elems [taskClasses arch, handlerClasses arch, resourceClasses arch, testClasses arch]
 
 -- | Every instance of a class, task, handler, resource or test, with the
 -- connections of its access ports, each from port to the element connected to
@@ -91,8 +106,8 @@ instanceConnections arch cls =
 -- instances that reach it: the procedure of the class of the resource
 -- connected to the port in each instance. Without instances, as in a library,
 -- the call goes to the procedure of the interface.
-procedureTargets :: TerminaProgArch a -> Maybe Identifier -> Identifier -> Identifier -> [(Target, S.Set Identifier)]
-procedureTargets arch cls port procedure =
+procedureTargets :: Context a -> Identifier -> Identifier -> [(Target, S.Set Identifier)]
+procedureTargets ctx port procedure =
   case resolved of
     [] -> [(OperationTarget (interfaceName ++ "::" ++ procedure), S.empty)]
     _ -> M.toList (M.fromListWith S.union resolved)
@@ -101,31 +116,35 @@ procedureTargets arch cls port procedure =
 
     resolved =
       [ (UnitTarget (Just (resourceClass res)) procedure, S.singleton inst)
-      | Just c <- [cls]
+      | Just arch <- [ctxArch ctx]
+      , Just c <- [ctxClass ctx]
       , (inst, conns) <- instanceConnections arch c
       , Just (target, _) <- [M.lookup port conns]
       , Just res <- [M.lookup target (resources arch)]
       ]
 
     interfaceName =
-      case cls >>= \c -> M.lookup c (M.fromList [ (classIdentifier k, k) | k <- allClasses arch ]) >>= M.lookup port . accessPorts of
-        Just (TAccessPort (TInterface _ iface), _) -> iface
+      case M.lookup port (ctxFields ctx) of
+        Just (TAccessPort (TInterface _ iface)) -> iface
         _ -> port
 
--- | The calls of a block of a unit of the given class, if any. A call whose
--- target does not depend on the connections is made by every instance of the
--- class.
-blockCalls :: TerminaProgArch a -> Maybe Identifier -> Block a -> CallSet
-blockCalls arch cls = M.unionsWith (<>) . map basicBlock . blockBody
+-- | The calls of a block. A call whose target does not depend on the
+-- connections is made by every instance of the class of the unit.
+blockCalls :: Context a -> Block a -> CallSet
+blockCalls ctx = M.unionsWith (<>) . map basicBlock . blockBody
 
   where
 
-    everyInstance = S.fromList (maybe [] (map fst . instanceConnections arch) cls)
+    everyInstance =
+      case (ctxArch ctx, ctxClass ctx) of
+        (Just arch, Just c) -> S.fromList (map fst (instanceConnections arch c))
+        _ -> S.empty
+    cls = ctxClass ctx
     direct targets = M.fromList [ (t, Call False everyInstance) | t <- targets ]
     operation pointer name = M.singleton (OperationTarget name) (Call pointer everyInstance)
-    viaPort obj p = M.fromList [ (t, Call True insts) | (t, insts) <- procedureTargets arch cls (portName obj) p ]
+    viaPort obj p = M.fromList [ (t, Call True insts) | (t, insts) <- procedureTargets ctx (portName obj) p ]
     exprs = M.unionsWith (<>) . map (direct . expressionCalls cls)
-    blocks = M.unionsWith (<>) . map (blockCalls arch cls)
+    blocks = M.unionsWith (<>) . map (blockCalls ctx)
 
     basicBlock bb =
       case bb of
@@ -133,7 +152,7 @@ blockCalls arch cls = M.unionsWith (<>) . map basicBlock . blockBody
         IfElseBlock ifc elifs els _ ->
           exprs (condIfCond ifc : map condElseIfCond elifs)
             `union` blocks (condIfBody ifc : map condElseIfBody elifs ++ maybe [] ((: []) . condElseBody) els)
-        ForLoopBlock _ _ from to cond body _ -> exprs (from : to : maybe [] (: []) cond) `union` blockCalls arch cls body
+        ForLoopBlock _ _ from to cond body _ -> exprs (from : to : maybe [] (: []) cond) `union` blockCalls ctx body
         MatchBlock e cases dflt _ ->
           exprs [e] `union` blocks (map matchBody cases ++ maybe [] (\(DefaultCase b _) -> [b]) dflt)
         SendMessage _ e _ -> exprs [e] `union` operation False "send"
@@ -234,14 +253,13 @@ data Instance = Instance
   } deriving (Show, Eq)
 
 -- | The instances of the application, tasks first, then handlers and
--- resources, each group sorted by name. Test instances are left out.
-instancesOf :: TerminaProgArch a -> [Instance]
-instancesOf arch =
+-- resources, each group sorted by name, given the calls of the units. Test
+-- instances are left out.
+instancesOf :: TerminaProgArch a -> M.Map UnitKey CallSet -> [Instance]
+instancesOf arch calls =
   map withCalls (map task (M.elems (tasks arch)) ++ map handler (M.elems (handlers arch)) ++ map resource (M.elems (resources arch)))
 
   where
-
-    calls = unitCalls arch
 
     withCalls i =
       i { instanceCalls =
@@ -296,7 +314,7 @@ archTotals arch =
     , totalDeques = M.size (deques arch)
     , totalChannels = M.size (channels arch)
     , totalEmitters = M.size (emitters arch)
-    , totalConnections = sum (map connections (instancesOf arch))
+    , totalConnections = sum (map connections (instancesOf arch M.empty))
     }
 
   where

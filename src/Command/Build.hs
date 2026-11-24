@@ -490,7 +490,9 @@ data CheckedDeployment = CheckedDeployment {
     checkedModules :: !ParsedProject,
     -- | The modules in the order in which they are type checked
     checkedOrder :: ![QualifiedName],
-    checkedResult :: !CheckedModules
+    checkedResult :: !CheckedModules,
+    -- | The typed AST of the modules, which the metrics are taken on
+    checkedTyped :: !TypedProject
   }
 
 -- | Load the modules of a deployment of a project and check them up to its
@@ -515,9 +517,9 @@ checkDeployment chatty project deployment = do
     when chatty (putStrLn . debugMessage $ "Ordering project modules")
     orderedDependencies <- orDieWithFailure files (orderedModules parsedProject)
     when chatty (putStrLn . debugMessage $ "Checking project modules")
-    checked <- orDieWithFailure (projectSourceFiles parsedProject)
-      (snd (checkModules config plt (dependencyModulesOf sources) parsedProject orderedDependencies))
-    return (CheckedDeployment sources parsedProject orderedDependencies checked)
+    let (typedProject, result) = checkModules config plt (dependencyModulesOf sources) parsedProject orderedDependencies
+    checked <- orDieWithFailure (projectSourceFiles parsedProject) result
+    return (CheckedDeployment sources parsedProject orderedDependencies checked typedProject)
 
 -- | Type check the exported modules of a library and the modules they import.
 -- The modules are checked on each platform of the tests of the library, or on
@@ -549,7 +551,7 @@ checkExportedModules chatty project = do
 -- modules of the deployment with their source files, and its groups of C.
 generateDeployment :: BuildCmdArgs -> LoadedProject -> Deployment -> IO ([(QualifiedName, FilePath)], [ExternGroup])
 generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _ _) project deployment = do
-    CheckedDeployment sources parsedProject _ (CheckedModules monadicTypes loweredProject elaboratedProject checksReports programArchitecture)
+    CheckedDeployment sources parsedProject _ (CheckedModules monadicTypes loweredProject elaboratedProject checksReports programArchitecture) _
         <- checkDeployment chatty project deployment
     let config = deploymentConfig deployment
         plt = deploymentPlatform deployment

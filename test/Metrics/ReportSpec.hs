@@ -26,14 +26,14 @@ exampleMetrics = do
         [ ("example.sensors", []), ("example.control", ["example.sensors"])
         , ("example.app", ["example.sensors", "example.control"]) ])
   return $ either (Left . failed) Right $ do
-    arch <- runProjectArchitecture sources
-    let calls = unitCalls arch
+    (arch, lowered) <- runProjectArchitecture sources
+    let calls = unitCalls (Just arch) (M.elems lowered)
         callers = unitCallers calls
     measured <- mapM (\(m, t) ->
       (\program -> moduleMetrics ("example." ++ m) ("src/example/" ++ m ++ ".fin") t program calls callers
          (M.findWithDefault ([], []) ("example." ++ m) imports))
         <$> runTypedModule ("example/" ++ m) sources) (zip modules texts)
-    return (ProjectMetrics (M.elems (M.fromList [ (mmName mm, mm) | mm <- measured ])) (instancesOf arch) (archTotals arch))
+    return (ProjectMetrics (M.elems (M.fromList [ (mmName mm, mm) | mm <- measured ])) (instancesOf arch calls) (archTotals arch))
 
 rendered :: (ProjectMetrics -> T.Text) -> IO T.Text
 rendered render = either (T.pack . ("error: " ++)) render <$> exampleMetrics

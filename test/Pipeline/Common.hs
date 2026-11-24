@@ -186,9 +186,13 @@ runProjectPipelineOn plt cfg sources = do
   pure (PipelineResult (checkedLowered checked) ordered (checkedArchitecture checked)
     (checkedElaborated checked) (checkedReports checked) (checkedMonadicTypes checked))
 
--- | The architecture of a project after its checks.
-runProjectArchitecture :: [(QualifiedName, String)] -> Either Failure (TerminaProgArch SemanticAnn)
-runProjectArchitecture sources = programArch <$> runProjectPipeline configParams sources
+-- | The architecture of a project after its checks, and the basic-block AST
+-- of each of its modules.
+runProjectArchitecture :: [(QualifiedName, String)]
+  -> Either Failure (TerminaProgArch SemanticAnn, M.Map QualifiedName (AnnotatedProgram SemanticAnn))
+runProjectArchitecture sources = do
+  result <- runProjectPipeline configParams sources
+  return (programArch result, M.map (loweredAST . metadata) (foldedModules result))
 
 -- | The modules of a project that keep their types after its checks, and the
 -- code of the error that stops them.
