@@ -10,7 +10,8 @@ import Data.Text (unpack)
 import Test.Hspec
 
 -- | A task that keeps a counter in a deque between activations and frees it
--- once it reaches four, and offers boxes to the deque with try_put and replace.
+-- once it reaches four, offers boxes to the deque with try_put and replace, and
+-- frees the box at its back.
 dequeApp :: String
 dequeApp =
     "struct Msg { n : u32; };\n" ++
@@ -70,6 +71,12 @@ dequeApp =
     "                    case None => { }\n" ++
     "                }\n" ++
     "            }\n" ++
+    "            case None => { }\n" ++
+    "        }\n" ++
+    "        var last : Option<box Msg> = None;\n" ++
+    "        self->pending.take_back(&mut last);\n" ++
+    "        match last {\n" ++
+    "            case Some(l) => { self->pool.free(l); }\n" ++
     "            case None => { }\n" ++
     "        }\n" ++
     "        return;\n" ++

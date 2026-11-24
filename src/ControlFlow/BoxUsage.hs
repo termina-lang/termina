@@ -239,7 +239,7 @@ checkBasicBlock (FreeBox obj arg ann)
 -- | A take fills an option box as an alloc does, and a put moves the box as a
 -- free does. A try_put or a replace does both, with the option that gets the
 -- box left out.
-checkBasicBlock (DequeTake obj arg ann) = useObject obj >> dequeOptionBox arg ann
+checkBasicBlock (DequeTake _ obj arg ann) = useObject obj >> dequeOptionBox arg ann
 checkBasicBlock (DequePut _ obj arg ann) = useObject obj >> dequeMoveBox arg ann
 checkBasicBlock (DequeExchange _ obj arg out ann) =
   useObject obj >> dequeOptionBox out ann >> dequeMoveBox arg ann

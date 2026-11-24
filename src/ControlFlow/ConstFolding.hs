@@ -652,11 +652,11 @@ foldBasicBlock (FreeBox obj expr ann) = do
   obj' <- foldObject obj
   expr' <- foldExpression expr
   return $ FreeBox obj' expr' ann'
-foldBasicBlock (DequeTake obj expr ann) = do
+foldBasicBlock (DequeTake end obj expr ann) = do
   ann' <- foldAnnotation ann
   obj' <- foldObject obj
   expr' <- foldExpression expr
-  return $ DequeTake obj' expr' ann'
+  return $ DequeTake end obj' expr' ann'
 foldBasicBlock (DequePut end obj expr ann) = do
   ann' <- foldAnnotation ann
   obj' <- foldObject obj

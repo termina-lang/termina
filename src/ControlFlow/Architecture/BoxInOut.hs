@@ -103,7 +103,7 @@ inOutBasicBlock (FreeBox obj arg ann) = do
     boxName <- getExprBoxName arg
     boxSource <- ST.gets (fromJust . M.lookup boxName . inBoxMap)
     addIOMapFree outPt ann boxSource
-inOutBasicBlock (DequeTake obj arg ann) = do
+inOutBasicBlock (DequeTake _ obj arg ann) = do
     deque <- getPortName obj
     optionBox <- getExprOptionBoxName arg
     fillOptionBox optionBox ann (InOptionBoxDeque deque ann)

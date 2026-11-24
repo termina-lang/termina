@@ -163,7 +163,8 @@ lowerStatements acc (stmt : xs) =
                         -- (DequeTake, DequePut or DequeExchange)
                         TAccessPort (TDequeAccess _) -> do
                             case (funcName, args) of
-                                ("take", [opt]) -> lowerStatements (DequeTake obj opt ann' : acc) xs
+                                ("take", [opt]) -> lowerStatements (DequeTake DequeFront obj opt ann' : acc) xs
+                                ("take_back", [opt]) -> lowerStatements (DequeTake DequeBack obj opt ann' : acc) xs
                                 ("put", [elemnt]) -> lowerStatements (DequePut DequeBack obj elemnt ann' : acc) xs
                                 ("put_front", [elemnt]) -> lowerStatements (DequePut DequeFront obj elemnt ann' : acc) xs
                                 ("try_put", [elemnt, out]) -> lowerStatements (DequeExchange DequeTryPut obj elemnt out ann' : acc) xs

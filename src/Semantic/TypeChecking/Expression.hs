@@ -660,6 +660,7 @@ typeMemberFunctionCall ann ak obj_ty ident args =
           box = builtinParameter "element" (TBoxSubtype ty_deque)
       case ident of
         "take" -> typeBuiltinArgs "take" [opt]
+        "take_back" -> typeBuiltinArgs "take_back" [opt]
         "put" -> typeBuiltinArgs "put" [box]
         "put_front" -> typeBuiltinArgs "put_front" [box]
         "try_put" -> typeBuiltinArgs "try_put" [box, builtinParameter "rejected" (paramType opt)]

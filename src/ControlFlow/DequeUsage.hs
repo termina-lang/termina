@@ -147,7 +147,7 @@ endPath returns = do
 
 dequeBlock :: BasicBlock SemanticAnn -> DequeM ()
 dequeBlock = \case
-  DequeTake obj _ _ -> forM_ (dequeOf obj) $ \deque ->
+  DequeTake _ obj _ _ -> forM_ (dequeOf obj) $ \deque ->
     modifyPath (\(Path p) -> Path (M.insert deque (M.singleton Empty S.empty) <$> p))
   DequePut _ obj _ ann -> forM_ (dequeOf obj) $ \deque -> do
     Path p <- getPath
@@ -246,7 +246,7 @@ dequeOperations members = foldr addBlock (S.empty, S.empty) (concatMap memberBlo
       _ -> []
 
     addBlock bb (taken, put) = case bb of
-      DequeTake obj _ _ -> (maybe taken (`S.insert` taken) (dequeOf obj), put)
+      DequeTake _ obj _ _ -> (maybe taken (`S.insert` taken) (dequeOf obj), put)
       DequePut _ obj _ _ -> (taken, maybe put (`S.insert` put) (dequeOf obj))
       DequeExchange _ obj _ _ _ -> (taken, maybe put (`S.insert` put) (dequeOf obj))
       _ -> (taken, put)

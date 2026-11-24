@@ -15,6 +15,10 @@ Patch versions on either side are interchangeable.
 
 ### Added
 
+- `take_back` on a `DequeAccess<T>` port, which takes the box at the back of
+  the deque into an `Option<box T>`. `DequeUsage` treats it as `take`: the
+  deque has room afterwards in both branches.
+
 - `termina coverage`, which measures the statement, decision and condition
   coverage of the `.fin` sources. The transpiler generates the C with a flag
   before each statement and a witness in each decision of an `if`, an

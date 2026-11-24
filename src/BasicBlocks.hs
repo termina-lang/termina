@@ -126,8 +126,9 @@ data BasicBlock' ty expr obj a =
         (obj a) -- port that implements the allocator interface
         (expr a) -- ^ argument expression
         a
-    -- | Call to the take procedure of a deque
+    -- | Call to the take or take_back procedure of a deque
     | DequeTake
+        DequeEnd -- ^ end of the deque the box comes out of
         (obj a) -- ^ port that accesses the deque
         (expr a) -- ^ argument expression
         a
@@ -181,7 +182,7 @@ basicBlockAnnotation blk = case blk of
     AtomicArrayStore _ _ _ a -> Just a
     AllocBox _ _ a -> Just a
     FreeBox _ _ a -> Just a
-    DequeTake _ _ a -> Just a
+    DequeTake _ _ _ a -> Just a
     DequePut _ _ _ a -> Just a
     DequeExchange _ _ _ _ a -> Just a
     RegularBlock _ -> Nothing
@@ -235,7 +236,7 @@ simpleBlockChildren bb = case bb of
   AtomicArrayStore obj index expr _ -> Just [ChildObject obj, ChildExpr index, ChildExpr expr]
   AllocBox obj expr _ -> Just [ChildObject obj, ChildExpr expr]
   FreeBox obj expr _ -> Just [ChildObject obj, ChildExpr expr]
-  DequeTake obj expr _ -> Just [ChildObject obj, ChildExpr expr]
+  DequeTake _ obj expr _ -> Just [ChildObject obj, ChildExpr expr]
   DequePut _ obj expr _ -> Just [ChildObject obj, ChildExpr expr]
   DequeExchange _ obj expr out _ -> Just [ChildObject obj, ChildExpr expr, ChildExpr out]
   ReturnBlock mExpr _ -> Just (map ChildExpr (maybeToList mExpr))

@@ -584,8 +584,9 @@ genBasicBlock (FreeBox obj arg ann) = do
     cArg <- genExpression arg
     methodCallExpr <- genPoolMethodCallExpr "free" cObj cArg (buildGenericAnn ann)
     return [pre_cr methodCallExpr |>> getLocation ann]
-genBasicBlock (DequeTake obj arg ann) =
-    genDequeCall "take" [_const (ptr _Option__box)] obj [arg] ann
+genBasicBlock (DequeTake end obj arg ann) =
+    let procName = case end of { DequeFront -> "take"; DequeBack -> "take_back" } in
+    genDequeCall procName [_const (ptr _Option__box)] obj [arg] ann
 genBasicBlock (DequePut end obj arg ann) =
     let procName = case end of { DequeBack -> "put"; DequeFront -> "put_front" } in
     genDequeCall procName [termina__box_t] obj [arg] ann

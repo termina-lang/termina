@@ -64,6 +64,21 @@ void T__offer(const termina__event_t * const termina__ev,
 
     }
 
+    Option__box last = { ._variant = Option__None };
+
+    termina__deque__take_back(self->pending, &last);
+
+    if (last._variant == Option__Some) {
+        
+        const termina__box_t l = last.Some._0;
+
+        self->pool.free(termina__ev, self->pool._that, l);
+
+    } else {
+        
+
+    }
+
     return;
 
 }

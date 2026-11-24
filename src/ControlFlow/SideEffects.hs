@@ -456,7 +456,7 @@ checkSimpleBlock bb = case bb of
   AtomicArrayStore _ idx val _   -> checkFullExpressions [idx, val]
   AllocBox _ arg _               -> checkFullExpression arg
   FreeBox _ arg _                -> checkFullExpression arg
-  DequeTake _ arg _              -> checkFullExpression arg
+  DequeTake _ _ arg _            -> checkFullExpression arg
   DequePut _ _ arg _             -> checkFullExpression arg
   DequeExchange _ _ arg out _    -> checkFullExpression arg >> checkFullExpression out
   ReturnBlock mRet _             -> mapM_ checkFullExpression mRet

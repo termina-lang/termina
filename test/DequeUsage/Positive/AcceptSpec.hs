@@ -16,6 +16,17 @@ spec = describe "DequeUsage: puts into a deque that is empty" $ do
     it "accepts take, then put_front at the start of an action" $
       compileErrorCode (taskProgram (drain ++ alloc "b" "self->pending.put_front(b);")) `shouldBe` Nothing
 
+    it "accepts take_back, then put at the start of an action" $ do
+      let src = taskProgram (
+                  "        var last : Option<box Msg> = None;\n" ++
+                  "        self->pending.take_back(&mut last);\n" ++
+                  "        match last {\n" ++
+                  "            case Some(o) => { self->pool.free(o); }\n" ++
+                  "            case None => { }\n" ++
+                  "        }\n" ++
+                  alloc "b" "self->pending.put(b);")
+      compileErrorCode src `shouldBe` Nothing
+
     it "accepts a try_put at the start of an action, with the rejected box freed" $
       compileErrorCode (taskProgram (alloc "b" (tryPut "b"))) `shouldBe` Nothing
 
