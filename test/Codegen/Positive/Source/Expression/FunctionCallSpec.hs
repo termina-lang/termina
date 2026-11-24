@@ -15,6 +15,17 @@ test0 = "function func_test0_0(a : u16) -> u16 {\n" ++
         "    return foo * 2;\n" ++
         "}"
 
+test1 :: String
+test1 = "const table : [u32; 4] = {1, 2, 3, 4};\n" ++
+        "\n" ++
+        "function first(values : &[u32; 4]) -> u32 {\n" ++
+        "    return values[0];\n" ++
+        "}\n" ++
+        "\n" ++
+        "function first_of_table() -> u32 {\n" ++
+        "    return first(&table);\n" ++
+        "}"
+
 spec :: Spec
 spec = do
   describe "Pretty printing function call expressions" $ do
@@ -46,5 +57,23 @@ spec = do
               "    uint16_t foo = func_test0_0(2U);\n" ++
               "\n" ++
               "    return (uint16_t)((uint32_t)foo * 2U & 0xFFFFU);\n" ++
+              "\n" ++
+              "}\n")
+    it "Passes a reference to a const array as the name of the array" $ do
+      renderSource test1 `shouldBe`
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++
+              "const uint32_t table[4U] = { 1U, 2U, 3U, 4U };\n" ++
+              "\n" ++
+              "uint32_t first(const uint32_t values[4U]) {\n" ++
+              "    \n" ++
+              "    return values[0U];\n" ++
+              "\n" ++
+              "}\n" ++
+              "\n" ++
+              "uint32_t first_of_table(void) {\n" ++
+              "    \n" ++
+              "    return first(table);\n" ++
               "\n" ++
               "}\n")    

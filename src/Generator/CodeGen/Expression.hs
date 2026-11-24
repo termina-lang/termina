@@ -606,7 +606,8 @@ genExpression (Casting expr ts ann) = do
     cExpr <- genExpression expr >>= castBinOpToOwnType (getLocation ann) expr
     return $ cast cType cExpr |>> getLocation ann
 genExpression (ReferenceExpression _ obj ann) = do
-    typeObj <- getObjType obj
+    -- | A const array, such as a global const, is printed as its name too
+    typeObj <- withoutConst <$> getObjType obj
     cObj <- genObject obj
     case typeObj of
         -- | If it is an array, we need to generate the address of the data
