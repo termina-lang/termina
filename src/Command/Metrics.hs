@@ -7,26 +7,31 @@ module Command.Metrics (
 ) where
 
 import Control.Monad (when)
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Data.Time (defaultTimeLocale, formatTime, getZonedTime)
 import qualified Options.Applicative as O
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>), makeRelative)
 
 import Command.Build (CheckedDeployment(..), checkDeployment)
+import Command.Provenance (terminaVersion)
 import Command.Common (libraryPlatforms, loadExportedModules, sourceTexts, typeLibrary)
 import Command.Dependencies (Fetching(..))
 import Command.Pipeline (CheckedModules(..))
 import Command.Project (Dependencies(..), loadProject)
 import Command.Sources (LoadedProject(..), buildSources, dependencyModulesOf)
 import Command.Types
-import Command.Utils (checkFailure, dieWithError, lowerProject, orDieWithFailure, projectSourceFiles)
-import Configuration.Manifest (appDeployment)
+import Command.Utils (checkFailure, dieWithError, infoMessage, lowerProject, orDieWithFailure, projectSourceFiles)
+import Configuration.Manifest (ProjectInfo(..), Manifest(..), appDeployment)
 import ControlFlow.Architecture.Types (TerminaProgArch)
 import Metrics.Coupling
+import Metrics.Html
 import Metrics.Report
+import Utils.HtmlReport (Provenance(..), markFile, script, scriptFile, styleSheet, terminaMark)
 import Modules.Modules (ModuleDependency(..), TerminaModuleData(..))
 import Modules.Utils (qualifiedToModuleName)
 import Semantic.Types (SemanticAnn)
@@ -101,6 +106,14 @@ metricsCommand (MetricsCmdArgs includeDeps) = do
     createDirectoryIfMissing True out
     writeFile (out </> "units.csv") (unitsCsv report)
     BL.writeFile (out </> "metrics.json") (metricsJson report)
+    written <- formatTime defaultTimeLocale "%Y-%m-%d %H:%M" <$> getZonedTime
+    let info = manifestProject (loadedManifest project)
+        provenance = Provenance (T.unpack (projectName info) ++ " " ++ T.unpack (projectVersion info)) terminaVersion written
+    BS.writeFile (out </> markFile) terminaMark
+    BS.writeFile (out </> styleFile) styleSheet
+    BS.writeFile (out </> scriptFile) script
+    writeFile (out </> "index.html") (reportPage provenance report)
+    putStrLn (infoMessage ("The metrics report is " ++ ("output" </> "metrics" </> "index.html")))
 
   where
 

@@ -9,7 +9,10 @@ module Metrics.Report
   , moduleMetrics
   , rulesVersion
   , unitLabel
+  , keyLabel
+  , targetLabel
   , kindLabel
+  , allUnits
   , textReport
   , unitsCsv
   , metricsJson

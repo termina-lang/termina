@@ -7,7 +7,9 @@ import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString.Lazy as BL
 
 import Metrics.Coupling
+import Metrics.Html
 import Metrics.Report
+import Utils.HtmlReport (Provenance(..))
 import Pipeline.Common (Failure(..), runProjectArchitecture, runTypedModule)
 import Golden (goldenMetrics)
 
@@ -46,3 +48,9 @@ spec = describe "Reports of the example application" $ do
     rendered (T.pack . unitsCsv) >>= goldenMetrics "csv" "example_units"
   it "Writes the JSON" $
     rendered (TE.decodeUtf8 . BL.toStrict . metricsJson) >>= goldenMetrics "json" "example_metrics"
+  it "Writes the page" $
+    rendered (T.pack . reportPage provenance) >>= goldenMetrics "html" "example_index"
+
+  where
+
+    provenance = Provenance "example 0.1.0" "0.0.0" "2026-01-01 00:00"
