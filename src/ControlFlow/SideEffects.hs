@@ -249,8 +249,8 @@ checkExpression expr = case expr of
   AccessObject obj -> mapM_ checkExpression (indexExpressions obj)
   Constant _ _ -> return ()
   StringInitializer _ _ -> return ()
-  IsEnumVariantExpression {} -> return ()
-  IsMonadicVariantExpression {} -> return ()
+  IsEnumVariantExpression value _ _ _ -> checkExpression value
+  IsMonadicVariantExpression value _ _ -> checkExpression value
 
   where
 

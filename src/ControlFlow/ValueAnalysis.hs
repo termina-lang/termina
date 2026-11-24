@@ -732,7 +732,7 @@ refine True (BinOp RelationalEqual left right ann) =
   refineEquality (getLocation ann) left right
 refine False (BinOp RelationalNotEqual left right ann) =
   refineEquality (getLocation ann) left right
-refine holds cond@(IsEnumVariantExpression obj _enum variant _) | Just cell <- cellOf obj = do
+refine holds cond@(IsEnumVariantExpression (AccessObject obj) _enum variant _) | Just cell <- cellOf obj = do
   range <- rangeOfVariable obj
   let loc = getLocation . getAnnotation $ cond
   if holds
@@ -1228,11 +1228,11 @@ abstractValue global locals (BinOp op left right _) = do
   leftValues <- operandOf global locals left
   rightValues <- operandOf global locals right
   B <$> compareValues op leftValues rightValues
-abstractValue global locals (IsEnumVariantExpression obj _enum variant _) = do
-  values <- valuesIn global locals (AccessObject obj)
+abstractValue global locals (IsEnumVariantExpression value _enum variant _) = do
+  values <- valuesIn global locals value
   B <$> isVariant variant values
-abstractValue global locals (IsMonadicVariantExpression obj label _) = do
-  values <- valuesIn global locals (AccessObject obj)
+abstractValue global locals (IsMonadicVariantExpression value label _) = do
+  values <- valuesIn global locals value
   B <$> isVariant (labelName label) values
 abstractValue _ _ _ = Nothing
 

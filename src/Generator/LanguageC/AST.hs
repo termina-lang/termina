@@ -316,6 +316,7 @@ data CExpression' a =
     | CExprAssign (CObject' a) (CExpression' a) CType a
     | CExprComma (CExpression' a) (CExpression' a) CType a -- ^ sequence expression r1, r2
     | CExprCall (CExpression' a) [CExpression' a] CType a
+    | CExprMember (CExpression' a) Ident CType a -- ^ member of a structure value that is not an object, f().m
     | CExprArrayInitializer [CExpression' a] CType a -- ^ array initializer list { e0, e1, ... }
     | CExprDesignatedInitializer [(Ident, CExpression' a)] CType a -- ^ struct/union initializer { .f0 = e0, .f1 = e1 }
     | CExprCompoundLiteral (CExpression' a) CType a -- ^ compound literal (T){ ... }, the initializer being one of the two above
@@ -336,6 +337,7 @@ instance Annotated CExpression' where
   getAnnotation (CExprAssign _ _ _ a) = a
   getAnnotation (CExprComma _ _ _ a) = a
   getAnnotation (CExprCall _ _ _ a) = a
+  getAnnotation (CExprMember _ _ _ a) = a
   getAnnotation (CExprArrayInitializer _ _ a) = a
   getAnnotation (CExprDesignatedInitializer _ _ a) = a
   getAnnotation (CExprCompoundLiteral _ _ a) = a
@@ -354,6 +356,7 @@ instance Annotated CExpression' where
   updateAnnotation (CExprAssign o e t _) = CExprAssign o e t
   updateAnnotation (CExprComma e1 e2 t _) = CExprComma e1 e2 t
   updateAnnotation (CExprCall e es t _) = CExprCall e es t
+  updateAnnotation (CExprMember e m t _) = CExprMember e m t
   updateAnnotation (CExprArrayInitializer es t _) = CExprArrayInitializer es t
   updateAnnotation (CExprDesignatedInitializer fs t _) = CExprDesignatedInitializer fs t
   updateAnnotation (CExprCompoundLiteral e t _) = CExprCompoundLiteral e t
@@ -373,6 +376,7 @@ getCExprType (CExprAlignOfType _ t _) = t
 getCExprType (CExprAssign _ _ t _) = t
 getCExprType (CExprComma _ _ t _) = t
 getCExprType (CExprCall _ _ t _) = t
+getCExprType (CExprMember _ _ t _) = t
 getCExprType (CExprArrayInitializer _ t _) = t
 getCExprType (CExprDesignatedInitializer _ t _) = t
 getCExprType (CExprCompoundLiteral _ t _) = t

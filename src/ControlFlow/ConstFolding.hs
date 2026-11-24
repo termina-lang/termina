@@ -30,6 +30,12 @@ proven kind reason obligations =
     shown = M.fromList
       [ (oid, Evidence "constant" reason) | Obligation oid@(_, k) _ <- obligations, k == kind ]
 
+-- | The folded initializer of the value that an `is` tests. Only a constant
+-- object has one; a call is never constant.
+testedInitializer :: Expression SemanticAnn -> ConstFoldMonad (Expression SemanticAnn)
+testedInitializer (AccessObject obj) = constInitializerOf obj
+testedInitializer _ = throwError $ annotateError Internal ENotConstant
+
 -- | The folded initializer of a constant object: a named constant, or a field
 -- or an element of one, reached down through the initializers. A name that
 -- holds a value gives it as a literal of the type of the object.
@@ -99,13 +105,13 @@ evalConstExpression (Casting expr' ty ann) = do
         then throwError $ annotateError (getLocation ann) (EConstIntegerOverflow i ty)
         else return $ I constValue (Just ty)
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
-evalConstExpression (IsEnumVariantExpression obj _ variant _) = do
-  initializer <- constInitializerOf obj
+evalConstExpression (IsEnumVariantExpression value _ variant _) = do
+  initializer <- testedInitializer value
   case initializer of
     EnumVariantInitializer _ held _ _ -> return $ B (held == variant)
     _ -> throwError $ annotateError Internal ENotConstant
-evalConstExpression (IsMonadicVariantExpression obj label _) = do
-  initializer <- constInitializerOf obj
+evalConstExpression (IsMonadicVariantExpression value label _) = do
+  initializer <- testedInitializer value
   case initializer of
     MonadicVariantInitializer held _ -> return $ B (holds label held)
     _ -> throwError $ annotateError Internal ENotConstant

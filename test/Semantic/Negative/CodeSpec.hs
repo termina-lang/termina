@@ -301,3 +301,28 @@ spec = do
     forM_ multiCases $ \(code, mods) -> do
       let name = maybe code (\t -> code ++ ": " ++ t) (lookup code titles)
       it name $ compileProjectErrorCode mods `shouldBe` Just (pack code)
+  describe "Semantic: is-variant tests on the value of a call" $
+    forM_ isOnCalls $ \(what, code, src) ->
+      it (code ++ ": " ++ what) $ compileErrorCode src `shouldBe` Just (pack code)
+
+-- | A variant test on the value of a call, with the error that its type gives.
+isOnCalls :: [(String, String, String)]
+isOnCalls =
+  [ ("an enum variant on a call that gives back an integer", "SE-151", withCall "u32" "v" "count(v) is Mode::On")
+  , ("an Option variant on a call that gives back an integer", "SE-152", withCall "u32" "v" "count(v) is None")
+  , ("a variant of another enum on a call", "SE-153", withCall "Level" "level" "count(v) is Mode::On")
+  ]
+
+  where
+
+    withCall ty value test =
+      "enum Mode {\n    On,\n    Off\n};\n" ++
+      "enum Level {\n    Low,\n    High\n};\n" ++
+      "function count(v : u32) -> " ++ ty ++ " {\n" ++
+      "    var level : Level = Level::Low;\n" ++
+      "    if (v > 0 : u32) {\n        level = Level::High;\n    }\n" ++
+      "    return " ++ value ++ ";\n}\n" ++
+      "function f(v : u32) -> u32 {\n" ++
+      "    var x : u32 = 0 : u32;\n" ++
+      "    if (" ++ test ++ ") {\n        x = 1 : u32;\n    }\n" ++
+      "    return x;\n}"

@@ -56,6 +56,38 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "VAE-001")
 
+    it "VAE-001: variant test on a call whose function gives back one variant" $ do
+      let src = "enum Mode {\n" ++
+                "    On,\n" ++
+                "    Off\n" ++
+                "};\n" ++
+                "function mode() -> Mode {\n" ++
+                "    var m : Mode = Mode::Off;\n" ++
+                "    return m;\n" ++
+                "}\n" ++
+                "function f() -> u32 {\n" ++
+                "    var x : u32 = 0 : u32;\n" ++
+                "    if (mode() is Mode::On) {\n" ++
+                "        x = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return x;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
+
+    it "VAE-001: Option test on a call whose function gives back None" $ do
+      let src = "function reading() -> Option<u32> {\n" ++
+                "    var r : Option<u32> = None;\n" ++
+                "    return r;\n" ++
+                "}\n" ++
+                "function f() -> u32 {\n" ++
+                "    var x : u32 = 0 : u32;\n" ++
+                "    if (reading() is Some) {\n" ++
+                "        x = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return x;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "VAE-001")
+
     it "VAE-001: condition that reads a local whose value is known" $ do
       let src = "function f() -> u32 {\n" ++
                 "    var x : u32 = 0 : u32;\n" ++

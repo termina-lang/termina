@@ -102,12 +102,12 @@ rewriteExpression r expr = case expr of
       <$> onAnnotation r ann <*> onObject r obj
   Casting inner ty ann ->
     (\ann' inner' -> Casting inner' ty ann') <$> onAnnotation r ann <*> onExpression r inner
-  IsEnumVariantExpression obj enum variant ann ->
-    (\ann' obj' -> IsEnumVariantExpression obj' enum variant ann')
-      <$> onAnnotation r ann <*> onObject r obj
-  IsMonadicVariantExpression obj label ann ->
-    (\ann' obj' -> IsMonadicVariantExpression obj' label ann')
-      <$> onAnnotation r ann <*> onObject r obj
+  IsEnumVariantExpression value enum variant ann ->
+    (\ann' value' -> IsEnumVariantExpression value' enum variant ann')
+      <$> onAnnotation r ann <*> onExpression r value
+  IsMonadicVariantExpression value label ann ->
+    (\ann' value' -> IsMonadicVariantExpression value' label ann')
+      <$> onAnnotation r ann <*> onExpression r value
   ArraySliceExpression ak obj lower upper ann ->
     (\ann' obj' lower' upper' -> ArraySliceExpression ak obj' lower' upper' ann')
       <$> onAnnotation r ann <*> onObject r obj

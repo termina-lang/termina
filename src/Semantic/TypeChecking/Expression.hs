@@ -447,9 +447,26 @@ memberRootTy getVarTy loc ident =
 
 -- | The type of a tested object without its constant mark, and the type of
 -- the test, which is a constant when the object is.
-testedTy :: (AccessKind, SAST.TerminaType SemanticAnn) -> (SAST.TerminaType SemanticAnn, SAST.TerminaType SemanticAnn)
-testedTy (_, TConstSubtype ty) = (ty, TConstSubtype TBool)
-testedTy (_, ty) = (ty, TBool)
+testedTy :: SAST.TerminaType SemanticAnn -> (SAST.TerminaType SemanticAnn, SAST.TerminaType SemanticAnn)
+testedTy (TConstSubtype ty) = (ty, TConstSubtype TBool)
+testedTy ty = (ty, TBool)
+
+-- | The value that an `is` tests, typed, with its type and the type of the
+-- test. An object is typed as an object, and any other value as an expression.
+typeTestedValue ::
+  (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
+  -> Expression ParserAnn
+  -> SemanticMonad (SAST.Expression SemanticAnn, SAST.TerminaType SemanticAnn, SAST.TerminaType SemanticAnn)
+typeTestedValue typeObj value =
+  case value of
+    AccessObject obj -> do
+      obj_typed <- typeObj obj
+      (ty, test_ty) <- testedTy . snd <$> getObjType obj_typed
+      return (SAST.AccessObject obj_typed, ty, test_ty)
+    _ -> do
+      value_typed <- typeExpression Nothing typeObj value
+      (ty, test_ty) <- testedTy <$> getExprType value_typed
+      return (value_typed, ty, test_ty)
 
 typeObject ::
   -- | Scope of variables. It returns its access kind (mutable or immutable) and its type
@@ -1612,9 +1629,8 @@ typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann)
       checkExpectedTy (getLocation ann) expectedType fty
       return $ SAST.DerefMemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)
     ty -> throwError $ annotateError (getLocation ann) $ EDereferenceInvalidType ty
-typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_id pann) = do
-  obj_typed <- typeObj obj
-  (obj_ty, test_ty) <- testedTy <$> getObjType obj_typed
+typeExpression expectedType typeObj (IsEnumVariantExpression value id_ty variant_id pann) = do
+  (value_typed, obj_ty, test_ty) <- typeTestedValue typeObj value
   lhs_decl <- case obj_ty of
     TEnum lhs_id -> do
       unless (lhs_id == id_ty) (throwError $ annotateError (getLocation pann) (EIsVariantEnumTypeMismatch lhs_id id_ty))
@@ -1625,10 +1641,10 @@ typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_i
       case Data.List.find ((variant_id ==) . variantIdentifier) ty_vs of
         Just (EnumVariant {}) -> do
           checkExpectedTy (getLocation pann) expectedType test_ty
-          return $ SAST.IsEnumVariantExpression obj_typed id_ty variant_id (buildExpAnn pann test_ty)
+          return $ SAST.IsEnumVariantExpression value_typed id_ty variant_id (buildExpAnn pann test_ty)
         Nothing -> throwError $ annotateError (getLocation pann) (EEnumVariantNotFound lhs_enum variant_id)
     _ -> throwError $ annotateError Internal EExpectedEnumType
-typeExpression expectedType typeObj (IsMonadicVariantExpression obj variant_id pann) = do
+typeExpression expectedType typeObj (IsMonadicVariantExpression value variant_id pann) = do
   case variant_id of
     NoneLabel -> typeOptionVariant
     SomeLabel -> typeOptionVariant
@@ -1641,32 +1657,29 @@ typeExpression expectedType typeObj (IsMonadicVariantExpression obj variant_id p
 
     typeOptionVariant :: SemanticMonad (SAST.Expression SemanticAnn)
     typeOptionVariant = do
-      obj_typed <- typeObj obj
-      (obj_ty, test_ty) <- testedTy <$> getObjType obj_typed
+      (value_typed, obj_ty, test_ty) <- typeTestedValue typeObj value
       case obj_ty of
         (TOption {}) -> do
           checkExpectedTy (getLocation pann) expectedType test_ty
-          return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann test_ty)
+          return $ SAST.IsMonadicVariantExpression value_typed variant_id (buildExpAnn pann test_ty)
         _ -> throwError $ annotateError (getLocation pann) (EIsOptionVariantInvalidType obj_ty)
 
     typeStatusVariant :: SemanticMonad (SAST.Expression SemanticAnn)
     typeStatusVariant = do
-      obj_typed <- typeObj obj
-      (obj_ty, test_ty) <- testedTy <$> getObjType obj_typed
+      (value_typed, obj_ty, test_ty) <- typeTestedValue typeObj value
       case obj_ty of
         (TStatus {}) -> do
           checkExpectedTy (getLocation pann) expectedType test_ty
-          return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann test_ty)
+          return $ SAST.IsMonadicVariantExpression value_typed variant_id (buildExpAnn pann test_ty)
         _ -> throwError $ annotateError (getLocation pann) (EIsStatusVariantInvalidType obj_ty)
 
     typeResultVariant :: SemanticMonad (SAST.Expression SemanticAnn)
     typeResultVariant = do
-      obj_typed <- typeObj obj
-      (obj_ty, test_ty) <- testedTy <$> getObjType obj_typed
+      (value_typed, obj_ty, test_ty) <- typeTestedValue typeObj value
       case obj_ty of
         (TResult {}) -> do
           checkExpectedTy (getLocation pann) expectedType test_ty
-          return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann test_ty)
+          return $ SAST.IsMonadicVariantExpression value_typed variant_id (buildExpAnn pann test_ty)
         _ -> throwError $ annotateError (getLocation pann) (EIsResultVariantInvalidType obj_ty)
 
 typeExpression _ _ (StructInitializer _ _ pann) = throwError $ annotateError (getLocation pann) EStructInitializerInvalidUse

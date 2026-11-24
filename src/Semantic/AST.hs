@@ -76,12 +76,12 @@ data Expression
   | MonadicVariantInitializer (MonadicVariant a) a
   | StringInitializer String a -- ^ String literal
   | IsEnumVariantExpression
-    (Object a) -- ^ Enum object
+    (Expression a) -- ^ Enum value
     Identifier -- ^ Enum identifier
     Identifier -- ^ Variant identifier a
     a
   | IsMonadicVariantExpression
-    (Object a) -- ^ Opion object
+    (Expression a) -- ^ Option, Status or Result value
     MonadicVariantLabel -- ^ Variant label
     a
   | ArraySliceExpression AccessKind (Object a) (Expression a) (Expression a) a
@@ -131,8 +131,8 @@ semanticTree = Tree children node
       BinOp _ left right _ -> [ChildExpr left, ChildExpr right]
       ReferenceExpression ak obj _ -> [ChildReference ak obj]
       Casting inner _ _ -> [ChildExpr inner]
-      IsEnumVariantExpression obj _ _ _ -> [ChildObject obj]
-      IsMonadicVariantExpression obj _ _ -> [ChildObject obj]
+      IsEnumVariantExpression value _ _ _ -> [ChildExpr value]
+      IsMonadicVariantExpression value _ _ -> [ChildExpr value]
       ArraySliceExpression ak obj lower upper _ ->
         [ChildReference ak obj, ChildExpr lower, ChildExpr upper]
       MemberFunctionCall obj _ args _ -> ChildObject obj : map ChildArg args

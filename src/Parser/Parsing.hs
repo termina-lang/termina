@@ -695,67 +695,30 @@ enumVariantExprParser = do
     option [] (parens (sepBy (try expressionParser) comma))
   EnumVariantInitializer enum variant parameterList . located current startPos <$> getPosition
 
-isEnumVariantExprParser :: TerminaParser (Expression ParserAnn)
-isEnumVariantExprParser = do
+-- | A test of the variant of a value: an object, a call or an expression in
+-- parentheses, `is`, and the variant of an enum or of an Option, a Status or a
+-- Result.
+isVariantExprParser :: TerminaParser (Expression ParserAnn)
+isVariantExprParser = do
   current <- getState
   startPos <- getPosition
-  object <- objectParser
+  value <- try functionCallParser <|> try accessObjectParser <|> parensExprParser
   _ <- reserved "is"
-  enum <- identifierParser
-  _ <- reservedOp "::"
-  variant <- identifierParser
-  IsEnumVariantExpression object enum variant . located current startPos <$> getPosition
+  test <- (IsMonadicVariantExpression value <$> monadicLabel)
+    <|> (IsEnumVariantExpression value <$> identifierParser <* reservedOp "::" <*> identifierParser)
+  test . located current startPos <$> getPosition
 
-isMonadicVariantExprParser :: TerminaParser (Expression ParserAnn)
-isMonadicVariantExprParser =
-  try (do
-    current <- getState
-    startPos <- getPosition
-    object <- objectParser
-    _ <- reserved "is"
-    _ <- reserved "None"
-    IsMonadicVariantExpression object NoneLabel . located current startPos <$> getPosition) <|>
-  try (do
-    current <- getState
-    startPos <- getPosition
-    object <- objectParser
-    _ <- reserved "is"
-    _ <- reserved "Some"
-    IsMonadicVariantExpression object SomeLabel . located current startPos <$> getPosition) <|>
-  try (do
-    current <- getState
-    startPos <- getPosition
-    object <- objectParser
-    _ <- reserved "is"
-    _ <- reserved "Ok"
-    IsMonadicVariantExpression object OkLabel . located current startPos <$> getPosition) <|>
-  try (do
-    current <- getState
-    startPos <- getPosition
-    object <- objectParser
-    _ <- reserved "is"
-    _ <- reserved "Error"
-    IsMonadicVariantExpression object ErrorLabel . located current startPos <$> getPosition) <|>
-  try (do
-    current <- getState
-    startPos <- getPosition
-    object <- objectParser
-    _ <- reserved "is"
-    _ <- reserved "Success"
-    IsMonadicVariantExpression object SuccessLabel . located current startPos <$> getPosition) <|>
-  (do
-    current <- getState
-    startPos <- getPosition
-    object <- objectParser
-    _ <- reserved "is"
-    _ <- reserved "Failure"
-    IsMonadicVariantExpression object FailureLabel . located current startPos <$> getPosition)
+  where
+
+    monadicLabel = choice
+      [ NoneLabel <$ reserved "None", SomeLabel <$ reserved "Some"
+      , OkLabel <$ reserved "Ok", ErrorLabel <$ reserved "Error"
+      , SuccessLabel <$ reserved "Success", FailureLabel <$ reserved "Failure" ]
 
 expressionParser :: TerminaParser (Expression ParserAnn)
 expressionParser = try builtinVariantExprParser
   <|> try enumVariantExprParser
   <|> try mutableReferenceExprParser
-  <|> try isMonadicVariantExprParser
   <|> try arrayExprListInitializerParser
   <|> arrayInitializerParser
   <|> referenceExprParser
@@ -780,7 +743,7 @@ referenceExprParser = do
   ReferenceExpression Immutable object . located current startPos <$> getPosition
 
 expressionTermParser :: TerminaParser (Expression ParserAnn)
-expressionTermParser = try isEnumVariantExprParser
+expressionTermParser = try isVariantExprParser
   <|> try constantParser
   <|> try functionCallParser
   <|> try accessObjectParser
