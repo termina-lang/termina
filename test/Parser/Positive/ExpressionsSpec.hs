@@ -101,7 +101,34 @@ spec = describe "Parser: expressions" $ do
   describe "enum variant test" $
     it "parses an 'is' enum variant test" $
       expr "x is Colour::Red" `shouldSatisfy` \case
-        Right (IsEnumVariantExpression _ "Colour" "Red" _) -> True; _ -> False
+        Right (IsEnumVariantExpression (AccessObject _) "Colour" "Red" _) -> True; _ -> False
+
+  describe "'is' on a value that is not an object" $ do
+    it "parses an enum variant test on a call" $
+      expr "f(x) is Colour::Red" `shouldSatisfy` \case
+        Right (IsEnumVariantExpression (FunctionCall "f" _ _) "Colour" "Red" _) -> True; _ -> False
+    it "parses a monadic variant test on a method call" $
+      expr "self->m(x) is None" `shouldSatisfy` \case
+        Right (IsMonadicVariantExpression (DerefMemberFunctionCall _ "m" _ _) NoneLabel _) -> True; _ -> False
+    it "parses a monadic variant test on a call through '.'" $
+      expr "p.m() is Some" `shouldSatisfy` \case
+        Right (IsMonadicVariantExpression (MemberFunctionCall _ "m" _ _) SomeLabel _) -> True; _ -> False
+    it "parses a variant test on an expression in parentheses" $
+      expr "(f(x)) is Success" `shouldSatisfy` \case
+        Right (IsMonadicVariantExpression (FunctionCall "f" _ _) SuccessLabel _) -> True; _ -> False
+    it "keeps an object as the object it is" $
+      expr "x is None" `shouldSatisfy` \case
+        Right (IsMonadicVariantExpression (AccessObject _) NoneLabel _) -> True; _ -> False
+    it "rejects a constant" $
+      expr "3 is None" `shouldSatisfy` \case Left _ -> True; _ -> False
+
+  describe "'is' as an operand" $ do
+    it "parses two monadic variant tests joined by '&&' without parentheses" $
+      expr "a is None && b is Some" `shouldSatisfy` \case
+        Right (BinOp LogicalAnd (IsMonadicVariantExpression _ NoneLabel _) (IsMonadicVariantExpression _ SomeLabel _) _) -> True; _ -> False
+    it "parses tests on calls joined by '&&' and '||'" $
+      expr "f() is E::A && g() is None || h() is Ok" `shouldSatisfy` \case
+        Right (BinOp LogicalOr (BinOp LogicalAnd (IsEnumVariantExpression {}) (IsMonadicVariantExpression {}) _) (IsMonadicVariantExpression _ OkLabel _) _) -> True; _ -> False
 
   describe "initializers" $ do
     it "parses a struct initializer" $

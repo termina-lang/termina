@@ -51,8 +51,8 @@ data Expression a
   | EnumVariantInitializer Identifier Identifier [Expression a] a
   | MonadicVariantInitializer (MonadicVariant' Expression a) a
   | StringInitializer String a
-  | IsEnumVariantExpression (Object a) Identifier Identifier a
-  | IsMonadicVariantExpression (Object a) MonadicVariantLabel a
+  | IsEnumVariantExpression (Expression a) Identifier Identifier a
+  | IsMonadicVariantExpression (Expression a) MonadicVariantLabel a
   -- | An array slice whose bounds go through the slice check.
   | CheckedArraySlice AccessKind (Object a) (Expression a) (Expression a) a
   -- | An array slice whose bounds are known to fall inside the array.
@@ -75,8 +75,8 @@ elaboratedTree = Tree children node
       UncheckedBinOp _ left right _ -> [ChildExpr left, ChildExpr right]
       ReferenceExpression ak obj _ -> [ChildReference ak obj]
       Casting inner _ _ -> [ChildExpr inner]
-      IsEnumVariantExpression obj _ _ _ -> [ChildObject obj]
-      IsMonadicVariantExpression obj _ _ -> [ChildObject obj]
+      IsEnumVariantExpression value _ _ _ -> [ChildExpr value]
+      IsMonadicVariantExpression value _ _ -> [ChildExpr value]
       CheckedArraySlice ak obj lower upper _ ->
         [ChildReference ak obj, ChildExpr lower, ChildExpr upper]
       UncheckedArraySlice ak obj lower upper _ ->

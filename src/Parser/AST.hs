@@ -88,12 +88,12 @@ data Expression
   | MonadicVariantInitializer (MonadicVariant a) a
   | StringInitializer String a -- ^ String literal
   | IsEnumVariantExpression
-    (Object a) -- ^ Enum object
+    (Expression a) -- ^ Enum value
     Identifier -- ^ Enum identifier
     Identifier -- ^ Variant identifier a
     a
   | IsMonadicVariantExpression
-    (Object a) -- ^ Option object
+    (Expression a) -- ^ Option, Status or Result value
     MonadicVariantLabel -- ^ Variant label
     a
   deriving (Show, Functor, Foldable)

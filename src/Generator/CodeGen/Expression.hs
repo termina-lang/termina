@@ -576,6 +576,17 @@ genBinOp' checked op left right ann =
 
     loc = getLocation ann
 
+-- | The variant field of the value that an `is` tests: a field of the object,
+-- or a member of the value of a call, which reads a scalar and so is allowed
+-- by MISRA C:2023 Rule 18.9.
+genTestedVariant :: Expression SemanticAnn -> SemanticAnn -> CGenerator CExpression
+genTestedVariant (AccessObject obj) ann = do
+    cObj <- genObject obj
+    return $ cObj @. variant @: enumFieldType |>> getLocation ann
+genTestedVariant value ann = do
+    cValue <- genExpression value
+    return $ CExprMember cValue variant enumFieldType (internalAnn CGenericAnn) |>> getLocation ann
+
 genExpression :: Expression SemanticAnn -> CGenerator CExpression
 genExpression (AccessObject obj) = do
     cObj <- genObject obj
@@ -631,15 +642,13 @@ genExpression (MemberFunctionCall obj ident args ann) = do
     genMemberFunctionAccess obj ident args ann
 genExpression (DerefMemberFunctionCall obj ident args ann) =
     genMemberFunctionAccess obj ident args ann
-genExpression (IsEnumVariantExpression obj enum this_variant ann) = do
-    cObj <- genObject obj
-    let leftExpr = cObj @. variant @: enumFieldType |>> getLocation ann
+genExpression (IsEnumVariantExpression value enum this_variant ann) = do
+    leftExpr <- genTestedVariant value ann
     let rightExpr = (enum <::> this_variant) @: enumFieldType |>> getLocation ann
     return $ leftExpr @== rightExpr |>> getLocation ann
-genExpression (IsMonadicVariantExpression obj this_variant ann) = do
-    cObj <- genObject obj
-    let leftExpr = cObj @. variant @: enumFieldType |>> getLocation ann
-    let rightExpr = case this_variant of 
+genExpression (IsMonadicVariantExpression value this_variant ann) = do
+    leftExpr <- genTestedVariant value ann
+    let rightExpr = case this_variant of
             NoneLabel -> optionNoneTag @: enumFieldType |>> getLocation ann
             SomeLabel -> optionSomeTag @: enumFieldType |>> getLocation ann
             SuccessLabel -> statusSuccessTag @: enumFieldType |>> getLocation ann

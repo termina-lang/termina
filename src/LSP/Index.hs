@@ -273,9 +273,9 @@ exprRefs locals (SAST.EnumVariantInitializer ident _ args ann) =
     Ref (getLocation ann) (TopLevel ident) : concatMap (exprRefs locals) args
 exprRefs locals (SAST.MonadicVariantInitializer variant _) = variantRefs locals variant
 exprRefs _ (SAST.StringInitializer _ _) = []
-exprRefs locals (SAST.IsEnumVariantExpression obj ident _ ann) =
-    Ref (getLocation ann) (TopLevel ident) : objRefs locals obj
-exprRefs locals (SAST.IsMonadicVariantExpression obj _ _) = objRefs locals obj
+exprRefs locals (SAST.IsEnumVariantExpression value ident _ ann) =
+    Ref (getLocation ann) (TopLevel ident) : exprRefs locals value
+exprRefs locals (SAST.IsMonadicVariantExpression value _ _) = exprRefs locals value
 exprRefs locals (SAST.ArraySliceExpression _ obj from to _) =
     objRefs locals obj ++ exprRefs locals from ++ exprRefs locals to
 

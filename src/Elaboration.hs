@@ -205,8 +205,8 @@ elabExpr d e = case e of
   LAST.EnumVariantInitializer enum variant args ann -> EnumVariantInitializer enum variant <$> mapM expr args <*> pure ann
   LAST.MonadicVariantInitializer variant ann -> MonadicVariantInitializer <$> monadic variant <*> pure ann
   LAST.StringInitializer str ann -> pure (StringInitializer str ann)
-  LAST.IsEnumVariantExpression obj enum variant ann -> (\o -> IsEnumVariantExpression o enum variant ann) <$> object obj
-  LAST.IsMonadicVariantExpression obj label ann -> (\o -> IsMonadicVariantExpression o label ann) <$> object obj
+  LAST.IsEnumVariantExpression value enum variant ann -> (\v -> IsEnumVariantExpression v enum variant ann) <$> expr value
+  LAST.IsMonadicVariantExpression value label ann -> (\v -> IsMonadicVariantExpression v label ann) <$> expr value
   LAST.ArraySliceExpression ak obj lower upper ann -> do
     unchecked <- d (expressionChecks e)
     (if unchecked then UncheckedArraySlice else CheckedArraySlice) ak

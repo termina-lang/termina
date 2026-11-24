@@ -37,6 +37,36 @@ test1 = "enum Message {\n" ++
         "    return ret;\n" ++
         "}"
 
+test2 :: String
+test2 = "enum Mode {\n" ++
+        "    On,\n" ++
+        "    Off\n" ++
+        "};\n" ++
+        "\n" ++
+        "function mode(v : u32) -> Mode {\n" ++
+        "    var m : Mode = Mode::Off;\n" ++
+        "    if v > 0 : u32 {\n" ++
+        "        m = Mode::On;\n" ++
+        "    }\n" ++
+        "    return m;\n" ++
+        "}\n" ++
+        "\n" ++
+        "function reading(v : u32) -> Option<u32> {\n" ++
+        "    var r : Option<u32> = None;\n" ++
+        "    if v > 1 : u32 {\n" ++
+        "        r = Some(v);\n" ++
+        "    }\n" ++
+        "    return r;\n" ++
+        "}\n" ++
+        "\n" ++
+        "function match_test2(v : u32) -> u32 {\n" ++
+        "    var ret : u32 = 0 : u32;\n" ++
+        "    if mode(v) is Mode::On && reading(v) is Some {\n" ++
+        "        ret = 1 : u32;\n" ++
+        "    }\n" ++
+        "    return ret;\n" ++
+        "}"
+
 spec :: Spec
 spec = do
   describe "Code generation for is-variant expressions" $ do
@@ -134,3 +164,6 @@ spec = do
               "    return ret;\n" ++
               "\n" ++
               "}\n")
+    it "Generates is-variant tests on the values of calls" $ do
+      renderSource test2 `shouldSatisfy` isInfixOf
+        (pack "    if (mode(v)._variant == Mode__On && reading(v)._variant == Option__Some) {\n")

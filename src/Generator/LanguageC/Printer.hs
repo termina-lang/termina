@@ -340,6 +340,9 @@ instance CPrint CExpression where
         pexpr <- pprintPrec 26 expr
         pargs <- mapM (pprintPrec 2) args
         return $ parenPrec p 26 $ pexpr <> parens (align (fillSep (punctuate comma pargs)))
+    pprintPrec p (CExprMember expr member _ _) = do
+        pexpr <- pprintPrec 26 expr
+        return $ parenPrec p 26 $ pexpr <> pretty "." <> pretty member
     pprintPrec _ (CExprArrayInitializer exprs _ _) = do
         pexprs <- mapM (pprintPrec 2) exprs
         return $ braces (space <> align (fillSep (punctuate comma pexprs)) <> space)
