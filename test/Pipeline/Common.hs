@@ -18,6 +18,7 @@ module Pipeline.Common
   , compileTestErrorCode
   , compileTestProjectErrorCode
   , runTestArchitecture
+  , runProjectArchitecture
   , runTestApp
   , runTestBuild
   , runTestDescriptor
@@ -184,6 +185,10 @@ runProjectPipelineOn plt cfg sources = do
   checked <- checkedOrFailure files (snd (checkModules cfg plt S.empty parsedProject ordered))
   pure (PipelineResult (checkedLowered checked) ordered (checkedArchitecture checked)
     (checkedElaborated checked) (checkedReports checked) (checkedMonadicTypes checked))
+
+-- | The architecture of a project after its checks.
+runProjectArchitecture :: [(QualifiedName, String)] -> Either Failure (TerminaProgArch SemanticAnn)
+runProjectArchitecture sources = programArch <$> runProjectPipeline configParams sources
 
 -- | The modules of a project that keep their types after its checks, and the
 -- code of the error that stops them.

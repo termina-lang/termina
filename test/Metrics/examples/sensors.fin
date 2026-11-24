@@ -41,7 +41,7 @@ resource class CSensor provides ISensor {
                 } else if (v == 0 || v == 0xFFFF) {
                     self->status = SensorStatus::Fault;
                 } else {
-                    self->last = v;
+                    self->last = self->last / 2 + v / 2;
                 }
             }
             case None => {

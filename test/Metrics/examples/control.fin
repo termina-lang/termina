@@ -1,0 +1,50 @@
+import example.sensors;
+
+function scale(x : u16) -> u16 {
+    return x / 2;
+}
+
+function filter(x : u16, offset : u16) -> u16 {
+    return scale(x + offset);
+}
+
+resource class CFakeSensor provides ISensor {
+    last : u16;
+
+    procedure update(&mut self, value : Option<u16>) {
+        match value {
+            case Some(v) => {
+                self->last = self->last / 2 + v / 2;
+            }
+            case None => {
+                self->last = 0;
+            }
+        }
+        return;
+    }
+};
+
+task class CControl {
+    sensor : access ISensor;
+    out_ch : out u16;
+    timer : sink TimeVal triggers sample;
+    count : u16;
+
+    action sample(&priv self, _t : TimeVal) {
+        let v : u16 = filter(self->count, 1);
+        let reading : Option<u16> = Some(v);
+        self->sensor.update(reading);
+        self->out_ch.send(v);
+        return;
+    }
+};
+
+task class CLogger {
+    data_in : in u16 triggers log;
+    total : u16;
+
+    action log(&priv self, x : u16) {
+        self->total = self->total + x;
+        return;
+    }
+};
