@@ -156,7 +156,7 @@ plainErrorAt src =
 -- with the position of the error.
 errorsInDocumented :: [(String, [String], (Int, Int))]
 errorsInDocumented =
-  [ ("a function", ["/// Doc.", "function f() -> bool {", "    return g() is E::A;", "}"], (3, 16))
+  [ ("a function", ["/// Doc.", "function f() -> u32 {", "    return x + ;", "}"], (3, 16))
   , ("a function, at its second token", ["/// Doc.", "function 1f() { return; }"], (2, 10))
   , ("an extern function", ["/// Doc.", "extern function f(x : ) -> u8;"], (2, 23))
   , ("a global constant", ["/// Doc.", "const a : u32 = ;"], (2, 17))
