@@ -230,7 +230,29 @@ docBefore p = do
   doc <- optionMaybe (docComment DocBefore)
   case doc of
     Nothing -> (Nothing,) <$> p
-    Just _ -> ((doc,) <$> p) <|> failAt pos (misplacedDocComment DocBefore)
+    Just _ -> do
+      start <- getPosition
+      (doc,) <$> afterDocComment pos start p
+
+-- | The element after a documentation comment, given where the comment and the
+-- element start. If the element fails right where it starts, nothing follows
+-- the comment and the error is reported at the comment; otherwise the error
+-- is that of the element.
+afterDocComment :: SourcePos -> SourcePos -> TerminaParser a -> TerminaParser a
+afterDocComment comment start p = P.mkPT $ \state -> do
+  outcome <- P.runParsecT p state
+  case outcome of
+    P.Empty reply -> do
+      r <- reply
+      return (if failsAtStart r then misplaced else P.Empty (return r))
+    P.Consumed _ -> return outcome
+
+  where
+
+    failsAtStart (P.Error err) = PE.errorPos err <= start
+    failsAtStart _ = False
+
+    misplaced = P.Consumed (return (P.Error (PE.newErrorMessage (PE.Message (misplacedDocComment DocBefore)) comment)))
 
 -- | An element with its documentation comment before it in its annotation.
 documented :: Annotated f => TerminaParser (f ParserAnn) -> TerminaParser (f ParserAnn)

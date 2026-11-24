@@ -11,6 +11,7 @@ import Core.AST (DocPlacement(..))
 import Utils.Annotations (AnnotatedError(..))
 import Text.Parsec (errorPos, sourceLine, sourceColumn)
 import Text.Parsec.Error (errorMessages, messageString)
+import qualified Data.List as L
 
 import Test.Hspec
 
@@ -84,6 +85,13 @@ misplaced =
   , ("a comment after a method", ["resource class C provides I {", "    method m(&priv self) { return; } ///< A method.", "};"], (DocAfter, 2, 38))
   , ("a comment after an interface procedure", ["interface I {", "    procedure p(&mut self); ///< A procedure.", "};"], (DocAfter, 2, 29))
   , ("a comment after the brace of a branch", ["function f(v : u32) {", "    if (v == 0) { ///< First.", "        return;", "    }", "    return;", "}"], (DocAfter, 2, 19))
+  , ("a comment that no statement of a branch follows", ["function f(v : u32) {", "    if (v == 0) {", "        return;", "        /// Nothing.", "    }", "    return;", "}"], (DocBefore, 4, 9))
+  , ("a comment that no field follows", ["struct S {", "    x : u32;", "    /// Nothing.", "};"], (DocBefore, 3, 5))
+  , ("a comment that no variant follows", ["enum E {", "    A", "    /// Nothing.", "};"], (DocBefore, 3, 5))
+  , ("a comment that no procedure follows", ["interface I {", "    procedure p(&mut self);", "    /// Nothing.", "};"], (DocBefore, 3, 5))
+  , ("a comment that no member follows", ["resource class C provides I {", "    method m(&priv self) { return; }", "    /// Nothing.", "};"], (DocBefore, 3, 5))
+  , ("a comment before what is not an element", ["/// Doc.", "123;"], (DocBefore, 1, 1))
+  , ("a comment before an element that does not start", ["function f() {", "    /// Doc.", "    = 1;", "}"], (DocBefore, 2, 5))
   ]
 
 -- | The line and column of the second documentation comment of an element, or
@@ -134,8 +142,48 @@ docTagErrors =
   , ("text after the tags", ["/**", " * Summary.", " * @pre Never.", " *", " * Loose text.", " */", "function f() { return; }"], ("EMalformedDocTag TextAfterTags", (5, 4)))
   ]
 
+-- | The line and column of a parse error that is not about documentation
+-- comments, or Nothing if the module parses or fails for another reason.
+plainErrorAt :: [String] -> Maybe (Int, Int)
+plainErrorAt src =
+  case parseTerminaModule "test" "test" (unlines src) of
+    Left err -> case parseError err of
+      EParseError _ -> Just (sourceLine (errorPos err), sourceColumn (errorPos err))
+      _ -> Nothing
+    Right _ -> Nothing
+
+-- | One module per kind of documented element with a parse error inside it,
+-- with the position of the error.
+errorsInDocumented :: [(String, [String], (Int, Int))]
+errorsInDocumented =
+  [ ("a function", ["/// Doc.", "function f() -> bool {", "    return g() is E::A;", "}"], (3, 16))
+  , ("a function, at its second token", ["/// Doc.", "function 1f() { return; }"], (2, 10))
+  , ("an extern function", ["/// Doc.", "extern function f(x : ) -> u8;"], (2, 23))
+  , ("a global constant", ["/// Doc.", "const a : u32 = ;"], (2, 17))
+  , ("a struct", ["/// Doc.", "struct S {", "    x : u32", "};"], (4, 1))
+  , ("a statement", ["function f() {", "    /// Doc.", "    let x : u8 = ;", "}"], (3, 18))
+  , ("a statement in a branch", ["function f(v : u32) {", "    if (v == 0) {", "        /// Doc.", "        let x : u8 = ;", "    }", "    return;", "}"], (4, 22))
+  , ("a case of a match", [ "function f(o : Option<u32>) -> u32 {", "    var r : u32 = 0;", "    match o {", "        /// Doc."
+                          , "        case Some(x) => { r = ; }", "        case None => { r = 1; }", "    }", "    return r;", "}" ], (5, 29))
+  , ("a field", ["struct S {", "    /// Doc.", "    x : ;", "};"], (3, 9))
+  , ("a variant", ["enum E {", "    /// Doc.", "    A(,", "};"], (3, 7))
+  , ("an interface procedure", ["interface I {", "    /// Doc.", "    procedure p(&mut self, x : );", "};"], (3, 32))
+  , ("a method", ["resource class C provides I {", "    /// Doc.", "    method m(&priv self) { return 1 + ; }", "};"], (3, 39))
+  , ("a field of a class", ["resource class C provides I {", "    /// Doc.", "    x : ;", "};"], (3, 9))
+  , ("a port", ["task class T {", "    /// Doc.", "    i : in u32 triggers ;", "    action a(&priv self, v : u32) { return; }", "};"], (3, 25))
+  ]
+
+-- | A module with its documentation comments, which take a line of their own
+-- in 'errorsInDocumented', blanked, so that the other lines keep their place.
+withoutDocs :: [String] -> [String]
+withoutDocs = map (\line -> if "///" `L.isPrefixOf` dropWhile (== ' ') line then "" else line)
+
 spec :: Spec
 spec = describe "Parser stage: error detail" $ do
+  describe "PE-001 points at the error inside a documented element" $
+    mapM_ (\(what, src, expected) -> it ("for " ++ what) $ plainErrorAt src `shouldBe` Just expected) errorsInDocumented
+  describe "A documented element fails as it does without its comment" $
+    mapM_ (\(what, src, _) -> it ("for " ++ what) $ plainErrorAt src `shouldBe` plainErrorAt (withoutDocs src)) errorsInDocumented
   describe "PE-011 and PE-012 point at the tag" $
     mapM_ (\(what, src, (expected, pos)) -> it ("for " ++ what) $
       fmap (\(e, p) -> (show e, p)) (docTagErrorAt src) `shouldBe` Just (expected, pos)) docTagErrors
