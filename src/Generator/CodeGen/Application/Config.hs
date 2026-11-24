@@ -4,7 +4,9 @@ import Generator.LanguageC.AST
 import qualified Data.Map.Strict as M
 import Generator.LanguageC.Embedded
 import Generator.CodeGen.Common
-import Configuration.Platform (Platform, interruptTableSize)
+import Configuration.Platform (Platform, interruptTableSize, defaultStackSize)
+import Core.AST (TInteger(..))
+import Data.Maybe (fromMaybe)
 import Control.Monad.Except (MonadError(throwError), runExceptT)
 import Control.Monad.Reader (runReader)
 import Data.Text (unpack)
@@ -63,6 +65,14 @@ genConfigFile mName config progArchitecture = do
 
     plt <- gets targetPlatform
 
+    -- | Stack of each task, at least the default one of the platform, which on
+    -- RTEMS is the minimum that the kernel gives any task
+    let defaultSize = defaultStackSize plt
+    harnessSize <- gets (fromMaybe defaultSize . harnessStackSize . configParams)
+    let stackOf tid = maybe harnessSize
+            ((\(TInteger size _) -> size) . getStackSize defaultSize) (M.lookup tid (tasks progArchitecture))
+        taskStackMemory = sum [max defaultSize (stackOf tid) | tid <- taskIds]
+
     return $ CHeaderFile mName $ [
             _ifndef "CONFIG_H__",
             _define "CONFIG_H__" Nothing
@@ -77,6 +87,7 @@ genConfigFile mName config progArchitecture = do
         ++ [
             pre_cr $ _define "TERMINA__APP_CONFIG__POOLS" (Just [show (length poolIds)]),
             pre_cr $ _define "TERMINA__APP_CONFIG__TASKS" (Just [show (length taskIds)]),
+            pre_cr $ _define "TERMINA__APP_CONFIG__TASK_STACK_MEMORY" (Just [show taskStackMemory ++ "U"]),
             pre_cr $ _define "TERMINA__APP_CONFIG__PERIODIC_TIMERS" (Just [show (length (M.elems periodicTimers))]),
             pre_cr $ _define "TERMINA__APP_CONFIG__MUTEXES" (Just [show (length mutexes)]),
             pre_cr $ _define "TERMINA__APP_CONFIG__IRQ_LOCKS" (Just [show (length irqLocks)]),

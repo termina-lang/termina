@@ -19,7 +19,11 @@ import Test.Hspec
 -- | A minimal but complete reactive application: one resource, one periodic
 -- task that reaches the resource through an access port, wired together.
 reactiveApp :: String
-reactiveApp =
+reactiveApp = reactiveAppWith ""
+
+-- | The same application, with more modifiers on its task.
+reactiveAppWith :: String -> String
+reactiveAppWith modifiers =
     "interface IFoo {\n" ++
     "    procedure get(&mut self, result : &mut u32);\n" ++
     "};\n" ++
@@ -42,7 +46,19 @@ reactiveApp =
     "emitter timer : PeriodicTimer = { period = {tv_sec = 1, tv_usec = 0} };\n" ++
     "resource foo_res : FooRes = { value = 0 };\n" ++
     "#[priority(10)]\n" ++
+    modifiers ++
     "task t : UserTask = { timer_port <- timer, foo <-> foo_res };\n"
+
+-- | Checks the stack memory of the config file with the task of the
+-- application given a stack_size.
+withStackSize :: String -> String -> Expectation
+withStackSize size expected =
+    case runFullProjectApp [("test", reactiveAppWith ("#[stack_size(" ++ size ++ ")]\n"))] of
+      Left err -> expectationFailure $ "pipeline failed: " ++ unpack (failMessage err)
+      Right (progArch, _) ->
+        either (expectationFailure . unpack)
+          (\c -> unpack c `shouldContain` ("#define TERMINA__APP_CONFIG__TASK_STACK_MEMORY " ++ expected ++ "\n"))
+          (renderConfigFile progArch)
 
 spec :: Spec
 spec = describe "Full pipeline: reactive application glue" $
@@ -61,6 +77,14 @@ spec = describe "Full pipeline: reactive application glue" $
         either (expectationFailure . unpack)
           (\c -> unpack c `shouldContain` "termina__task__init(t__task_id, 10, 2048U,")
           (renderMainFileOn FreeRTOS10STM32L432NUCLEOL432KC progArch)
+      it "gives the stack memory of the tasks in the config file" $
+        either (expectationFailure . unpack)
+          (\c -> unpack c `shouldContain` "#define TERMINA__APP_CONFIG__TASK_STACK_MEMORY 4096U\n")
+          (renderConfigFile progArch)
+      it "counts the stack_size of a task in the stack memory" $
+        withStackSize "8192" "8192U"
+      it "counts a stack_size below the default of the platform as the default" $
+        withStackSize "2048" "4096U"
       it "reserves emitter identifier 0 for system_except, connected or not" $
         either (expectationFailure . unpack)
           (\c -> do
