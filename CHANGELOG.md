@@ -15,6 +15,13 @@ Patch versions on either side are interchangeable.
 
 ### Added
 
+- An option, status or result initializer (`Some(x)`, `None`, `Success`,
+  `Failure(e)`, `Ok(x)`, `Error(e)`) can be the argument of a call, as an enum
+  variant or struct initializer can, and reaches C as a compound literal.
+  `Some(b)` given to a procedure that takes an `Option<box T>` moves the box
+  `b`, and the architecture checks the pool it came from as for a box passed
+  alone.
+
 - `take_back` on a `DequeAccess<T>` port, which takes the box at the back of
   the deque into an `Option<box T>`. `DequeUsage` treats it as `take`: the
   deque has room afterwards in both branches.

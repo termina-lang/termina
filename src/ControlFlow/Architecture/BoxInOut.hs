@@ -167,11 +167,20 @@ inOutBasicBlock (ProcedureInvoke obj procId args ann) = do
                 boxSource <- ST.gets (fromJust . M.lookup boxName . inBoxMap)
                 addIOMapProcedureCall outPt procId (toInteger argNum) ann boxSource
             -- | The option-box is moved into the procedure
-            TOption (TBoxSubtype _) -> do
-                outPt <- getPortName obj
-                optionBox <- getExprOptionBoxName (args !! argNum)
-                optionBoxSource <- ST.gets (fromJust . M.lookup optionBox . inOptionBoxMap)
-                addIOMapProcedureCall outPt procId (toInteger argNum) ann (getInBox optionBoxSource)
+            TOption (TBoxSubtype _) -> case args !! argNum of
+                -- | An option-box built in the argument moves the box it holds
+                MonadicVariantInitializer (Some boxArg) _ -> do
+                    outPt <- getPortName obj
+                    boxName <- getExprBoxName boxArg
+                    boxSource <- ST.gets (fromJust . M.lookup boxName . inBoxMap)
+                    addIOMapProcedureCall outPt procId (toInteger argNum) ann boxSource
+                -- | An empty option-box moves no box
+                MonadicVariantInitializer None _ -> return ()
+                arg -> do
+                    outPt <- getPortName obj
+                    optionBox <- getExprOptionBoxName arg
+                    optionBoxSource <- ST.gets (fromJust . M.lookup optionBox . inOptionBoxMap)
+                    addIOMapProcedureCall outPt procId (toInteger argNum) ann (getInBox optionBoxSource)
             -- | The procedure writes a box into the option-box
             TReference Mutable (TOption (TBoxSubtype _)) -> do
                 outPt <- getPortName obj

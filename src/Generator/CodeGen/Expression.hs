@@ -687,11 +687,13 @@ genExpression (CheckedIndex size index ann) = do
     let cFuncType = CTFunction size_t [_const size_t, _const size_t]
     return $ ("termina__check__array_index" @: cFuncType |>> getLocation ann)
         @@ [cArraySize, cIndex] |>> getLocation ann
--- | An enum variant or struct initializer outside a declaration, which the
--- type checker only lets through as the argument of a call, becomes a
--- compound literal (T){ ... } around the same designated initializer.
+-- | An enum variant, struct, option, status or result initializer outside a
+-- declaration, which the type checker only lets through as the argument of a
+-- call, becomes a compound literal (T){ ... } around the same designated
+-- initializer.
 genExpression e@(EnumVariantInitializer _ _ _ ann) = genCompoundLiteral e ann
 genExpression e@(StructInitializer _ ann) = genCompoundLiteral e ann
+genExpression e@(MonadicVariantInitializer _ ann) = genCompoundLiteral e ann
 genExpression o = throwError $ InternalError $ "Unsupported expression: " ++ show o
 
 genCompoundLiteral :: Expression SemanticAnn -> SemanticAnn -> CGenerator CExpression

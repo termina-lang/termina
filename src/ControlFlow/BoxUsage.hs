@@ -47,6 +47,11 @@ useArguments e@(AccessObject (Variable ident ann))
     Just (TReference Mutable (TOption (TBoxSubtype _))) ->
       allocOptionBox ident (getLocation ann)
     _ -> useExpression e
+-- | An option-box built in the argument moves the box it holds
+useArguments e@(MonadicVariantInitializer (Some (AccessObject (Variable ident ann))) _)
+  = case getTypeSemAnn ann of
+    Just (TBoxSubtype _) -> safeMoveBox ident (getLocation ann)
+    _ -> useExpression e
 -- | A procedure fills the option-box it is given, as an alloc does
 useArguments (ReferenceExpression _ (Variable ident ann) _a) =
   case getTypeSemAnn ann of

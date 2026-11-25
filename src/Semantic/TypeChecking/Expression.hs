@@ -981,15 +981,17 @@ partTy :: SAST.TerminaType SemanticAnn -> SAST.TerminaType SemanticAnn -> SAST.T
 partTy (TConstSubtype _) ty = TConstSubtype ty
 partTy _ ty = ty
 
--- | An argument of a call. An enum variant or struct initializer is typed
--- against the type of the parameter, as the initializer of a declaration is
--- against the type of the object; it reaches C as a compound literal.
+-- | An argument of a call. An enum variant, struct, option, status or result
+-- initializer is typed against the type of the parameter, as the initializer of
+-- a declaration is against the type of the object; it reaches C as a compound
+-- literal.
 typeArgument ::
   SAST.TerminaType SemanticAnn ->
   Expression ParserAnn ->
   SemanticMonad (SAST.Expression SemanticAnn)
 typeArgument paramTy e@(EnumVariantInitializer {}) = typeAssignmentExpression paramTy typeRHSObject e
 typeArgument paramTy e@(StructInitializer {}) = typeAssignmentExpression paramTy typeRHSObject e
+typeArgument paramTy e@(MonadicVariantInitializer {}) = typeAssignmentExpression paramTy typeRHSObject e
 typeArgument paramTy e = typeExpression (Just paramTy) typeRHSObject e
 
 typeAssignmentExpression ::
