@@ -15,6 +15,12 @@ Patch versions on either side are interchangeable.
 
 ### Added
 
+- `termina build` and `termina generate` with several deployments (`--tests`,
+  `--all`) continue with the remaining deployments when one fails to
+  transpile or to build, and end with an error that lists the ones that
+  failed. With a single
+  deployment the error stops the command, as before.
+
 - An option, status or result initializer (`Some(x)`, `None`, `Success`,
   `Failure(e)`, `Ok(x)`, `Error(e)`) can be the argument of a call, as an enum
   variant or struct initializer can, and reaches C as a compound literal.

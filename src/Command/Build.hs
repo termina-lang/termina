@@ -3,7 +3,7 @@
 module Command.Build (
     buildCmdArgsParser, buildCommand, generateCommand, BuildCmdArgs(..),
     Selection(..), selectDeployments, selectedDeployments, nothingSelected, warnLocalFolders, refuseLocalFoldersInRelease,
-    localFoldersInRelease, buildDeployment, announce, runMake,
+    localFoldersInRelease, buildDeployment, announce, runMake, failedSummary,
     CheckedDeployment(..), checkDeployment, checkExportedModules
 ) where
 
@@ -32,7 +32,7 @@ import qualified Data.Map.Strict as M
 import Runner.Coverage (coverageArrays, gdbScripts, linkedArrays, readMaps)
 import Modules.Modules
 import Generator.Monadic
-import Data.List (nub)
+import Data.List (intercalate, nub)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Generator.CodeGen.Coverage (renderCoverageMap)
 import Doc.Facts (DocFact, instanceFacts)
@@ -427,18 +427,33 @@ nothingSelected manifest selection mPlatform =
 generateCommand :: BuildCmdArgs -> IO ()
 generateCommand args = do
     (project, deployments) <- selectedDeployments args
-    forM_ deployments $ \deployment -> do
-      announce deployments ("Generating " ++ deploymentLabel deployment)
-      void (generateDeployment args project deployment)
+    forEachDeployment deployments "Generating" (void . generateDeployment args project)
 
 -- | Command handler for the "build" command: it generates each deployment
 -- and runs make on the folder of its C with the #line pragmas
 buildCommand :: BuildCmdArgs -> IO ()
 buildCommand args = do
     (project, deployments) <- selectedDeployments args
-    forM_ deployments $ \deployment -> do
-      announce deployments ("Building " ++ deploymentLabel deployment)
-      void (buildDeployment args project deployment)
+    forEachDeployment deployments "Building" (void . buildDeployment args project)
+
+-- | Runs the action on each deployment. Among several, a deployment that fails
+-- does not stop the next ones, and the deployments that failed are listed at
+-- the end with an error.
+forEachDeployment :: [Deployment] -> String -> (Deployment -> IO ()) -> IO ()
+forEachDeployment [deployment] _ action = action deployment
+forEachDeployment deployments verb action = do
+    failed <- fmap concat $ forM deployments $ \deployment -> do
+        announce deployments (verb ++ " " ++ deploymentLabel deployment)
+        result <- try (action deployment)
+        case result of
+            Left (ExitFailure _) -> return [deployment]
+            _ -> return []
+    unless (null failed) $ dieWithError (failedSummary (length deployments) (map deploymentLabel failed))
+
+-- | The line that lists the deployments that failed, among how many.
+failedSummary :: Int -> [String] -> String
+failedSummary total labels =
+    show (length labels) ++ " of " ++ show total ++ " deployments failed: " ++ intercalate ", " labels
 
 -- | Generate a deployment of a project, run make on the folder of its C with
 -- the #line pragmas and write its provenance.json. It gives the modules of the
