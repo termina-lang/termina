@@ -565,6 +565,14 @@ blockConstruct (RebootBlock {}) = Just "reboot"
 blockConstruct (NoReturnCall {}) = Just "noreturn"
 blockConstruct _ = Nothing
 
+-- | The object that receives the value of an atomic load or the previous value
+-- of an atomic addition: the referenced object of @&x@, or the object a
+-- reference points to otherwise.
+genAtomicDestination :: Expression SemanticAnn -> CGenerator CObject
+genAtomicDestination (ReferenceExpression _ refObj _) = genObject refObj
+genAtomicDestination (AccessObject obj) = deref <$> genObject obj
+genAtomicDestination e = throwError $ InternalError $ "invalid destination of an atomic access: " ++ show e
+
 -- | The C of a block, without the flag of the coverage or the comment before it.
 genBasicBlock :: BasicBlock SemanticAnn -> CGenerator [CCompoundBlockItem]
 genBasicBlock (RegularBlock stmts) = concat <$> traverse genStatement stmts
@@ -597,14 +605,9 @@ genBasicBlock (AtomicLoad obj arg ann) = do
     -- Generate the C code for the object
     cObj <- genObject obj
     let cObjExpr = cObj @: getCObjType cObj |>> getLocation ann
-    -- Generate the C code for the parameters
-    cArg <- genExpression arg
-    case arg of
-        ReferenceExpression _ refObj _ -> do
-            cRefObj <- genObject refObj
-            mCall <- genAtomicMethodCall "load" cObjExpr [cArg] (buildGenericAnn ann)
-            return [pre_cr (cRefObj @= mCall) |>> getLocation ann]
-        _ -> throwError $ InternalError $ "invalid params for atomic load: " ++ show arg
+    cDst <- genAtomicDestination arg
+    mCall <- genAtomicMethodCall "load" cObjExpr [] (buildGenericAnn ann)
+    return [pre_cr (cDst @= mCall) |>> getLocation ann]
 genBasicBlock (AtomicStore obj arg ann) = do
     -- Generate the C code for the object
     cObj <- genObject obj
@@ -618,15 +621,11 @@ genBasicBlock (AtomicArrayLoad obj idx arg ann) = do
     -- Generate the C code for the object
     cObj <- genObject obj
     cIdx <- genExpression idx
-    cArg <- genExpression arg
-    case arg of
-        ReferenceExpression _ refObj _ -> do
-            cIndexedObj <- genIndexOf cObj cIdx
-            cRefIndexedObj <- genAddrOf cIndexedObj noqual cAnn
-            cRefObj <- genObject refObj
-            mCall <- genAtomicMethodCall "load" cRefIndexedObj [cArg] cAnn
-            return [pre_cr (cRefObj @= mCall) |>> getLocation ann]
-        _ -> throwError $ InternalError $ "invalid params for atomic load_index: " ++ show arg
+    cIndexedObj <- genIndexOf cObj cIdx
+    cRefIndexedObj <- genAddrOf cIndexedObj noqual cAnn
+    cDst <- genAtomicDestination arg
+    mCall <- genAtomicMethodCall "load" cRefIndexedObj [] cAnn
+    return [pre_cr (cDst @= mCall) |>> getLocation ann]
 genBasicBlock (AtomicArrayStore obj idx arg ann) = do
     let cAnn = buildGenericAnn ann
     -- Generate the C code for the object
@@ -637,6 +636,23 @@ genBasicBlock (AtomicArrayStore obj idx arg ann) = do
     cRefIndexedObj <- genAddrOf cIndexedObj noqual cAnn
     mCall <- genAtomicMethodCall "store" cRefIndexedObj [cArg] cAnn
     return [pre_cr mCall |>> getLocation ann]
+genBasicBlock (AtomicFetchAdd obj value prev ann) = do
+    cObj <- genObject obj
+    let cObjExpr = cObj @: getCObjType cObj |>> getLocation ann
+    cValue <- genExpression value
+    cPrev <- genAtomicDestination prev
+    mCall <- genAtomicMethodCall "fetch_add" cObjExpr [cValue] (buildGenericAnn ann)
+    return [pre_cr (cPrev @= mCall) |>> getLocation ann]
+genBasicBlock (AtomicArrayFetchAdd obj idx value prev ann) = do
+    let cAnn = buildGenericAnn ann
+    cObj <- genObject obj
+    cIdx <- genExpression idx
+    cValue <- genExpression value
+    cIndexedObj <- genIndexOf cObj cIdx
+    cRefIndexedObj <- genAddrOf cIndexedObj noqual cAnn
+    cPrev <- genAtomicDestination prev
+    mCall <- genAtomicMethodCall "fetch_add" cRefIndexedObj [cValue] cAnn
+    return [pre_cr (cPrev @= mCall) |>> getLocation ann]
 genBasicBlock (SendMessage obj arg ann) = do
     let cAnn = buildGenericAnn ann
     cObj <- genObject obj

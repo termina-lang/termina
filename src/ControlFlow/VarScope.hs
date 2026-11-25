@@ -235,6 +235,12 @@ firstAccessAssigns ident body =
     simpleBlock (AtomicArrayLoad port index dest _)
       | isDestination dest =
           readChildren [ChildObject port, ChildExpr index] >> putPath (Assigned True)
+    simpleBlock (AtomicFetchAdd port value dest _)
+      | isDestination dest =
+          readChildren [ChildObject port, ChildExpr value] >> putPath (Assigned True)
+    simpleBlock (AtomicArrayFetchAdd port index value dest _)
+      | isDestination dest =
+          readChildren [ChildObject port, ChildExpr index, ChildExpr value] >> putPath (Assigned True)
     simpleBlock bb = mapM_ readChildren (simpleBlockChildren bb)
 
     isDestination (ReferenceExpression _ (Variable v _) _) = v == ident

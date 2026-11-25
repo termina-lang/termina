@@ -116,6 +116,17 @@ data BasicBlock' ty expr obj a =
         (expr a) -- ^ index expression
         (expr a) -- ^ value to store
         a
+    | AtomicFetchAdd
+        (obj a) -- ^ access port
+        (expr a) -- ^ value to add
+        (expr a) -- ^ expression that points to the object where the previous value will be stored
+        a
+    | AtomicArrayFetchAdd
+        (obj a) -- ^ access port
+        (expr a) -- ^ index expression
+        (expr a) -- ^ value to add
+        (expr a) -- ^ expression that points to the object where the previous value will be stored
+        a
     -- | Call to the alloc procedure of a memory allocator
     | AllocBox
         (obj a) -- port that implements the allocator interface
@@ -180,6 +191,8 @@ basicBlockAnnotation blk = case blk of
     AtomicStore _ _ a -> Just a
     AtomicArrayLoad _ _ _ a -> Just a
     AtomicArrayStore _ _ _ a -> Just a
+    AtomicFetchAdd _ _ _ a -> Just a
+    AtomicArrayFetchAdd _ _ _ _ a -> Just a
     AllocBox _ _ a -> Just a
     FreeBox _ _ a -> Just a
     DequeTake _ _ _ a -> Just a
@@ -234,6 +247,8 @@ simpleBlockChildren bb = case bb of
   AtomicStore obj expr _ -> Just [ChildObject obj, ChildExpr expr]
   AtomicArrayLoad obj index expr _ -> Just [ChildObject obj, ChildExpr index, ChildExpr expr]
   AtomicArrayStore obj index expr _ -> Just [ChildObject obj, ChildExpr index, ChildExpr expr]
+  AtomicFetchAdd obj value expr _ -> Just [ChildObject obj, ChildExpr value, ChildExpr expr]
+  AtomicArrayFetchAdd obj index value expr _ -> Just [ChildObject obj, ChildExpr index, ChildExpr value, ChildExpr expr]
   AllocBox obj expr _ -> Just [ChildObject obj, ChildExpr expr]
   FreeBox obj expr _ -> Just [ChildObject obj, ChildExpr expr]
   DequeTake _ obj expr _ -> Just [ChildObject obj, ChildExpr expr]

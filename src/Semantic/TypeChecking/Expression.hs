@@ -632,6 +632,10 @@ typeMemberFunctionCall ann ak obj_ty ident args =
               return (([builtinParameter "v" ty_atomic], [typed_value]), TUnit)
             [] -> throwError $ annotateError (getLocation ann) (EProcedureCallMissingArgs ("store", [builtinParameter "v" ty_atomic], Builtin) 0)
             _ -> throwError $ annotateError (getLocation ann) (EProcedureCallExtraArgs ("store", [builtinParameter "v" ty_atomic], Builtin) (fromIntegral (length args)))
+        "fetch_add" -> do
+          mutableCall
+          checkFetchAddType "fetch_add" ty_atomic
+          typeBuiltinArgs "fetch_add" [builtinParameter "v" ty_atomic, builtinParameter "p" (TReference Mutable ty_atomic)]
         _ -> throwError $ annotateError (getLocation ann) (EUnknownProcedure ident)
     TAccessPort (TAtomicArrayAccess ty_atomic _size) ->
       case ident of
@@ -658,6 +662,10 @@ typeMemberFunctionCall ann ak obj_ty ident args =
             _ -> if length args < 2 then
               throwError $ annotateError (getLocation ann) (EProcedureCallMissingArgs ("store_index", [builtinParameter "idx" TUSize, builtinParameter "v" ty_atomic], Builtin) (fromIntegral (length args)))
               else throwError $ annotateError (getLocation ann) (EProcedureCallExtraArgs ("store_index", [builtinParameter "idx" TUSize, builtinParameter "v" ty_atomic], Builtin) (fromIntegral (length args)))
+        "fetch_add_index" -> do
+          mutableCall
+          checkFetchAddType "fetch_add_index" ty_atomic
+          typeBuiltinArgs "fetch_add_index" [builtinParameter "idx" TUSize, builtinParameter "v" ty_atomic, builtinParameter "p" (TReference Mutable ty_atomic)]
         _ -> throwError $ annotateError (getLocation ann) (EUnknownProcedure ident)
     TOutPort ty -> do
       when (ak == Immutable) (throwError $ annotateError (getLocation ann) EInvalidAccessToOutPortFromImmutableSelfReference)
@@ -701,6 +709,16 @@ typeMemberFunctionCall ann ak obj_ty ident args =
     -- | A procedure that changes the component cannot be called through an
     -- immutable self reference
     mutableCall = when (ak == Immutable) (throwError $ annotateError (getLocation ann) EInvalidAccessToProcedureFromImmutableSelfReference)
+
+    -- | An atomic addition is defined on the unsigned integer types only
+    checkFetchAddType :: Identifier -> SAST.TerminaType SemanticAnn -> SemanticMonad ()
+    checkFetchAddType procName ty =
+      case ty of
+        TUInt8 -> return ()
+        TUInt16 -> return ()
+        TUInt32 -> return ()
+        TUSize -> return ()
+        _ -> throwError $ annotateError (getLocation ann) (EAtomicFetchAddInvalidType procName ty)
 
     -- | Types the arguments of a built-in procedure against its parameters
     typeBuiltinArgs procName ps

@@ -613,41 +613,26 @@ foldBasicBlock (AtomicArrayLoad obj indexExpr expr ann) = do
   obj' <- foldObject obj
   index' <- foldExpression indexExpr
   expr' <- foldExpression expr
-  objType <- getObjType obj'
-  indexExprType <- getExprType index'
-  let folded = AtomicArrayLoad obj' index' expr' ann'
-  case (objType, indexExprType) of
-    (TAccessPort (TAtomicArrayAccess _ arraySizeExpr), TConstSubtype _) -> do
-      arraySizeExprValue <- evalConstExpression arraySizeExpr
-      indexExprValue <- evalConstExpression index'
-      case (arraySizeExprValue, indexExprValue) of
-        (I (TInteger arraySizeValue _) _, I (TInteger indexValue _) _) -> do
-          when (indexValue < 0 || indexValue >= arraySizeValue) $
-            throwError $ annotateError (getLocation . getAnnotation $ obj) (EAtomicArrayIndexOutOfBounds arraySizeValue indexValue)
-          proven IndexInBounds "the index is a constant" (atomicIndexChecks folded)
-          return folded
-        _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
-    _ -> return folded
+  foldAtomicIndex obj obj' index' (AtomicArrayLoad obj' index' expr' ann')
 foldBasicBlock (AtomicArrayStore obj indexExpr expr ann) = do
   ann' <- foldAnnotation ann
   obj' <- foldObject obj
   index' <- foldExpression indexExpr
   expr' <- foldExpression expr
-  objType <- getObjType obj'
-  indexExprType <- getExprType index'
-  let folded = AtomicArrayStore obj' index' expr' ann'
-  case (objType, indexExprType) of
-    (TAccessPort (TAtomicArrayAccess _ arraySizeExpr), TConstSubtype _) -> do
-      arraySizeExprValue <- evalConstExpression arraySizeExpr
-      indexExprValue <- evalConstExpression index'
-      case (arraySizeExprValue, indexExprValue) of
-        (I (TInteger arraySizeValue _) _, I (TInteger indexValue _) _) -> do
-          when (indexValue < 0 || indexValue >= arraySizeValue) $
-            throwError $ annotateError (getLocation . getAnnotation $ obj) (EAtomicArrayIndexOutOfBounds arraySizeValue indexValue)
-          proven IndexInBounds "the index is a constant" (atomicIndexChecks folded)
-          return folded
-        _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
-    _ -> return folded
+  foldAtomicIndex obj obj' index' (AtomicArrayStore obj' index' expr' ann')
+foldBasicBlock (AtomicFetchAdd obj value expr ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  value' <- foldExpression value
+  expr' <- foldExpression expr
+  return $ AtomicFetchAdd obj' value' expr' ann'
+foldBasicBlock (AtomicArrayFetchAdd obj indexExpr value expr ann) = do
+  ann' <- foldAnnotation ann
+  obj' <- foldObject obj
+  index' <- foldExpression indexExpr
+  value' <- foldExpression value
+  expr' <- foldExpression expr
+  foldAtomicIndex obj obj' index' (AtomicArrayFetchAdd obj' index' value' expr' ann')
 foldBasicBlock (AllocBox obj expr ann) = do
   ann' <- foldAnnotation ann
   obj' <- foldObject obj
@@ -698,6 +683,25 @@ foldBasicBlock (SystemCall obj ident exprs ann) = do
   exprs' <- mapM foldExpression exprs
   checkCallArgs ann' exprs'
   return $ SystemCall obj' ident exprs' ann'
+
+-- | Check a constant index of an atomic access to an element of an array
+-- against the size of the array, and prove its bounds check.
+foldAtomicIndex :: Object SemanticAnn -> Object SemanticAnn -> Expression SemanticAnn -> BasicBlock SemanticAnn -> ConstFoldMonad (BasicBlock SemanticAnn)
+foldAtomicIndex obj obj' index' folded = do
+  objType <- getObjType obj'
+  indexExprType <- getExprType index'
+  case (objType, indexExprType) of
+    (TAccessPort (TAtomicArrayAccess _ arraySizeExpr), TConstSubtype _) -> do
+      arraySizeExprValue <- evalConstExpression arraySizeExpr
+      indexExprValue <- evalConstExpression index'
+      case (arraySizeExprValue, indexExprValue) of
+        (I (TInteger arraySizeValue _) _, I (TInteger indexValue _) _) -> do
+          when (indexValue < 0 || indexValue >= arraySizeValue) $
+            throwError $ annotateError (getLocation . getAnnotation $ obj) (EAtomicArrayIndexOutOfBounds arraySizeValue indexValue)
+          proven IndexInBounds "the index is a constant" (atomicIndexChecks folded)
+          return folded
+        _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
+    _ -> return folded
 
 -- | Check the arguments of a call against the parameters its annotation
 -- carries. A call to a function or a member is an expression; a procedure

@@ -142,6 +142,8 @@ elabBasicBlock d bb = case bb of
   AtomicStore obj e ann -> AtomicStore <$> object obj <*> expr e <*> pure ann
   AtomicArrayLoad obj index e ann -> AtomicArrayLoad <$> object obj <*> atomicIndex obj index <*> expr e <*> pure ann
   AtomicArrayStore obj index e ann -> AtomicArrayStore <$> object obj <*> atomicIndex obj index <*> expr e <*> pure ann
+  AtomicFetchAdd obj v e ann -> AtomicFetchAdd <$> object obj <*> expr v <*> expr e <*> pure ann
+  AtomicArrayFetchAdd obj index v e ann -> AtomicArrayFetchAdd <$> object obj <*> atomicIndex obj index <*> expr v <*> expr e <*> pure ann
   AllocBox obj e ann -> AllocBox <$> object obj <*> expr e <*> pure ann
   FreeBox obj e ann -> FreeBox <$> object obj <*> expr e <*> pure ann
   DequeTake end obj e ann -> DequeTake end <$> object obj <*> expr e <*> pure ann

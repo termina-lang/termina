@@ -139,6 +139,9 @@ lowerStatements acc (stmt : xs) =
                                 "store" -> case args of
                                     [value] -> lowerStatements (AtomicStore obj value ann' : acc) xs
                                     _ -> throwError $ InternalError ("lowerStatements: unexpected number of arguments of procedure " ++ funcName)
+                                "fetch_add" -> case args of
+                                    [value, retval] -> lowerStatements (AtomicFetchAdd obj value retval ann' : acc) xs
+                                    _ -> throwError $ InternalError ("lowerStatements: unexpected number of arguments of procedure " ++ funcName)
                                 _ -> throwError $ InternalError ("lowerStatements: unexpected function name " ++ funcName)
                         TAccessPort (TAtomicArrayAccess {}) -> do
                             -- | We need to check the operation (load_index or store_index)
@@ -148,6 +151,9 @@ lowerStatements acc (stmt : xs) =
                                     _ -> throwError $ InternalError ("lowerStatements: unexpected number of arguments of procedure " ++ funcName)
                                 "store_index" -> case args of
                                     [index, value] -> lowerStatements (AtomicArrayStore obj index value ann' : acc) xs
+                                    _ -> throwError $ InternalError ("lowerStatements: unexpected number of arguments of procedure " ++ funcName)
+                                "fetch_add_index" -> case args of
+                                    [index, value, retval] -> lowerStatements (AtomicArrayFetchAdd obj index value retval ann' : acc) xs
                                     _ -> throwError $ InternalError ("lowerStatements: unexpected number of arguments of procedure " ++ funcName)
                                 _ -> throwError $ InternalError ("lowerStatements: unexpected function name " ++ funcName)
                         -- | If the object is an output port, we shall create a

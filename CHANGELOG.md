@@ -15,6 +15,14 @@ Patch versions on either side are interchangeable.
 
 ### Added
 
+- `fetch_add(v, &mut prev)` on an `AtomicAccess<T>` port and
+  `fetch_add_index(i, v, &mut prev)` on an `AtomicArrayAccess<T; N>` port,
+  which add `v` to the atomic, or to its element `i`, and leave the previous
+  value in `prev`. They take `u8`, `u16`, `u32` and `usize`, and the sum
+  wraps around as the `+` of an unsigned integer does; any other type is
+  rejected (SE-243). The index goes through the bounds check as that of
+  `load_index` and `store_index`.
+
 - `termina build` and `termina generate` with several deployments (`--tests`,
   `--all`) continue with the remaining deployments when one fails to
   transpile or to build, and end with an error that lists the ones that
@@ -114,6 +122,10 @@ Patch versions on either side are interchangeable.
 
 ### Fixed
 
+- `load` and `load_index` take a `&mut T` parameter as their destination, as
+  in `self->value.load(dst)`, and the C stores the value through it. Until
+  now only an explicit `&mut x` reached C, and a reference parameter ended
+  the build with an internal error in the code generator.
 - The columns of a line with tabs count each tab as one character, as the
   error messages and the language server do, instead of moving to the next
   tab stop.

@@ -454,6 +454,9 @@ genAtomicMethodCall mName cObj cArgs cAnn =
         "store" -> do
             let cFuncType = CTFunction (CTVoid noqual) (getCExprType cObj : fmap getCExprType cArgs)
             return $ CExprCall (CExprValOf (CVar (atomicMethodName mName) cFuncType) cFuncType cAnn) (cObj : cArgs) (CTVoid noqual) cAnn
+        "fetch_add" -> do
+            let cFuncType = CTFunction (CTVoid noqual) (getCExprType cObj : fmap getCExprType cArgs)
+            return $ CExprCall (CExprValOf (CVar (atomicMethodName mName) cFuncType) cFuncType cAnn) (cObj : cArgs) (CTVoid noqual) cAnn
         _ -> throwError $ InternalError $ "invalid atomic method name: " ++ mName
 
 genInteger :: TInteger -> CInteger

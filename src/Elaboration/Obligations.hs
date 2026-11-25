@@ -88,6 +88,7 @@ atomicIndexChecks :: BasicBlock SemanticAnn -> [Obligation]
 atomicIndexChecks bb = case bb of
   AtomicArrayLoad obj index _ ann -> [indexIn obj index ann]
   AtomicArrayStore obj index _ ann -> [indexIn obj index ann]
+  AtomicArrayFetchAdd obj index _ _ ann -> [indexIn obj index ann]
   _ -> []
 
   where

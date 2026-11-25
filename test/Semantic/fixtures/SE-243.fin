@@ -1,0 +1,14 @@
+interface ICounter {
+    procedure next(&mut self, id : &mut i32);
+};
+
+resource class CCounter provides ICounter {
+
+    counter : access AtomicAccess<i32>;
+
+    procedure next(&mut self, id : &mut i32) {
+        self->counter.fetch_add(1, id);
+        return;
+    }
+
+};

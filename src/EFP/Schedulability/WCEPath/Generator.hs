@@ -182,6 +182,10 @@ genPaths (AtomicArrayLoad _obj _index _expr ann) =
     [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
 genPaths (AtomicArrayStore _obj _index _expr ann) =
     [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
+genPaths (AtomicFetchAdd _obj _value _expr ann) =
+    [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
+genPaths (AtomicArrayFetchAdd _obj _index _value _expr ann) =
+    [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
 genPaths (AllocBox obj _args ann) =
     let outPt = case obj of
             (MemberAccess _ portId _) -> portId

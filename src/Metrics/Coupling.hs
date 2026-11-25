@@ -161,6 +161,8 @@ blockCalls ctx = M.unionsWith (<>) . map basicBlock . blockBody
         AtomicStore _ e _ -> exprs [e] `union` operation False "Atomic::store"
         AtomicArrayLoad _ i e _ -> exprs [i, e] `union` operation False "AtomicArray::load"
         AtomicArrayStore _ i e _ -> exprs [i, e] `union` operation False "AtomicArray::store"
+        AtomicFetchAdd _ v e _ -> exprs [v, e] `union` operation False "Atomic::fetch_add"
+        AtomicArrayFetchAdd _ i v e _ -> exprs [i, v, e] `union` operation False "AtomicArray::fetch_add"
         AllocBox _ e _ -> exprs [e] `union` operation True "Pool::alloc"
         FreeBox _ e _ -> exprs [e] `union` operation True "Pool::free"
         DequeTake end _ e _ ->

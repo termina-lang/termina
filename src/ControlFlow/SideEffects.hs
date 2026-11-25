@@ -454,6 +454,8 @@ checkSimpleBlock bb = case bb of
   AtomicStore _ val _            -> checkFullExpression val
   AtomicArrayLoad _ idx dst _    -> checkFullExpressions [idx, dst]
   AtomicArrayStore _ idx val _   -> checkFullExpressions [idx, val]
+  AtomicFetchAdd _ val dst _     -> checkFullExpressions [val, dst]
+  AtomicArrayFetchAdd _ idx val dst _ -> checkFullExpressions [idx, val, dst]
   AllocBox _ arg _               -> checkFullExpression arg
   FreeBox _ arg _                -> checkFullExpression arg
   DequeTake _ _ arg _            -> checkFullExpression arg
