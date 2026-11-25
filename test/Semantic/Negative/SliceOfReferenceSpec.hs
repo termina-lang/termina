@@ -6,7 +6,6 @@ import Test.Hspec
 import Semantic.AST
 import Semantic.Errors
 import Semantic.Common
-import Semantic.Types
 
 -- | A function that takes a part of an array and one that slices the given
 -- parameter in the given statement.
