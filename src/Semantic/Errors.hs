@@ -40,7 +40,6 @@ data Error
   | EExpectedNumType (TerminaType SemanticAnn) -- ^ Expected a numeric type (Internal)
   | EInvalidEmitterClass -- ^ Error when obtaining the the class of an emitter (Internal)
   | EInvalidObjectDeclaration Identifier -- ^ Invalid object declaration (Internal)
-  | EMalformedSlice -- ^ Malformed slice (Internal)
   | EMalformedClassTyping -- ^ Malformed class typing (Internal)
   | EContinueActionNotFound -- ^ Action not found in continue statement (Internal)
   | EMissingIdentifier -- ^ Missing identifier (Internal)

@@ -1548,16 +1548,11 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
       typed_lower <- catchMismatch (getLocation $ getAnnotation lower) EArraySliceLowerBoundNotUSize (typeExpression (Just TUSize) typeRHSObject lower)
       typed_upper <- catchMismatch (getLocation $ getAnnotation upper) EArraySliceUpperBoundNotUSize (typeExpression (Just TUSize) typeRHSObject upper)
       case withoutConst obj_ty of
-        TArray ty _ -> do
-          checkReferenceAccessKind obj_ak
-          case expectedType of
-            Just (TReference ak (TArray ts rawSize)) -> do
-              unless (sameTy ty ts) (throwError $ annotateError (getLocation pann) $ EMismatch ts ty)
-              expectedSize <- evalArraySizeExpr rawSize
-              return (SAST.ArraySliceExpression refKind typed_obj typed_lower typed_upper (buildExpAnn pann (TReference ak (TArray ts expectedSize))))
-            Just ety -> throwError $ annotateError (getLocation pann) $ EMismatch (TReference refKind ty) ety
-            _ -> throwError $ annotateError (getLocation pann) ESliceInvalidUse
-        _ -> throwError $ annotateError Internal EMalformedSlice
+        TArray ty _ -> sliceOf typed_obj obj_ak ty typed_lower typed_upper
+        -- | A reference to an array is dereferenced, as when it is indexed.
+        TReference ref_ak arrTy@(TArray ty _) ->
+          sliceOf (SAST.Dereference typed_obj (buildExpAnnObj (getAnnotation obj) ref_ak arrTy)) ref_ak ty typed_lower typed_upper
+        ty -> throwError $ annotateError (getLocation pann) (EInvalidArrayIndexing ty)
     _ -> do
       -- | Type object
       typed_obj <- typeObj rhs_e
@@ -1600,6 +1595,20 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
         (Immutable, Mutable) -> throwError $ annotateError (getLocation pann) EMutableReferenceToImmutable
         (Private, Mutable) -> throwError $ annotateError (getLocation pann) EMutableReferenceToPrivate
         _ -> return ()
+
+    -- | A reference to the part of an array object with elements of the type.
+    sliceOf :: SAST.Object SemanticAnn -> AccessKind -> SAST.TerminaType SemanticAnn
+      -> SAST.Expression SemanticAnn -> SAST.Expression SemanticAnn
+      -> SemanticMonad (SAST.Expression SemanticAnn)
+    sliceOf arrObj obj_ak ty typed_lower typed_upper = do
+      checkReferenceAccessKind obj_ak
+      case expectedType of
+        Just (TReference ak (TArray ts rawSize)) -> do
+          unless (sameTy ty ts) (throwError $ annotateError (getLocation pann) $ EMismatch ts ty)
+          expectedSize <- evalArraySizeExpr rawSize
+          return (SAST.ArraySliceExpression refKind arrObj typed_lower typed_upper (buildExpAnn pann (TReference ak (TArray ts expectedSize))))
+        Just ety -> throwError $ annotateError (getLocation pann) $ EMismatch (TReference refKind ty) ety
+        _ -> throwError $ annotateError (getLocation pann) ESliceInvalidUse
 
 ---------------------------------------
 -- | Function Expression.  A tradicional function call

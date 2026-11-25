@@ -110,6 +110,10 @@ Patch versions on either side are interchangeable.
 - The generated C keeps the parentheses of a `&&` on either side of a `||`,
   as in `(a && b) || c`, which GCC reports under `-Wparentheses` and clang
   under `-Wlogical-op-parentheses` when they are left out.
+- A slice of a reference to an array, `&mut x[a .. b]` with `x : &mut [T; N]`,
+  dereferences the reference, as indexing it does, instead of stopping with
+  an internal error. A slice of an object that is not an array gives SE-001
+  with its position.
 
 ## [0.7.0] - 2026-11-06
 
