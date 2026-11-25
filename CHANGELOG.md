@@ -97,6 +97,10 @@ Patch versions on either side are interchangeable.
   columns of the checks on such expressions in `checks.json` move by one.
 - The runner reads the symbol table of a binary with the Haskell library
   `elf` instead of the `nm` of the toolchain.
+- The platform of the NOEL-V on the Arty A7 is `rtems6-noel32imafd-artya7`,
+  on the `noel32imafd` board support package of RTEMS 6, and replaces
+  `rtems6-noel32im-artya7`. The atomic operations are instructions of the A
+  extension, and floating point runs on the unit of the core.
 
 ### Removed
 

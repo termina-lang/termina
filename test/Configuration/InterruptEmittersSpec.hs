@@ -23,7 +23,7 @@ platforms =
     , ("freertos10-stm32l432-nucleol432kc", FreeRTOS10STM32L432NUCLEOL432KC)
     , ("rtems6-zynq7000-pynqz2", RTEMS6ZYNQ7000PYNQZ2)
     , ("rtems6-rv32im-spike", RTEMS6RV32IMSPIKE)
-    , ("rtems6-noel32im-artya7", RTEMS6NOEL32IMARTYA7)
+    , ("rtems6-noel32imafd-artya7", RTEMS6NOEL32IMAFDARTYA7)
     ]
 
 initialProgram :: Platform -> TerminaProgArch SemanticAnn

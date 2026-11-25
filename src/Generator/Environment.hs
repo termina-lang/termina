@@ -40,8 +40,8 @@ getPlatformInitialGlobalEnv _ RTEMS6RV32IMSPIKE =
     interruptGlobalEnv RTEMS6RV32IMSPIKE ++
     -- | SystemAPI interface.
     [builtinType (Interface SystemInterface "SystemAPI" ["SysTime"] [] [])]
-getPlatformInitialGlobalEnv _ RTEMS6NOEL32IMARTYA7 =
-    interruptGlobalEnv RTEMS6NOEL32IMARTYA7 ++
+getPlatformInitialGlobalEnv _ RTEMS6NOEL32IMAFDARTYA7 =
+    interruptGlobalEnv RTEMS6NOEL32IMAFDARTYA7 ++
     -- | SystemAPI interface.
     [builtinType (Interface SystemInterface "SystemAPI" ["SysTime"] [] [])]
 getPlatformInitialGlobalEnv _ TestPlatform =
