@@ -100,6 +100,9 @@ Patch versions on either side are interchangeable.
 - The columns of a line with tabs count each tab as one character, as the
   error messages and the language server do, instead of moving to the next
   tab stop.
+- The generated C keeps the parentheses of a `&&` on either side of a `||`,
+  as in `(a && b) || c`, which GCC reports under `-Wparentheses` and clang
+  under `-Wlogical-op-parentheses` when they are left out.
 
 ## [0.7.0] - 2026-11-06
 

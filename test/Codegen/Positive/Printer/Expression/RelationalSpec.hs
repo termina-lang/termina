@@ -77,6 +77,10 @@ logicalOrConst, logicalOrExpr :: Expression SemanticAnn
 logicalOrConst = BinOp LogicalOr falseBool trueBool boolExprSemAnn
 logicalOrExpr = BinOp LogicalOr var1LTConstant var0LTEConstant boolExprSemAnn
 
+logicalOrAndLeft, logicalOrAndRight :: Expression SemanticAnn
+logicalOrAndLeft = BinOp LogicalOr logicalAndExpr var1LTConstant boolExprSemAnn
+logicalOrAndRight = BinOp LogicalOr var1LTConstant logicalAndExpr boolExprSemAnn
+
 spec :: Spec
 spec = do
   describe "Pretty printing equality expressions" $ do
@@ -205,3 +209,9 @@ spec = do
     it "Prints the expression: var1 < 1024U || var2 == var3" $ do
       renderExpression logicalOrExpr `shouldBe`
         pack "*(uint16_t *)var1.data < 1024U || var0 <= 1024U"
+    it "Prints the expression: (var0 == var1 && var0 <= 1024U) || var1 < 1024U" $ do
+      renderExpression logicalOrAndLeft `shouldBe`
+        pack "(var0 == *(uint16_t *)var1.data && var0 <= 1024U)\n|| *(uint16_t *)var1.data < 1024U"
+    it "Prints the expression: var1 < 1024U || (var0 == var1 && var0 <= 1024U)" $ do
+      renderExpression logicalOrAndRight `shouldBe`
+        pack "*(uint16_t *)var1.data < 1024U\n|| (var0 == *(uint16_t *)var1.data && var0 <= 1024U)"

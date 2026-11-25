@@ -316,8 +316,12 @@ instance CPrint CExpression where
         pexpr2 <- pprintPrec 13 expr2
         return $ parenPrec p 12 $ align (sep [pexpr1, pretty "&&" <+> pexpr2])
     pprintPrec p (CExprSeqOr expr1 expr2 _ _) = do
-        pexpr1 <- pprintPrec 11 expr1
-        pexpr2 <- pprintPrec 12 expr2
+        -- Force parentheses on an operand that is a logical and.
+        let operandPrec def expr = case expr of
+              CExprSeqAnd {} -> 13
+              _ -> def
+        pexpr1 <- pprintPrec (operandPrec 11 expr1) expr1
+        pexpr2 <- pprintPrec (operandPrec 12 expr2) expr2
         return $ parenPrec p 11 $ align (sep [pexpr1, pretty "||" <+> pexpr2])
     pprintPrec p (CExprSizeOfType decl _ _) = do
         pdecl <- pprint decl
