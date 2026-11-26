@@ -109,15 +109,15 @@ spec = describe "Manifest" $ do
       let ssh = "Use https://github.com/uah/drivers instead.\n"
             ++ "If you want git to clone it over SSH, run this once on your computer:\n"
             ++ "  git config --global url.\"git@github.com:\".insteadOf \"https://github.com/\"\n"
-      (project ++ app ++ "dependencies:\n  - git: git@github.com:uah/drivers\n    rev: v1\n") `failsWith` ssh
-      (project ++ app ++ "dependencies:\n  - git: ssh://git@github.com/uah/drivers\n    rev: v1\n") `failsWith` ssh
+      (project ++ app ++ "dependencies:\n  - git: git@github.com:uah/drivers\n    tag: v1\n") `failsWith` ssh
+      (project ++ app ++ "dependencies:\n  - git: ssh://git@github.com/uah/drivers\n    tag: v1\n") `failsWith` ssh
 
     it "rejects a rev that YAML reads as a number" $
-      (project ++ app ++ "dependencies:\n  - git: https://github.com/a/b\n    rev: 1.10\n")
-        `failsWith` "dependencies[0].rev: is read as a number. Write the tag in quotes, as in rev: \"1.10\""
+      (project ++ app ++ "dependencies:\n  - git: https://github.com/a/b\n    tag: 1.10\n")
+        `failsWith` "dependencies[0].tag: is read as a number. Write the tag in quotes, as in tag: \"1.10\""
 
     it "rejects a dependency that is not https" $
-      (project ++ app ++ "dependencies:\n  - git: http://example.com/a/b\n    rev: v1\n")
+      (project ++ app ++ "dependencies:\n  - git: http://example.com/a/b\n    tag: v1\n")
         `failsWith` "dependencies[0].git: http://example.com/a/b is not an https:// URL, and dependencies are fetched with https://"
 
     it "rejects a tick that does not divide 1000000" $
@@ -330,21 +330,21 @@ spec = describe "Manifest" $ do
 
     it "adds a dependencies section at the end when there is none" $
       addDependencyEntry nexys Nothing pus v1
-        `shouldBe` Right (nexys ++ "\ndependencies:\n  - git: https://github.com/acme/pus\n    rev: \"v0.3.1\"\n")
+        `shouldBe` Right (nexys ++ "\ndependencies:\n  - git: https://github.com/acme/pus\n    tag: \"v0.3.1\"\n")
 
     it "adds the entry at the end of the dependencies, keeping the rest" $ do
-      let original = project ++ "dependencies:   # flight\n    - git: https://github.com/acme/ccsds\n      rev: v1.0\n\n# the application\n" ++ app
+      let original = project ++ "dependencies:   # flight\n    - git: https://github.com/acme/ccsds\n      tag: v1.0\n\n# the application\n" ++ app
       addDependencyEntry original Nothing pus v1
-        `shouldBe` Right (project ++ "dependencies:   # flight\n    - git: https://github.com/acme/ccsds\n      rev: v1.0\n"
-          ++ "    - git: https://github.com/acme/pus\n      rev: \"v0.3.1\"\n\n# the application\n" ++ app)
+        `shouldBe` Right (project ++ "dependencies:   # flight\n    - git: https://github.com/acme/ccsds\n      tag: v1.0\n"
+          ++ "    - git: https://github.com/acme/pus\n      tag: \"v0.3.1\"\n\n# the application\n" ++ app)
 
     it "adds the entry to an indentless sequence" $
-      addDependencyEntry (nexys ++ "dependencies:\n- git: https://github.com/acme/ccsds\n  rev: v1.0\n") Nothing pus v1
-        `shouldBe` Right (nexys ++ "dependencies:\n- git: https://github.com/acme/ccsds\n  rev: v1.0\n- git: https://github.com/acme/pus\n  rev: \"v0.3.1\"\n")
+      addDependencyEntry (nexys ++ "dependencies:\n- git: https://github.com/acme/ccsds\n  tag: v1.0\n") Nothing pus v1
+        `shouldBe` Right (nexys ++ "dependencies:\n- git: https://github.com/acme/ccsds\n  tag: v1.0\n- git: https://github.com/acme/pus\n  tag: \"v0.3.1\"\n")
 
     it "adds the dependencies of a test, keeping the tests after it" $
       addDependencyEntry (nexys ++ hk ++ "  tm:\n    platforms: [posix-gcc]\n    timeout: 10\n") (Just "hk") pus v1
-        `shouldBe` Right (nexys ++ hk ++ "    dependencies:\n      - git: https://github.com/acme/pus\n        rev: \"v0.3.1\"\n"
+        `shouldBe` Right (nexys ++ hk ++ "    dependencies:\n      - git: https://github.com/acme/pus\n        tag: \"v0.3.1\"\n"
           ++ "  tm:\n    platforms: [posix-gcc]\n    timeout: 10\n")
 
     it "gives a manifest that reads back with the new dependency" $ do
@@ -358,5 +358,5 @@ spec = describe "Manifest" $ do
       addDependencyEntry (nexys ++ hk) (Just "tm") pus v1 `shouldBe` Left "the manifest declares no test tm"
 
     it "rejects the overrides of a test, which apply to the whole project" $
-      (nexys ++ hk ++ "    overrides:\n      - git: https://github.com/acme/pus\n        rev: v1\n")
+      (nexys ++ hk ++ "    overrides:\n      - git: https://github.com/acme/pus\n        tag: v1\n")
         `failsWith` "tests.hk: overrides go at the top level of the manifest"

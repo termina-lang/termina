@@ -135,8 +135,8 @@ syncDependencies place fetching write root manifest lock = do
         let locked = M.lookup (normalizeUrl u) oldPackages
         in case (fetching, locked) of
             (Refresh _ selected, _) | selected (normalizeUrl u) -> fromGit used u t
-            (_, Just l) | lockedRev l == t -> fromVendor l
-            (Offline, _) -> return (Left (NeedsNetwork (lockedRev <$> locked)))
+            (_, Just l) | lockedTag l == t -> fromVendor l
+            (Offline, _) -> return (Left (NeedsNetwork (lockedTag <$> locked)))
             _ -> fromGit used u t
 
     fromVendor locked = do
@@ -145,7 +145,7 @@ syncDependencies place fetching write root manifest lock = do
             Left err -> Left (VendorMismatch err)
             Right files ->
                 either (Left . InvalidPackage . pure) Right $
-                    packageFromFiles (FromGit (lockedUrl locked) (lockedRev locked) (lockedCommit locked)) (packageDir root (lockedUrl locked))
+                    packageFromFiles (FromGit (lockedUrl locked) (lockedTag locked) (lockedCommit locked)) (packageDir root (lockedUrl locked))
                         [FetchedFile p "100644" b | (p, b) <- files]
 
     fromGit used u t = do
@@ -201,10 +201,10 @@ commitOf = fromMaybe "" . packageCommit . resolvedPackage
 describeChange :: LockChange -> String
 describeChange (Added p) = "added " ++ T.unpack (resolvedUrl p) ++ " " ++ T.unpack (resolvedTag p)
 describeChange (Changed l p)
-    | lockedRev l == resolvedTag p =
+    | lockedTag l == resolvedTag p =
         T.unpack (resolvedUrl p) ++ " " ++ T.unpack (resolvedTag p) ++ " now at " ++ T.unpack (commitOf p)
-    | otherwise = T.unpack (resolvedUrl p) ++ " " ++ T.unpack (lockedRev l) ++ " -> " ++ T.unpack (resolvedTag p)
-describeChange (Removed l) = "removed " ++ T.unpack (lockedUrl l) ++ " " ++ T.unpack (lockedRev l)
+    | otherwise = T.unpack (resolvedUrl p) ++ " " ++ T.unpack (lockedTag l) ++ " -> " ++ T.unpack (resolvedTag p)
+describeChange (Removed l) = "removed " ++ T.unpack (lockedUrl l) ++ " " ++ T.unpack (lockedTag l)
 
 -- | Check, without network and without writing, that the lock and vendor/
 -- match a manifest and that no dependency comes from a local folder.
@@ -220,7 +220,7 @@ syncFrozen place root manifest lock =
 -- | A change that the lock needs, as an error of a command that does not
 -- write the lock.
 lockMismatch :: LockChange -> String
-lockMismatch (Removed l) = "termina.lock has " ++ T.unpack (lockedUrl l) ++ " " ++ T.unpack (lockedRev l)
+lockMismatch (Removed l) = "termina.lock has " ++ T.unpack (lockedUrl l) ++ " " ++ T.unpack (lockedTag l)
     ++ ", which termina.yaml no longer needs. Run termina build or termina update to update termina.lock."
 lockMismatch change = "termina.lock does not match termina.yaml: " ++ describeChange change
     ++ ". Run termina build or termina update to update termina.lock."

@@ -39,7 +39,7 @@ Patch versions on either side are interchangeable.
   left out.
 
 - `fetch_add(v, &mut prev)` on an `AtomicAccess<T>` port and
-  `fetch_add_index(i, v, &mut prev)` on an `AtomicArrayAccess<T; N>` port,
+  `fetch_add_index(i, v, &mut prev)` on an `AtomicArrayAccess<T, N>` port,
   which add `v` to the atomic, or to its element `i`, and leave the previous
   value in `prev`. They take `u8`, `u16`, `u32` and `usize`, and the sum
   wraps around as the `+` of an unsigned integer does; any other type is
@@ -121,6 +121,11 @@ Patch versions on either side are interchangeable.
 - The parameters of a type are separated by commas, as in `Deque<T, N>`,
   `Pool<[u8; 16], 4>` or `Result<T, E>`. A semicolon between them is
   rejected. Arrays keep the semicolon, as in `[u8; 16]` and `[0; 16]`.
+
+- The tag of a git dependency in `termina.yaml` is written as `tag`, as in
+  `tag: v1.0.0`, in `dependencies` and in `overrides`. In `termina.lock`,
+  each package keeps its tag in `tag` and the commit it resolved to in
+  `commit`.
 
 - A module that defines nothing, only types, interfaces or constants, gets no
   `.c`: its C would only include its header. The build removes a `.c` left

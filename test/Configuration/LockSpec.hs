@@ -19,7 +19,7 @@ hash :: String
 hash = "sha256:" ++ replicate 64 'f'
 
 package :: String -> String -> String -> String -> String
-package url rev c h = "  - git: " ++ url ++ "\n    rev: " ++ rev ++ "\n    resolved-rev: " ++ c ++ "\n    content-hash: " ++ h ++ "\n"
+package url rev c h = "  - git: " ++ url ++ "\n    tag: " ++ rev ++ "\n    commit: " ++ c ++ "\n    content-hash: " ++ h ++ "\n"
 
 lockText :: [String] -> String
 lockText pkgs = "version: 1\npackages:\n" ++ concat pkgs
@@ -84,12 +84,12 @@ spec = do
           "version: 1",
           "packages:",
           "  - git: https://github.com/termina-lang/embedded-hal",
-          "    rev: \"1.0\"",
-          "    resolved-rev: " ++ commit,
+          "    tag: \"1.0\"",
+          "    commit: " ++ commit,
           "    content-hash: " ++ hash,
           "  - git: https://github.com/termina-lang/pus-services",
-          "    rev: \"v0.3.1\"",
-          "    resolved-rev: " ++ commit,
+          "    tag: \"v0.3.1\"",
+          "    commit: " ++ commit,
           "    content-hash: " ++ hash
         ]
       fmap lockPackages (parse text) `shouldBe` Right (reverse (lockPackages lock))

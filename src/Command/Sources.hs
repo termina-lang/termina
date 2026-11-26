@@ -116,7 +116,7 @@ readProject root manifest = do
         let url = lockedUrl l
         files <- readPackage root url
         return $ either (\err -> Left ["vendor/" ++ T.unpack (normalizeUrl url) ++ ": " ++ err]) (Right . (,) (normalizeUrl url)) $
-            packageFromFiles (FromGit url (lockedRev l) (lockedCommit l)) (packageDir root url) [FetchedFile p "100644" b | (p, b) <- files]
+            packageFromFiles (FromGit url (lockedTag l) (lockedCommit l)) (packageDir root url) [FetchedFile p "100644" b | (p, b) <- files]
 
 -- | The project with the text of some of its module files replaced.
 -- The texts are given by the path of their file, which starts with the folder

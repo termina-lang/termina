@@ -108,7 +108,7 @@ data Nature = Library ![Prefix] | Application !AppDeployment
 
 data GitDependency = GitDependency {
     gitUrl :: !T.Text,
-    gitRev :: !T.Text
+    gitTag :: !T.Text
   } deriving (Eq, Show)
 
 data Dependency = DepGit !GitDependency | DepPath !FilePath
@@ -306,10 +306,10 @@ dependencyParser = withObject "dependency" $ \o ->
 
 gitDependencyParser :: Value -> Parser GitDependency
 gitDependencyParser = withObject "dependency" $ \o -> do
-    onlyFields ["git", "rev"] o
+    onlyFields ["git", "tag"] o
     GitDependency
         <$> explicitParseField urlParser o "git"
-        <*> explicitParseField revParser o "rev"
+        <*> explicitParseField tagParser o "tag"
 
   where
 
@@ -318,10 +318,10 @@ gitDependencyParser = withObject "dependency" $ \o -> do
         either fail return (checkGitUrl url)
         return url
 
-    revParser rev = case rev of
+    tagParser value = case value of
         String tag -> return tag
         -- YAML reads 1.0 or 1.10 as a number, and 1.10 becomes 1.1, so the tag is lost.
-        Number _ -> fail "is read as a number. Write the tag in quotes, as in rev: \"1.10\""
+        Number _ -> fail "is read as a number. Write the tag in quotes, as in tag: \"1.10\""
         _ -> fail "is not a tag"
 
 -- | A dependency is written with https://. An SSH address gets its https://
@@ -823,7 +823,7 @@ addDependencyEntry original mTest url tag =
 
   where
 
-    item ind = [ind ++ "- git: " ++ T.unpack url, ind ++ "  rev: \"" ++ T.unpack tag ++ "\""]
+    item ind = [ind ++ "- git: " ++ T.unpack url, ind ++ "  tag: \"" ++ T.unpack tag ++ "\""]
 
     -- | Insert the item under the path of keys, in a block whose keys are
     -- indented by "cur".

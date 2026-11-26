@@ -38,7 +38,7 @@ library repos name deps tag = do
     createDirectoryIfMissing True (repo </> "src" </> name)
     void $ readProcess "git" ["init", "-q", repo] ""
     BS.writeFile (repo </> "termina.yaml") $ BS.pack $ header name ++ "exports: [" ++ name ++ "]\n"
-        ++ (if null deps then "" else "dependencies:\n" ++ concat ["  - git: " ++ T.unpack (url d) ++ "\n    rev: \"" ++ t ++ "\"\n" | (d, t) <- deps])
+        ++ (if null deps then "" else "dependencies:\n" ++ concat ["  - git: " ++ T.unpack (url d) ++ "\n    tag: \"" ++ t ++ "\"\n" | (d, t) <- deps])
     BS.writeFile (repo </> "src" </> name </> "m.fin") ""
     BS.writeFile (repo </> "README.md") "not copied\n"
     void $ git repo ["add", "."]
@@ -73,7 +73,7 @@ add :: FilePath -> String -> String -> Maybe String -> IO (Either [String] AddRe
 add project name = addDependency Computer project (url name) . T.pack
 
 lockOf :: FilePath -> IO [(T.Text, T.Text)]
-lockOf project = either error (map (\p -> (lockedUrl p, lockedRev p)) . lockPackages) <$> decodeLockFile (project </> "termina.lock")
+lockOf project = either error (map (\p -> (lockedUrl p, lockedTag p)) . lockPackages) <$> decodeLockFile (project </> "termina.lock")
 
 spec :: Spec
 spec = do
@@ -86,7 +86,7 @@ spec = do
         library repos "pus" [("ccsds", "v1.0.0")] "v0.1.0"
         fmap reportLines <$> add project "pus" "v0.1.0" Nothing `shouldReturn` Right
           ["added https://example.invalid/acme/pus v0.1.0", "pulled https://example.invalid/acme/ccsds v1.0.0 (app -> pus)"]
-        readFile (project </> "termina.yaml") >>= (`shouldSatisfy` isInfixOf "  - git: https://example.invalid/acme/pus\n    rev: \"v0.1.0\"\n")
+        readFile (project </> "termina.yaml") >>= (`shouldSatisfy` isInfixOf "  - git: https://example.invalid/acme/pus\n    tag: \"v0.1.0\"\n")
         lockOf project `shouldReturn` [(url "ccsds", "v1.0.0"), (url "pus", "v0.1.0")]
         let vendored = project </> "vendor" </> "example.invalid" </> "acme" </> "pus"
         mapM (doesFileExist . (vendored </>)) ["termina.yaml", "src/pus/m.fin", "README.md"] `shouldReturn` [True, True, False]
@@ -160,8 +160,8 @@ spec = do
         _ <- git ccsds ["commit", "-q", "--allow-empty", "-m", "second"]
         _ <- git ccsds ["tag", "-f", "v1.0.0"]
         fmap reportLines <$> add project "tm" "v0.1.0" Nothing `shouldReturn` Right ["added https://example.invalid/acme/tm v0.1.0"]
-        commits <- filter ("resolved-rev" `isInfixOf`) . lines <$> readFile (project </> "termina.lock")
-        forM_ (filter ("resolved-rev" `isInfixOf`) (lines (BS.unpack locked))) (\l -> commits `shouldContain` [l])
+        commits <- filter ("commit:" `isInfixOf`) . lines <$> readFile (project </> "termina.lock")
+        forM_ (filter ("commit:" `isInfixOf`) (lines (BS.unpack locked))) (\l -> commits `shouldContain` [l])
 
   describe "reconciliation of the lock with the manifest" $ do
 
@@ -206,7 +206,7 @@ spec = do
         sync project `shouldReturn` Right ["added https://example.invalid/acme/tm v0.1.0", "removed https://example.invalid/acme/pus v0.1.0"]
         lockOf project `shouldReturn` [(url "tm", "v0.1.0")]
         doesDirectoryExist (project </> "vendor" </> "example.invalid" </> "acme" </> "pus") `shouldReturn` False
-        edit project "dependencies:\n  - git: https://example.invalid/acme/tm\n    rev: \"v0.1.0\"\n" ""
+        edit project "dependencies:\n  - git: https://example.invalid/acme/tm\n    tag: \"v0.1.0\"\n" ""
         sync project `shouldReturn` Right ["removed https://example.invalid/acme/tm v0.1.0"]
         doesFileExist (project </> "termina.lock") `shouldReturn` False
         doesDirectoryExist (project </> "vendor" </> "example.invalid") `shouldReturn` False
@@ -268,7 +268,7 @@ spec = do
         verify `shouldReturn` Left
           [ "https://example.invalid/acme/pus v0.2.0 (required by app): termina.lock has v0.1.0 instead, and fetching it needs the network. "
             ++ "Run termina build without --offline, or termina update, to update termina.lock." ]
-        edit project "dependencies:\n  - git: https://example.invalid/acme/pus\n    rev: \"v0.2.0\"\n" ""
+        edit project "dependencies:\n  - git: https://example.invalid/acme/pus\n    tag: \"v0.2.0\"\n" ""
         verify `shouldReturn` Left
           [ "termina.lock has https://example.invalid/acme/pus v0.1.0, which termina.yaml no longer needs. "
             ++ "Run termina build or termina update to update termina.lock." ]

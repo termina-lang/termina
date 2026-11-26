@@ -42,7 +42,7 @@ data LockedPackage = LockedPackage {
     -- | The URL as written in the first manifest that names the package.
     lockedUrl :: !T.Text,
     -- | The tag.
-    lockedRev :: !T.Text,
+    lockedTag :: !T.Text,
     -- | The full SHA that the tag resolved to.
     lockedCommit :: !T.Text,
     -- | "sha256:" and the hash of the vendored content.
@@ -116,18 +116,18 @@ lockParser = withObject "lock" $ \o -> do
 
 packageParser :: Value -> Parser LockedPackage
 packageParser = withObject "locked package" $ \o -> do
-    onlyLockFields "a package of termina.lock" ["git", "rev", "resolved-rev", "content-hash"] o
+    onlyLockFields "a package of termina.lock" ["git", "tag", "commit", "content-hash"] o
     url <- o .: "git"
     unless ("https://" `T.isPrefixOf` url) $
         fail $ "the repository " ++ T.unpack url ++ " of termina.lock is not an https:// URL"
-    rev <- o .: "rev"
-    commit <- o .: "resolved-rev"
+    tag <- o .: "tag"
+    commit <- o .: "commit"
     unless (isHex 40 commit) $
-        fail $ "the resolved-rev of " ++ T.unpack url ++ " is not a full commit SHA (40 lowercase hexadecimal digits)"
+        fail $ "the commit of " ++ T.unpack url ++ " is not a full commit SHA (40 lowercase hexadecimal digits)"
     hash <- o .: "content-hash"
     unless (maybe False (isHex 64) (T.stripPrefix "sha256:" hash)) $
         fail $ "the content-hash of " ++ T.unpack url ++ " is not sha256: and 64 lowercase hexadecimal digits"
-    return (LockedPackage url rev commit hash)
+    return (LockedPackage url tag commit hash)
 
   where
 
@@ -148,8 +148,8 @@ renderLock lock = unlines $ [
 
     package p = [
         "  - git: " ++ T.unpack (lockedUrl p),
-        "    rev: " ++ T.unpack (TE.decodeUtf8 (BL.toStrict (A.encode (lockedRev p)))),
-        "    resolved-rev: " ++ T.unpack (lockedCommit p),
+        "    tag: " ++ T.unpack (TE.decodeUtf8 (BL.toStrict (A.encode (lockedTag p)))),
+        "    commit: " ++ T.unpack (lockedCommit p),
         "    content-hash: " ++ T.unpack (lockedContentHash p)
       ]
 

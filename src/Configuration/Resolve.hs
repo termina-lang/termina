@@ -80,7 +80,7 @@ resolve obtain root = resolveWith obtain root []
 resolveWith :: Monad m => (T.Text -> T.Text -> m (Either e Package)) -> Manifest -> [(GitDependency, [String])]
     -> m (Either [ResolveError e] Resolution)
 resolveWith obtain root extra = do
-    final <- go (initial ++ [Requirement (gitUrl g) (gitRev g) path | (g, path) <- extra]) (State M.empty M.empty [] [] [])
+    final <- go (initial ++ [Requirement (gitUrl g) (gitTag g) path | (g, path) <- extra]) (State M.empty M.empty [] [] [])
     return $ case reverse (errors final) of
         [] -> Right (Resolution (packages final) (reverse (applied final)) (reverse (ignored final)))
         errs -> Left errs
@@ -89,10 +89,10 @@ resolveWith obtain root extra = do
 
     rootName = T.unpack (projectName (manifestProject root))
 
-    overrides = M.fromList [(normalizeUrl (gitUrl o), gitRev o) | o <- manifestOverrides root]
+    overrides = M.fromList [(normalizeUrl (gitUrl o), gitTag o) | o <- manifestOverrides root]
 
-    initial = [Requirement (gitUrl g) (gitRev g) [rootName] | DepGit g <- manifestDependencies root]
-        ++ [ Requirement (gitUrl g) (gitRev g) [rootName ++ " (test " ++ T.unpack t ++ ")"]
+    initial = [Requirement (gitUrl g) (gitTag g) [rootName] | DepGit g <- manifestDependencies root]
+        ++ [ Requirement (gitUrl g) (gitTag g) [rootName ++ " (test " ++ T.unpack t ++ ")"]
            | (t, entry) <- M.toList (manifestTests root), DepGit g <- testDependencies entry ]
 
     go [] st = return st
@@ -112,7 +112,7 @@ resolveWith obtain root extra = do
                     Right got -> do
                         let manifest = packageManifest got
                             name = projectName (manifestProject manifest)
-                            deps = [Requirement (gitUrl g) (gitRev g) (path ++ [T.unpack name]) | DepGit g <- manifestDependencies manifest]
+                            deps = [Requirement (gitUrl g) (gitTag g) (path ++ [T.unpack name]) | DepGit g <- manifestDependencies manifest]
                         go (rest ++ deps) st' {
                             packages = M.insert key (ResolvedDependency url tag got path) (packages st'),
                             ignored = reverse [(name, gitUrl o) | o <- manifestOverrides manifest] ++ ignored st' }

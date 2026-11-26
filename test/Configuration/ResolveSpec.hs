@@ -18,7 +18,7 @@ import Configuration.Helpers
 
 depsOf :: String -> [(String, String)] -> String
 depsOf _ [] = ""
-depsOf key deps = key ++ ":\n" ++ concat ["  - git: " ++ u ++ "\n    rev: \"" ++ t ++ "\"\n" | (u, t) <- deps]
+depsOf key deps = key ++ ":\n" ++ concat ["  - git: " ++ u ++ "\n    tag: \"" ++ t ++ "\"\n" | (u, t) <- deps]
 
 -- | A library named as the last segment of its URL, with its dependencies
 -- and its overrides.

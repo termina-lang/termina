@@ -107,16 +107,16 @@ checkTags root = do
             let locked url = find ((== normalizeUrl url) . normalizeUrl . lockedUrl) (lockPackages lock)
                 manifestDrift =
                     [ case locked (gitUrl g) of
-                        Nothing -> "termina.yaml asks for " ++ T.unpack (gitUrl g) ++ " " ++ T.unpack (gitRev g) ++ ", which termina.lock does not have"
-                        Just l -> "termina.yaml asks for " ++ T.unpack (gitRev g) ++ " of " ++ T.unpack (gitUrl g)
-                            ++ ", and termina.lock has " ++ T.unpack (lockedRev l)
-                    | g <- gitDependencies manifest, maybe True ((/= gitRev g) . lockedRev) (locked (gitUrl g)) ]
+                        Nothing -> "termina.yaml asks for " ++ T.unpack (gitUrl g) ++ " " ++ T.unpack (gitTag g) ++ ", which termina.lock does not have"
+                        Just l -> "termina.yaml asks for " ++ T.unpack (gitTag g) ++ " of " ++ T.unpack (gitUrl g)
+                            ++ ", and termina.lock has " ++ T.unpack (lockedTag l)
+                    | g <- gitDependencies manifest, maybe True ((/= gitTag g) . lockedTag) (locked (gitUrl g)) ]
             tags <- forM (lockPackages lock) $ \l -> do
-                resolved <- resolveTag (lockedUrl l) (lockedRev l)
+                resolved <- resolveTag (lockedUrl l) (lockedTag l)
                 return $ case resolved of
-                    Left err -> Left (T.unpack (lockedUrl l) ++ " " ++ T.unpack (lockedRev l) ++ ": " ++ describePackageError (FetchFailed err))
+                    Left err -> Left (T.unpack (lockedUrl l) ++ " " ++ T.unpack (lockedTag l) ++ ": " ++ describePackageError (FetchFailed err))
                     Right sha
-                        | sha /= lockedCommit l -> Right ["the tag " ++ T.unpack (lockedRev l) ++ " of " ++ T.unpack (lockedUrl l)
+                        | sha /= lockedCommit l -> Right ["the tag " ++ T.unpack (lockedTag l) ++ " of " ++ T.unpack (lockedUrl l)
                             ++ " now points to " ++ shortSha sha ++ ", and termina.lock has " ++ shortSha (lockedCommit l)]
                         | otherwise -> Right []
             return $ case [err | Left err <- tags] of

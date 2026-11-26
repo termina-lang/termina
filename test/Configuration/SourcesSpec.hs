@@ -29,7 +29,7 @@ url name = T.pack ("https://github.com/acme/" ++ name)
 
 deps :: [String] -> String
 deps [] = ""
-deps names = "dependencies:\n" ++ concat ["  - git: " ++ T.unpack (url n) ++ "\n    rev: \"v1\"\n" | n <- names]
+deps names = "dependencies:\n" ++ concat ["  - git: " ++ T.unpack (url n) ++ "\n    tag: \"v1\"\n" | n <- names]
 
 -- | The sources of the build of the application and of the test hk of the
 -- project of withLoaded.
@@ -67,7 +67,7 @@ withLoaded action = do
         writeLockFile "termina.lock" (Lock 1 [LockedPackage (url n) "v1" (T.pack (replicate 40 'a')) (T.pack ("sha256:" ++ replicate 64 'b')) | n <- ["pus", "ccsds", "fixtures"]])
         let manifest = manifestOf $ header "obdh" ++ "app:\n  platform: posix-gcc\n  profile: release\n" ++ deps ["pus"]
                 ++ "  - path: libs/drivers\n"
-                ++ "tests:\n  hk:\n    platforms: [posix-gcc]\n    timeout: 10\n    dependencies:\n      - git: " ++ T.unpack (url "fixtures") ++ "\n        rev: \"v1\"\n"
+                ++ "tests:\n  hk:\n    platforms: [posix-gcc]\n    timeout: 10\n    dependencies:\n      - git: " ++ T.unpack (url "fixtures") ++ "\n        tag: \"v1\"\n"
         readProject "." manifest >>= either (error . unlines) action
 
 vendored :: String -> FilePath

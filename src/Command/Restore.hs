@@ -53,7 +53,7 @@ restoreVendor place root = do
                         writePackage root (lockedUrl locked) files
                         when fromPrefetch (removePathForcibly (prefetchDir root (lockedUrl locked)))
                     return $ Right
-                        [ "restored vendor/" ++ T.unpack (normalizeUrl (lockedUrl locked)) ++ " (" ++ T.unpack (lockedRev locked) ++ ")"
+                        [ "restored vendor/" ++ T.unpack (normalizeUrl (lockedUrl locked)) ++ " (" ++ T.unpack (lockedTag locked) ++ ")"
                         | Right (locked, _, _) <- results ]
                 errs -> return (Left (describeObtainErrors place (Just RestoreCommand) errs))
 
@@ -63,7 +63,7 @@ restoreVendor place root = do
     -- It is not admitted again: the content-hash froze an admitted package.
     bring locked = do
         let url = lockedUrl locked
-            tag = lockedRev locked
+            tag = lockedTag locked
             failed = Left . ObtainFailed url tag ["termina.lock"]
         fetched <- fetchLocked root url tag (lockedCommit locked)
         return $ case fetched of

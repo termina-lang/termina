@@ -33,7 +33,7 @@ package name exports deps modules =
   where
 
     m = manifestOf $ header name ++ "exports: [" ++ exports ++ "]\n"
-        ++ (if null deps then "" else "dependencies:\n" ++ concat ["  - git: " ++ url d ++ "\n    rev: v1\n" | d <- deps])
+        ++ (if null deps then "" else "dependencies:\n" ++ concat ["  - git: " ++ url d ++ "\n    tag: v1\n" | d <- deps])
 
     files = FetchedFile "termina.yaml" "100644" "" : [FetchedFile p "100644" (BS.pack body) | (p, body) <- modules]
 
