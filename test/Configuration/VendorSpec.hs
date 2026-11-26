@@ -50,6 +50,11 @@ spec = do
         ] `shouldBe` ["termina.yaml", "src/pus/service1.fin", "src/pus/service1/tm.fin", "src/ccsds/tc/frame.fin",
           "extern/src/crc.c", "extern/src/spi/a.c", "extern/include/crc.h", "extern/lib/posix-gcc/libcrc.a"]
 
+    it "keeps the license files at the root of the package, and not those of a folder" $
+      filter (isVendored library) [
+          "LICENSE", "LICENSE.md", "LICENSE-APACHE", "COPYING", "src/pus/LICENSE", "extern/LICENSE", ".LICENSE"
+        ] `shouldBe` ["LICENSE", "LICENSE.md", "LICENSE-APACHE"]
+
     it "keeps the namespace.yaml of the folders of the exported prefixes, and not the one of a folder that only contains a prefix" $
       filter (isVendored library) [
           "src/pus/namespace.yaml", "src/pus/service1/namespace.yaml", "src/ccsds/namespace.yaml",

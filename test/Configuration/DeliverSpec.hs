@@ -128,9 +128,10 @@ spec = describe "termina deliver" $ do
         , "DOT_IMAGE_FORMAT      = svg"
         , "INTERACTIVE_SVG       = YES"
         , "DOT_GRAPH_MAX_NODES   = 100"
+        , "INCLUDED_BY_GRAPH     = NO"
         ]
 
-    it "leaves the graphs out with --no-graphs" $
+    it "leaves the graphs out without --graphs" $
       drop 12 (T.lines (genDoxyfile info (defaultConfig "icu-asw" POSIXGCC) [] False))
         `shouldBe` ["GENERATE_LATEX        = NO", "HAVE_DOT              = NO"]
 

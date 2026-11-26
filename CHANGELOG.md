@@ -115,10 +115,14 @@ Patch versions on either side are interchangeable.
   statements go into the C as plain comments. The deliverable gets a
   `Doxyfile` at its root that documents its C without the third-party files
   of the OSAL, and Doxygen documents it into `doc/html`, which `--archive`
-  packs with the rest. A warning of Doxygen stops the delivery. The pages
-  have the graphs of the includes, of the structures and of the groups,
-  drawn by `dot` of Graphviz, which `--no-graphs` leaves out.
-  `provenance.json` records the versions of Doxygen and of Graphviz.
+  packs with the rest. A warning of Doxygen stops the delivery. With
+  `--graphs`, the pages have the graphs of the includes, of the structures
+  and of the groups, drawn by `dot` of Graphviz. `provenance.json` records
+  the versions of Doxygen and, with `--graphs`, of Graphviz.
+- `termina deliver` copies the license files of each dependency into
+  `licenses/<package>` of the deliverable, and those of the project to its
+  root. `vendor/` keeps the license files at the root of each package, so
+  the content-hash of a package changes when it is added again.
 
 ### Changed
 

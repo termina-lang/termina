@@ -21,6 +21,7 @@ import Configuration.Configuration
 import Configuration.Manifest
 import Configuration.NamespaceFile (readNamespaceDescription)
 import Configuration.Package (Package(..))
+import Configuration.Vendor (isLicenseFile)
 import Generator.Makefile.AST
 import Generator.CodeGen.Doc (moduleNamespace, namespaceGroup)
 import Generator.Makefile.Printer
@@ -54,7 +55,7 @@ data DeliverCmdArgs =
         Bool -- ^ Deliver the tests as well
         Bool -- ^ Pack each deliverable into a .tar.gz
         Bool -- ^ Print the documentation comments in the C and document it with Doxygen
-        Bool -- ^ Leave the graphs out of the documentation
+        Bool -- ^ Draw the graphs of the documentation
     deriving Show
 
 -- | Parser for the "deliver" command arguments
@@ -69,16 +70,16 @@ deliverCmdArgsParser = DeliverCmdArgs
         <> O.help "Pack each deliverable into a .tar.gz")
     <*> O.switch (O.long "docs"
         <> O.help "Print the documentation comments in the C, and document it with Doxygen in doc/html")
-    <*> O.switch (O.long "no-graphs"
-        <> O.help "With --docs, leave out the graphs, which need dot of Graphviz")
+    <*> O.switch (O.long "graphs"
+        <> O.help "With --docs, draw the graphs of the includes, the structures and the groups, which need dot of Graphviz")
 
 -- | Command handler for the "deliver" command
 deliverCommand :: DeliverCmdArgs -> IO ()
-deliverCommand (DeliverCmdArgs chatty withTests archive docs noGraphs) = do
-    when (noGraphs && not docs) $
-      dieWithError "--no-graphs is for the documentation of --docs"
+deliverCommand (DeliverCmdArgs chatty withTests archive docs graphs) = do
+    when (graphs && not docs) $
+      dieWithError "--graphs is for the documentation of --docs"
     -- | The tools are checked before the first build, which takes long
-    tools <- if docs then Just <$> documentationTools (not noGraphs) else return Nothing
+    tools <- if docs then Just <$> documentationTools graphs else return Nothing
     -- A deliverable is built from the state in git, with termina.lock and
     -- vendor/ as they are.
     loaded <- loadProject Frozen
@@ -125,7 +126,7 @@ documentationTools graphs = do
     dot <- if not graphs then return Nothing else do
       found <- findExecutable "dot"
       when (isNothing found) $
-        dieWithError "the graphs of --docs need dot of Graphviz, which is not in the PATH: install Graphviz, or leave them out with --no-graphs"
+        dieWithError "--graphs needs dot of Graphviz, which is not in the PATH: install Graphviz, or leave out --graphs"
       -- | dot -V writes "dot - graphviz version X.Y.Z (date)" to stderr
       (_, _, err) <- readProcessWithExitCode "dot" ["-V"] ""
       return . Just $ case dropWhile (/= "version") (words err) of
@@ -172,11 +173,13 @@ genDoxyfile project config externFolders graphs = T.unlines $
     , "HAVE_DOT              = " <> (if graphs then "YES" else "NO")
     ] ++
     -- | The graphs of the includes, of the structures and of the groups, but
-    -- not those of the calls
+    -- not those of the calls nor those of the files that include a header,
+    -- which for termina.h has a node for every file
     (if graphs
         then [ "DOT_IMAGE_FORMAT      = svg"
              , "INTERACTIVE_SVG       = YES"
-             , "DOT_GRAPH_MAX_NODES   = 100" ]
+             , "DOT_GRAPH_MAX_NODES   = 100"
+             , "INCLUDED_BY_GRAPH     = NO" ]
         else [])
 
   where
@@ -379,6 +382,15 @@ deliverDeployment chatty loaded archive tools folder deployment = do
         osalUsed = nub . sort . filter (inFolder osalDir) $ osalSources ++ opened ++ named ++ externScript
     licenses <- licenseFiles osalDir osalUsed
     forM_ (map (relativeTo osalDir) (osalUsed ++ licenses)) $ \file -> copyInto (osalDir </> file) (folder </> "osal" </> file)
+    -- | The licenses of the project, at the root of the deliverable, and those
+    -- of its dependencies, whose code the deliverable carries, in
+    -- "licenses/<name of the package>"
+    projectLicenses <- licensesIn (loadedRoot loaded)
+    forM_ projectLicenses $ \file -> copyInto file (folder </> takeFileName file)
+    forM_ (M.elems (loadedRemotes loaded) ++ M.elems (loadedLocals loaded)) $ \p -> do
+      let packageName = T.unpack (projectName (manifestProject (packageManifest p)))
+      packageLicenses <- licensesIn (packageFolder p)
+      forM_ packageLicenses $ \file -> copyInto file (folder </> "licenses" </> packageName </> takeFileName file)
     forM_ (projectLinkerScript config info) $ \(script, path) -> copyInto script (folder </> path)
     let makefile = runMakefilePrinter $
             genDeliverableMakefile config info (map relocated osalSources) sources externs (testModules config modules)
@@ -715,11 +727,12 @@ licenseFiles osalDir used = do
     let vendored = nub [ osalDir </> "vendor" </> v | f <- used, ("vendor" : v : _ : _) <- [splitDirectories (relativeTo osalDir f)] ]
     concat <$> mapM licensesIn (osalDir : vendored)
 
-  where
-
-    licensesIn dir = do
-      entries <- listDirectory dir
-      filterM doesFileExist [ dir </> e | e <- sort entries, "LICENSE" `isPrefixOf` e ]
+-- | The license files at the root of a folder, such as "LICENSE" or
+-- "LICENSE.md".
+licensesIn :: FilePath -> IO [FilePath]
+licensesIn dir = do
+    entries <- listDirectory dir
+    filterM doesFileExist [ dir </> e | e <- sort entries, isLicenseFile e ]
 
 copyInto :: FilePath -> FilePath -> IO ()
 copyInto from to = do

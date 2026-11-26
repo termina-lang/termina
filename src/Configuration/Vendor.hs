@@ -7,6 +7,7 @@ module Configuration.Vendor (
     vendorDir,
     packageDir,
     isVendored,
+    isLicenseFile,
     exportedExtern,
     contentHash,
     writePackage,
@@ -19,7 +20,7 @@ import Control.Monad
 import qualified Crypto.Hash.SHA256 as SHA256
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BC
-import Data.List (intercalate, isSuffixOf, sortOn)
+import Data.List (intercalate, isPrefixOf, isSuffixOf, sortOn)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -46,16 +47,22 @@ packageDir :: FilePath -> T.Text -> FilePath
 packageDir root url = vendorDir root </> normalizedFolder url
 
 -- | Whether a file of a package goes to "vendor/": its "termina.yaml", the
--- modules of its exported prefixes and the "namespace.yaml" of their
--- folders, and the files that its "extern" section lists under those modules,
--- none of them hidden.
+-- license files at its root, the modules of its exported prefixes and the
+-- "namespace.yaml" of their folders, and the files that its "extern" section
+-- lists under those modules, none of them hidden.
 isVendored :: Manifest -> String -> Bool
 isVendored manifest path =
     not (isHidden path)
         && (path == "termina.yaml"
+            || isLicenseFile path
             || ((".fin" `isSuffixOf` path || ("/" ++ namespaceFileName) `isSuffixOf` path)
                 && any (`ownsPath` path) (manifestPrefixes manifest))
             || any (\listed -> listedMatches ("extern/" ++ listed) path) (externFiles (exportedExtern manifest)))
+
+-- | Whether a path of a package is a license file at its root, such as
+-- "LICENSE" or "LICENSE.md".
+isLicenseFile :: String -> Bool
+isLicenseFile path = '/' `notElem` path && "LICENSE" `isPrefixOf` path
 
 -- | The entries of the "extern" section of a package whose module is in one
 -- of its exported prefixes, the only ones that a consumer gets.
