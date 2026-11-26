@@ -159,6 +159,11 @@ Patch versions on either side are interchangeable.
 
 ### Fixed
 
+- On `freertos10-stm32l432-nucleol432kc`, the board starts the program at
+  the first power-on after a load. Writing the flash toggles PEMPTY
+  (`FLASH_SR`, bit 17), with which a reset starts the system bootloader; the
+  commands that load the board, in `termina test`, `termina run` and the
+  debugging sessions, now clear it after the load and reset again.
 - `termina platforms --json --xsdb <host>:<port>` gives the XSDB address
   only to the PYNQ-Z2. Until now every platform got one when `--xsdb` had a
   port.

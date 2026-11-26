@@ -35,7 +35,12 @@ usizeWidth TestPlatform                    = 32
 -- The runner of termina test and termina platforms --json give them.
 gdbLaunch :: Platform -> Maybe [String]
 gdbLaunch RTEMS5LEON3SFNEXYSA7 = Just ["monitor reset", "load"]
-gdbLaunch FreeRTOS10STM32L432NUCLEOL432KC = Just ["monitor reset", "load"]
+-- | The load toggles PEMPTY (bit 17 of FLASH_SR), and with it set the reset
+-- boots the system bootloader: writing the bit back clears it
+gdbLaunch FreeRTOS10STM32L432NUCLEOL432KC = Just
+    [ "monitor reset", "load"
+    , "set *(unsigned int *)0x40022010 = *(unsigned int *)0x40022010 & 0x20000"
+    , "monitor reset" ]
 -- | The XSDB script of the project resets the PYNQ before the load
 gdbLaunch RTEMS6ZYNQ7000PYNQZ2 = Just ["load"]
 -- | OpenOCD cannot reset Spike, and the load leaves the PC at the entry: the
