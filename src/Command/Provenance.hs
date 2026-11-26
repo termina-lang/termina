@@ -32,12 +32,13 @@ import System.Exit (ExitCode(..))
 import System.FilePath
 import System.Process (readProcessWithExitCode)
 
--- | The fields of the provenance of a build, given the values of its Makefile,
--- the hashes of its bin/stripped.sha256 and its modules with their source
--- files.
-provenanceFields :: TerminaConfig -> M.Map String String -> M.Map FilePath String -> [(QualifiedName, FilePath)] -> IO [Pair]
-provenanceFields config info hashes modules = do
+-- | The fields of the provenance of a build, given the folder it was built in,
+-- the values of its Makefile, the hashes of its bin/stripped.sha256 and its
+-- modules with their source files.
+provenanceFields :: FilePath -> TerminaConfig -> M.Map String String -> M.Map FilePath String -> [(QualifiedName, FilePath)] -> IO [Pair]
+provenanceFields root config info hashes modules = do
     osalVersion <- readOsalVersion (dropTrailingPathSeparator (M.findWithDefault "" "TERMINA_OSAL_DIR" info))
+    entries <- mapM moduleEntry modules
     return [
         "name" .= name config,
         "deployment" .= (if isTestBuild config then "test" else "app" :: String),
@@ -50,7 +51,7 @@ provenanceFields config info hashes modules = do
             "path" .= binary,
             "stripped-sha256" .= M.lookup binary hashes
           ],
-        "modules" .= map moduleEntry modules
+        "modules" .= entries
       ]
 
   where
@@ -61,13 +62,17 @@ provenanceFields config info hashes modules = do
 
     originOf source = if take 1 (splitDirectories source) == ["tests"] then "test" else "project" :: String
 
-    moduleEntry (qname, source) = object [
-        "module" .= map (\c -> if c == '/' then '.' else c) qname,
-        "origin" .= originOf source,
-        "source" .= source,
-        "object" .= objectOf qname,
-        "stripped-sha256" .= M.lookup (objectOf qname) hashes
-      ]
+    -- | A module that defines nothing has no source file, and so no object
+    moduleEntry (qname, source) = do
+        built <- doesFileExist (root </> objectOf qname)
+        let obj = if built then Just (objectOf qname) else Nothing
+        return $ object [
+            "module" .= map (\c -> if c == '/' then '.' else c) qname,
+            "origin" .= originOf source,
+            "source" .= source,
+            "object" .= obj,
+            "stripped-sha256" .= M.lookup (objectOf qname) hashes
+          ]
 
 -- | Write the provenance.json of a folder, given its fields.
 writeProvenanceFile :: FilePath -> [Pair] -> IO ()

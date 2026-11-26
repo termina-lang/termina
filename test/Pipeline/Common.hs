@@ -15,6 +15,7 @@ module Pipeline.Common
   , renderDocumentedFiles
   , renderDocumentedFilesOn
   , generatedNameErrorOn
+  , sourceDefinesNothing
   , compileErrorCode
   , compileTestErrorCode
   , compileTestProjectErrorCode
@@ -69,7 +70,7 @@ import Modules.Utils (buildModuleName)
 import Parser.Errors (Error(..), ParsingErrors, parseError)
 import Utils.Annotations (QualifiedName, annotateError, Location(Internal), Located(..), getError)
 import Generator.Names (checkGeneratedNames)
-import Generator.LanguageC.AST (CFile)
+import Generator.LanguageC.AST (CFile, definesNothing)
 import qualified Generator.Names.Errors as Names
 import Data.Maybe (listToMaybe, mapMaybe)
 
@@ -166,6 +167,13 @@ generatedNameErrorOn plt sources = either (Left . failMessage) Right $ do
   result <- runProjectPipelineOn plt configParams sources
   files <- mapM (generatedFilesOn plt result) (M.keys (elaboratedModules result))
   return (getError <$> listToMaybe (mapMaybe (checkGeneratedNames plt) (concatMap (\(h, c) -> [h, c]) files)))
+
+-- | Whether the source file of a module holds nothing but includes.
+sourceDefinesNothing :: QualifiedName -> [(QualifiedName, String)] -> Either Text Bool
+sourceDefinesNothing target sources = either (Left . failMessage) Right $ do
+  result <- runProjectPipelineOn TestPlatform configParams sources
+  (_, cSourceFile) <- generatedFilesOn TestPlatform result target
+  return (definesNothing cSourceFile)
 
 -- | Header and source file of a module, generated on a platform.
 generatedFilesOn :: Platform -> PipelineResult -> QualifiedName -> Either Failure (CFile, CFile)

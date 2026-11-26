@@ -34,6 +34,7 @@ import Modules.Modules
 import Generator.Monadic
 import Data.List (intercalate, nub)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
+import Generator.LanguageC.AST (definesNothing)
 import Generator.CodeGen.Coverage (renderCoverageMap)
 import Doc.Facts (DocFact, instanceFacts)
 import Semantic.Types (SemanticAnn)
@@ -245,9 +246,11 @@ genModules ::
   -- | The facts of the instances of the deployment
   -> M.Map Identifier [DocFact SemanticAnn]
   -- | The project to generate the code from
-  -> ElaboratedProject -> IO ()
+  -> ElaboratedProject
+  -- | The modules that have a source file
+  -> IO [QualifiedName]
 genModules params plt instrumented initialMonadicTypes facts loweredProject =
-  foldM_ printModule initialMonadicTypes (M.elems loweredProject)
+  snd <$> foldM printModule (initialMonadicTypes, []) (M.elems loweredProject)
 
   where
 
@@ -258,12 +261,14 @@ genModules params plt instrumented initialMonadicTypes facts loweredProject =
     -- documentation comments when the configuration asks for them
     moduleConfig config = CPrinterConfig (lineDirectives config) False (docComments config)
 
-    printModule :: MonadicTypes -> ElaboratedModule -> IO MonadicTypes
-    printModule currentMonadicTypes bbModule = do
-      printSource bbModule
-      printHeader currentMonadicTypes bbModule
+    printModule :: (MonadicTypes, [QualifiedName]) -> ElaboratedModule -> IO (MonadicTypes, [QualifiedName])
+    printModule (currentMonadicTypes, withSource) bbModule = do
+      written <- printSource bbModule
+      newMonadicTypes <- printHeader currentMonadicTypes bbModule
+      return (newMonadicTypes, if written then qualifiedName bbModule : withSource else withSource)
 
-    printSource :: ElaboratedModule -> IO ()
+    -- | No source file for a module that defines nothing, whose C would only include its header
+    printSource :: ElaboratedModule -> IO Bool
     printSource bbModule = do
       let destinationPath = outputFolder params
           sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
@@ -271,14 +276,17 @@ genModules params plt instrumented initialMonadicTypes facts loweredProject =
           covered = instrumented (qualifiedName bbModule)
       case runGenSourceFile params { coverage = covered } plt (qualifiedName bbModule) tAST of
         Left err -> dieWithError $ show err
-        Right (cSourceFile, points) -> do
-          checkCNames files plt cSourceFile
-          writeIfChanged sourceFile $ runCPrinterWith (moduleConfig params) cSourceFile
-          -- | The map of the flags of an instrumented module
-          when covered $ do
-            let mapFile = destinationPath </> "map" </> qualifiedName bbModule <.> "json"
-            sourceHash <- sha256File (fullPath bbModule)
-            writeIfChanged mapFile $ renderCoverageMap terminaVersion (fullPath bbModule) sourceHash (qualifiedName bbModule) points
+        Right (cSourceFile, points)
+          | definesNothing cSourceFile -> return False
+          | otherwise -> do
+              checkCNames files plt cSourceFile
+              writeIfChanged sourceFile $ runCPrinterWith (moduleConfig params) cSourceFile
+              -- | The map of the flags of an instrumented module
+              when covered $ do
+                let mapFile = destinationPath </> "map" </> qualifiedName bbModule <.> "json"
+                sourceHash <- sha256File (fullPath bbModule)
+                writeIfChanged mapFile $ renderCoverageMap terminaVersion (fullPath bbModule) sourceHash (qualifiedName bbModule) points
+              return True
 
     printHeader :: MonadicTypes -> ElaboratedModule -> IO MonadicTypes
     printHeader currentMonadicTypes bbModule = do
@@ -474,7 +482,7 @@ buildDeployment args project deployment = do
     runMake (deploymentLabel deployment) (outputFolder config) ["-s", "stripped-hashes"]
     info <- buildInfo (deploymentLabel deployment) (outputFolder config)
     hashes <- readHashes (outputFolder config </> "bin" </> "stripped.sha256")
-    provenanceFields config info hashes modules >>= writeProvenanceFile (outputFolder config)
+    provenanceFields (outputFolder config) config info hashes modules >>= writeProvenanceFile (outputFolder config)
     when (coverage config) (writeGdbScripts config)
     return built
 
@@ -590,19 +598,19 @@ generateDeployment (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag _ _ _ _
     externs <- prepareExtern config (map outputFolder outConfigs) parsedProject sources (deploymentExterns deployment)
     forM_ outConfigs $ \outConfig -> do
       when chatty (putStrLn . debugMessage $ "Generating code into \"" ++ outputFolder outConfig ++ "\"")
-      genModules outConfig plt instrumented monadicTypes (instanceFacts plt programArchitecture) elaboratedProject
+      withSource <- genModules outConfig plt instrumented monadicTypes (instanceFacts plt programArchitecture) elaboratedProject
       genInitFile outConfig plt elaboratedProject
       genPlatformCode outConfig plt loweredProject programArchitecture externs
       monadicHeaders <- genMonadicHeaderFiles outConfig plt monadicTypes
-      -- | The C of a module that is no longer in the project would still be
-      -- compiled and linked
+      -- | The C of a module that is no longer in the project, or that no
+      -- longer defines anything, would still be compiled and linked
       let out = outputFolder outConfig
           moduleNames = M.keys elaboratedProject
-      removeStaleFiles (out </> "src") [".c"] [out </> "src" </> m <.> "c" | m <- moduleNames]
+      removeStaleFiles (out </> "src") [".c"] [out </> "src" </> m <.> "c" | m <- withSource]
       removeStaleFiles (out </> "include") [".h"]
         ([out </> "include" </> m <.> "h" | m <- moduleNames] ++ [out </> "include" </> genConfigPathName] ++ monadicHeaders)
       when (coverage outConfig) $
-        removeStaleFiles (out </> "map") [".json"] [out </> "map" </> m <.> "json" | m <- moduleNames, instrumented m]
+        removeStaleFiles (out </> "map") [".json"] [out </> "map" </> m <.> "json" | m <- withSource, instrumented m]
     genChecksReportFile config loweredProject checksReports
     when genTransactionalWCEPs $
       when chatty (putStrLn . debugMessage $ "Generating transactional worst-case execution paths") >>

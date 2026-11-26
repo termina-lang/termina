@@ -223,7 +223,7 @@ deliverDeployment chatty loaded archive docs folder deployment = do
     -- | provenance.json of the deliverable, which adds its files to the one
     -- of a build
     fileHashes <- mapM (\f -> (f,) <$> sha256File (folder </> f)) delivered
-    fields <- provenanceFields config info deliveredHashes modules
+    fields <- provenanceFields folder config info deliveredHashes modules
     writeProvenanceFile folder (fields ++ ["files" .= map (\(f, h) -> object ["path" .= f, "sha256" .= h]) fileHashes])
     when archive $ do
       let project = manifestProject (loadedManifest loaded)

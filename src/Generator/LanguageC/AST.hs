@@ -59,6 +59,19 @@ data CFileItem' a
     | CFunctionDef (Maybe CStorageSpecifier) (CFunction' a) a
     | CPPDirective CPreprocessorDirective a
 
+-- | Whether a file holds nothing but includes
+definesNothing :: CFile' a -> Bool
+definesNothing file = all isInclude items
+
+    where
+
+        items = case file of
+            CSourceFile _ is -> is
+            CHeaderFile _ is -> is
+
+        isInclude (CPPDirective (CPPInclude _ _) _) = True
+        isInclude _ = False
+
 data CAttribute' a = CAttr Ident [CExpression' a]
     deriving Show
 

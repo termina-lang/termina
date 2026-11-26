@@ -112,6 +112,11 @@ Patch versions on either side are interchangeable.
 
 ### Changed
 
+- A module that defines nothing, only types, interfaces or constants, gets no
+  `.c`: its C would only include its header. The build removes a `.c` left
+  by an earlier build of such a module, and its entry in `provenance.json`
+  has no object.
+
 - A comment that starts with `///` or `/**` is a documentation comment and
   follows its syntax. Comments in the style of Doxygen, with tags such as
   `@brief` or `@defgroup`, are rejected with PE-011.
