@@ -38,7 +38,7 @@ spec = do
       contentHash [("termina.yaml", "a\n"), ("src/pus/x.fin", "b\n")] `shouldNotBe` contentHash package
       contentHash [("termina.yaml", "a\n"), ("src/pus/y.fin", "b\r\n")] `shouldNotBe` contentHash package
 
-  describe "files that go to vendor" $
+  describe "files that go to vendor" $ do
 
     it "keeps the manifest, the modules of the exported prefixes and the extern files listed under them, none of them hidden" $
       filter (isVendored library) [
@@ -49,6 +49,12 @@ spec = do
           "src/ccsds/.draft.fin", "src/ccsds/.cache/frame.fin", "extern/src/spi/.a.c", "extern/src/.DS_Store"
         ] `shouldBe` ["termina.yaml", "src/pus/service1.fin", "src/pus/service1/tm.fin", "src/ccsds/tc/frame.fin",
           "extern/src/crc.c", "extern/src/spi/a.c", "extern/include/crc.h", "extern/lib/posix-gcc/libcrc.a"]
+
+    it "keeps the namespace.yaml of the folders of the exported prefixes, and not the one of a folder that only contains a prefix" $
+      filter (isVendored library) [
+          "src/pus/namespace.yaml", "src/pus/service1/namespace.yaml", "src/ccsds/namespace.yaml",
+          "src/ccsds/tc/namespace.yaml", "src/test_support/namespace.yaml", "src/pus/service1/notes.yaml"
+        ] `shouldBe` ["src/pus/service1/namespace.yaml", "src/ccsds/namespace.yaml", "src/ccsds/tc/namespace.yaml"]
 
   describe "check against the lock" $
 

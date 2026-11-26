@@ -6,6 +6,9 @@ module Generator.CodeGen.Doc
   , genProcedureDoc
   , genInstanceDoc
   , genFileDoc
+  , genSourceFileDoc
+  , moduleNamespace
+  , namespaceGroup
   , statementComment
   , genBriefDoc
   , generatedDoc
@@ -34,7 +37,8 @@ import Generator.LanguageC.AST
 import Parser.Types (ParserAnn(..))
 import Semantic.AST (Expression(..), Parameter)
 import Semantic.Types (GlobalDecl, SemanticAnn, globalDeclName, sourceOf)
-import Utils.Annotations (Annotated(..))
+import System.FilePath (splitDirectories)
+import Utils.Annotations (Annotated(..), QualifiedName)
 import Utils.Printer (ShowText(..))
 
 -- | The Doxygen comment of the C declaration of an element, from the comment
@@ -63,13 +67,33 @@ genInstanceDoc identifier ann = do
     facts <- gets (M.findWithDefault [] identifier . deploymentFacts)
     return $ withFacts (map factInlines facts) doc
 
--- | The comment of a C file: @\@file@, which Doxygen needs to list the
--- members of the file, and the comment of the module, if it has one.
-genFileDoc :: Maybe DocComment -> CGenerator CDoc
-genFileDoc Nothing = return (CDoc [] [] [CDocFile])
-genFileDoc (Just comment) = do
+-- | The comment of a C file of a module: @\@file@, which Doxygen needs to list
+-- the members of the file, the group of the namespace of the module, and the
+-- comment of the module, if it has one.
+genFileDoc :: QualifiedName -> Maybe DocComment -> CGenerator CDoc
+genFileDoc mName Nothing = return (CDoc [] [] [CDocFile, CDocInGroup (namespaceGroup (moduleNamespace mName))])
+genFileDoc mName (Just comment) = do
     doc <- cDoc [] <$> modelOf comment
-    return doc { cdocTags = CDocFile : cdocTags doc }
+    return doc { cdocTags = CDocFile : CDocInGroup (namespaceGroup (moduleNamespace mName)) : cdocTags doc }
+
+-- | The comment of the source file of a module: @\@file@, the group of the
+-- namespace of the module, and a brief that names its header, with the path
+-- with which the header is included, which Doxygen turns into a link.
+genSourceFileDoc :: QualifiedName -> CDoc
+genSourceFileDoc mName =
+    CDoc [DText (T.pack ("Implementation of the functions declared in " ++ mName ++ ".h."))] []
+        [CDocFile, CDocInGroup (namespaceGroup (moduleNamespace mName))]
+
+-- | The namespace of a module, the folders of its name: [\"icu\"] for
+-- \"icu/mb_store\", and none for a module at the root.
+moduleNamespace :: QualifiedName -> [String]
+moduleNamespace = init . splitDirectories
+
+-- | The label of the Doxygen group of a namespace. The modules at the root go
+-- in the group of the project.
+namespaceGroup :: [String] -> String
+namespaceGroup [] = "termina__project"
+namespaceGroup segments = "termina__ns__" ++ intercalate "__" segments
 
 -- | The comment of a statement, of a branch of an @if@ or of a case of a
 -- @match@: its lines as the author wrote them.

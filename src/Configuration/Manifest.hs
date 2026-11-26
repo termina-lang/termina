@@ -37,7 +37,8 @@ module Configuration.Manifest (
     addTestEntry,
     addDependencyEntry,
     checkGitUrl,
-    isSnakeCase
+    isSnakeCase,
+    onlyFields
 ) where
 
 import Control.Monad
@@ -83,7 +84,9 @@ data ProjectInfo = ProjectInfo {
     projectName :: !T.Text,
     projectVersion :: !T.Text,
     projectManifestVersion :: !Int,
-    projectAssurance :: ![Assurance]
+    projectAssurance :: ![Assurance],
+    -- | One sentence on what the project is, which documents its package
+    projectDescription :: !(Maybe T.Text)
   } deriving (Eq, Show)
 
 data Standard = ECSSEST40 | DO178C
@@ -258,12 +261,13 @@ styleParser v = do
 
 projectParser :: Value -> Parser ProjectInfo
 projectParser = withObject "project" $ \o -> do
-    onlyFields ["name", "version", "manifest-version", "assurance"] o
+    onlyFields ["name", "version", "manifest-version", "assurance", "description"] o
     ProjectInfo
         <$> o .: "name"
         <*> o .: "version"
         <*> o .: "manifest-version"
         <*> (explicitParseFieldMaybe (listOf assuranceParser >=> noRepeatedStandard) o "assurance" .!= [])
+        <*> o .:? "description"
 
   where
 

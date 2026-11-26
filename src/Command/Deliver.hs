@@ -7,7 +7,8 @@
 -- the #line pragmas.
 module Command.Deliver (
     deliverCmdArgsParser, deliverCommand, DeliverCmdArgs,
-    dependencies, inFolder, pathsIn, relocatePaths, toolchainVariables, releaseBuild, genDoxyfile
+    dependencies, inFolder, pathsIn, relocatePaths, toolchainVariables, releaseBuild, genDoxyfile,
+    genDoxygenGroups, naturalKey
 ) where
 
 import Command.Build
@@ -18,7 +19,10 @@ import Command.Sources (LoadedProject(..))
 import Command.Utils
 import Configuration.Configuration
 import Configuration.Manifest
+import Configuration.NamespaceFile (readNamespaceDescription)
+import Configuration.Package (Package(..))
 import Generator.Makefile.AST
+import Generator.CodeGen.Doc (moduleNamespace, namespaceGroup)
 import Generator.Makefile.Printer
 import Utils.Annotations (QualifiedName)
 import Utils.Files (filesUnder)
@@ -30,10 +34,10 @@ import qualified Codec.Compression.GZip as GZip
 import Control.Monad
 import Data.Aeson (object, (.=))
 import qualified Data.ByteString.Lazy as BL
-import Data.Char (isSpace)
+import Data.Char (isAlphaNum, isDigit, isSpace)
 import Data.List (intercalate, isPrefixOf, isSuffixOf, sortOn, nub, sort)
 import qualified Data.Map.Strict as M
-import Data.Maybe (isJust)
+import Data.Maybe (fromMaybe, isJust, listToMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import qualified Options.Applicative as O
@@ -103,7 +107,7 @@ genDoxyfile project config externFolders = T.unlines
     [ "PROJECT_NAME          = \"" <> projectName project <> testSuffix <> "\""
     , "PROJECT_NUMBER        = " <> projectVersion project
     , "OUTPUT_DIRECTORY      = doc"
-    , "INPUT                 = " <> T.unwords (map T.pack (["include", "src", "osal"] ++ nub externFolders))
+    , "INPUT                 = " <> T.unwords (map T.pack (["groups.dox", "include", "src", "osal"] ++ nub externFolders))
     , "RECURSIVE             = YES"
     , "EXCLUDE               = osal/vendor"
     , "FILE_PATTERNS         = *.h *.c"
@@ -117,6 +121,121 @@ genDoxyfile project config externFolders = T.unlines
   where
 
     testSuffix = if isTestBuild config then ", test " <> name config else ""
+
+-- | The Doxygen groups of a deliverable: the project with the namespaces of
+-- its modules, the libraries, each package with the namespaces of its
+-- modules, and the OSAL with a group for each of its folders. The modules of a
+-- package are those whose source is in its folder, and the rest are of the
+-- project. Each namespace goes inside the one that contains it, with the given
+-- description if it has one, and the groups at each level are in natural
+-- order.
+genDoxygenGroups :: ProjectInfo -> [(FilePath, ProjectInfo)] -> M.Map [String] T.Text -> [(QualifiedName, FilePath)] -> T.Text
+genDoxygenGroups project packages descriptions modules = T.unlines $
+    group (namespaceGroup []) ("Application " <> projectName project) Nothing
+        (fromMaybe ("Application " <> projectName project <> ", version " <> projectVersion project <> ".") (projectDescription project))
+    ++ namespaceGroups Nothing (namespaceGroup [])
+    ++ (if null usedPackages then [] else
+          group librariesGroup "Libraries" Nothing ""
+          ++ concat [ group (packageGroup info) (projectName info <> " " <> projectVersion info) (Just librariesGroup)
+                        (fromMaybe ("Library " <> projectName info <> ", version " <> projectVersion info <> ".") (projectDescription info))
+                      ++ namespaceGroups (Just folder) (packageGroup info)
+                    | (folder, info) <- usedPackages ])
+    ++ group osalGroup "OSAL" Nothing "Operating system abstraction layer on which the generated C runs."
+    ++ concat [ group (osalGroup ++ "__" ++ f) ("OSAL " <> T.pack f) (Just osalGroup) (T.pack d)
+              | (f, d) <- [ ("api", "Interface of the OSAL that the generated C calls.")
+                          , ("shared", "Implementation of the OSAL common to every operating system.")
+                          , ("os", "Implementation of the OSAL on each operating system.")
+                          , ("platform", "Support of each platform: start-up, devices and linking.") ] ]
+
+  where
+
+    librariesGroup = "termina__libraries"
+    osalGroup = "termina__osal"
+
+    packageGroup info = "termina__package__" ++ map (\c -> if isAlphaNum c then c else '_') (T.unpack (projectName info))
+
+    -- | The package whose folder holds the source of a module, if any
+    packageOf source = listToMaybe [ folder | (folder, _) <- packages, splitDirectories (normalise folder) `isPrefixOf` splitDirectories (normalise source) ]
+
+    usedPackages = sortOn (naturalKey . T.unpack . projectName . snd) [ p | p@(folder, _) <- packages, Just folder `elem` map (packageOf . snd) modules ]
+
+    -- | The namespaces of the modules of a package, or of the project, each
+    -- one inside its parent and the first level inside the given group
+    namespaceGroups pkg top = concat
+        [ group (namespaceGroup ns) (T.pack (dotted ns)) (Just (if length ns == 1 then top else namespaceGroup (init ns)))
+            (M.findWithDefault "" ns descriptions)
+        | ns <- sortOn (map naturalKey) . nub $
+            [ take n ns | (qname, source) <- modules, packageOf source == pkg, let ns = moduleNamespace qname, n <- [1 .. length ns] ] ]
+
+    dotted = intercalate "."
+
+    group label title within brief =
+        ["/**", " * @defgroup " <> T.pack label <> " " <> title]
+        ++ [ " * @ingroup " <> T.pack p | Just p <- [within] ]
+        ++ (if T.null brief then [] else [" *", " * @brief " <> brief])
+        ++ [" */"]
+
+-- | The descriptions of the namespaces of the modules, given the folder of the
+-- project and the one of the deliverable: the one of the "namespace.yaml" in
+-- the folder of the namespace, or else the brief of the module named as the
+-- namespace, as its header in the deliverable has it.
+namespaceDescriptions :: FilePath -> FilePath -> [(QualifiedName, FilePath)] -> IO (M.Map [String] T.Text)
+namespaceDescriptions root deliverable modules = M.fromList . concat <$> mapM describe (M.toList folders)
+
+  where
+
+    -- | Each namespace with its folder from the project, from the source of a
+    -- module in it
+    folders = M.fromList
+        [ (take n ns, joinPath (take (length parts - (length ns - n)) parts))
+        | (qname, source) <- modules, let ns = moduleNamespace qname
+        , let parts = splitDirectories (takeDirectory source), n <- [1 .. length ns] ]
+
+    describe (ns, dir) = do
+        own <- readNamespaceDescription (root </> dir)
+        case own of
+            Left err -> dieWithError err
+            Right (Just d) -> return [(ns, d)]
+            Right Nothing -> maybe [] (\b -> [(ns, b)]) <$> headerBrief (deliverable </> "include" </> joinPath ns <.> "h")
+
+-- | The brief of the comment of the file of a header written by the
+-- generator, the comment that the header starts with, where the brief goes on
+-- a line that starts with "@brief" and on the indented lines below. A missing
+-- header has none.
+headerBrief :: FilePath -> IO (Maybe T.Text)
+headerBrief path = do
+    exists <- doesFileExist path
+    if not exists then return Nothing else do
+        ls <- T.lines <$> TIO.readFile path
+        let fileComment = takeWhile (/= " */") ls
+        return $ case break (" * @brief " `T.isPrefixOf`) fileComment of
+            (_, first : rest) ->
+                Just (T.unwords (T.drop 10 first : map (T.strip . T.drop 2) (takeWhile continues rest)))
+            _ -> Nothing
+
+  where
+
+    continues l = " *  " `T.isPrefixOf` l && not (" * @" `T.isPrefixOf` l)
+
+-- | The modules of a deliverable whose header has no brief, because the module
+-- has no documentation comment, given the folder of the deliverable.
+undocumentedModules :: FilePath -> [(QualifiedName, FilePath)] -> IO [QualifiedName]
+undocumentedModules deliverable modules = filterM undocumented (nub (map fst modules))
+
+  where
+
+    undocumented qname = do
+        let header = deliverable </> "include" </> qname <.> "h"
+        exists <- doesFileExist header
+        if exists then (== Nothing) <$> headerBrief header else return False
+
+-- | A key that sorts names with numbers in natural order: service3 before
+-- service12.
+naturalKey :: String -> [Either Integer String]
+naturalKey [] = []
+naturalKey s@(c : _)
+    | isDigit c = let (d, rest) = span isDigit s in Left (read d) : naturalKey rest
+    | otherwise = let (t, rest) = break isDigit s in Right t : naturalKey rest
 
 -- | A deployment whose plain C, the one delivered, carries the documentation
 -- comments or not. The C with the #line pragmas, against whose binary the
@@ -203,9 +322,17 @@ deliverDeployment chatty loaded archive docs folder deployment = do
     let makefile = runMakefilePrinter $
             genDeliverableMakefile config info (map relocated osalSources) sources externs (testModules config modules)
     TIO.writeFile (folder </> "Makefile") makefile
-    when docs $
+    when docs $ do
       TIO.writeFile (folder </> "Doxyfile") $
         genDoxyfile (manifestProject (loadedManifest loaded)) config [ groupFolder g | g <- externs ]
+      undocumented <- undocumentedModules folder modules
+      forM_ undocumented $ \qname ->
+        putStrLn . warnMessage $ "module " ++ intercalate "." (splitDirectories qname) ++ " has no documentation comment, so its file has no description."
+      descriptions <- namespaceDescriptions (loadedRoot loaded) folder modules
+      TIO.writeFile (folder </> "groups.dox") $
+        genDoxygenGroups (manifestProject (loadedManifest loaded))
+          [ (packageFolder p, manifestProject (packageManifest p)) | p <- M.elems (loadedRemotes loaded) ++ M.elems (loadedLocals loaded) ]
+          descriptions modules
     -- | The files delivered, as they are on disk
     delivered <- filesUnder folder
     -- | Build the deliverable and compare its binary with the one of the C

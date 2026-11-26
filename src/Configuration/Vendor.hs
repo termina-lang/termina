@@ -27,6 +27,7 @@ import System.Directory
 import System.FilePath
 
 import Configuration.Configuration
+import Configuration.NamespaceFile (namespaceFileName)
 import Configuration.Lock
 import Configuration.Manifest
 import Configuration.Prefix
@@ -45,13 +46,15 @@ packageDir :: FilePath -> T.Text -> FilePath
 packageDir root url = vendorDir root </> normalizedFolder url
 
 -- | Whether a file of a package goes to "vendor/": its "termina.yaml", the
--- modules of its exported prefixes and the files that its "extern" section
--- lists under those modules, none of them hidden.
+-- modules of its exported prefixes and the "namespace.yaml" of their
+-- folders, and the files that its "extern" section lists under those modules,
+-- none of them hidden.
 isVendored :: Manifest -> String -> Bool
 isVendored manifest path =
     not (isHidden path)
         && (path == "termina.yaml"
-            || (".fin" `isSuffixOf` path && any (`ownsPath` path) (manifestPrefixes manifest))
+            || ((".fin" `isSuffixOf` path || ("/" ++ namespaceFileName) `isSuffixOf` path)
+                && any (`ownsPath` path) (manifestPrefixes manifest))
             || any (\listed -> listedMatches ("extern/" ++ listed) path) (externFiles (exportedExtern manifest)))
 
 -- | The entries of the "extern" section of a package whose module is in one

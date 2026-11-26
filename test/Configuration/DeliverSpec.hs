@@ -3,12 +3,12 @@
 -- and rewrites their paths for the flat Makefile of the deliverable.
 module Configuration.DeliverSpec (spec) where
 
-import Command.Deliver (dependencies, inFolder, pathsIn, relocatePaths, toolchainVariables, releaseBuild, genDoxyfile)
+import Command.Deliver (dependencies, inFolder, pathsIn, relocatePaths, toolchainVariables, releaseBuild, genDoxyfile, genDoxygenGroups, naturalKey)
 import Configuration.Configuration
 import Configuration.Manifest
 
 import qualified Data.ByteString.Char8 as BS
-import Data.List (isPrefixOf)
+import Data.List (isPrefixOf, sortOn)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Data.Yaml (decodeEither')
@@ -107,14 +107,14 @@ spec = describe "termina deliver" $ do
 
   describe "genDoxyfile" $ do
 
-    let info = ProjectInfo { projectName = "icu-asw", projectVersion = "1.2.0", projectManifestVersion = 1, projectAssurance = [] }
+    let info = ProjectInfo { projectName = "icu-asw", projectVersion = "1.2.0", projectManifestVersion = 1, projectAssurance = [], projectDescription = Nothing }
 
     it "documents the C of the deliverable from its root, with the folders of the extern C and without the vendored files of the OSAL" $
       genDoxyfile info (defaultConfig "icu-asw" POSIXGCC) ["extern/icu"] `shouldBe` T.unlines
         [ "PROJECT_NAME          = \"icu-asw\""
         , "PROJECT_NUMBER        = 1.2.0"
         , "OUTPUT_DIRECTORY      = doc"
-        , "INPUT                 = include src osal extern/icu"
+        , "INPUT                 = groups.dox include src osal extern/icu"
         , "RECURSIVE             = YES"
         , "EXCLUDE               = osal/vendor"
         , "FILE_PATTERNS         = *.h *.c"
@@ -128,3 +128,41 @@ spec = describe "termina deliver" $ do
     it "names the test in the project of a deliverable of a test" $
       take 1 (T.lines (genDoxyfile info ((defaultConfig "uart" POSIXGCC) { deploymentKind = TestBuild "uart" }) []))
         `shouldBe` ["PROJECT_NAME          = \"icu-asw, test uart\""]
+
+  describe "genDoxygenGroups" $ do
+
+    let app = ProjectInfo { projectName = "icu-asw", projectVersion = "1.2.0", projectManifestVersion = 1, projectAssurance = [], projectDescription = Just "Software of the ICU." }
+        pus = ProjectInfo { projectName = "termina-pus", projectVersion = "0.1.0", projectManifestVersion = 1, projectAssurance = [], projectDescription = Nothing }
+        vendored = "vendor" </> "github.com" </> "acme" </> "termina-pus"
+        modules =
+          [ ("icu/manager", "src" </> "icu" </> "manager.fin")
+          , ("icu/manager/executor", "src" </> "icu" </> "manager" </> "executor.fin")
+          , ("pus/services/service12/internal", vendored </> "src" </> "pus" </> "services" </> "service12" </> "internal.fin")
+          , ("pus/services/service3/internal", vendored </> "src" </> "pus" </> "services" </> "service3" </> "internal.fin") ]
+        groups = T.lines (genDoxygenGroups app [(vendored, pus)] (M.fromList [(["icu", "manager"], "Manager task.")]) modules)
+        defined = [ T.unwords (drop 2 (T.words l)) | l <- groups, " * @defgroup " `T.isPrefixOf` l ]
+
+    it "defines the application, its namespaces, the libraries with theirs in natural order, and the OSAL" $
+      defined `shouldBe`
+        [ "termina__project Application icu-asw", "termina__ns__icu icu", "termina__ns__icu__manager icu.manager"
+        , "termina__libraries Libraries", "termina__package__termina_pus termina-pus 0.1.0"
+        , "termina__ns__pus pus", "termina__ns__pus__services pus.services"
+        , "termina__ns__pus__services__service3 pus.services.service3", "termina__ns__pus__services__service12 pus.services.service12"
+        , "termina__osal OSAL", "termina__osal__api OSAL api", "termina__osal__shared OSAL shared"
+        , "termina__osal__os OSAL os", "termina__osal__platform OSAL platform" ]
+
+    it "gives the application and a package their description or one with their version, and a namespace the one found for it" $ do
+      take 4 groups `shouldBe` ["/**", " * @defgroup termina__project Application icu-asw", " *", " * @brief Software of the ICU."]
+      groups `shouldContain` [" * @brief Library termina-pus, version 0.1.0."]
+      groups `shouldContain` [" * @brief Manager task."]
+
+    it "puts each namespace in its parent, the first level of a package in the package" $ do
+      let after label = takeWhile (/= " */") (drop 1 (dropWhile (not . T.isInfixOf label) groups))
+      after "@defgroup termina__ns__pus " `shouldContain` [" * @ingroup termina__package__termina_pus"]
+      after "@defgroup termina__ns__icu__manager " `shouldContain` [" * @ingroup termina__ns__icu"]
+      after "@defgroup termina__ns__icu " `shouldContain` [" * @ingroup termina__project"]
+
+  describe "naturalKey" $
+
+    it "sorts the numbers in names by their value" $
+      sortOn naturalKey ["service12", "service3", "service1", "a10b2", "a10b10"] `shouldBe` ["a10b2", "a10b10", "service1", "service3", "service12"]

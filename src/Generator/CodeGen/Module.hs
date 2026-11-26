@@ -24,7 +24,7 @@ import Generator.Monadic
 import Control.Monad.State
 import qualified Data.Set as S
 import Doc.Facts (DocFact)
-import Generator.CodeGen.Doc (genFileDoc)
+import Generator.CodeGen.Doc (genFileDoc, genSourceFileDoc)
 
 
 genModuleDefineLabel :: QualifiedName -> String
@@ -67,7 +67,7 @@ genHeaderFile ::
     -> CGenerator CFile
 genHeaderFile includeOptionH includeStatusH includeResultH mName imports comment program = do
     let defineLabel = genModuleDefineLabel mName
-    fileDoc <- genFileDoc comment
+    fileDoc <- genFileDoc mName comment
     items <- concat <$> traverse genHeaderASTElement program
     extra <- gets extraImports
     let includeList = genIncludeList (S.toList (S.union (S.fromList imports) extra))
@@ -101,7 +101,7 @@ genSourceFile ::
     -> AnnotatedProgram SemanticAnn
     -> CGenerator CFile
 genSourceFile mName program = do
-    fileDoc <- genFileDoc Nothing
+    let fileDoc = genSourceFileDoc mName
     items <- concat <$> traverse genSourceASTElement program
     -- | The arrays of the coverage, whose sizes are known once the items are generated
     covItems <- coverageItems

@@ -65,10 +65,10 @@ cDocLines width (CDoc brief body tags) =
 
     where
 
-        groups = [ ["@file"] | any isFile tags ]
+        groups = [ "@file" : [ "@ingroup " <> T.pack g | CDocInGroup g <- tags ] | any isFile tags ]
             ++ [ hanging width "@brief " [DPara brief] | not (null brief) ]
             ++ map (blockLines width) body
-            ++ [ concatMap (tagLines width) [ t | t <- tags, not (isSection t), not (isFile t) ] ]
+            ++ [ concatMap (tagLines width) [ t | t <- tags, not (isSection t), not (isFile t), not (isGroup t) ] ]
             ++ [ tagLines width t | t <- tags, isSection t ]
 
         isSection (CDocSection _ _) = True
@@ -76,6 +76,9 @@ cDocLines width (CDoc brief body tags) =
 
         isFile CDocFile = True
         isFile _ = False
+
+        isGroup (CDocInGroup _) = True
+        isGroup _ = False
 
 -- | The lines of a tag. Its text goes on its line and on the lines below,
 -- indented under it, without blank lines, which would end it.
@@ -93,6 +96,7 @@ tagLines width tag = case tag of
     CDocSince bs -> hanging width "@since " bs
     CDocSection title bs -> ("@par " <> escapeDoxygen title) : concatMap (blockLines width) bs
     CDocFile -> ["@file"]
+    CDocInGroup g -> ["@ingroup " <> T.pack g]
 
     where
 
