@@ -15,6 +15,16 @@ Patch versions on either side are interchangeable.
 
 ### Added
 
+- Before writing a file of C, the build looks up every name the file declares
+  (functions, globals, types, tags, enumerators, macros, parameters and
+  locals, but not the members of a struct) in the same lists as the semantic
+  analysis, and stops at the first one that C or the platform keeps for itself
+  (CE-001). It catches the names that the transpiler makes from several
+  identifiers, such as `uuid__generate_random` for the procedure
+  `generate_random` of a class `uuid`, a symbol of the RTEMS of the Nexys A7
+  that neither part is on its own. The names with the prefix `termina__` are
+  left out.
+
 - `fetch_add(v, &mut prev)` on an `AtomicAccess<T>` port and
   `fetch_add_index(i, v, &mut prev)` on an `AtomicArrayAccess<T; N>` port,
   which add `v` to the atomic, or to its element `i`, and leave the previous

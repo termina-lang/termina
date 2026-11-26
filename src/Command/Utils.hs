@@ -48,6 +48,8 @@ import Utils.HtmlReport (Provenance(..))
 import Runner.CoverageReport (buildReport)
 import Data.Time (defaultTimeLocale, formatTime, getZonedTime)
 import Utils.Files (filesUnder)
+import Generator.LanguageC.AST (CFile)
+import Generator.Names (checkGeneratedNames)
 
 -- | Error message formatter
 -- Prints error messages in the form "[error] <message>"
@@ -266,6 +268,11 @@ projectSourceFiles =
 -- modules of the project, and stop.
 orDieWithFailure :: M.Map FilePath T.Text -> Either CheckFailure a -> IO a
 orDieWithFailure files = either (\failure -> dieWithReport (failureMessage failure files)) return
+
+-- | Stop, with the source of the modules of the project, at the first name of a
+-- file of generated C that C or the platform keeps for itself.
+checkCNames :: M.Map FilePath T.Text -> Platform -> CFile -> IO ()
+checkCNames files plt = orDieWithFailure files . maybe (Right ()) (Left . checkFailure) . checkGeneratedNames plt
 
 -- | The folder of the project of a command, which is the folder where
 -- termina runs once enterProject has gone to it.

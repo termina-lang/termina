@@ -14,6 +14,7 @@ module Pipeline.Common
   , runCoverageBuild
   , renderDocumentedFiles
   , renderDocumentedFilesOn
+  , generatedNameErrorOn
   , compileErrorCode
   , compileTestErrorCode
   , compileTestProjectErrorCode
@@ -66,7 +67,11 @@ import Command.Utils (CheckFailure(..), sortProjectDepsOrLoop)
 import Modules.Modules (TerminaModuleData(..), ModuleDependency(..))
 import Modules.Utils (buildModuleName)
 import Parser.Errors (Error(..), ParsingErrors, parseError)
-import Utils.Annotations (QualifiedName, annotateError, Location(Internal), Located(..))
+import Utils.Annotations (QualifiedName, annotateError, Location(Internal), Located(..), getError)
+import Generator.Names (checkGeneratedNames)
+import Generator.LanguageC.AST (CFile)
+import qualified Generator.Names.Errors as Names
+import Data.Maybe (listToMaybe, mapMaybe)
 
 import Command.Pipeline (CheckedModules(..), checkModules, typeProject)
 import ControlFlow.Architecture.Types (TerminaProgArch)
@@ -151,17 +156,33 @@ renderDocumentedFiles = renderDocumentedFilesOn TestPlatform
 renderDocumentedFilesOn :: Platform -> QualifiedName -> [(QualifiedName, String)] -> Either Text (Text, Text)
 renderDocumentedFilesOn plt target sources = either (Left . failMessage) Right $ do
   result <- runProjectPipelineOn plt configParams sources
+  (cHeaderFile, cSourceFile) <- generatedFilesOn plt result target
+  let printed = runCPrinterWith (CPrinterConfig False False True)
+  return (printed cHeaderFile, printed cSourceFile)
+
+-- | The first name of the header and the source file of each module of a
+-- project, generated on a platform, that C or the platform keeps for itself,
+-- as the build checks them before writing them.
+generatedNameErrorOn :: Platform -> [(QualifiedName, String)] -> Either Text (Maybe Names.Error)
+generatedNameErrorOn plt sources = either (Left . failMessage) Right $ do
+  result <- runProjectPipelineOn plt configParams sources
+  files <- mapM (generatedFilesOn plt result) (M.keys (elaboratedModules result))
+  return (getError <$> listToMaybe (mapMaybe (checkGeneratedNames plt) (concatMap (\(h, c) -> [h, c]) files)))
+
+-- | The header and the source file of a module of a project, generated on a
+-- platform from the result of the pipeline.
+generatedFilesOn :: Platform -> PipelineResult -> QualifiedName -> Either Failure (CFile, CFile)
+generatedFilesOn plt result target = do
   let eModule = elaboratedModules result M.! target
       program = elaboratedAST . metadata $ eModule
       deps = [ qname | ModuleDependency qname _ <- importedModules eModule ]
-      printed = runCPrinterWith (CPrinterConfig False False True)
       generatorError err = Failure (T.pack (show err)) (T.pack (show err))
   (cHeaderFile, _) <- either (Left . generatorError) Right
     (runGenHeaderFile configParams plt target deps (moduleComment eModule) program (pipelineMonadicTypes result)
       (instanceFacts plt (programArch result)))
   (cSourceFile, _) <- either (Left . generatorError) Right
     (runGenSourceFile configParams plt target program)
-  return (printed cHeaderFile, printed cSourceFile)
+  return (cHeaderFile, cSourceFile)
 
 -- | The full pipeline up to (and including) the architecture checks, shared by
 -- 'runFullProjectBuild' (which renders each source module) and

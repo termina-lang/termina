@@ -7,7 +7,7 @@ module Semantic.Errors where
 -- Termina AST
 import Semantic.AST
 import Semantic.Modifiers
-import Semantic.Reserved (ReservedBy(..))
+import Semantic.Reserved (ReservedBy(..), reservedByText)
 import Utils.Annotations
 import Utils.Errors
 import qualified Data.Map.Strict as M
@@ -1030,15 +1030,7 @@ instance Diagnosable Error where
             ("The character literal has code point \x1b[31m" <> T.pack (show (fromEnum cp)) <> "\x1b[0m, which is outside the 7-bit ASCII range (0 to 127).")
     describe (EReservedIdentifier ident reservedBy) =
         diagnostic "SE-213" "reserved identifier"
-            ("The identifier \x1b[31m" <> T.pack ident <> "\x1b[0m " <> heldBy <> ".")
-      where
-        heldBy = case reservedBy of
-            CKeyword -> "is a keyword of C"
-            CStandardLibrary -> "belongs to the standard library of C"
-            CImplementation -> "begins with an underscore and an uppercase letter, which C keeps for the\nimplementation (ISO/IEC 9899 7.1.3)"
-            CPlatform plt -> "is declared by the headers of the target platform " <> T.pack (show plt)
-            CLinked plt -> "collides with a symbol of the target platform " <> T.pack (show plt)
-            TerminaType -> "is a type of Termina"
+            ("The identifier \x1b[31m" <> T.pack ident <> "\x1b[0m " <> reservedByText reservedBy <> ".")
     describe (EReferenceToPackedMember ident) =
         diagnostic "SE-212" "reference to a packed struct member"
             ("This reference reaches into the packed struct \x1b[31m" <> T.pack ident <> "\x1b[0m.\n" <> "Taking a reference to a member of a packed struct yields an under-aligned pointer, whose\n" <> "packed provenance is lost at the call boundary; on a strict-alignment target the callee then\n" <> "performs a misaligned access (undefined behavior). Read or write the member by value instead.")

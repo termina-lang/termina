@@ -40,11 +40,11 @@ genPlatformCode params plt loweredProject progArchitecture externs = do
 
   case runGenMainFile params plt mainFile stamp cases progArchitecture of
     Left err -> dieWithError $ show err
-    Right cMainFile -> writeIfChanged mainFile $ runCPrinter (lineDirectives params) cMainFile
+    Right cMainFile -> checkCNames M.empty plt cMainFile >> writeIfChanged mainFile (runCPrinter (lineDirectives params) cMainFile)
 
   case runGenConfigFile params plt configFile progArchitecture of
     Left err -> dieWithError $ show err
-    Right cConfigFile -> writeIfChanged configFile $ runCPrinter (lineDirectives params) cConfigFile
+    Right cConfigFile -> checkCNames M.empty plt cConfigFile >> writeIfChanged configFile (runCPrinter (lineDirectives params) cConfigFile)
 
   writeIfChanged (destinationPath </> "Makefile") $
     runMakefilePrinter (genMakefile params loweredProject externs (isUnitTest progArchitecture))

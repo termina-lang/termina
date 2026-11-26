@@ -50,6 +50,10 @@ families =
       "src/ControlFlow/VarUsage/Errors.hs"
       ["test/VarUsage/Negative/CodeSpec.hs"] []
       []
+  , Family "Generated names (CE)" "CE"
+      "src/Generator/Names/Errors.hs"
+      ["test/Codegen/Negative/CodeSpec.hs"] []
+      []
   , Family "VarScope (VSE)" "VSE"
       "src/ControlFlow/VarScope/Errors.hs"
       ["test/VarScope/Negative/CodeSpec.hs"] []

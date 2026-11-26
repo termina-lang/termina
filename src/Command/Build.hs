@@ -251,6 +251,9 @@ genModules params plt instrumented initialMonadicTypes facts loweredProject =
 
   where
 
+    -- | The source of each module, which the errors quote
+    files = projectSourceFiles loweredProject
+
     -- | The C of the modules, with #line pragmas or plain, and with the
     -- documentation comments when the configuration asks for them
     moduleConfig config = CPrinterConfig (lineDirectives config) False (docComments config)
@@ -269,6 +272,7 @@ genModules params plt instrumented initialMonadicTypes facts loweredProject =
       case runGenSourceFile params { coverage = covered } plt (qualifiedName bbModule) tAST of
         Left err -> dieWithError $ show err
         Right (cSourceFile, points) -> do
+          checkCNames files plt cSourceFile
           writeIfChanged sourceFile $ runCPrinterWith (moduleConfig params) cSourceFile
           -- | The map of the flags of an instrumented module
           when covered $ do
@@ -285,6 +289,7 @@ genModules params plt instrumented initialMonadicTypes facts loweredProject =
         Left err -> dieWithError $ show err
         Right (cHeaderFile, newMonadicTypes) -> do
           let headerFile = destinationPath </> "include" </> qualifiedName bbModule <.> "h"
+          checkCNames files plt cHeaderFile
           writeIfChanged headerFile $ runCPrinterWith (moduleConfig params) cHeaderFile
           return newMonadicTypes
 
@@ -294,7 +299,7 @@ genInitFile params plt loweredProject = do
       projectModules = M.toList $ elaboratedAST . metadata <$> loweredProject
   case runGenInitFile params plt initFile projectModules of
     Left err -> dieWithError $ show err
-    Right cInitFile -> writeIfChanged initFile $ runCPrinter False cInitFile
+    Right cInitFile -> checkCNames M.empty plt cInitFile >> writeIfChanged initFile (runCPrinter False cInitFile)
 
 -- | The headers of the option, status and result types, each when the project
 -- uses one of them. A header that is not generated is not expected in the
@@ -314,7 +319,10 @@ genMonadicHeaderFiles params plt monadicTypes = do
           let file = outputFolder params </> "include" </> headerName
           case generator params plt file monadicTypes of
             Left err -> dieWithError $ show err
-            Right cFile -> writeIfChanged file (runCPrinter (lineDirectives params) cFile) >> return [file]
+            Right cFile -> do
+              checkCNames M.empty plt cFile
+              writeIfChanged file (runCPrinter (lineDirectives params) cFile)
+              return [file]
 
     notStructOrEnum (TStruct _) = False
     notStructOrEnum (TEnum _) = False

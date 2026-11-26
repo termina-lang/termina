@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 -- | The names of C that a Termina identifier may not take.
 --
 -- The transpiler does not mangle: a Termina name reaches the generated code as
@@ -20,13 +21,14 @@
 -- link or, with a static library, replaces the definition of the library
 -- without any error.
 module Semantic.Reserved (
-    ReservedBy(..), reservedName, reservedMemberName, linkedName
+    ReservedBy(..), reservedName, reservedMemberName, linkedName, reservedByText
 ) where
 
 import Core.AST (Identifier)
 import Configuration.Platform (Platform(..))
 import Data.Char (isUpper)
 import qualified Data.Set as S
+import qualified Data.Text as T
 
 import qualified Semantic.Reserved.FreeRTOS10STM32L432NUCLEOL432KC as FreeRTOS10STM32L432NUCLEOL432KC
 import qualified Semantic.Reserved.POSIXGCC as POSIXGCC
@@ -53,6 +55,16 @@ data ReservedBy =
     -- | The name of a type of Termina that takes type arguments.
     | TerminaType
   deriving (Eq, Show)
+
+-- | What holds a name, as the end of a sentence whose subject is the name.
+reservedByText :: ReservedBy -> T.Text
+reservedByText reservedBy = case reservedBy of
+    CKeyword -> "is a keyword of C"
+    CStandardLibrary -> "belongs to the standard library of C"
+    CImplementation -> "begins with an underscore and an uppercase letter, which C keeps for the\nimplementation (ISO/IEC 9899 7.1.3)"
+    CPlatform plt -> "is declared by the headers of the target platform " <> T.pack (show plt)
+    CLinked plt -> "collides with a symbol of the target platform " <> T.pack (show plt)
+    TerminaType -> "is a type of Termina"
 
 -- | What holds a name, if anything does. The answer is the same for a top-level
 -- element and for a local object, which is the whole of the rule: the C name
