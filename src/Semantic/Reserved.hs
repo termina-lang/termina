@@ -56,7 +56,7 @@ data ReservedBy =
     | TerminaType
   deriving (Eq, Show)
 
--- | What holds a name, as the end of a sentence whose subject is the name.
+-- | Who reserves a name, as the predicate of the sentence of an error message.
 reservedByText :: ReservedBy -> T.Text
 reservedByText reservedBy = case reservedBy of
     CKeyword -> "is a keyword of C"

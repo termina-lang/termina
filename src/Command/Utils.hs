@@ -269,8 +269,7 @@ projectSourceFiles =
 orDieWithFailure :: M.Map FilePath T.Text -> Either CheckFailure a -> IO a
 orDieWithFailure files = either (\failure -> dieWithReport (failureMessage failure files)) return
 
--- | Stop, with the source of the modules of the project, at the first name of a
--- file of generated C that C or the platform keeps for itself.
+-- | Stops at the first name of a generated C file reserved by C or the platform.
 checkCNames :: M.Map FilePath T.Text -> Platform -> CFile -> IO ()
 checkCNames files plt = orDieWithFailure files . maybe (Right ()) (Left . checkFailure) . checkGeneratedNames plt
 

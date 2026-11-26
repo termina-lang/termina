@@ -251,7 +251,7 @@ genModules params plt instrumented initialMonadicTypes facts loweredProject =
 
   where
 
-    -- | The source of each module, which the errors quote
+    -- | Source of each module, for the error messages
     files = projectSourceFiles loweredProject
 
     -- | The C of the modules, with #line pragmas or plain, and with the

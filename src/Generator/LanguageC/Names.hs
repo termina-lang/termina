@@ -1,9 +1,4 @@
--- | The names that a file of generated C declares, each with its scope and the
--- place in the Termina source it comes from.
---
--- A member of a struct or a union is left out, since it lives in the name space
--- of its struct. A tag of a struct, a union or an enum is a global name: MISRA
--- C:2023 rule 5.8 counts every name space.
+-- | Names declared by a file of generated C, except struct and union members.
 module Generator.LanguageC.Names (
     CNameScope(..), DeclaredName(..), declaredNames
 ) where
@@ -11,12 +6,11 @@ module Generator.LanguageC.Names (
 import Generator.LanguageC.AST
 import Utils.Annotations
 
--- | Whether a name has file scope, and so may reach the linker, or block or
--- prototype scope.
+-- | File scope, or block or prototype scope.
 data CNameScope = CGlobalName | CLocalName
   deriving (Eq, Show)
 
--- | A name declared by the generated C.
+-- | Name declared by the generated C, with its scope and its source location.
 data DeclaredName = DeclaredName
   {
     declaredIdent :: Ident
@@ -25,7 +19,7 @@ data DeclaredName = DeclaredName
   }
   deriving Show
 
--- | The names that a file declares, in the order they appear.
+-- | Names declared by a file, in order of appearance.
 declaredNames :: CFile -> [DeclaredName]
 declaredNames (CSourceFile _ items) = concatMap fileItem items
 declaredNames (CHeaderFile _ items) = concatMap fileItem items
@@ -54,8 +48,7 @@ externalDeclaration loc decl = case decl of
 
     tagged = maybe [] (\t -> [DeclaredName t CGlobalName loc])
 
--- | The name of a declaration, and the enumerators of an enum declared in its
--- type, which have file scope wherever the enum is.
+-- | Name of a declaration and enumerators of an enum declared in its type.
 declaration :: CNameScope -> Location -> CDeclaration -> [DeclaredName]
 declaration scope loc (CDecl ty mName _) =
     maybe [] (\name -> [DeclaredName name scope loc]) mName ++ typeNames loc ty
@@ -66,8 +59,7 @@ typeNames loc ty = case ty of
     CTSStructUnion s -> structUnion loc s
     CTypeSpec _ -> []
 
--- | The tag of a struct or a union declared inside another declaration, and the
--- enumerators of the enums declared in its members.
+-- | Tag of a nested struct or union and enumerators declared in its members.
 structUnion :: Location -> CStructureUnion -> [DeclaredName]
 structUnion loc (CStruct _ tag members _) =
     maybe [] (\t -> [DeclaredName t CGlobalName loc]) tag

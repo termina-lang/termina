@@ -1,5 +1,4 @@
--- | The names of the generated C that C or the platform keeps for itself, which
--- the build rejects before writing the files (CE codes).
+-- | Names of the generated C reserved by C or the platform (CE codes).
 module Codegen.Negative.CodeSpec (spec) where
 
 import Test.Hspec
@@ -9,9 +8,7 @@ import Generator.Names.Errors (Error(..))
 import Pipeline.Common (generatedNameErrorOn)
 import Semantic.Reserved (ReservedBy(..))
 
--- | A class uuid with a procedure generate_random, which the C names
--- uuid__generate_random. Neither part is reserved, but the whole name is a
--- symbol of the RTEMS of the Nexys A7.
+-- | Class whose procedure becomes uuid__generate_random, a symbol of RTEMS 5.
 uuidGenerator :: String
 uuidGenerator = unlines
   [ "interface IGenerator {"

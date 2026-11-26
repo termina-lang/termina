@@ -160,17 +160,14 @@ renderDocumentedFilesOn plt target sources = either (Left . failMessage) Right $
   let printed = runCPrinterWith (CPrinterConfig False False True)
   return (printed cHeaderFile, printed cSourceFile)
 
--- | The first name of the header and the source file of each module of a
--- project, generated on a platform, that C or the platform keeps for itself,
--- as the build checks them before writing them.
+-- | First reserved name in the C of the modules of a project, generated on a platform.
 generatedNameErrorOn :: Platform -> [(QualifiedName, String)] -> Either Text (Maybe Names.Error)
 generatedNameErrorOn plt sources = either (Left . failMessage) Right $ do
   result <- runProjectPipelineOn plt configParams sources
   files <- mapM (generatedFilesOn plt result) (M.keys (elaboratedModules result))
   return (getError <$> listToMaybe (mapMaybe (checkGeneratedNames plt) (concatMap (\(h, c) -> [h, c]) files)))
 
--- | The header and the source file of a module of a project, generated on a
--- platform from the result of the pipeline.
+-- | Header and source file of a module, generated on a platform.
 generatedFilesOn :: Platform -> PipelineResult -> QualifiedName -> Either Failure (CFile, CFile)
 generatedFilesOn plt result target = do
   let eModule = elaboratedModules result M.! target
