@@ -13,7 +13,7 @@ test0 = "enum Message {\n" ++
         "    Reset\n" ++
         "};\n" ++
         "\n" ++
-        "resource message_pool : Pool<Message; 10>;\n"
+        "resource message_pool : Pool<Message, 10>;\n"
 
 spec :: Spec
 spec = do

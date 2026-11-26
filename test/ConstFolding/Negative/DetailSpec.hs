@@ -31,7 +31,7 @@ atomicIndexOutOfBounds :: String
 atomicIndexOutOfBounds =
   "interface IPool {\n    procedure touch(&mut self);\n};\n" ++
   "resource class CPool provides IPool {\n" ++
-  "    pool : access AtomicArrayAccess<u32; 8>;\n" ++
+  "    pool : access AtomicArrayAccess<u32, 8>;\n" ++
   "    procedure touch(&mut self) {\n" ++
   "        self->pool.store_index(10, 0);\n" ++
   "        return;\n" ++

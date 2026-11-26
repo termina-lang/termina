@@ -289,9 +289,9 @@ seMonadicOption, seMonadicResultOk, seMonadicResultError, seMonadicStatus :: Str
 seMonadicOption =
   "function f() -> Option<u32> {\n    var b : bool = false;\n    var o : Option<u32> = Some(b);\n    return o;\n}\n"
 seMonadicResultOk =
-  "function f() -> Result<u32; u32> {\n    var b : bool = false;\n    var r : Result<u32; u32> = Ok(b);\n    return r;\n}\n"
+  "function f() -> Result<u32, u32> {\n    var b : bool = false;\n    var r : Result<u32, u32> = Ok(b);\n    return r;\n}\n"
 seMonadicResultError =
-  "function f() -> Result<u32; u32> {\n    var b : bool = false;\n    var r : Result<u32; u32> = Error(b);\n    return r;\n}\n"
+  "function f() -> Result<u32, u32> {\n    var b : bool = false;\n    var r : Result<u32, u32> = Error(b);\n    return r;\n}\n"
 seMonadicStatus =
   "function f() -> Status<i32> {\n    var b : bool = false;\n    var s : Status<i32> = Failure(b);\n    return s;\n}\n"
 

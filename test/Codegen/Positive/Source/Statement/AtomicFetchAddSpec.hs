@@ -16,7 +16,7 @@ atomicAdditions =
   "};\n" ++
   "resource class CCounter provides ICounter {\n" ++
   "    counter : access AtomicAccess<u16>;\n" ++
-  "    counts : access AtomicArrayAccess<u32; 8>;\n" ++
+  "    counts : access AtomicArrayAccess<u32, 8>;\n" ++
   "    procedure next(&mut self, id : &mut u16) {\n" ++
   "        self->counter.fetch_add(1, id);\n" ++
   "        return;\n" ++

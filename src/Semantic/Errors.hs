@@ -948,7 +948,7 @@ instance Diagnosable Error where
             ("The variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant for a status.\n" <> "Only the variants \x1b[31mSuccess\x1b[0m, \x1b[31mFailure\x1b[0m are valid.")
     describe (EInvalidResultTypeSpecifier typeSpec) =
         diagnostic "SE-187" "invalid type specifier for result"
-            ("The type specifier \x1b[31m" <> showText typeSpec <> "\x1b[0m is not a valid type specifier for a result.\n" <> "Result types must be of the form \x1b[31mResult<R; L>\x1b[0m, where \x1b[31mR\x1b[0m is the valid result type and \x1b[31mL\x1b[0m is the error type.")
+            ("The type specifier \x1b[31m" <> showText typeSpec <> "\x1b[0m is not a valid type specifier for a result.\n" <> "Result types must be of the form \x1b[31mResult<R, L>\x1b[0m, where \x1b[31mR\x1b[0m is the valid result type and \x1b[31mL\x1b[0m is the error type.")
     describe (EMonadicVariantParameterTypeMismatch expectedTy actualTy) =
         diagnostic "SE-188" "monadic variant parameter type mismatch"
             ("The parameter of the variant is expected to be of type \x1b[31m" <> showText expectedTy <> "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")

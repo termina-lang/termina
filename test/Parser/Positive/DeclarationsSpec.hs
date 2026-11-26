@@ -64,7 +64,7 @@ spec = describe "Parser: top-level declarations" $ do
       [ ("task instance", ctorOf taskDeclParser "task t : CFoo = { };", "Task")
       , ("resource instance", ctorOf resourceDeclParser "resource r : CFoo = { };", "Resource")
       , ("handler instance", ctorOf handlerDeclParser "handler h : CFoo = { };", "Handler")
-      , ("channel instance", ctorOf channelDeclParser "channel c : MsgQueue<u32; 10>;", "Channel")
+      , ("channel instance", ctorOf channelDeclParser "channel c : MsgQueue<u32, 10>;", "Channel")
       , ("emitter instance", ctorOf emitterDeclParser "emitter e : PeriodicTimer = { };", "Emitter")
       , ("test instance", ctorOf testDeclParser "test t : CFooTests = { };", "Test")
       , ("test instance through the global declaration parser",

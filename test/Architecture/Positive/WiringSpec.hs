@@ -35,7 +35,7 @@ channelWired =
   "    }\n" ++
   "};\n" ++
   periodicEmitter "timer" 1 ++
-  "channel chan : MsgQueue<u32; 10>;\n" ++
+  "channel chan : MsgQueue<u32, 10>;\n" ++
   "#[priority(10)]\n" ++
   "task p : ProducerTask = { timer_port <- timer, out_port -> chan };\n" ++
   "#[priority(11)]\n" ++
@@ -85,7 +85,7 @@ poolUsed =
   "    }\n" ++
   "};\n" ++
   periodicEmitter "timer" 1 ++
-  "resource mypool_res : Pool<u32; 4>;\n" ++
+  "resource mypool_res : Pool<u32, 4>;\n" ++
   "#[priority(10)]\n" ++
   "task t : PoolTask = { timer_port <- timer, mypool <-> mypool_res };\n"
 
@@ -109,7 +109,7 @@ poolUsedInLoop =
   "    }\n" ++
   "};\n" ++
   periodicEmitter "timer" 1 ++
-  "resource mypool_res : Pool<u32; 4>;\n" ++
+  "resource mypool_res : Pool<u32, 4>;\n" ++
   "#[priority(10)]\n" ++
   "task t : PoolTask = { timer_port <- timer, mypool <-> mypool_res };\n"
 
@@ -151,8 +151,8 @@ poolThroughDeque =
   "};\n" ++
   periodicEmitter "timer" 1 ++
   periodicEmitter "timer2" 2 ++
-  "resource mypool_res : Pool<u32; 4>;\n" ++
-  "resource pending_deque : Deque<u32; 1>;\n" ++
+  "resource mypool_res : Pool<u32, 4>;\n" ++
+  "resource pending_deque : Deque<u32, 1>;\n" ++
   "#[priority(10)]\n" ++
   "task t : DequeTask = { timer_port <- timer, drain_port <- timer2, mypool <-> mypool_res, pending <-> pending_deque };\n"
 
@@ -208,8 +208,8 @@ poolThroughOptionBoxParam =
   "};\n" ++
   periodicEmitter "timer" 1 ++
   periodicEmitter "timer2" 2 ++
-  "resource mypool_res : Pool<u32; 4>;\n" ++
-  "resource pending_deque : Deque<u32; 4>;\n" ++
+  "resource mypool_res : Pool<u32, 4>;\n" ++
+  "resource pending_deque : Deque<u32, 4>;\n" ++
   "resource store_res : Store = { pending <-> pending_deque, pool <-> mypool_res };\n" ++
   "#[priority(10)]\n" ++
   "task t : StoreTask = { timer_port <- timer, drain_port <- timer2, mypool <-> mypool_res, store <-> store_res };\n"
@@ -243,7 +243,7 @@ poolThroughOptionBoxArgument =
   "    }\n" ++
   "};\n" ++
   periodicEmitter "timer" 1 ++
-  "resource mypool_res : Pool<u32; 4>;\n" ++
+  "resource mypool_res : Pool<u32, 4>;\n" ++
   "resource sink_res : Sink = { pool <-> mypool_res };\n" ++
   "#[priority(10)]\n" ++
   "task t : SinkTask = { timer_port <- timer, snk <-> sink_res, mypool <-> mypool_res };\n"
@@ -280,7 +280,7 @@ poolThroughSomeArgument =
   "    }\n" ++
   "};\n" ++
   periodicEmitter "timer" 1 ++
-  "resource mypool_res : Pool<u32; 4>;\n" ++
+  "resource mypool_res : Pool<u32, 4>;\n" ++
   "resource sink_res : Sink = { pool <-> mypool_res };\n" ++
   "#[priority(10)]\n" ++
   "task t : SinkTask = { timer_port <- timer, snk <-> sink_res, mypool <-> mypool_res };\n"

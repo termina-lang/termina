@@ -72,7 +72,7 @@ tempMonitorWiring :: String
 tempMonitorWiring =
   "resource sensor : CFakeSensor = { value = 0 };\n" ++
   "emitter tick : TestEmitter<TimeVal>;\n" ++
-  "channel alarms : TestChannel<u32; 4>;\n" ++
+  "channel alarms : TestChannel<u32, 4>;\n" ++
   "#[priority(5)]\n" ++
   "task uut : CTempMonitor = {\n" ++
   "    limit = 80,\n" ++
@@ -161,9 +161,9 @@ tcExecutor =
 
 tcExecutorWiring :: String
 tcExecutorWiring =
-  "resource tm_pool : TestPool<TMPacket; 4>;\n" ++
-  "channel tcs : MsgQueue<TCCommand; 1>;\n" ++
-  "channel tms : TestChannel<box TMPacket; 4>;\n" ++
+  "resource tm_pool : TestPool<TMPacket, 4>;\n" ++
+  "channel tcs : MsgQueue<TCCommand, 1>;\n" ++
+  "channel tms : TestChannel<box TMPacket, 4>;\n" ++
   "#[priority(5)]\n" ++
   "task uut : CTCExecutor = {\n" ++
   "    tc_in <- tcs,\n" ++
@@ -191,7 +191,7 @@ spec = describe "Semantic: components and resources of a test" $ do
     typeCheckErrorOn TestPlatform (tempMonitor ++ tempMonitorWiring) `shouldBe` Just (pack "SE-236")
 
   it "rejects the components of a unit test outside a test" $
-    typeCheckErrorOn TestPlatform "channel alarms : TestChannel<u32; 4>;\n" `shouldBe` Just (pack "SE-236")
+    typeCheckErrorOn TestPlatform "channel alarms : TestChannel<u32, 4>;\n" `shouldBe` Just (pack "SE-236")
 
   it "has no TestChecks outside a test" $
     typeCheckErrorOn TestPlatform

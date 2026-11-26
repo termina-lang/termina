@@ -39,7 +39,7 @@ unit =
   "    }\n" ++
   "};\n" ++
   "resource sensor : CSensor = { value = 0 : u32 };\n" ++
-  "channel tcs : MsgQueue<u32; 1>;\n" ++
+  "channel tcs : MsgQueue<u32, 1>;\n" ++
   "#[priority(5)]\n" ++
   "task uut : CMonitor = {\n" ++
   "    tc_in <- tcs,\n" ++

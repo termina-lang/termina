@@ -31,7 +31,7 @@ spec = describe "termina test --list" $ do
       `shouldBe` Right [("a", "one", "tests/t/src/cases/first.fin", 3)]
 
   it "gives no cases for a concurrent test" $
-    casesIn [("tests/t/test.fin", "channel c : MsgQueue<u32; 1>;\n")] `shouldBe` Right []
+    casesIn [("tests/t/test.fin", "channel c : MsgQueue<u32, 1>;\n")] `shouldBe` Right []
 
   it "rejects a test instance whose class is not a test class" $
     casesIn [("tests/t/test.fin", "test a : CMissing = { t <-> test_checks };\n")]

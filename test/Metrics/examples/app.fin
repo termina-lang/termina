@@ -4,8 +4,8 @@ import example.control;
 resource real : CSensor = { last = 0, status = SensorStatus::Ok };
 resource fake : CFakeSensor = { last = 0 };
 
-channel data_a : MsgQueue<u16; 4>;
-channel data_b : MsgQueue<u16; 4>;
+channel data_a : MsgQueue<u16, 4>;
+channel data_b : MsgQueue<u16, 4>;
 
 emitter timer_a : PeriodicTimer = { period = { tv_sec = 1, tv_usec = 0 } };
 emitter timer_b : PeriodicTimer = { period = { tv_sec = 1, tv_usec = 0 } };

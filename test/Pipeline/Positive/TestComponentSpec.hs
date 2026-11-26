@@ -61,8 +61,8 @@ unitTest =
     "    }\n" ++
     "};\n" ++
     "emitter tick : TestEmitter<TimeVal>;\n" ++
-    "channel tms : TestChannel<box TMPacket; 4>;\n" ++
-    "resource tm_pool : TestPool<TMPacket; 4>;\n" ++
+    "channel tms : TestChannel<box TMPacket, 4>;\n" ++
+    "resource tm_pool : TestPool<TMPacket, 4>;\n" ++
     "#[priority(5)]\n" ++
     "task uut : CExecutor = { tick <- tick, tm_out -> tms, tm_pool <-> tm_pool };\n" ++
     "test exec_tests : CExecutorTests = { tick <-> tick, tms <-> tms, tm_pool <-> tm_pool,\n" ++
@@ -93,7 +93,7 @@ handlerTest =
     "    }\n" ++
     "};\n" ++
     "emitter irq : TestEmitter<u32>;\n" ++
-    "channel rxs : TestChannel<u32; 2>;\n" ++
+    "channel rxs : TestChannel<u32, 2>;\n" ++
     "handler rx : CRx = { rx <- irq, rx_out -> rxs };\n" ++
     "test rx_tests : CRxTests = { irq <-> irq, rxs <-> rxs, t <-> test_checks };\n"
 

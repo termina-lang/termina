@@ -340,7 +340,7 @@ instance ShowText (TypeSpecifier a) where
     showText (TSOutPort ts) = "out " <> showText ts
     showText (TSReference ak ts) = "&" <> showText ak <> showText ts
     showText (TSDefinedType ident []) = T.pack ident
-    showText (TSDefinedType ident tsps) = T.pack ident <> "<" <> T.intercalate "; " (map showText tsps) <> ">"
+    showText (TSDefinedType ident tsps) = T.pack ident <> "<" <> T.intercalate ", " (map showText tsps) <> ">"
     showText TSUnit = "unit"
 
 type Parameter = Parameter' TypeSpecifier

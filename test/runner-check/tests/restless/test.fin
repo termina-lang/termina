@@ -27,7 +27,7 @@ task class CRestless {
     }
 };
 
-channel start_channel : MsgQueue<TimeVal; 1>;
+channel start_channel : MsgQueue<TimeVal, 1>;
 
 handler starter : CStarter = { init_ev <- system_init, start_out -> start_channel };
 

@@ -19,7 +19,7 @@ resource class ResourceClass0 provides Interface0 {
 
 task class TaskClass0 {
 
-    pool0 : access AtomicArrayAccess<u32; 10>;
+    pool0 : access AtomicArrayAccess<u32, 10>;
 
     snk0 : sink TimeVal triggers action0;
     

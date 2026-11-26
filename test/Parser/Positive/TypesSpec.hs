@@ -5,6 +5,7 @@ module Parser.Positive.TypesSpec (spec) where
 import Parser.Common (parseWith, ctorName)
 import Parser.Parsing (typeSpecifierParser)
 
+import Data.List (isInfixOf)
 import Test.Hspec
 
 -- | The constructor a type fragment parses to.
@@ -48,7 +49,11 @@ spec = describe "Parser: type specifiers" $ do
     it "parses a nested generic (Option of box)" $
       ty "Option<box u32>" `shouldBe` Right "TSDefinedType"
     it "parses a two-parameter generic" $
-      ty "MsgQueue<u32; 10>" `shouldBe` Right "TSDefinedType"
+      ty "MsgQueue<u32, 10>" `shouldBe` Right "TSDefinedType"
+    it "parses an array inside a two-parameter generic" $
+      ty "Pool<[u8; 16], 4>" `shouldBe` Right "TSDefinedType"
+    it "rejects a semicolon between the parameters of a type" $
+      either (\e -> "separated by commas" `isInfixOf` e) (const False) (ty "MsgQueue<u32; 10>") `shouldBe` True
 
   describe "port types" $ do
     it "parses a sink port type" $ ty "sink u32 triggers on_tick" `shouldBe` Right "TSSinkPort"

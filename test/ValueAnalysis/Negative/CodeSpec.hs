@@ -546,7 +546,7 @@ spec = do
                 "    procedure touch(&mut self, i : usize);\n" ++
                 "};\n" ++
                 "resource class CPool provides IPool {\n" ++
-                "    pool : access AtomicArrayAccess<u32; 8>;\n" ++
+                "    pool : access AtomicArrayAccess<u32, 8>;\n" ++
                 "    procedure touch(&mut self, i : usize) {\n" ++
                 "        if i > 10 {\n" ++
                 "            self->pool.store_index(i, 0);\n" ++

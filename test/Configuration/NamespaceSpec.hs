@@ -107,8 +107,8 @@ spec = describe "exports" $ do
 
     it "rejects an instance in an exported module, and lets a constant and a module that is not exported hold one" $
       exportErrorsWith "instance"
-        [ ("src/pus/wiring.fin", "const MAX : u32 = 4;\nchannel tm : MsgQueue<u32; 4>;\n")
-        , ("src/test_support/wiring.fin", "channel tc : MsgQueue<u32; 4>;\n") ]
+        [ ("src/pus/wiring.fin", "const MAX : u32 = 4;\nchannel tm : MsgQueue<u32, 4>;\n")
+        , ("src/test_support/wiring.fin", "channel tc : MsgQueue<u32, 4>;\n") ]
         (library ["pus"])
         `shouldReturn` ["src/pus/wiring.fin:2: the exported module pus.wiring declares the instance tm, which only the app.fin of an application or the test.fin of a test may hold"]
 

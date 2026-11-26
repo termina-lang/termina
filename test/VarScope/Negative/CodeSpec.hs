@@ -16,10 +16,10 @@ kindEnum = "enum Kind { A, B };\n"
 -- into a local can be written.
 atomicProgram :: String -> String
 atomicProgram body =
-    "resource arr : AtomicArray<u32; 4> = { values = [0 : u32; 4] };\n" ++
+    "resource arr : AtomicArray<u32, 4> = { values = [0 : u32; 4] };\n" ++
     "task class T {\n" ++
     "    timer_port : sink TimeVal triggers tick;\n" ++
-    "    arr_port : access AtomicArrayAccess<u32; 4>;\n" ++
+    "    arr_port : access AtomicArrayAccess<u32, 4>;\n" ++
     "    action tick(&priv self, _t : TimeVal) {\n" ++
     body ++
     "        return;\n" ++

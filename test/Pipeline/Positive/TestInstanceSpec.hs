@@ -41,7 +41,7 @@ unitTest =
     "    }\n" ++
     "};\n" ++
     "resource value : CValue = { value = 0 };\n" ++
-    "channel tcs : MsgQueue<u32; 1>;\n" ++
+    "channel tcs : MsgQueue<u32, 1>;\n" ++
     "#[priority(5)]\n" ++
     "task writer : CWriter = { tc_in <- tcs, value <-> value };\n" ++
     "test writer_tests : CWriterTests = { tc_out -> tcs, value <-> value };\n"

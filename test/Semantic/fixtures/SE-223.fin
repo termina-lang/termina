@@ -17,5 +17,5 @@ task class TaskClass0 {
 
 };
 
-resource deque0 : Deque<u32; 4>;
+resource deque0 : Deque<u32, 4>;
 task task0 : TaskClass0 = { pending <-> deque0, snk0 <- irq_1 };

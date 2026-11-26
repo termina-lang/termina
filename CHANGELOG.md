@@ -118,6 +118,10 @@ Patch versions on either side are interchangeable.
 
 ### Changed
 
+- The parameters of a type are separated by commas, as in `Deque<T, N>`,
+  `Pool<[u8; 16], 4>` or `Result<T, E>`. A semicolon between them is
+  rejected. Arrays keep the semicolon, as in `[u8; 16]` and `[0; 16]`.
+
 - A module that defines nothing, only types, interfaces or constants, gets no
   `.c`: its C would only include its header. The build removes a `.c` left
   by an earlier build of such a module, and its entry in `provenance.json`

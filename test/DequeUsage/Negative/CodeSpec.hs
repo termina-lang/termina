@@ -112,8 +112,8 @@ spec = do
                 "        return;\n" ++
                 "    }\n" ++
                 "};\n" ++
-                "resource pool_res : Pool<Msg; 4>;\n" ++
-                "resource pending_deque : Deque<Msg; 1>;\n" ++
+                "resource pool_res : Pool<Msg, 4>;\n" ++
+                "resource pending_deque : Deque<Msg, 1>;\n" ++
                 "emitter timer : PeriodicTimer = { period = {tv_sec = 1, tv_usec = 0} };\n" ++
                 "#[priority(10)]\n" ++
                 "task t : T = { timer_port <- timer, pool <-> pool_res, pending <-> pending_deque };\n"

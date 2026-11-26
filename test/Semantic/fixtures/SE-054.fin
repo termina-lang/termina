@@ -6,7 +6,7 @@ interface Interface0 {
 
 resource class ResourceClass0 provides Interface0 {
 
-    data_pool : access AtomicArrayAccess<char; 10>;
+    data_pool : access AtomicArrayAccess<char, 10>;
 
     procedure proc0(&mut self, _data : u16) {
 

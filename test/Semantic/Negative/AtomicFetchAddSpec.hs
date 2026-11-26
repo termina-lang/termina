@@ -16,7 +16,7 @@ resource ty self stmt =
     "};\n" ++
     "resource class CR provides IR {\n" ++
     "    value : access AtomicAccess<" ++ ty ++ ">;\n" ++
-    "    values : access AtomicArrayAccess<" ++ ty ++ "; 4>;\n" ++
+    "    values : access AtomicArrayAccess<" ++ ty ++ ", 4>;\n" ++
     "    procedure run(" ++ self ++ ", i : usize, prev : &mut " ++ ty ++ ") {\n" ++
     "        " ++ stmt ++ "\n" ++
     "        return;\n" ++

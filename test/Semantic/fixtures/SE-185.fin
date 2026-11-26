@@ -1,6 +1,6 @@
 function test0() {
 
-    var r : Result<u32; u32> = None;
+    var r : Result<u32, u32> = None;
 
     return;
 

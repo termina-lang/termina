@@ -11,10 +11,10 @@ import Data.Text (pack)
 atomicProgram :: String -> String -> String -> String
 atomicProgram extraConsts portSize body =
     extraConsts ++
-    "resource arr : AtomicArray<u32; 4> = { values = [0 : u32; 4] };\n" ++
+    "resource arr : AtomicArray<u32, 4> = { values = [0 : u32; 4] };\n" ++
     "task class T {\n" ++
     "    timer_port : sink TimeVal triggers tick;\n" ++
-    "    arr_port : access AtomicArrayAccess<u32; " ++ portSize ++ ">;\n" ++
+    "    arr_port : access AtomicArrayAccess<u32, " ++ portSize ++ ">;\n" ++
     "    action tick(&priv self, _t : TimeVal) {\n" ++
     body ++
     "        return;\n" ++

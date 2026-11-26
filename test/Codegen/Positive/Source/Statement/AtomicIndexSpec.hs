@@ -14,7 +14,7 @@ atomicAccesses =
   "    procedure touch(&mut self, i : usize);\n" ++
   "};\n" ++
   "resource class CPool provides IPool {\n" ++
-  "    pool : access AtomicArrayAccess<u32; 8>;\n" ++
+  "    pool : access AtomicArrayAccess<u32, 8>;\n" ++
   "    procedure touch(&mut self, i : usize) {\n" ++
   "        var v : u32 = 0;\n" ++
   "        self->pool.load_index(i, &mut v);\n" ++

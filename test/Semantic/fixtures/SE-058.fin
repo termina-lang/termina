@@ -4,11 +4,11 @@ interface Interface0 {
 
 };
 
-resource glb_atomic_array : AtomicArray<u16; 10> = { values = [0; 10] };
+resource glb_atomic_array : AtomicArray<u16, 10> = { values = [0; 10] };
 
 resource class ResourceClass0 provides Interface0 {
 
-    atomic_array : access AtomicArrayAccess<u32; 10>;
+    atomic_array : access AtomicArrayAccess<u32, 10>;
 
     procedure proc0(&mut self, data : u32) {
 

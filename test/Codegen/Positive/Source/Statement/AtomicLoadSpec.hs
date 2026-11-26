@@ -15,7 +15,7 @@ atomicLoads =
   "};\n" ++
   "resource class CReader provides IReader {\n" ++
   "    value : access AtomicAccess<u32>;\n" ++
-  "    values : access AtomicArrayAccess<u32; 4>;\n" ++
+  "    values : access AtomicArrayAccess<u32, 4>;\n" ++
   "    procedure get(&mut self, dst : &mut u32) {\n" ++
   "        var x : u32 = 0;\n" ++
   "        self->value.load(&mut x);\n" ++

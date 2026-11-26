@@ -451,12 +451,16 @@ typeParamParser = do
   <|> TypeParamTypeSpec <$> typeSpecifierParser
   <|> TypeParamSize <$> expressionTermParser
 
---  (angles (sepBy (wspcs *> typeParamParser <* wspcs) semi)  semi)
 definedTypeParser :: TerminaParser (TypeSpecifier ParserAnn)
 definedTypeParser = do
   name <- identifierParser
-  typeParams <- option [] (angles (sepBy (wspcs *> typeParamParser <* wspcs) semi))
+  typeParams <- option [] (angles (sepBy (wspcs *> typeParamParser <* wspcs) typeParamSeparator))
   return $ TSDefinedType name typeParams
+
+  where
+
+    typeParamSeparator = comma
+      <|> (semi *> fail "the parameters of a type are separated by commas, as in Deque<T, N>")
 
 -- | Types
 typeSpecifierParser :: TerminaParser (TypeSpecifier ParserAnn)

@@ -11,5 +11,5 @@ task class TaskClass0 {
 
 };
 
-channel msg_queue0 : MsgQueue<u32; 10>;
+channel msg_queue0 : MsgQueue<u32, 10>;
 task task0 : TaskClass0 = { in0 <- msg_queue0 };

@@ -108,7 +108,7 @@ spec = do
              ++ periodicEmitter "timer" 1
              ++ "#[priority(10)]\n"
              ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
-             ++ "resource mypool : Pool<u32; 4>;\n"
+             ++ "resource mypool : Pool<u32, 4>;\n"
       compileErrorCode src `shouldBe` Just (pack "AE-008")
 
     it "AE-006: channel with a source but no target" $ do
@@ -123,7 +123,7 @@ spec = do
             "    }\n" ++
             "};\n" ++
             periodicEmitter "timer" 1
-            ++ "channel chan : MsgQueue<u32; 10>;\n"
+            ++ "channel chan : MsgQueue<u32, 10>;\n"
             ++ "#[priority(10)]\n"
             ++ "task t : ProducerTask = { timer_port <- timer, out_port -> chan };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-006")
@@ -139,7 +139,7 @@ spec = do
             "        return;\n" ++
             "    }\n" ++
             "};\n" ++
-            "channel chan : MsgQueue<u32; 10>;\n"
+            "channel chan : MsgQueue<u32, 10>;\n"
             ++ "#[priority(10)]\n"
             ++ "task t : ConsumerTask = { last = 0, in_port <- chan };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-005")
@@ -200,7 +200,7 @@ spec = do
             "        return;\n" ++
             "    }\n" ++
             "};\n" ++
-            "channel report_chan : MsgQueue<u32; 4>;\n" ++
+            "channel report_chan : MsgQueue<u32, 4>;\n" ++
             "handler fault_handler : FaultHandler = { faults = 0, except_port <- system_except, report_port -> report_chan };\n" ++
             "#[priority(10)]\n" ++
             "task fdir : FdirTask = { last = 0, reports <- report_chan };\n"
@@ -223,8 +223,8 @@ spec = do
       let src = relayClass "Starter" True
              ++ relayClass "Relay" False
              ++ periodicEmitter "timer" 1
-             ++ "channel to_relay : MsgQueue<u32; 1>;\n"
-             ++ "channel to_starter : MsgQueue<u32; 1>;\n"
+             ++ "channel to_relay : MsgQueue<u32, 1>;\n"
+             ++ "channel to_starter : MsgQueue<u32, 1>;\n"
              ++ "#[priority(10)]\n"
              ++ "task starter : Starter = { start_port <- timer, msg_in <- to_starter, msg_out -> to_relay };\n"
              ++ "#[priority(11)]\n"
@@ -243,9 +243,9 @@ spec = do
              ++ "};\n"
              ++ periodicEmitter "timer_a" 1
              ++ periodicEmitter "timer_b" 2
-             ++ "channel unused_a : MsgQueue<u32; 1>;\n"
-             ++ "channel unused_b : MsgQueue<u32; 1>;\n"
-             ++ "channel shared : MsgQueue<u32; 4>;\n"
+             ++ "channel unused_a : MsgQueue<u32, 1>;\n"
+             ++ "channel unused_b : MsgQueue<u32, 1>;\n"
+             ++ "channel shared : MsgQueue<u32, 4>;\n"
              ++ "#[priority(10)]\n"
              ++ "task a : Starter = { start_port <- timer_a, msg_in <- unused_a, msg_out -> shared };\n"
              ++ "#[priority(11)]\n"
@@ -257,7 +257,7 @@ spec = do
     it "AE-015: a task that sends messages to itself" $ do
       let src = relayClass "Starter" True
              ++ periodicEmitter "timer" 1
-             ++ "channel loop_chan : MsgQueue<u32; 1>;\n"
+             ++ "channel loop_chan : MsgQueue<u32, 1>;\n"
              ++ "#[priority(10)]\n"
              ++ "task starter : Starter = { start_port <- timer, msg_in <- loop_chan, msg_out -> loop_chan };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-015")
@@ -279,10 +279,10 @@ spec = do
              ++ relayClass "Relay" False
              ++ twoInputsClass False
              ++ periodicEmitter "timer" 1
-             ++ "channel to_a : MsgQueue<u32; 1>;\n"
-             ++ "channel to_b : MsgQueue<u32; 1>;\n"
-             ++ "channel from_a : MsgQueue<u32; 1>;\n"
-             ++ "channel from_b : MsgQueue<u32; 1>;\n"
+             ++ "channel to_a : MsgQueue<u32, 1>;\n"
+             ++ "channel to_b : MsgQueue<u32, 1>;\n"
+             ++ "channel from_a : MsgQueue<u32, 1>;\n"
+             ++ "channel from_b : MsgQueue<u32, 1>;\n"
              ++ "#[priority(10)]\n"
              ++ "task fan_out : FanOut = { start_port <- timer, out_a -> to_a, out_b -> to_b };\n"
              ++ "#[priority(11)]\n"
@@ -313,7 +313,7 @@ spec = do
             "        return;\n" ++
             "    }\n" ++
             "};\n" ++
-            "channel chan : MsgQueue<u32; 10>;\n"
+            "channel chan : MsgQueue<u32, 10>;\n"
             ++ "#[priority(10)]\n"
             ++ "task t1 : ConsumerTask = { last = 0, in_port <- chan };\n"
             ++ "#[priority(11)]\n"
@@ -341,8 +341,8 @@ spec = do
             "        return;\n" ++
             "    }\n" ++
             "};\n" ++
-            "resource pool0 : Pool<u32; 10>;\n" ++
-            "resource pool1 : Pool<u32; 10>;\n" ++
+            "resource pool0 : Pool<u32, 10>;\n" ++
+            "resource pool1 : Pool<u32, 10>;\n" ++
             periodicEmitter "timer" 10
             ++ "#[priority(10)]\n"
             ++ "task t : BoxTask = { timer_port <- timer, data_pool0 <-> pool0, data_pool1 <-> pool1 };\n"
@@ -389,9 +389,9 @@ spec = do
             "        return;\n" ++
             "    }\n" ++
             "};\n" ++
-            "resource pool0 : Pool<u32; 10>;\n" ++
-            "resource pool1 : Pool<u32; 10>;\n" ++
-            "resource pending_deque : Deque<u32; 1>;\n" ++
+            "resource pool0 : Pool<u32, 10>;\n" ++
+            "resource pool1 : Pool<u32, 10>;\n" ++
+            "resource pending_deque : Deque<u32, 1>;\n" ++
             periodicEmitter "timer" 10 ++
             periodicEmitter "timer2" 20
             ++ "#[priority(10)]\n"
@@ -400,7 +400,7 @@ spec = do
 
     it "AE-012: deque not connected to any access port" $ do
       let src = timerTaskClass ++ periodicEmitter "timer" 1
-            ++ "resource orphan : Deque<u32; 1>;\n"
+            ++ "resource orphan : Deque<u32, 1>;\n"
             ++ "#[priority(10)]\n"
             ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-012")
@@ -420,7 +420,7 @@ spec = do
             "        return;\n" ++
             "    }\n" ++
             "};\n" ++
-            "resource pending_deque : Deque<u32; 1>;\n" ++
+            "resource pending_deque : Deque<u32, 1>;\n" ++
             periodicEmitter "timer" 10
             ++ "#[priority(10)]\n"
             ++ "task t : DequeTask = { timer_port <- timer, pending <-> pending_deque };\n"
@@ -449,8 +449,8 @@ spec = do
             "        return;\n" ++
             "    }\n" ++
             "};\n" ++
-            "resource pool0 : Pool<u32; 4>;\n" ++
-            "resource shared_deque : Deque<u32; 1>;\n" ++
+            "resource pool0 : Pool<u32, 4>;\n" ++
+            "resource shared_deque : Deque<u32, 1>;\n" ++
             periodicEmitter "timer" 10 ++
             periodicEmitter "timer2" 20
             ++ "#[priority(10)]\n"
@@ -481,8 +481,8 @@ spec = do
             "        return;\n" ++
             "    }\n" ++
             "};\n" ++
-            "resource pool0 : Pool<u32; 10>;\n" ++
-            "resource pool1 : Pool<u32; 10>;\n" ++
+            "resource pool0 : Pool<u32, 10>;\n" ++
+            "resource pool1 : Pool<u32, 10>;\n" ++
             periodicEmitter "timer" 10
             ++ "#[priority(10)]\n"
             ++ "task t : BoxTask = { timer_port <- timer, data_pool0 <-> pool0, data_pool1 <-> pool1 };\n"
@@ -530,8 +530,8 @@ spec = do
             "        return;\n" ++
             "    }\n" ++
             "};\n" ++
-            "resource pool0 : Pool<u32; 10>;\n" ++
-            "resource pool1 : Pool<u32; 10>;\n" ++
+            "resource pool0 : Pool<u32, 10>;\n" ++
+            "resource pool1 : Pool<u32, 10>;\n" ++
             "resource inner_res : Inner = { pool <-> pool0 };\n" ++
             "resource src_res : Source = { inner <-> inner_res, pool <-> pool1 };\n" ++
             periodicEmitter "timer" 10
@@ -574,8 +574,8 @@ spec = do
             "        return;\n" ++
             "    }\n" ++
             "};\n" ++
-            "resource pool0 : Pool<u32; 10>;\n" ++
-            "resource pool1 : Pool<u32; 10>;\n" ++
+            "resource pool0 : Pool<u32, 10>;\n" ++
+            "resource pool1 : Pool<u32, 10>;\n" ++
             "resource sink_res : Sink = { pool <-> pool1 };\n" ++
             periodicEmitter "timer" 10
             ++ "#[priority(10)]\n"
@@ -620,8 +620,8 @@ spec = do
             "        return;\n" ++
             "    }\n" ++
             "};\n" ++
-            "resource pool0 : Pool<u32; 10>;\n" ++
-            "resource pool1 : Pool<u32; 10>;\n" ++
+            "resource pool0 : Pool<u32, 10>;\n" ++
+            "resource pool1 : Pool<u32, 10>;\n" ++
             "resource sink_res : Sink = { pool <-> pool1 };\n" ++
             periodicEmitter "timer" 10
             ++ "#[priority(10)]\n"
@@ -633,8 +633,8 @@ spec = do
     it "AE-001: test emitter connected to the sinks of two tasks" $ do
       let src = monitorClass "CMonitor" ++ monitorTestClass
              ++ "emitter tick : TestEmitter<TimeVal>;\n"
-             ++ "channel alarms : TestChannel<u32; 4>;\n"
-             ++ "channel spare : MsgQueue<u32; 4>;\n"
+             ++ "channel alarms : TestChannel<u32, 4>;\n"
+             ++ "channel spare : MsgQueue<u32, 4>;\n"
              ++ "#[priority(5)]\n"
              ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
              ++ "#[priority(6)]\n"
@@ -646,7 +646,7 @@ spec = do
       let src = monitorClass "CMonitor" ++ monitorTestClass
              ++ "emitter tick : TestEmitter<TimeVal>;\n"
              ++ "emitter other_tick : TestEmitter<TimeVal>;\n"
-             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "channel alarms : TestChannel<u32, 4>;\n"
              ++ "#[priority(5)]\n"
              ++ "task uut : CMonitor = { tick_ev <- other_tick, alarm_out -> alarms };\n"
              ++ monitorTest
@@ -655,8 +655,8 @@ spec = do
     it "AE-005: test channel that no out port of the unit is connected to" $ do
       let src = monitorClass "CMonitor" ++ monitorTestClass
              ++ "emitter tick : TestEmitter<TimeVal>;\n"
-             ++ "channel alarms : TestChannel<u32; 4>;\n"
-             ++ "channel other_alarms : TestChannel<u32; 4>;\n"
+             ++ "channel alarms : TestChannel<u32, 4>;\n"
+             ++ "channel other_alarms : TestChannel<u32, 4>;\n"
              ++ "#[priority(5)]\n"
              ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> other_alarms };\n"
              ++ monitorTest
@@ -666,7 +666,7 @@ spec = do
       let src = monitorClass "CMonitor" ++ monitorTestClass
              ++ "emitter tick : TestEmitter<TimeVal>;\n"
              ++ "emitter other_tick : TestEmitter<TimeVal>;\n"
-             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "channel alarms : TestChannel<u32, 4>;\n"
              ++ "#[priority(5)]\n"
              ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
              ++ "#[priority(6)]\n"
@@ -687,7 +687,7 @@ spec = do
              ++ "    }\n"
              ++ "};\n"
              ++ "emitter tick : TestEmitter<TimeVal>;\n"
-             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "channel alarms : TestChannel<u32, 4>;\n"
              ++ "#[priority(5)]\n"
              ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
              ++ "test alarm_tests : CAlarmTests = { alarms <-> alarms, t <-> test_checks };\n"
@@ -695,16 +695,16 @@ spec = do
 
     it "AE-017: test pool that no test instance reaches through TestPoolAccess" $ do
       let src = executorClass ++ executorTestClass False
-             ++ "resource tm_pool : TestPool<TMPacket; 4>;\n"
+             ++ "resource tm_pool : TestPool<TMPacket, 4>;\n"
              ++ executorWiring False
       compileTestErrorCode src `shouldBe` Just (pack "AE-017")
 
     it "AE-018: test pool that the unit does not reach through an allocator" $ do
       let src = executorClass ++ executorTestClass True
-             ++ "resource tm_pool : TestPool<TMPacket; 4>;\n"
-             ++ "resource unit_pool : Pool<TMPacket; 4>;\n"
-             ++ "channel tcs : MsgQueue<TCCommand; 1>;\n"
-             ++ "channel tms : TestChannel<box TMPacket; 4>;\n"
+             ++ "resource tm_pool : TestPool<TMPacket, 4>;\n"
+             ++ "resource unit_pool : Pool<TMPacket, 4>;\n"
+             ++ "channel tcs : MsgQueue<TCCommand, 1>;\n"
+             ++ "channel tms : TestChannel<box TMPacket, 4>;\n"
              ++ "#[priority(5)]\n"
              ++ "task uut : CTCExecutor = { tc_in <- tcs, tm_out -> tms, tm_pool <-> unit_pool };\n"
              ++ "test exec_tests : CTCExecutorTests = {\n"
@@ -717,7 +717,7 @@ spec = do
       let src = monitorClass "CMonitor" ++ monitorTestClass ++ timerTaskClass
              ++ periodicEmitter "timer" 1
              ++ "emitter tick : TestEmitter<TimeVal>;\n"
-             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "channel alarms : TestChannel<u32, 4>;\n"
              ++ "#[priority(5)]\n"
              ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
              ++ "#[priority(6)]\n"
@@ -736,7 +736,7 @@ spec = do
              ++ "    }\n"
              ++ "};\n"
              ++ "emitter tick : TestEmitter<TimeVal>;\n"
-             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "channel alarms : TestChannel<u32, 4>;\n"
              ++ "#[priority(5)]\n"
              ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
              ++ "handler fault_handler : FaultHandler = { faults = 0, except_port <- system_except };\n"
@@ -772,7 +772,7 @@ spec = do
     it "AE-023: a test instance declared in a module that the test.fin imports" $ do
       let lib = monitorTestClass
              ++ "emitter tick : TestEmitter<TimeVal>;\n"
-             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "channel alarms : TestChannel<u32, 4>;\n"
              ++ monitorTest
           test = "import lib.tests;\n"
              ++ monitorClass "CMonitor"
@@ -783,7 +783,7 @@ spec = do
     it "AE-020: test channel in a concurrent test" $ do
       let src = monitorClass "CMonitor"
              ++ periodicEmitter "timer" 1
-             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "channel alarms : TestChannel<u32, 4>;\n"
              ++ "#[priority(5)]\n"
              ++ "task uut : CMonitor = { tick_ev <- timer, alarm_out -> alarms };\n"
       compileTestErrorCode src `shouldBe` Just (pack "AE-020")
@@ -803,7 +803,7 @@ spec = do
              ++ "    }\n"
              ++ "};\n"
              ++ "emitter tick : TestEmitter<TimeVal>;\n"
-             ++ "channel alarms : TestChannel<u32; 4>;\n"
+             ++ "channel alarms : TestChannel<u32, 4>;\n"
              ++ "#[priority(5)]\n"
              ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
              ++ "test monitor_tests : CMonitorTests = { tick <-> tick, alarms <-> alarms, s <-> test_scenario };\n"
@@ -821,9 +821,9 @@ spec = do
              ++ "        return;\n"
              ++ "    }\n"
              ++ "};\n"
-             ++ "channel from_case : MsgQueue<u32; 1>;\n"
-             ++ "channel to_relay : MsgQueue<u32; 1>;\n"
-             ++ "channel from_relay : MsgQueue<u32; 1>;\n"
+             ++ "channel from_case : MsgQueue<u32, 1>;\n"
+             ++ "channel to_relay : MsgQueue<u32, 1>;\n"
+             ++ "channel from_relay : MsgQueue<u32, 1>;\n"
              ++ "#[priority(10)]\n"
              ++ "task two : TwoInputs = { last = 0, in_a <- from_case, in_b <- from_relay, msg_out -> to_relay };\n"
              ++ "#[priority(11)]\n"
@@ -833,10 +833,10 @@ spec = do
 
     it "AE-003: box taken from a test channel and freed to another pool" $ do
       let src = executorClass ++ executorTestClass True
-             ++ "resource tm_pool : TestPool<TMPacket; 4>;\n"
-             ++ "resource other_pool : Pool<TMPacket; 4>;\n"
-             ++ "channel tcs : MsgQueue<TCCommand; 1>;\n"
-             ++ "channel tms : TestChannel<box TMPacket; 4>;\n"
+             ++ "resource tm_pool : TestPool<TMPacket, 4>;\n"
+             ++ "resource other_pool : Pool<TMPacket, 4>;\n"
+             ++ "channel tcs : MsgQueue<TCCommand, 1>;\n"
+             ++ "channel tms : TestChannel<box TMPacket, 4>;\n"
              ++ "#[priority(5)]\n"
              ++ "task uut : CTCExecutor = { tc_in <- tcs, tm_out -> tms, tm_pool <-> tm_pool };\n"
              ++ "test exec_tests : CTCExecutorTests = {\n"
@@ -934,8 +934,8 @@ executorTestClass withPoolState =
 
 executorWiring :: Bool -> String
 executorWiring withPoolState =
-    "channel tcs : MsgQueue<TCCommand; 1>;\n" ++
-    "channel tms : TestChannel<box TMPacket; 4>;\n" ++
+    "channel tcs : MsgQueue<TCCommand, 1>;\n" ++
+    "channel tms : TestChannel<box TMPacket, 4>;\n" ++
     "#[priority(5)]\n" ++
     "task uut : CTCExecutor = { tc_in <- tcs, tm_out -> tms, tm_pool <-> tm_pool };\n" ++
     "test exec_tests : CTCExecutorTests = {\n" ++

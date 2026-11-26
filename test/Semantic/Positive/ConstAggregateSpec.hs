@@ -150,5 +150,5 @@ spec = do
         `shouldBe` Just (pack "SE-183")
 
     it "Rejects a const result of a box" $
-      compileErrorCode "const R : Result<box u32; i32> = Ok(1 : u32);\n"
+      compileErrorCode "const R : Result<box u32, i32> = Ok(1 : u32);\n"
         `shouldBe` Just (pack "SE-182")

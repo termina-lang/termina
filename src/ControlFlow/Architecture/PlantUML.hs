@@ -206,7 +206,7 @@ genResource currentDepth (TPResource resourceId resourceCls apConns _ _ _) = do
 genPool :: TPPool a -> PlantUMLCmpGenMonad a ()
 genPool (TPPool poolId ty size _ _) = do
     let cmp = PlantUMLCmpComponent poolId
-            (Just $ "Pool&#60;" <> showText ty <> "; " <> showText size <> "&#62;") (Just $ PlantUMLColorName "Plum")
+            (Just $ "Pool&#60;" <> showText ty <> ", " <> showText size <> "&#62;") (Just $ PlantUMLColorName "Plum")
     -- | Insert the new participant
     ST.modify $ \s -> s {
         participants = M.insert poolId cmp (participants s)
@@ -235,7 +235,7 @@ genAtomicArray (TPAtomicArray atomicArrayId ty size _ _) = do
 genDeque :: TPDeque a -> PlantUMLCmpGenMonad a ()
 genDeque (TPDeque dequeId ty size _ _) = do
     let cmp = PlantUMLCmpComponent dequeId
-            (Just $ "Deque&#60;" <> showText ty <> "; " <> showText size <> "&#62;") (Just $ PlantUMLColorName "Plum")
+            (Just $ "Deque&#60;" <> showText ty <> ", " <> showText size <> "&#62;") (Just $ PlantUMLColorName "Plum")
     -- | Insert the new participant
     ST.modify $ \s -> s {
         participants = M.insert dequeId cmp (participants s)

@@ -54,8 +54,8 @@ sendInitializerSrc =
     "};\n" ++
     "emitter level : TestEmitter<Level>;\n" ++
     "emitter pin : TestEmitter<Pin>;\n" ++
-    "channel pins : TestChannel<Pin; 2>;\n" ++
-    "channel levels : TestChannel<Level; 2>;\n" ++
+    "channel pins : TestChannel<Pin, 2>;\n" ++
+    "channel levels : TestChannel<Level, 2>;\n" ++
     "#[priority(5)]\n" ++
     "task sender : CSender = { levels_in <- level, pins_in <- pin, pins -> pins, levels -> levels };\n" ++
     "test sender_tests : CSenderTests = { level <-> level, pin <-> pin, pins <-> pins, levels <-> levels };\n"

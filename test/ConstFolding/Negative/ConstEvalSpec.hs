@@ -148,7 +148,7 @@ spec = do
     it "CFE-017: deque with a capacity of zero" $ do
       let src = timerTaskClass
              ++ "const capacity : usize = 0;\n"
-             ++ "resource empty_deque : Deque<u32; capacity>;\n"
+             ++ "resource empty_deque : Deque<u32, capacity>;\n"
              ++ "emitter timer : PeriodicTimer = { period = {tv_sec = 1, tv_usec = 0} };\n"
              ++ "#[priority(1)]\n"
              ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"

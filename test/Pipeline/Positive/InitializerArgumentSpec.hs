@@ -71,7 +71,7 @@ monadicArgumentSrc =
     "    }\n" ++
     "    return r;\n" ++
     "}\n" ++
-    "function from_result(s : Result<u8; i32>) -> u8 {\n" ++
+    "function from_result(s : Result<u8, i32>) -> u8 {\n" ++
     "    var r : u8;\n" ++
     "    match s {\n" ++
     "        case Ok(v) => {\n" ++

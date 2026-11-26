@@ -38,5 +38,5 @@ resource res0 : ResourceClass0 = { field0 = 0 };
 emitter timer0 : PeriodicTimer = {
     period = {tv_sec = 1 : u32, tv_usec = 0 : u32}
 };
-channel channel0 : MsgQueue<u32; 10>;
+channel channel0 : MsgQueue<u32, 10>;
 task task0 : TaskClass0 = { field0 -> channel0, snk0 <- timer0 };

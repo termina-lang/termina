@@ -22,8 +22,8 @@ taskProgram body =
     "        return;\n" ++
     "    }\n" ++
     "};\n" ++
-    "resource pool_res : Pool<Msg; 4>;\n" ++
-    "resource pending_deque : Deque<Msg; 1>;\n" ++
+    "resource pool_res : Pool<Msg, 4>;\n" ++
+    "resource pending_deque : Deque<Msg, 1>;\n" ++
     "emitter timer : PeriodicTimer = { period = {tv_sec = 1, tv_usec = 0} };\n" ++
     "emitter timer2 : PeriodicTimer = { period = {tv_sec = 2, tv_usec = 0} };\n" ++
     "#[priority(10)]\n" ++
@@ -60,8 +60,8 @@ resourceProgram methods body =
     "        return;\n" ++
     "    }\n" ++
     "};\n" ++
-    "resource pool_res : Pool<Msg; 4>;\n" ++
-    "resource pending_deque : Deque<Msg; 1>;\n" ++
+    "resource pool_res : Pool<Msg, 4>;\n" ++
+    "resource pending_deque : Deque<Msg, 1>;\n" ++
     "resource holder_res : CHolder = { pool <-> pool_res, pending <-> pending_deque };\n" ++
     "emitter timer : PeriodicTimer = { period = {tv_sec = 1, tv_usec = 0} };\n" ++
     "#[priority(10)]\n" ++

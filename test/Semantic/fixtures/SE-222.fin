@@ -17,5 +17,5 @@ task class TaskClass0 {
 
 };
 
-resource pool0 : Pool<Msg; 4>;
+resource pool0 : Pool<Msg, 4>;
 task task0 : TaskClass0 = { pending <-> pool0, snk0 <- irq_1 };

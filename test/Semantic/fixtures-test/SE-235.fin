@@ -8,7 +8,7 @@ test class CTests {
     }
 };
 
-channel alarms : TestChannel<u16; 4>;
+channel alarms : TestChannel<u16, 4>;
 
 test tests : CTests = {
     alarms <-> alarms

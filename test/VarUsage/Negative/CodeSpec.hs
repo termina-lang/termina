@@ -74,9 +74,9 @@ takeFromTestChannel frees afterTake =
   "        return;\n" ++
   "    }\n" ++
   "};\n" ++
-  "resource tm_pool : TestPool<TMPacket; 4>;\n" ++
-  "channel tcs : MsgQueue<TCCommand; 1>;\n" ++
-  "channel tms : TestChannel<box TMPacket; 4>;\n" ++
+  "resource tm_pool : TestPool<TMPacket, 4>;\n" ++
+  "channel tcs : MsgQueue<TCCommand, 1>;\n" ++
+  "channel tms : TestChannel<box TMPacket, 4>;\n" ++
   "#[priority(5)]\n" ++
   "task uut : CTCExecutor = { tc_in <- tcs, tm_out -> tms, tm_pool <-> tm_pool };\n" ++
   "test exec_tests : CTCExecutorTests = { tc_out -> tcs, tm_rx <-> tms, " ++

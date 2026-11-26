@@ -17,7 +17,7 @@ task mods =
     "        return;\n" ++
     "    }\n" ++
     "};\n" ++
-    "channel chan : MsgQueue<u32; 10>;\n" ++
+    "channel chan : MsgQueue<u32, 10>;\n" ++
     mods ++
     "task task0 : TaskClass0 = { in_port <- chan };\n"
 

@@ -82,8 +82,8 @@ dequeApp =
     "        return;\n" ++
     "    }\n" ++
     "};\n" ++
-    "resource pool_res : Pool<Msg; 4>;\n" ++
-    "resource pending_deque : Deque<Msg; 2>;\n" ++
+    "resource pool_res : Pool<Msg, 4>;\n" ++
+    "resource pending_deque : Deque<Msg, 2>;\n" ++
     "emitter timer : PeriodicTimer = { period = {tv_sec = 1, tv_usec = 0} };\n" ++
     "emitter timer2 : PeriodicTimer = { period = {tv_sec = 2, tv_usec = 0} };\n" ++
     "#[priority(10)]\n" ++

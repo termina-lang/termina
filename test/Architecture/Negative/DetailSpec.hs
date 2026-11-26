@@ -23,7 +23,7 @@ unusedPool =
   timerTaskClass ++ periodicEmitter "timer" 1
   ++ "#[priority(10)]\n"
   ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
-  ++ "resource mypool : Pool<u32; 4>;\n"
+  ++ "resource mypool : Pool<u32, 4>;\n"
 
 spec :: Spec
 spec = describe "Architecture: error detail (blamed identifier)" $ do

@@ -24,7 +24,7 @@ test0 = "task class CHousekeeping {\n" ++
 
 test1 :: String
 test1 = "task class CHousekeeping {\n" ++
-        "  interval : access AtomicArrayAccess<u32; 10>;\n" ++
+        "  interval : access AtomicArrayAccess<u32, 10>;\n" ++
         "  timer : sink TimeVal triggers timeout;\n" ++
         "\n" ++
         "  action timeout(&priv self, current : TimeVal) {\n" ++

@@ -67,8 +67,8 @@ sharedDouble =
   "resource value : CFakeValue = { value = 0 };\n" ++
   "emitter tick_a : TestEmitter<TimeVal>;\n" ++
   "emitter tick_b : TestEmitter<TimeVal>;\n" ++
-  "channel out_a : TestChannel<u32; 4>;\n" ++
-  "channel out_b : TestChannel<u32; 4>;\n"
+  "channel out_a : TestChannel<u32, 4>;\n" ++
+  "channel out_b : TestChannel<u32, 4>;\n"
 
 -- | A task of a concurrent test that records a check on each tick
 checkerClass :: String
@@ -88,7 +88,7 @@ spec = describe "Architecture: deployment of a test" $ do
   it "accepts a task with a test emitter and a test channel" $
     lockings (monitorClass "CMonitor" ++ monitorTestClass
               ++ "emitter tick : TestEmitter<TimeVal>;\n"
-              ++ "channel alarms : TestChannel<u32; 4>;\n"
+              ++ "channel alarms : TestChannel<u32, 4>;\n"
               ++ "#[priority(5)]\n"
               ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
               ++ monitorTest)
@@ -96,7 +96,7 @@ spec = describe "Architecture: deployment of a test" $ do
 
   it "accepts a box sent to a test channel and freed by the case to its pool" $
     M.lookup "tm_pool" <$> lockings (executorClass ++ executorTestClass True
-              ++ "resource tm_pool : TestPool<TMPacket; 4>;\n"
+              ++ "resource tm_pool : TestPool<TMPacket, 4>;\n"
               ++ executorWiring True)
       `shouldBe` Right (Just ResourceLockNone)
 
@@ -124,7 +124,7 @@ spec = describe "Architecture: deployment of a test" $ do
     -- Only the case reaches it
     M.lookup "test_checks" <$> lockings (monitorClass "CMonitor" ++ monitorTestClass
               ++ "emitter tick : TestEmitter<TimeVal>;\n"
-              ++ "channel alarms : TestChannel<u32; 4>;\n"
+              ++ "channel alarms : TestChannel<u32, 4>;\n"
               ++ "#[priority(5)]\n"
               ++ "task uut : CMonitor = { tick_ev <- tick, alarm_out -> alarms };\n"
               ++ monitorTest)

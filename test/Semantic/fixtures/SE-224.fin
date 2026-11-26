@@ -2,4 +2,4 @@ struct Msg {
     n : u32;
 };
 
-resource deque0 : Deque<Msg; 4> = {};
+resource deque0 : Deque<Msg, 4> = {};
