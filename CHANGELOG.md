@@ -114,7 +114,11 @@ Patch versions on either side are interchangeable.
   of an emitter, and the port that triggers each action. The comments of the
   statements go into the C as plain comments. The deliverable gets a
   `Doxyfile` at its root that documents its C without the third-party files
-  of the OSAL.
+  of the OSAL, and Doxygen documents it into `doc/html`, which `--archive`
+  packs with the rest. A warning of Doxygen stops the delivery. The pages
+  have the graphs of the includes, of the structures and of the groups,
+  drawn by `dot` of Graphviz, which `--no-graphs` leaves out.
+  `provenance.json` records the versions of Doxygen and of Graphviz.
 
 ### Changed
 
@@ -126,6 +130,10 @@ Patch versions on either side are interchangeable.
   `tag: v1.0.0`, in `dependencies` and in `overrides`. In `termina.lock`,
   each package keeps its tag in `tag` and the commit it resolved to in
   `commit`.
+
+- The `.tar.gz` of `termina deliver --archive` for the application is named
+  after the project and its version, without the platform, since an
+  application has only one; that of a test keeps its name and platform.
 
 - A module that defines nothing, only types, interfaces or constants, gets no
   `.c`: its C would only include its header. The build removes a `.c` left

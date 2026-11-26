@@ -33,16 +33,19 @@ import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import Control.Monad
 import Data.Aeson (object, (.=))
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.Char (isAlphaNum, isDigit, isSpace)
 import Data.List (intercalate, isPrefixOf, isSuffixOf, sortOn, nub, sort)
 import qualified Data.Map.Strict as M
-import Data.Maybe (fromMaybe, isJust, listToMaybe)
+import Data.Maybe (fromMaybe, isJust, isNothing, listToMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import qualified Options.Applicative as O
 import System.Directory
+import System.Exit (ExitCode(..))
 import System.FilePath
+import System.Process (proc, readCreateProcessWithExitCode, readProcessWithExitCode, CreateProcess(cwd))
 
 -- | Data type for the "deliver" command arguments
 data DeliverCmdArgs =
@@ -50,7 +53,8 @@ data DeliverCmdArgs =
         Bool -- ^ Verbose mode
         Bool -- ^ Deliver the tests as well
         Bool -- ^ Pack each deliverable into a .tar.gz
-        Bool -- ^ Print the documentation comments in the C, and write the Doxyfile
+        Bool -- ^ Print the documentation comments in the C and document it with Doxygen
+        Bool -- ^ Leave the graphs out of the documentation
     deriving Show
 
 -- | Parser for the "deliver" command arguments
@@ -64,11 +68,17 @@ deliverCmdArgsParser = DeliverCmdArgs
     <*> O.switch (O.long "archive"
         <> O.help "Pack each deliverable into a .tar.gz")
     <*> O.switch (O.long "docs"
-        <> O.help "Print the documentation comments in the C, and write the Doxyfile that documents it")
+        <> O.help "Print the documentation comments in the C, and document it with Doxygen in doc/html")
+    <*> O.switch (O.long "no-graphs"
+        <> O.help "With --docs, leave out the graphs, which need dot of Graphviz")
 
 -- | Command handler for the "deliver" command
 deliverCommand :: DeliverCmdArgs -> IO ()
-deliverCommand (DeliverCmdArgs chatty withTests archive docs) = do
+deliverCommand (DeliverCmdArgs chatty withTests archive docs noGraphs) = do
+    when (noGraphs && not docs) $
+      dieWithError "--no-graphs is for the documentation of --docs"
+    -- | The tools are checked before the first build, which takes long
+    tools <- if docs then Just <$> documentationTools (not noGraphs) else return Nothing
     -- A deliverable is built from the state in git, with termina.lock and
     -- vendor/ as they are.
     loaded <- loadProject Frozen
@@ -87,8 +97,50 @@ deliverCommand (DeliverCmdArgs chatty withTests archive docs) = do
     when (null deployments) (putStrLn . infoMessage $ nothingSelected manifest selection Nothing)
     forM_ deployments $ \deployment -> do
       announce deployments ("Delivering " ++ deploymentLabel deployment)
-      deliverDeployment chatty loaded archive docs (deliverableFolder (deploymentConfig deployment))
+      deliverDeployment chatty loaded archive tools (deliverableFolder (deploymentConfig deployment))
         (documentedBuild docs (releaseBuild deployment))
+
+-- | The tools that document the deliverables, with their versions: Doxygen,
+-- and dot of Graphviz when the documentation has graphs
+data DocTools = DocTools {
+    doxygenVersion :: String,
+    graphvizVersion :: Maybe String
+  }
+
+-- | The version of Doxygen of the container image
+expectedDoxygen :: String
+expectedDoxygen = "1.18.0"
+
+-- | The tools of --docs in the PATH, and their versions
+documentationTools :: Bool -> IO DocTools
+documentationTools graphs = do
+    doxygen <- findExecutable "doxygen"
+    when (isNothing doxygen) $
+      dieWithError "--docs documents the C with doxygen, which is not in the PATH"
+    (_, out, _) <- readProcessWithExitCode "doxygen" ["--version"] ""
+    let version = takeWhile (not . isSpace) out
+    unless (version == expectedDoxygen) $
+      putStrLn . warnMessage $ "the documentation is checked with Doxygen " ++ expectedDoxygen
+        ++ ", and the one in the PATH is " ++ version
+    dot <- if not graphs then return Nothing else do
+      found <- findExecutable "dot"
+      when (isNothing found) $
+        dieWithError "the graphs of --docs need dot of Graphviz, which is not in the PATH: install Graphviz, or leave them out with --no-graphs"
+      -- | dot -V writes "dot - graphviz version X.Y.Z (date)" to stderr
+      (_, _, err) <- readProcessWithExitCode "dot" ["-V"] ""
+      return . Just $ case dropWhile (/= "version") (words err) of
+        _ : v : _ -> v
+        _ -> takeWhile (/= '\n') err
+    return (DocTools version dot)
+
+-- | Runs Doxygen in the folder of a deliverable. With QUIET it writes nothing
+-- but its warnings, and any of them stops the delivery.
+runDoxygen :: String -> FilePath -> IO ()
+runDoxygen label folder = do
+    (code, out, err) <- readCreateProcessWithExitCode ((proc "doxygen" []) { cwd = Just folder }) ""
+    let messages = filter (not . all isSpace) (lines out ++ lines err)
+    unless (code == ExitSuccess && null messages) $
+      dieWithError $ "Doxygen did not document " ++ label ++ " without warnings:\n" ++ unlines messages
 
 -- | The folder of the deliverable of a deployment: "deliverable/app",
 -- "deliverable/tests/<name>/<platform>".
@@ -102,8 +154,8 @@ deliverableFolder config = outputFolderName </> "deliverable" </> makeRelative o
 -- functions, where the methods and viewers of the classes go, only with
 -- EXTRACT_STATIC. What is not documented is reported by the transpiler, so
 -- Doxygen does not warn about it.
-genDoxyfile :: ProjectInfo -> TerminaConfig -> [FilePath] -> T.Text
-genDoxyfile project config externFolders = T.unlines
+genDoxyfile :: ProjectInfo -> TerminaConfig -> [FilePath] -> Bool -> T.Text
+genDoxyfile project config externFolders graphs = T.unlines $
     [ "PROJECT_NAME          = \"" <> projectName project <> testSuffix <> "\""
     , "PROJECT_NUMBER        = " <> projectVersion project
     , "OUTPUT_DIRECTORY      = doc"
@@ -116,7 +168,16 @@ genDoxyfile project config externFolders = T.unlines
     , "MARKDOWN_SUPPORT      = YES"
     , "WARN_IF_UNDOCUMENTED  = NO"
     , "QUIET                 = YES"
-    ]
+    , "GENERATE_LATEX        = NO"
+    , "HAVE_DOT              = " <> (if graphs then "YES" else "NO")
+    ] ++
+    -- | The graphs of the includes, of the structures and of the groups, but
+    -- not those of the calls
+    (if graphs
+        then [ "DOT_IMAGE_FORMAT      = svg"
+             , "INTERACTIVE_SVG       = YES"
+             , "DOT_GRAPH_MAX_NODES   = 100" ]
+        else [])
 
   where
 
@@ -263,8 +324,8 @@ releaseBuild deployment = deployment {
 
 -- | Build a deployment and its deliverable in the given folder, and compare
 -- their binaries.
-deliverDeployment :: Bool -> LoadedProject -> Bool -> Bool -> FilePath -> Deployment -> IO ()
-deliverDeployment chatty loaded archive docs folder deployment = do
+deliverDeployment :: Bool -> LoadedProject -> Bool -> Maybe DocTools -> FilePath -> Deployment -> IO ()
+deliverDeployment chatty loaded archive tools folder deployment = do
     let config = deploymentConfig deployment
         label = deploymentLabel deployment
         built = outputFolder config
@@ -322,9 +383,10 @@ deliverDeployment chatty loaded archive docs folder deployment = do
     let makefile = runMakefilePrinter $
             genDeliverableMakefile config info (map relocated osalSources) sources externs (testModules config modules)
     TIO.writeFile (folder </> "Makefile") makefile
-    when docs $ do
+    forM_ tools $ \t -> do
       TIO.writeFile (folder </> "Doxyfile") $
         genDoxyfile (manifestProject (loadedManifest loaded)) config [ groupFolder g | g <- externs ]
+          (isJust (graphvizVersion t))
       undocumented <- undocumentedModules folder modules
       forM_ undocumented $ \qname ->
         putStrLn . warnMessage $ "module " ++ intercalate "." (splitDirectories qname) ++ " has no documentation comment, so its file has no description."
@@ -347,21 +409,26 @@ deliverDeployment chatty loaded archive docs folder deployment = do
               dieWithError $ "the binary of the deliverable of " ++ label ++ " differs without debugging information from the one built from the C with the #line pragmas ("
                 ++ h2 ++ " in " ++ folder ++ ", " ++ h1 ++ " in " ++ built ++ ")"
         _ -> dieWithError $ "the binaries of " ++ label ++ " have no hashes to compare (is " ++ value "OBJCOPY" ++ " installed?)"
+    forM_ tools (const (runDoxygen label folder))
     -- | provenance.json of the deliverable, which adds its files to the one
-    -- of a build
+    -- of a build, and the versions of the tools of its documentation, whose
+    -- files it does not hash
     fileHashes <- mapM (\f -> (f,) <$> sha256File (folder </> f)) delivered
     fields <- provenanceFields folder config info deliveredHashes modules
-    writeProvenanceFile folder (fields ++ ["files" .= map (\(f, h) -> object ["path" .= f, "sha256" .= h]) fileHashes])
+    writeProvenanceFile folder (fields
+        ++ ["files" .= map (\(f, h) -> object ["path" .= f, "sha256" .= h]) fileHashes]
+        ++ concat [ ["doxygen" .= doxygenVersion t, "graphviz" .= graphvizVersion t] | Just t <- [tools] ])
     when archive $ do
       let project = manifestProject (loadedManifest loaded)
+          -- | An application has a single platform, and a test one of those of its list
           archiveName = intercalate "-" $
             [T.unpack (projectName project), T.unpack (projectVersion project)]
-            ++ [T.unpack (name config) | isTestBuild config]
-            ++ [T.unpack (platform config)]
+            ++ (if isTestBuild config then [T.unpack (name config), T.unpack (platform config)] else [])
           archiveFile = outputFolderName </> "deliverable" </> archiveName <.> "tar" <.> "gz"
           mapFile = binary <.> "map"
       hasMap <- doesFileExist (folder </> mapFile)
-      let contents = map (\f -> (f, folder </> f)) ("provenance.json" : delivered)
+      docFiles <- if isJust tools then map (("doc" </> "html") </>) <$> filesUnder (folder </> "doc" </> "html") else return []
+      let contents = map (\f -> (f, folder </> f)) ("provenance.json" : delivered ++ docFiles)
             ++ [(binary, folder </> binary)]
             ++ [(mapFile, folder </> mapFile) | hasMap]
       writeArchive archiveFile archiveName contents
@@ -668,7 +735,8 @@ writeArchive archiveFile root contents = do
       tarPath <- either (dieWithError . (("cannot archive " ++ path ++ ": ") ++)) return
         (Tar.toTarPath False (root </> path))
       isExecutable <- executable <$> getPermissions source
-      content <- BL.readFile source
+      -- | Read whole, since the lazy read keeps one descriptor open per file
+      content <- BL.fromStrict <$> BS.readFile source
       return (Tar.fileEntry tarPath content) {
         Tar.entryPermissions = if isExecutable then Tar.executableFilePermissions else Tar.ordinaryFilePermissions
       }

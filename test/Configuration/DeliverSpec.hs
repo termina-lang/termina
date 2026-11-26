@@ -110,7 +110,7 @@ spec = describe "termina deliver" $ do
     let info = ProjectInfo { projectName = "icu-asw", projectVersion = "1.2.0", projectManifestVersion = 1, projectAssurance = [], projectDescription = Nothing }
 
     it "documents the C of the deliverable from its root, with the folders of the extern C and without the vendored files of the OSAL" $
-      genDoxyfile info (defaultConfig "icu-asw" POSIXGCC) ["extern/icu"] `shouldBe` T.unlines
+      genDoxyfile info (defaultConfig "icu-asw" POSIXGCC) ["extern/icu"] True `shouldBe` T.unlines
         [ "PROJECT_NAME          = \"icu-asw\""
         , "PROJECT_NUMBER        = 1.2.0"
         , "OUTPUT_DIRECTORY      = doc"
@@ -123,10 +123,19 @@ spec = describe "termina deliver" $ do
         , "MARKDOWN_SUPPORT      = YES"
         , "WARN_IF_UNDOCUMENTED  = NO"
         , "QUIET                 = YES"
+        , "GENERATE_LATEX        = NO"
+        , "HAVE_DOT              = YES"
+        , "DOT_IMAGE_FORMAT      = svg"
+        , "INTERACTIVE_SVG       = YES"
+        , "DOT_GRAPH_MAX_NODES   = 100"
         ]
 
+    it "leaves the graphs out with --no-graphs" $
+      drop 12 (T.lines (genDoxyfile info (defaultConfig "icu-asw" POSIXGCC) [] False))
+        `shouldBe` ["GENERATE_LATEX        = NO", "HAVE_DOT              = NO"]
+
     it "names the test in the project of a deliverable of a test" $
-      take 1 (T.lines (genDoxyfile info ((defaultConfig "uart" POSIXGCC) { deploymentKind = TestBuild "uart" }) []))
+      take 1 (T.lines (genDoxyfile info ((defaultConfig "uart" POSIXGCC) { deploymentKind = TestBuild "uart" }) [] True))
         `shouldBe` ["PROJECT_NAME          = \"icu-asw, test uart\""]
 
   describe "genDoxygenGroups" $ do
