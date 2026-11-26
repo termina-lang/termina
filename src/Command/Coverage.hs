@@ -13,7 +13,7 @@ import Configuration.Configuration
 import Configuration.Manifest (Deployment(..), Instrumentation(..), coverageConfigFor)
 import Configuration.Platform (Platform(..), checkPlatform)
 import Runner.Coverage (coverageArrays, readDumps, readMaps, writeAppResult, writeTestResult)
-import Runner.Servers (Server, readServer)
+import Runner.Servers (Server, readServer, gdbPortsParser)
 
 import Control.Monad (forM_, when)
 import Data.List (intercalate)
@@ -38,6 +38,7 @@ data CoverageCmdArgs =
         (Maybe Integer) -- ^ Seconds after which the application stops
         Bool -- ^ Run the binary of posix-gcc without the coverage under gdb
         (Maybe Server) -- ^ The GDB server of the board
+        [(Platform, Int)] -- ^ The port of the GDB server of some platforms
         (Maybe Server) -- ^ The XSDB command server of the PYNQ
         Bool -- ^ Fail instead of fetching the dependencies
         Bool -- ^ Instrument also the modules of the dependencies
@@ -68,6 +69,7 @@ coverageCmdArgsParser = CoverageCmdArgs
     <*> O.optional (O.option (O.eitherReader (readServer "GDB server"))
           ( O.long "gdb" <> O.metavar "HOST[:PORT]"
           <> O.help "The host of the GDB servers of the boards, or the host and the port of the server of a single board (default: localhost, or host.docker.internal in the container)"))
+    <*> gdbPortsParser
     <*> O.optional (O.option (O.eitherReader (readServer "XSDB server"))
           ( O.long "xsdb" <> O.metavar "HOST[:PORT]"
           <> O.help "The XSDB command server that prepares the PYNQ (default: the host of the GDB server)"))
@@ -92,7 +94,7 @@ coverageCmdArgsParser = CoverageCmdArgs
 
 -- | Runs the application or the tests with the coverage, builds them, or writes the report again
 coverageCommand :: CoverageCmdArgs -> IO ()
-coverageCommand (CoverageCmdArgs target mPlatform mProfile mCase isolated seconds withGdb mServer mXsdb offline withDeps reportOnly buildOnly mRecord)
+coverageCommand (CoverageCmdArgs target mPlatform mProfile mCase isolated seconds withGdb mServer gdbPorts mXsdb offline withDeps reportOnly buildOnly mRecord)
     | reportOnly = refuse "--report-only" (given ++ [ "--build-only" | buildOnly ] ++ [ "--record" | isJust mRecord ] ++ [ "--test or --tests" | notApplication target ])
         >> report
     | Just folder <- mRecord = refuse "--record" (filter (`notElem` ["--platform", "--profile"]) given ++ [ "--build-only" | buildOnly ] ++ [ "--tests" | isEveryTest target ])
@@ -102,10 +104,10 @@ coverageCommand (CoverageCmdArgs target mPlatform mProfile mCase isolated second
     | otherwise = refuseMachO >> case target of
         Application -> do
             refuse "the application" (filter (`elem` ["--platform", "--case", "--isolated"]) given)
-            runApplication instrumentation mProfile offline seconds withGdb mServer mXsdb
+            runApplication instrumentation mProfile offline seconds withGdb mServer gdbPorts mXsdb
         _ -> do
             refuse "the tests" (filter (== "--timeout") given)
-            either cannotRun (runTests (testName target) mPlatform mProfile withGdb mServer mXsdb offline instrumentation)
+            either cannotRun (runTests (testName target) mPlatform mProfile withGdb mServer gdbPorts mXsdb offline instrumentation)
                 (modeOf (testName target) mCase isolated Nothing offline)
 
   where
@@ -116,7 +118,7 @@ coverageCommand (CoverageCmdArgs target mPlatform mProfile mCase isolated second
     given = [ option | (True, option) <-
         [ (isJust mPlatform, "--platform"), (isJust mProfile, "--profile"), (isJust mCase, "--case")
         , (isolated, "--isolated"), (isJust seconds, "--timeout"), (withGdb, "--with-gdb")
-        , (isJust mServer, "--gdb"), (isJust mXsdb, "--xsdb"), (offline, "--offline"), (withDeps, "--include-deps") ] ]
+        , (isJust mServer, "--gdb"), (not (null gdbPorts), "--gdb-port"), (isJust mXsdb, "--xsdb"), (offline, "--offline"), (withDeps, "--include-deps") ] ]
 
     refuse what options = case options of
         option : _ -> cannotRun (option ++ " cannot be used with " ++ what)

@@ -28,7 +28,7 @@ import Runner.Posix (PosixRun(..), runPosix)
 import Runner.Record (Header(..), Layout, decodeHeader, decodeRecords, headerSize, platformLayout, relocate)
 import Runner.Results (Evidence(..), readProvenance, resultsJson, renderResults, renderJUnit)
 import Runner.Symbols (locateAddresses, stampAddress)
-import Runner.Servers (Server(..), readServer, gdbHost, gdbAddress)
+import Runner.Servers (Server(..), readServer, gdbPortsParser, checkGdbPorts, gdbHost, xsdbHost, gdbAddress)
 import Runner.Xsdb (prepareBoard)
 import qualified Runner.Symbols as S
 
@@ -78,6 +78,7 @@ data TestCmdArgs =
         (Maybe FilePath) -- ^ The folder of a record dumped outside the runner
         Bool -- ^ Run the binary of posix-gcc under gdb
         (Maybe Server) -- ^ The GDB server of the board
+        [(Platform, Int)] -- ^ The port of the GDB server of some platforms
         (Maybe Server) -- ^ The XSDB command server of the PYNQ
         Bool -- ^ Fail instead of fetching the dependencies
         Bool -- ^ List the tests instead of running them
@@ -112,6 +113,7 @@ testCmdArgsParser = TestCmdArgs
           ( O.long "gdb"
           <> O.metavar "HOST[:PORT]"
           <> O.help "The host of the GDB servers of the boards, each at the port of its platform, or the host and the port of the server of a single board (default: localhost, or host.docker.internal in the container)"))
+    <*> gdbPortsParser
     <*> O.optional (O.option (O.eitherReader (readServer "XSDB server"))
           ( O.long "xsdb"
           <> O.metavar "HOST[:PORT]"
@@ -141,13 +143,13 @@ data Mode =
 
 -- | Command handler for the "test" command
 testCommand :: TestCmdArgs -> IO ()
-testCommand (TestCmdArgs mName mPlatform mProfile mCase isolated mRecord withGdb mServer mXsdb offline list json)
+testCommand (TestCmdArgs mName mPlatform mProfile mCase isolated mRecord withGdb mServer gdbPorts mXsdb offline list json)
     | list = either cannotRun (const (listTests json)) (listOnly [
         (isJust mName, "the name of a test"), (isJust mPlatform, "--platform"), (isJust mProfile, "--profile"),
         (isJust mCase, "--case"), (isolated, "--isolated"), (isJust mRecord, "--record"),
-        (withGdb, "--with-gdb"), (isJust mServer, "--gdb"), (isJust mXsdb, "--xsdb"), (offline, "--offline")])
+        (withGdb, "--with-gdb"), (isJust mServer, "--gdb"), (not (null gdbPorts), "--gdb-port"), (isJust mXsdb, "--xsdb"), (offline, "--offline")])
     | json = cannotRun "--json needs --list"
-    | otherwise = either cannotRun (runTests mName mPlatform mProfile withGdb mServer mXsdb offline NoCoverage) (modeOf mName mCase isolated mRecord offline)
+    | otherwise = either cannotRun (runTests mName mPlatform mProfile withGdb mServer gdbPorts mXsdb offline NoCoverage) (modeOf mName mCase isolated mRecord offline)
 
 -- | A test that cannot be run exits with 2
 cannotRun :: String -> IO a
@@ -182,8 +184,10 @@ modeOf mName mCase isolated mRecord offline =
 -- a test cannot be built or read, also when the project cannot be loaded. A
 -- record is decoded with the binary already built, and only the manifest is
 -- read.
-runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Bool -> Maybe Server -> Maybe Server -> Bool -> Instrumentation -> Mode -> IO ()
-runTests mName mPlatform mProfile withGdb mServer mXsdb offline instrumentation mode = do
+runTests :: Maybe String -> Maybe Platform -> Maybe ProjectProfile -> Bool -> Maybe Server -> [(Platform, Int)] -> Maybe Server -> Bool -> Instrumentation -> Mode -> IO ()
+runTests mName mPlatform mProfile withGdb mServer gdbPorts mXsdb offline instrumentation mode = do
+    -- | A port for a platform without tests in the selection is left unused
+    ports <- either cannotRun return (checkGdbPorts gdbPorts)
     loaded <- try (case mode of
         Recorded _ -> (\m -> LoadedProject projectRoot m M.empty M.empty M.empty) <$> (loadManifest projectRoot >>= either dieWithFirstError return)
         _ -> do
@@ -213,8 +217,8 @@ runTests mName mPlatform mProfile withGdb mServer mXsdb offline instrumentation 
     when (withGdb && POSIXGCC `notElem` platforms) $
         cannotRun ("--with-gdb is for " ++ show POSIXGCC ++ ", and no test of the selection runs on it")
     host <- gdbHost mServer
-    let servers = Servers (host, mServer >>= \(Server _ port) -> port)
-                          (maybe host (\(Server h _) -> h) mXsdb, mXsdb >>= \(Server _ port) -> port)
+    let servers = Servers (host, mServer >>= \(Server _ port) -> port) ports
+                          (xsdbHost host mXsdb, mXsdb >>= \(Server _ port) -> port)
     codes <- case (mode, deployments) of
         -- | A record is decoded with the binary already built, which made it
         (Recorded _, [deployment]) -> (: []) . runCode <$> runDeployment True True [] servers mode deployment
@@ -273,9 +277,10 @@ runCovered project servers mode instrumentation deployment plainResult = do
 labelOf :: TerminaConfig -> String
 labelOf config = T.unpack (name config) ++ " (" ++ T.unpack (platform config) ++ ")"
 
--- | The host and the port of the GDB server of a board and of the XSDB server
--- of the PYNQ, each port when it is not the one of the platform
-data Servers = Servers (String, Maybe Int) (String, Maybe Int)
+-- | The host and the port of the GDB server of a board, the ports of
+-- --gdb-port, and the host and the port of the XSDB server of the PYNQ, each
+-- port when it is not the one of the platform
+data Servers = Servers (String, Maybe Int) [(Platform, Int)] (String, Maybe Int)
 
 -- | How the binary of a test is launched on a platform.
 data Target = Target {
@@ -296,7 +301,7 @@ targetOf :: Platform -> Maybe FilePath -> Bool -> Servers -> Target
 targetOf POSIXGCC _ False _ = Target False AsProcess (return (Right ()))
 targetOf POSIXGCC _ True _ = Target False (UnderGdb "gdb" NativeProcess) (return (Right ()))
 targetOf TestPlatform _ _ _ = error "no test runs on the test platform"
-targetOf plt mScript _ servers@(Servers _ (xsdbHost, mXsdbPort)) =
+targetOf plt mScript _ servers@(Servers _ _ (xsdbServerHost, mXsdbPort)) =
     case (gdbLaunch plt, xsdbServerPort plt) of
         -- | The NOEL-V needs its device tree loaded by GRMON before each run
         (Nothing, _) -> notYetTarget plt servers
@@ -309,10 +314,10 @@ targetOf plt mScript _ servers@(Servers _ (xsdbHost, mXsdbPort)) =
         Nothing -> return (Left ("the " ++ show plt ++ " is prepared before each run with an XSDB script, "
             ++ "and termina.yaml gives none: add xsdb-init to app, or to the test for " ++ show plt))
         Just script -> do
-            done <- prepareBoard xsdbHost port script
+            done <- prepareBoard xsdbServerHost port script
             return (either (Left . notPrepared port) Right done)
 
-    notPrepared port err = "the XSDB server at " ++ xsdbHost ++ ":" ++ show port ++ " did not prepare the board: "
+    notPrepared port err = "the XSDB server at " ++ xsdbServerHost ++ ":" ++ show port ++ " did not prepare the board: "
         ++ err ++ "; it is started from the root of the project with xsdb -eval \"xsdbserver start -port "
         ++ show port ++ "; vwait forever\""
 
@@ -325,8 +330,8 @@ notYetTarget plt servers = (boardTarget plt ["load"] servers) {
 -- | A board under gdb-multiarch, through its GDB server.
 -- The commands given reset the board and load the binary.
 boardTarget :: Platform -> [String] -> Servers -> Target
-boardTarget plt commands (Servers gdb _) =
-    Target True (UnderGdb "gdb-multiarch" (RemoteServer (gdbAddress plt gdb) commands)) (return (Right ()))
+boardTarget plt commands (Servers gdb ports _) =
+    Target True (UnderGdb "gdb-multiarch" (RemoteServer (gdbAddress plt ports gdb) commands)) (return (Right ()))
 
 invalid :: TerminaConfig -> String -> TestResult
 invalid config reason = TestResult (labelOf config) (Just reason) [] Nothing

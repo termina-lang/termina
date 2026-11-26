@@ -12,10 +12,11 @@ import Command.Provenance (terminaVersion)
 import Command.Utils
 import Configuration.Configuration
 import Configuration.Manifest
+import Configuration.Platform (Platform)
 import Runner.Coverage (readMaps, coverageArrays, linkedArrays, writeAppResult)
 import Runner.Gdb (AppRun(..), runAppGdb)
 import Runner.Posix (waitFor)
-import Runner.Servers (Server(..), readServer, gdbHost)
+import Runner.Servers (Server(..), readServer, gdbPortsParser, checkGdbPorts, gdbHost, xsdbHost)
 
 import Control.Exception (AsyncException(UserInterrupt), catch, throwIO)
 import Control.Monad (void, when)
@@ -33,6 +34,7 @@ data RunCmdArgs =
         (Maybe Integer) -- ^ Seconds after which the run stops
         Bool -- ^ Run the binary of posix-gcc under gdb
         (Maybe Server) -- ^ The GDB server of the board
+        [(Platform, Int)] -- ^ The port of the GDB server of some platforms
         (Maybe Server) -- ^ The XSDB command server of the PYNQ
     deriving Show
 
@@ -51,18 +53,20 @@ runCmdArgsParser = RunCmdArgs
     <*> O.optional (O.option (O.eitherReader (readServer "GDB server"))
           ( O.long "gdb" <> O.metavar "HOST[:PORT]"
           <> O.help "The GDB server of the board (default: localhost, or host.docker.internal in the container)"))
+    <*> gdbPortsParser
     <*> O.optional (O.option (O.eitherReader (readServer "XSDB server"))
           ( O.long "xsdb" <> O.metavar "HOST[:PORT]"
           <> O.help "The XSDB command server that prepares the PYNQ (default: the host of the GDB server)"))
 
 -- | Builds the application if needed and runs it until a Ctrl-C, the timeout or its end
 runCommand :: RunCmdArgs -> IO ()
-runCommand (RunCmdArgs mProfile offline seconds withGdb mServer mXsdb) =
-    runApplication NoCoverage mProfile offline seconds withGdb mServer mXsdb
+runCommand (RunCmdArgs mProfile offline seconds withGdb mServer gdbPorts mXsdb) =
+    runApplication NoCoverage mProfile offline seconds withGdb mServer gdbPorts mXsdb
 
 -- | Runs the application built with its instrumentation
-runApplication :: Instrumentation -> Maybe ProjectProfile -> Bool -> Maybe Integer -> Bool -> Maybe Server -> Maybe Server -> IO ()
-runApplication instrumentation mProfile offline seconds withGdb mServer mXsdb = do
+runApplication :: Instrumentation -> Maybe ProjectProfile -> Bool -> Maybe Integer -> Bool -> Maybe Server -> [(Platform, Int)] -> Maybe Server -> IO ()
+runApplication instrumentation mProfile offline seconds withGdb mServer gdbPorts mXsdb = do
+    ports <- either dieWithError return (checkGdbPorts gdbPorts)
     let withCoverage = instrumentation /= NoCoverage
     refuseLocalFoldersInRelease SelectApp Nothing mProfile
     project <- loadProject (Update (if offline then Offline else Reuse BuildCommand))
@@ -77,8 +81,8 @@ runApplication instrumentation mProfile offline seconds withGdb mServer mXsdb = 
     warnLocalFolders project [deployment]
     void (buildDeployment buildArgs project deployment)
     host <- gdbHost mServer
-    let servers = Servers (host, mServer >>= \(Server _ port) -> port)
-                          (maybe host (\(Server h _) -> h) mXsdb, mXsdb >>= \(Server _ port) -> port)
+    let servers = Servers (host, mServer >>= \(Server _ port) -> port) ports
+                          (xsdbHost host mXsdb, mXsdb >>= \(Server _ port) -> port)
         target = targetOf plt (xsdbInit config) (withGdb || withCoverage) servers
     prepared <- targetPrepare target
     either dieWithError return prepared

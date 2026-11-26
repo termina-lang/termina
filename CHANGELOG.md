@@ -15,6 +15,12 @@ Patch versions on either side are interchangeable.
 
 ### Added
 
+- The option `--gdb-port <platform>:<port>` of `termina test`, `coverage`,
+  `run` and `platforms`, once per platform, gives the port of the GDB server
+  of the boards of a platform, so that two boards with the same default
+  port run in the same command. A platform without tests in the selection
+  ignores it. `--xsdb :<port>` gives the port of the XSDB server with the
+  default host.
 - The statement `_ = e;` reads a fixed-location field, or a part of one, and
   discards the value, as a driver does to empty a FIFO or to clear a flag
   that a read clears. Any other expression is rejected (SE-244): the value of
@@ -144,6 +150,9 @@ Patch versions on either side are interchangeable.
 
 ### Fixed
 
+- `termina platforms --json --xsdb <host>:<port>` gives the XSDB address
+  only to the PYNQ-Z2. Until now every platform got one when `--xsdb` had a
+  port.
 - `load` and `load_index` take a `&mut T` parameter as their destination, as
   in `self->value.load(dst)`, and the C stores the value through it. Until
   now only an explicit `&mut x` reached C, and a reference parameter ended

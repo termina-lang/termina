@@ -8,7 +8,8 @@ module Command.Platforms (
 ) where
 
 import Configuration.Platform
-import Runner.Servers (Server(..), readServer, gdbHost, gdbAddress, xsdbAddress)
+import Runner.Servers (Server(..), readServer, gdbPortsParser, checkGdbPorts, gdbHost, xsdbHost, gdbAddress, xsdbAddress)
+import Command.Utils (dieWithError)
 
 import Control.Monad (forM_)
 import Data.Aeson (Value, object, (.=))
@@ -22,6 +23,7 @@ data PlatformsCmdArgs =
     PlatformsCmdArgs
         Bool -- ^ Write the list in JSON
         (Maybe String) -- ^ The host of the GDB servers
+        [(Platform, Int)] -- ^ The port of the GDB server of some platforms
         (Maybe Server) -- ^ The XSDB server
     deriving Show
 
@@ -33,30 +35,32 @@ platformsCmdArgsParser = PlatformsCmdArgs
           ( O.long "gdb"
           <> O.metavar "HOST"
           <> O.help "The host of the GDB servers of the boards (default: localhost, or host.docker.internal in the container)"))
+    <*> gdbPortsParser
     <*> O.optional (O.option (O.eitherReader (readServer "XSDB server"))
           ( O.long "xsdb"
           <> O.metavar "HOST[:PORT]"
           <> O.help "The XSDB command server that prepares the boards prepared through XSDB (default: the host of the GDB servers, at the port of the platform)"))
 
 platformsCommand :: PlatformsCmdArgs -> IO ()
-platformsCommand (PlatformsCmdArgs json mGdb mXsdb) = do
+platformsCommand (PlatformsCmdArgs json mGdb gdbPorts mXsdb) = do
+    ports <- either dieWithError return (checkGdbPorts gdbPorts)
     host <- gdbHost (flip Server Nothing <$> mGdb)
-    let xsdb = maybe (host, Nothing) (\(Server h port) -> (h, port)) mXsdb
+    let xsdb = (xsdbHost host mXsdb, mXsdb >>= \(Server _ port) -> port)
     if json
         then BLC.putStrLn $ encodePretty' defConfig { confCompare = keyOrder keys }
-            [ entry host xsdb plt desc | (plt, desc) <- supportedPlatforms ]
+            [ entry host ports xsdb plt desc | (plt, desc) <- supportedPlatforms ]
         else forM_ supportedPlatforms $ \(plt, desc) -> putStrLn (show plt ++ ": " ++ desc)
 
   where
 
     keys = ["name", "description", "gdb", "xsdb", "address", "launch"]
 
-    entry :: String -> (String, Maybe Int) -> Platform -> String -> Value
-    entry host xsdb plt desc = object (catMaybes [
+    entry :: String -> [(Platform, Int)] -> (String, Maybe Int) -> Platform -> String -> Value
+    entry host ports xsdb plt desc = object (catMaybes [
         Just ("name" .= show plt),
         Just ("description" .= desc),
         (\commands -> "gdb" .= object [
-            "address" .= gdbAddress plt (host, Nothing),
+            "address" .= gdbAddress plt ports (host, Nothing),
             "launch" .= commands ]) <$> gdbLaunch plt,
         (\address -> "xsdb" .= object [ "address" .= address ]) <$> xsdbAddress plt xsdb
       ])
