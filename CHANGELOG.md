@@ -15,6 +15,13 @@ Patch versions on either side are interchangeable.
 
 ### Added
 
+- The statement `_ = e;` reads a fixed-location field, or a part of one, and
+  discards the value, as a driver does to empty a FIFO or to clear a flag
+  that a read clears. Any other expression is rejected (SE-244): the value of
+  a function or a method cannot be discarded. The C casts the read to void,
+  `(void)self->regs->data;`, and the access stays, since the field is
+  volatile.
+
 - Before writing a file of C, the build looks up every name the file declares
   (functions, globals, types, tags, enumerators, macros, parameters and
   locals, but not the members of a struct) in the same lists as the semantic

@@ -248,6 +248,7 @@ stmtRefs locals (SAST.MatchStmt e cases mdefault _) =
 
         defaultRefs (SAST.DefaultCase body _) = blockRefs locals body
 stmtRefs locals (SAST.SingleExpStmt e _) = (locals, exprRefs locals e)
+stmtRefs locals (SAST.DiscardStmt e _) = (locals, exprRefs locals e)
 stmtRefs locals (SAST.ReturnStmt me _) = (locals, maybe [] (exprRefs locals) me)
 stmtRefs locals (SAST.ContinueStmt e _) = (locals, exprRefs locals e)
 stmtRefs locals (SAST.RebootStmt _) = (locals, [])

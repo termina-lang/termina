@@ -134,6 +134,7 @@ data Error
   | EModifierValue Identifier Bool -- ^ Modifier with a value it does not take, or without the one it takes (SE-241)
   | EReferenceToFixedLocation Identifier -- ^ Reference to a fixed-location field or to a part of one (SE-242)
   | EAtomicFetchAddInvalidType Identifier (TerminaType SemanticAnn) -- ^ Atomic addition on a type that is not an unsigned integer (SE-243)
+  | EDiscardNotFixedLocationRead -- ^ Discarded expression that is not the read of a fixed-location field (SE-244)
   | EInvalidArrayType (TerminaType SemanticAnn) -- ^ Invalid array type
   | EInvalidBoxType (TerminaType SemanticAnn) -- ^ Invalid box type
   | ENoTypeFound Identifier -- ^ Type not found
@@ -1138,6 +1139,9 @@ instance Diagnosable Error where
     describe (EAtomicFetchAddInvalidType procName ty) =
         diagnostic "SE-243" "invalid type for an atomic addition"
             ("\x1b[31m" <> T.pack procName <> "\x1b[0m adds unsigned integers only (u8, u16, u32 and usize), and the atomic holds \x1b[31m" <> showText ty <> "\x1b[0m.")
+    describe EDiscardNotFixedLocationRead =
+        diagnostic "SE-244" "discarded expression that is not a fixed-location read"
+            "Only the read of a fixed-location field, or of a part of one, can be discarded with \x1b[31m_ =\x1b[0m."
 
     -- | The two clauses below pick their detail with a case, which the script
     -- that moved the rest of this table does not read, so they were moved by

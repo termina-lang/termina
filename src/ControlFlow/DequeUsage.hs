@@ -171,6 +171,7 @@ transfer summaries = Transfer
       Declaration _ _ _ mExpr _ -> mapM_ calls mExpr
       AssignmentStmt obj e _ -> mapM_ calls (indexExpressions obj) >> calls e
       SingleExpStmt e _ -> calls e
+      DiscardStmt e _ -> calls e
   , onSimpleBlock = \block -> do
       forM_ (simpleBlockChildren block) $ mapM_ $ \case
         ChildExpr e -> calls e

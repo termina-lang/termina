@@ -419,6 +419,7 @@ checkStatement stmt = case stmt of
   -- while the program runs, is an effect of the body as much as reading one.
   AssignmentStmt lhs rhs _     -> forM_ (objectEffect lhs) noteEffect >> checkFullExpression rhs
   SingleExpStmt e _            -> checkFullExpression e
+  DiscardStmt e _              -> checkFullExpression e
 
 -- | What each node means to this pass. It learns nothing from a condition and
 -- carries nothing from one statement to the next, so the refinements are empty

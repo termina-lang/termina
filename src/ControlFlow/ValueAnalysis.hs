@@ -962,6 +962,7 @@ checkStatement (AssignmentStmt obj expr ann) = do
     -- known of the object it starts from no longer holds.
     Nothing -> forget (rootIdent obj)
 checkStatement (SingleExpStmt expr _) = recordExpression expr >> noteEscapes expr
+checkStatement (DiscardStmt expr _) = recordExpression expr >> noteEscapes expr
 
 
 -- | What each node means to this pass. Only the expressions that decide a path

@@ -1114,6 +1114,7 @@ statementParser
   =   try ifElseIfStmtParser
   <|> try mutableObjDeclarationParser
   <|> try immutableObjDeclarationParser
+  <|> try discardStmtParser
   <|> try assignmentStmtPaser
   <|> try forLoopStmtParser
   <|> try matchStmtParser
@@ -1121,6 +1122,18 @@ statementParser
   <|> try continueStmtParser
   <|> try rebootStmtParser
   <|> singleExprStmtParser
+
+-- | Discard statement: a lone underscore, an equals sign and an expression
+discardStmtParser :: TerminaParser (Statement ParserAnn)
+discardStmtParser = do
+  current <- getState
+  startPos <- getPosition
+  _ <- lexeme (char '_' <* notFollowedBy (alphaNum <|> char '_'))
+  _ <- reservedOp "="
+  rval <- expressionParser
+  endPos <- getPosition
+  _ <- semi
+  return $ DiscardStmt rval (located current startPos endPos)
 
 assignmentStmtPaser :: TerminaParser (Statement ParserAnn)
 assignmentStmtPaser = do

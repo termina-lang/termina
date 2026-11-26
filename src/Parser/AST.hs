@@ -262,6 +262,10 @@ data Statement a =
   | SingleExpStmt
     (Expression a) -- ^ expression
     a
+  -- | Read of a fixed-location field whose value is discarded (_ = e;)
+  | DiscardStmt
+    (Expression a) -- ^ expression
+    a
   | ReturnStmt
     (Maybe (Expression a)) -- ^ return expression
     a
@@ -278,6 +282,7 @@ instance Annotated Statement where
   getAnnotation (ForLoopStmt _ _ _ _ _ _ a) = a
   getAnnotation (MatchStmt _ _ _ a) = a
   getAnnotation (SingleExpStmt _ a) = a
+  getAnnotation (DiscardStmt _ a) = a
   getAnnotation (ReturnStmt _ a) = a
   getAnnotation (ContinueStmt _ a) = a
   getAnnotation (RebootStmt a) = a
@@ -288,6 +293,7 @@ instance Annotated Statement where
   updateAnnotation (ForLoopStmt n ts f t c b _) = ForLoopStmt n ts f t c b
   updateAnnotation (MatchStmt e cs d _) = MatchStmt e cs d
   updateAnnotation (SingleExpStmt e _) = SingleExpStmt e
+  updateAnnotation (DiscardStmt e _) = DiscardStmt e
   updateAnnotation (ReturnStmt e _) = ReturnStmt e
   updateAnnotation (ContinueStmt e _) = ContinueStmt e
   updateAnnotation (RebootStmt _) = RebootStmt

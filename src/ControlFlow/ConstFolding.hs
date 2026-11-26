@@ -522,6 +522,10 @@ foldStatement (SingleExpStmt expr ann) = do
   ann' <- foldAnnotation ann
   expr' <- foldExpression expr
   return $ SingleExpStmt expr' ann'
+foldStatement (DiscardStmt expr ann) = do
+  ann' <- foldAnnotation ann
+  expr' <- foldExpression expr
+  return $ DiscardStmt expr' ann'
 
 foldBasicBlock :: BasicBlock SemanticAnn -> ConstFoldMonad (BasicBlock SemanticAnn)
 foldBasicBlock (RegularBlock stmts) =

@@ -72,6 +72,10 @@ data Statement' ty expr obj a =
   | SingleExpStmt
     (expr a) -- ^ expression
     a
+  -- | Read of a fixed-location field whose value is discarded
+  | DiscardStmt
+    (expr a) -- ^ expression
+    a
   deriving (Functor)
 
 data BasicBlock' ty expr obj a =
@@ -227,6 +231,7 @@ instance Annotated (Statement' ty expr obj) where
   getAnnotation (Declaration _ _ _ _ ann) = ann
   getAnnotation (AssignmentStmt _ _ ann) = ann
   getAnnotation (SingleExpStmt _ ann) = ann
+  getAnnotation (DiscardStmt _ ann) = ann
 
   updateAnnotation (Declaration idk ak t expr _) =
     Declaration idk ak t expr
@@ -234,6 +239,8 @@ instance Annotated (Statement' ty expr obj) where
     AssignmentStmt obj expr
   updateAnnotation (SingleExpStmt expr _) =
     SingleExpStmt expr
+  updateAnnotation (DiscardStmt expr _) =
+    DiscardStmt expr
 
 -- | The children of a basic block that only evaluates expressions, in
 -- evaluation order. The blocks that branch return 'Nothing', since what they

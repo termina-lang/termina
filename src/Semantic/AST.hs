@@ -272,6 +272,10 @@ data Statement a =
   | SingleExpStmt
     (Expression a) -- ^ expression
     a
+  -- | Read of a fixed-location field whose value is discarded (_ = e;)
+  | DiscardStmt
+    (Expression a) -- ^ expression
+    a
   | ReturnStmt
     (Maybe (Expression a)) -- ^ return expression
     a

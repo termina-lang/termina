@@ -89,6 +89,9 @@ genRegularBlockPath acc (AssignmentStmt _ expr _ : xs) =
 genRegularBlockPath acc (SingleExpStmt expr _ : xs) =
     let exprPath = genExpressionPath expr acc
     in genRegularBlockPath exprPath xs
+genRegularBlockPath acc (DiscardStmt expr _ : xs) =
+    let exprPath = genExpressionPath expr acc
+    in genRegularBlockPath exprPath xs
 
 uniqueRegularBlocks :: [WCEPathBlock GeneratorAnn] -> [WCEPathBlock GeneratorAnn]
 uniqueRegularBlocks [] = []

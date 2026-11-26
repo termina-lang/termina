@@ -89,6 +89,7 @@ selfInvStmt (MatchStmt e mcases mDefaultCase _ann) prevMap =
       flip (foldr selfInvStmt) . blockBody $ body
 
 selfInvStmt (SingleExpStmt e _ann) prevMap = selfInv e prevMap
+selfInvStmt (DiscardStmt e _ann) prevMap = selfInv e prevMap
 selfInvStmt (ReturnStmt ret _ann) prevMap = 
   maybe prevMap (`selfInv` prevMap) ret
 selfInvStmt (ContinueStmt ret _ann) prevMap = 
@@ -131,6 +132,7 @@ fieldDepStmt (MatchStmt e mcases mDefaultCase _ann) prevMap =
       flip (foldr fieldDepStmt) . blockBody $ body
 
 fieldDepStmt (SingleExpStmt e _ann) prevMap = fieldDepExpr e prevMap
+fieldDepStmt (DiscardStmt e _ann) prevMap = fieldDepExpr e prevMap
 fieldDepStmt (ReturnStmt ret _ann) prevMap =
   maybe prevMap (`fieldDepExpr` prevMap) ret
 fieldDepStmt (ContinueStmt ret _ann) prevMap = 

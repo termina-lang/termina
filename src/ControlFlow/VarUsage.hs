@@ -303,6 +303,7 @@ checkStatement (AssignmentStmt obj e ann) = do
     -- | Only a part of it is
     _ -> checkPartialWrite obj (getLocation ann) >> markWrittenObject obj >> readIndices obj
 checkStatement (SingleExpStmt e _) = readExpression e
+checkStatement (DiscardStmt e _) = readExpression e
 
 -- | What each node means to this pass. The two refinements are empty because
 -- reading a condition teaches it nothing about the paths it guards.

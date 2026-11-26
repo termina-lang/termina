@@ -155,6 +155,7 @@ checkStatement (Declaration ident ak _ mInit ann) = do
     }
 checkStatement (AssignmentStmt obj e _) = useObject obj >> useExpression e
 checkStatement (SingleExpStmt e _) = useExpression e
+checkStatement (DiscardStmt e _) = useExpression e
 
 -- | Walks an inner block. What it declares is not visible after it.
 checkInner :: Location -> Maybe (Block SemanticAnn) -> Block SemanticAnn -> ScopeM ()
@@ -229,6 +230,7 @@ firstAccessAssigns ident body =
     statement (AssignmentStmt obj e _) = readChildren [ChildObject obj, ChildExpr e]
     statement (Declaration _ _ _ mInit _) = mapM_ readExpr mInit
     statement (SingleExpStmt e _) = readExpr e
+    statement (DiscardStmt e _) = readExpr e
 
     simpleBlock (AtomicLoad port dest _)
       | isDestination dest = readChildren [ChildObject port] >> putPath (Assigned True)

@@ -146,6 +146,7 @@ expressionsOf stmt =
     ForLoopStmt _ _ from to cond _ _ -> from : to : maybe [] (: []) cond
     MatchStmt expr _ _ _ -> [expr]
     SingleExpStmt expr _ -> [expr]
+    DiscardStmt expr _ -> [expr]
     ReturnStmt expr _ -> maybe [] (: []) expr
     ContinueStmt expr _ -> [expr]
     RebootStmt _ -> []

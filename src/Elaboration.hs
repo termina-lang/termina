@@ -175,6 +175,7 @@ elabBasicBlock d bb = case bb of
     statement (Declaration ident ak ty mExpr ann) = Declaration ident ak ty <$> traverse expr mExpr <*> pure ann
     statement (AssignmentStmt obj e ann) = AssignmentStmt <$> object obj <*> expr e <*> pure ann
     statement (SingleExpStmt e ann) = SingleExpStmt <$> expr e <*> pure ann
+    statement (DiscardStmt e ann) = DiscardStmt <$> expr e <*> pure ann
 
 elabObj :: Decide -> LAST.Object SemanticAnn -> ElaborationM (Object SemanticAnn)
 elabObj d obj = case obj of

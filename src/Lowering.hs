@@ -68,6 +68,7 @@ appendRegularBlock acc currBlock@(RegularBlock currStmts) (stmt : xs) =
         SAST.Declaration name accessKind typeSpecifier expr ann ->
             appendRegularBlock acc (RegularBlock (Declaration name accessKind typeSpecifier expr ann : currStmts)) xs
         SAST.AssignmentStmt obj expr ann -> appendRegularBlock acc (RegularBlock (AssignmentStmt obj expr ann : currStmts)) xs
+        SAST.DiscardStmt expr ann -> appendRegularBlock acc (RegularBlock (DiscardStmt expr ann : currStmts)) xs
         _ -> lowerStatements (currBlock : acc) (stmt : xs)
 appendRegularBlock _ currBlock _ = throwError $ InternalError ("appendRegularBlock: unexpected block type " ++ show currBlock)
 
@@ -197,6 +198,7 @@ lowerStatements acc (stmt : xs) =
                 _ -> appendRegularBlock acc (RegularBlock [SingleExpStmt expr ann]) xs
         SAST.Declaration name accessKind typeSpecifier expr ann -> appendRegularBlock acc (RegularBlock [Declaration name accessKind typeSpecifier expr ann]) xs
         SAST.AssignmentStmt obj expr ann -> appendRegularBlock acc (RegularBlock [AssignmentStmt obj expr ann]) xs
+        SAST.DiscardStmt expr ann -> appendRegularBlock acc (RegularBlock [DiscardStmt expr ann]) xs
         SAST.ForLoopStmt iterator typeSpecifier initial final breakCondition (SAST.Block loopStmts blkann) ann -> do
             loopBlocks <- lowerStatements [] (reverse loopStmts)
             lowerStatements (ForLoopBlock iterator typeSpecifier initial final breakCondition (Block loopBlocks blkann) ann : acc) xs

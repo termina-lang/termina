@@ -544,6 +544,7 @@ genBlocks (RegularBlock stmts) = concat <$> traverse genCoveredStatement stmts
                 AssignmentStmt _ _ ann -> statementPoint Nothing (getLocation ann)
                 Declaration _ _ _ _ ann -> statementPoint Nothing (getLocation ann)
                 SingleExpStmt _ ann -> statementPoint Nothing (getLocation ann)
+                DiscardStmt _ ann -> statementPoint Nothing (getLocation ann)
             commentFirst (getAnnotation stmt) . (point ++) <$> genStatement stmt
 genBlocks blk = do
     point <- maybe (return []) (statementPoint (blockConstruct blk) . getLocation) (basicBlockAnnotation blk)
@@ -1142,3 +1143,8 @@ genStatement (SingleExpStmt expr ann) = do
     let loc = getLocation ann
     cExpr <- genExpression expr
     return [pre_cr cExpr |>> loc]
+-- | Read cast to void, which keeps the access since the field is volatile
+genStatement (DiscardStmt expr ann) = do
+    let loc = getLocation ann
+    cExpr <- genExpression expr
+    return [pre_cr (cast (CTVoid noqual) cExpr) |>> loc]

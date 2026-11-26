@@ -148,6 +148,8 @@ checkStatement (AssignmentStmt obj e ann) = do
       _ -> useObject obj >> useExpression e
 checkStatement (SingleExpStmt e _ann)
   = useExpression e
+checkStatement (DiscardStmt e _ann)
+  = useExpression e
 
 checkBasicBlocks :: [BasicBlock SemanticAnn] -> BoxUsageM BoxUsageError ()
 checkBasicBlocks = mapM_ checkBasicBlock . reverse

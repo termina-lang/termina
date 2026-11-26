@@ -141,6 +141,15 @@ typeStatement _retTy (SingleExpStmt expr anns) = do
       EMismatch ty _ -> throwError $ annotateError (getLocation anns) (ESingleExpressionTypeNotUnit ty)
       _ -> throwError err)
   return $ SAST.SingleExpStmt typed_expr (stmtAnn anns)
+-- | Only the read of a fixed-location field, or of a part of one, is discarded
+typeStatement _retTy (DiscardStmt expr anns) = do
+  typed_expr <- typeExpression Nothing typeRHSObject expr
+  isFixedLocationRead <- case typed_expr of
+    SAST.AccessObject obj -> isJust <$> fixedLocationReference obj
+    _ -> return False
+  unless isFixedLocationRead $
+    throwError $ annotateError (getLocation anns) EDiscardNotFixedLocationRead
+  return $ SAST.DiscardStmt typed_expr (buildStmtAnn anns)
 typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
   typed_matchE <- typeExpression Nothing typeRHSObject matchE
   -- | A constant is matched on as a value of its type.

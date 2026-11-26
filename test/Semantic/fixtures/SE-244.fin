@@ -1,0 +1,14 @@
+interface IFifo {
+    procedure flush(&mut self);
+};
+
+resource class CFifo provides IFifo {
+
+    count : u32;
+
+    procedure flush(&mut self) {
+        _ = self->count;
+        return;
+    }
+
+};

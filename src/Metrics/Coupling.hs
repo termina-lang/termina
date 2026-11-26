@@ -182,6 +182,7 @@ blockCalls ctx = M.unionsWith (<>) . map basicBlock . blockBody
         Declaration _ _ _ initial _ -> exprs (maybe [] (: []) initial)
         AssignmentStmt obj e _ -> exprs (indexExpressionsOf semanticTree obj ++ [e])
         SingleExpStmt e _ -> exprs [e]
+        DiscardStmt e _ -> exprs [e]
 
     union = M.unionWith (<>)
 

@@ -7,7 +7,7 @@ import Parser.Parsing
   ( returnStmtParser, continueStmtParser, rebootStmtParser
   , ifElseIfStmtParser, matchStmtParser, forLoopStmtParser
   , mutableObjDeclarationParser, immutableObjDeclarationParser
-  , assignmentStmtPaser, singleExprStmtParser )
+  , assignmentStmtPaser, singleExprStmtParser, statementParser )
 import Parser.AST
 
 import Test.Hspec
@@ -51,6 +51,10 @@ spec = describe "Parser: statements" $ do
       ctorOf assignmentStmtPaser "x = 1 : u32;" `shouldBe` "AssignmentStmt"
     it "parses a single-expression statement" $
       ctorOf singleExprStmtParser "f(x);" `shouldBe` "SingleExpStmt"
+    it "parses a discard statement" $
+      ctorOf statementParser "_ = self->regs.data;" `shouldBe` "DiscardStmt"
+    it "parses an assignment to a name that starts with an underscore" $
+      ctorOf statementParser "_x = 1;" `shouldBe` "AssignmentStmt"
 
   where
     ctorOf p s = either show ctorName (parseWith p s)
