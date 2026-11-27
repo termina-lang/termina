@@ -13,6 +13,8 @@ Patch versions on either side are interchangeable.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-27
+
 ### Added
 
 - The option `--gdb-port <platform>:<port>` of `termina test`, `coverage`,
@@ -123,6 +125,20 @@ Patch versions on either side are interchangeable.
   `licenses/<package>` of the deliverable, and those of the project to its
   root. `vendor/` keeps the license files at the root of each package, so
   the content-hash of a package changes when it is added again.
+- `termina metrics`, which measures the `.fin` sources and writes to
+  `output/metrics/` a table on the screen, `units.csv`, `metrics.json` and a
+  web page. It counts the lines of each module by class and gives, for each
+  unit, its statements, logical lines, cyclomatic complexity, nesting and
+  parameters. The coupling of the program covers the imports between modules,
+  the calls, with the procedures resolved through the connections of the
+  architecture, and the wiring of `app.fin`. `--include-deps` also measures
+  the modules of the dependencies.
+- A `#[unprotected]` resource may have fields when every procedure and
+  method of its class takes `&self`. Its fields are set by its initializer in
+  `app.fin` and are not written afterwards. A member that takes `&mut self` or
+  `&priv self` is still rejected with SE-205, which names it.
+- `is` tests any value, such as the result of a call, as in
+  `count(v) is Mode::On`, and not only an object.
 
 ### Changed
 
@@ -200,6 +216,31 @@ Patch versions on either side are interchangeable.
   dereferences the reference, as indexing it does, instead of stopping with
   an internal error. A slice of an object that is not an array gives SE-001
   with its position.
+- `config.h` defines `TERMINA__APP_CONFIG__TASK_STACK_MEMORY`, the sum of the
+  stacks of the tasks, the harness of a test included, each at least the
+  default one of the platform. On RTEMS a task with a `stack_size` above the
+  minimum could not be created, since the OSAL reserved no memory beyond the
+  minimum of each task. It needs the OSAL 0.8.
+- An assignment to a whole `loc` field writes through the pointer,
+  `*self->status = ...`, or, for a located array, indexes the pointer to its
+  first element. The C wrote `&obj;`, so the location was never written, and
+  a binary operation on the right raised SE-215.
+- A reference to a global constant array passed to a function reaches C as
+  the name of the array, a pointer to its first element, instead of `&name`,
+  a pointer to the array.
+- A `match` on an enum returned by a function declares its temporary with
+  the struct of the enum instead of the type of its tag.
+- SE-213 also checks the fields of structs and classes and the procedures of
+  interfaces, which reach C as members of a struct, against the keywords of
+  C and the names it reserves at every scope.
+- A resource reached through a chain of `#[unprotected]` resources gets the
+  protection that the tasks and handlers at the start of the chain need.
+  Only the first unprotected resource of the chain was followed, and the
+  resource behind the second one was left without a path to its users.
+- Sources, messages and the channel of the language server are read and
+  written as UTF-8 whatever the locale of the host.
+- The language server also checks each test with a file open in the editor,
+  and publishes its errors in the files where they are.
 
 ## [0.7.0] - 2026-11-06
 
