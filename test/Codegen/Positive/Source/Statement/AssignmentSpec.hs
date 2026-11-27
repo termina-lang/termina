@@ -159,7 +159,7 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    termina__resource_lock_type_t _lock_type;\n" ++
-              "    volatile Regs (* banks);\n" ++
+              "    volatile Regs * banks;\n" ++
               "    volatile uint8_t (* matrix)[4U];\n" ++
               "    volatile Regs * regs;\n" ++
               "    volatile Option__u16 * opt;\n" ++

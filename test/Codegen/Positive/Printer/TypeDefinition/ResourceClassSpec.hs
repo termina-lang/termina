@@ -171,7 +171,7 @@ spec = do
             "    termina__resource_lock_type_t _lock_type;\n" ++
             "    uint32_t field0;\n" ++
             "    volatile uint32_t * field1;\n" ++
-            "    volatile uint32_t (* field2);\n" ++
+            "    volatile uint32_t * field2;\n" ++
             "    volatile uint32_t (* field3)[32U];\n" ++
             "} Class0;\n" ++
             "\n" ++

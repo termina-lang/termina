@@ -158,6 +158,13 @@ Patch versions on either side are interchangeable.
   on the `noel32imafd` board support package of RTEMS 6, and replaces
   `rtems6-noel32im-artya7`. The atomic operations are instructions of the A
   extension, and floating point runs on the unit of the core.
+- A pointer to the elements of a one-dimensional array, such as a field
+  `loc [u8; N]`, is printed in C as a plain pointer,
+  `volatile uint8_t * field;`, instead of `volatile uint8_t (* field);`.
+  With the parentheses, the MISRA addon of cppcheck took `uint8_t` for a
+  variable in every translation unit that included the declaration, and
+  reported the parameters of type `uint8_t` declared after it as unnamed
+  (rule 8.2).
 
 ### Removed
 

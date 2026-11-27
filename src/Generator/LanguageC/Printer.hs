@@ -129,6 +129,10 @@ instance CPrint CConstant where
     -- Boolean in the MISRA-C essential type model (0 and 1 are not).
     pprint (CBoolConst b) = return $ pretty (if b then "true" else "false" :: String)
 
+isCTArray :: CType -> Bool
+isCTArray (CTArray {}) = True
+isCTArray _ = False
+
 rootCType :: CType -> CType
 rootCType ty =
     case ty of
@@ -158,6 +162,8 @@ instance CPrint CType where
         pqual <- pprint qual
         ptype <- pprintCTInt size signedness
         return $ pqual <+> ptype
+    -- | A pointer to the elements of a one-dimensional array is a plain pointer
+    pprint (CTPointer (CTArray aTy _) qual) | not (isCTArray aTy) = pprint (CTPointer aTy qual)
     pprint (CTPointer (CTArray aTy _) (CQualifier False False False)) = do
         pATy <- pprint (rootCType aTy)
         pArraySizes <- pprintCTArray aTy
@@ -394,6 +400,7 @@ pprintCTypeDecl ident ty =
             pRootTy <- pprint (rootCType ty)
             pArraySizes <- pprintCTArray ty
             return $ pRootTy <+> pretty ident <> pArraySizes
+        CTPointer (CTArray aTy _) qual | not (isCTArray aTy) -> pprintCTypeDecl ident (CTPointer aTy qual)
         CTPointer (CTArray aTy _) (CQualifier False False False) -> do
             pATy <- pprint (rootCType aTy)
             pArraySizes <- pprintCTArray aTy
