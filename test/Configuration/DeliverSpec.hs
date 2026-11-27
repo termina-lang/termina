@@ -110,7 +110,7 @@ spec = describe "termina deliver" $ do
     let info = ProjectInfo { projectName = "icu-asw", projectVersion = "1.2.0", projectManifestVersion = 1, projectAssurance = [], projectDescription = Nothing }
 
     it "documents the C of the deliverable from its root, with the folders of the extern C and without the vendored files of the OSAL" $
-      genDoxyfile info (defaultConfig "icu-asw" POSIXGCC) ["extern/icu"] True `shouldBe` T.unlines
+      genDoxyfile info (defaultConfig "icu-asw" POSIXGCC) ["include", "src", "osal", "extern/icu"] True `shouldBe` T.unlines
         [ "PROJECT_NAME          = \"icu-asw\""
         , "PROJECT_NUMBER        = 1.2.0"
         , "OUTPUT_DIRECTORY      = doc"
@@ -122,7 +122,8 @@ spec = describe "termina deliver" $ do
         , "EXTRACT_STATIC        = YES"
         , "MARKDOWN_SUPPORT      = YES"
         , "WARN_IF_UNDOCUMENTED  = NO"
-        , "QUIET                 = YES"
+        , "WARN_IF_INCOMPLETE_DOC = NO"
+        , "QUIET                = YES"
         , "GENERATE_LATEX        = NO"
         , "HAVE_DOT              = YES"
         , "DOT_IMAGE_FORMAT      = svg"
@@ -132,7 +133,7 @@ spec = describe "termina deliver" $ do
         ]
 
     it "leaves the graphs out without --graphs" $
-      drop 12 (T.lines (genDoxyfile info (defaultConfig "icu-asw" POSIXGCC) [] False))
+      drop 13 (T.lines (genDoxyfile info (defaultConfig "icu-asw" POSIXGCC) [] False))
         `shouldBe` ["GENERATE_LATEX        = NO", "HAVE_DOT              = NO"]
 
     it "names the test in the project of a deliverable of a test" $

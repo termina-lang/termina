@@ -150,17 +150,17 @@ deliverableFolder config = outputFolderName </> "deliverable" </> makeRelative o
 
 -- | The Doxyfile of a deliverable, which documents its C from its root with
 -- nothing else: the name and the version of the project, the folders of the
--- C but the third-party files of the OSAL, and the settings that the
--- generated C needs. Doxygen lists the static
+-- C that the deliverable has but the third-party files of the OSAL, and the
+-- settings that the generated C needs. Doxygen lists the static
 -- functions, where the methods and viewers of the classes go, only with
 -- EXTRACT_STATIC. What is not documented is reported by the transpiler, so
 -- Doxygen does not warn about it.
 genDoxyfile :: ProjectInfo -> TerminaConfig -> [FilePath] -> Bool -> T.Text
-genDoxyfile project config externFolders graphs = T.unlines $
+genDoxyfile project config folders graphs = T.unlines $
     [ "PROJECT_NAME          = \"" <> projectName project <> testSuffix <> "\""
     , "PROJECT_NUMBER        = " <> projectVersion project
     , "OUTPUT_DIRECTORY      = doc"
-    , "INPUT                 = " <> T.unwords (map T.pack (["groups.dox", "include", "src", "osal"] ++ nub externFolders))
+    , "INPUT                 = " <> T.unwords (map T.pack ("groups.dox" : nub folders))
     , "RECURSIVE             = YES"
     , "EXCLUDE               = osal/vendor"
     , "FILE_PATTERNS         = *.h *.c"
@@ -168,7 +168,8 @@ genDoxyfile project config externFolders graphs = T.unlines $
     , "EXTRACT_STATIC        = YES"
     , "MARKDOWN_SUPPORT      = YES"
     , "WARN_IF_UNDOCUMENTED  = NO"
-    , "QUIET                 = YES"
+    , "WARN_IF_INCOMPLETE_DOC = NO"
+    , "QUIET                = YES"
     , "GENERATE_LATEX        = NO"
     , "HAVE_DOT              = " <> (if graphs then "YES" else "NO")
     ] ++
@@ -396,8 +397,9 @@ deliverDeployment chatty loaded archive tools folder deployment = do
             genDeliverableMakefile config info (map relocated osalSources) sources externs (testModules config modules)
     TIO.writeFile (folder </> "Makefile") makefile
     forM_ tools $ \t -> do
+      present <- filterM (doesDirectoryExist . (folder </>)) ["include", "src", "osal"]
       TIO.writeFile (folder </> "Doxyfile") $
-        genDoxyfile (manifestProject (loadedManifest loaded)) config [ groupFolder g | g <- externs ]
+        genDoxyfile (manifestProject (loadedManifest loaded)) config (present ++ [ groupFolder g | g <- externs ])
           (isJust (graphvizVersion t))
       undocumented <- undocumentedModules folder modules
       forM_ undocumented $ \qname ->
