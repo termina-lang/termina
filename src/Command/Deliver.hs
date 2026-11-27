@@ -169,7 +169,7 @@ genDoxyfile project config folders graphs = T.unlines $
     , "MARKDOWN_SUPPORT      = YES"
     , "WARN_IF_UNDOCUMENTED  = NO"
     , "WARN_IF_INCOMPLETE_DOC = NO"
-    , "QUIET                = YES"
+    , "QUIET                 = YES"
     , "GENERATE_LATEX        = NO"
     , "HAVE_DOT              = " <> (if graphs then "YES" else "NO")
     ] ++

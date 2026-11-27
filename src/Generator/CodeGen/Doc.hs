@@ -84,8 +84,8 @@ genSourceFileDoc mName =
     CDoc [DText (T.pack ("Implementation of the functions declared in " ++ mName ++ ".h."))] []
         [CDocFile, CDocInGroup (namespaceGroup (moduleNamespace mName))]
 
--- | The namespace of a module, the folders of its name: [\"icu\"] for
--- \"icu/mb_store\", and none for a module at the root.
+-- | The namespace of a module, the folders of its name: [\"obdh\"] for
+-- \"obdh/hk_fdir\", and none for a module at the root.
 moduleNamespace :: QualifiedName -> [String]
 moduleNamespace = init . splitDirectories
 

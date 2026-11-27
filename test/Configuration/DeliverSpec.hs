@@ -107,14 +107,14 @@ spec = describe "termina deliver" $ do
 
   describe "genDoxyfile" $ do
 
-    let info = ProjectInfo { projectName = "icu-asw", projectVersion = "1.2.0", projectManifestVersion = 1, projectAssurance = [], projectDescription = Nothing }
+    let info = ProjectInfo { projectName = "obdh-asw", projectVersion = "1.2.0", projectManifestVersion = 1, projectAssurance = [], projectDescription = Nothing }
 
     it "documents the C of the deliverable from its root, with the folders of the extern C and without the vendored files of the OSAL" $
-      genDoxyfile info (defaultConfig "icu-asw" POSIXGCC) ["include", "src", "osal", "extern/icu"] True `shouldBe` T.unlines
-        [ "PROJECT_NAME          = \"icu-asw\""
+      genDoxyfile info (defaultConfig "obdh-asw" POSIXGCC) ["include", "src", "osal", "extern/obdh"] True `shouldBe` T.unlines
+        [ "PROJECT_NAME          = \"obdh-asw\""
         , "PROJECT_NUMBER        = 1.2.0"
         , "OUTPUT_DIRECTORY      = doc"
-        , "INPUT                 = groups.dox include src osal extern/icu"
+        , "INPUT                 = groups.dox include src osal extern/obdh"
         , "RECURSIVE             = YES"
         , "EXCLUDE               = osal/vendor"
         , "FILE_PATTERNS         = *.h *.c"
@@ -123,7 +123,7 @@ spec = describe "termina deliver" $ do
         , "MARKDOWN_SUPPORT      = YES"
         , "WARN_IF_UNDOCUMENTED  = NO"
         , "WARN_IF_INCOMPLETE_DOC = NO"
-        , "QUIET                = YES"
+        , "QUIET                 = YES"
         , "GENERATE_LATEX        = NO"
         , "HAVE_DOT              = YES"
         , "DOT_IMAGE_FORMAT      = svg"
@@ -133,29 +133,29 @@ spec = describe "termina deliver" $ do
         ]
 
     it "leaves the graphs out without --graphs" $
-      drop 13 (T.lines (genDoxyfile info (defaultConfig "icu-asw" POSIXGCC) [] False))
+      drop 13 (T.lines (genDoxyfile info (defaultConfig "obdh-asw" POSIXGCC) [] False))
         `shouldBe` ["GENERATE_LATEX        = NO", "HAVE_DOT              = NO"]
 
     it "names the test in the project of a deliverable of a test" $
       take 1 (T.lines (genDoxyfile info ((defaultConfig "uart" POSIXGCC) { deploymentKind = TestBuild "uart" }) [] True))
-        `shouldBe` ["PROJECT_NAME          = \"icu-asw, test uart\""]
+        `shouldBe` ["PROJECT_NAME          = \"obdh-asw, test uart\""]
 
   describe "genDoxygenGroups" $ do
 
-    let app = ProjectInfo { projectName = "icu-asw", projectVersion = "1.2.0", projectManifestVersion = 1, projectAssurance = [], projectDescription = Just "Software of the ICU." }
+    let app = ProjectInfo { projectName = "obdh-asw", projectVersion = "1.2.0", projectManifestVersion = 1, projectAssurance = [], projectDescription = Just "Software of the OBDH." }
         pus = ProjectInfo { projectName = "termina-pus", projectVersion = "0.1.0", projectManifestVersion = 1, projectAssurance = [], projectDescription = Nothing }
         vendored = "vendor" </> "github.com" </> "acme" </> "termina-pus"
         modules =
-          [ ("icu/manager", "src" </> "icu" </> "manager.fin")
-          , ("icu/manager/executor", "src" </> "icu" </> "manager" </> "executor.fin")
+          [ ("obdh/manager", "src" </> "obdh" </> "manager.fin")
+          , ("obdh/manager/executor", "src" </> "obdh" </> "manager" </> "executor.fin")
           , ("pus/services/service12/internal", vendored </> "src" </> "pus" </> "services" </> "service12" </> "internal.fin")
           , ("pus/services/service3/internal", vendored </> "src" </> "pus" </> "services" </> "service3" </> "internal.fin") ]
-        groups = T.lines (genDoxygenGroups app [(vendored, pus)] (M.fromList [(["icu", "manager"], "Manager task.")]) modules)
+        groups = T.lines (genDoxygenGroups app [(vendored, pus)] (M.fromList [(["obdh", "manager"], "Manager task.")]) modules)
         defined = [ T.unwords (drop 2 (T.words l)) | l <- groups, " * @defgroup " `T.isPrefixOf` l ]
 
     it "defines the application, its namespaces, the libraries with theirs in natural order, and the OSAL" $
       defined `shouldBe`
-        [ "termina__project Application icu-asw", "termina__ns__icu icu", "termina__ns__icu__manager icu.manager"
+        [ "termina__project Application obdh-asw", "termina__ns__obdh obdh", "termina__ns__obdh__manager obdh.manager"
         , "termina__libraries Libraries", "termina__package__termina_pus termina-pus 0.1.0"
         , "termina__ns__pus pus", "termina__ns__pus__services pus.services"
         , "termina__ns__pus__services__service3 pus.services.service3", "termina__ns__pus__services__service12 pus.services.service12"
@@ -163,15 +163,15 @@ spec = describe "termina deliver" $ do
         , "termina__osal__os OSAL os", "termina__osal__platform OSAL platform" ]
 
     it "gives the application and a package their description or one with their version, and a namespace the one found for it" $ do
-      take 4 groups `shouldBe` ["/**", " * @defgroup termina__project Application icu-asw", " *", " * @brief Software of the ICU."]
+      take 4 groups `shouldBe` ["/**", " * @defgroup termina__project Application obdh-asw", " *", " * @brief Software of the OBDH."]
       groups `shouldContain` [" * @brief Library termina-pus, version 0.1.0."]
       groups `shouldContain` [" * @brief Manager task."]
 
     it "puts each namespace in its parent, the first level of a package in the package" $ do
       let after label = takeWhile (/= " */") (drop 1 (dropWhile (not . T.isInfixOf label) groups))
       after "@defgroup termina__ns__pus " `shouldContain` [" * @ingroup termina__package__termina_pus"]
-      after "@defgroup termina__ns__icu__manager " `shouldContain` [" * @ingroup termina__ns__icu"]
-      after "@defgroup termina__ns__icu " `shouldContain` [" * @ingroup termina__project"]
+      after "@defgroup termina__ns__obdh__manager " `shouldContain` [" * @ingroup termina__ns__obdh"]
+      after "@defgroup termina__ns__obdh " `shouldContain` [" * @ingroup termina__project"]
 
   describe "naturalKey" $
 
